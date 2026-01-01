@@ -17,13 +17,17 @@ const Header = ({
   onClassChange, 
   daysRemaining, 
   theme, 
-  onToggleTheme 
+  onToggleTheme,
+  installPrompt,
+  onInstall
 }: { 
   currentClass: 11 | 12, 
   onClassChange: (c: 11 | 12) => void, 
   daysRemaining: number, 
   theme: 'dark' | 'light',
-  onToggleTheme: () => void
+  onToggleTheme: () => void,
+  installPrompt: any,
+  onInstall: () => void
 }) => (
   <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
     <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
@@ -36,6 +40,14 @@ const Header = ({
         </p>
       </div>
       <div className="flex gap-2">
+        {installPrompt && (
+          <button 
+            onClick={onInstall}
+            className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
+          >
+            INSTALL
+          </button>
+        )}
         <button 
           onClick={onToggleTheme}
           className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
@@ -198,6 +210,30 @@ const App: React.FC = () => {
     return defaultState;
   });
 
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.then((choiceResult: any) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted the A2HS prompt');
+      } else {
+        console.log('User dismissed the A2HS prompt');
+      }
+      setInstallPrompt(null);
+    });
+  };
+
   const theme = state.theme || 'dark';
 
   useEffect(() => {
@@ -300,7 +336,9 @@ const App: React.FC = () => {
           onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))} 
           daysRemaining={daysRemaining} 
           theme={theme} 
-          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))} 
+          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
+          installPrompt={installPrompt}
+          onInstall={handleInstallClick}
         />
       )}
 

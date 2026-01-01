@@ -1,7 +1,7 @@
 
 import { Subject, SyllabusStatus } from './types';
 
-export const JEE_2027_DATE = new Date('2027-01-20'); 
+export const JEE_2027_DATE = new Date('2027-01-01'); 
 
 export const SUBJECTS: Subject[] = ['Physics', 'Chemistry', 'Maths'];
 

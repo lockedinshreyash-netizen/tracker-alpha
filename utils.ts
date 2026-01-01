@@ -12,8 +12,21 @@ export const getISTDateString = (date: Date = new Date()): string => {
 
 export const getDaysRemaining = (target: Date): number => {
   const now = new Date();
-  const diffTime = target.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Create IST date objects for both target and current time
+  const istNowStr = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const istTargetStr = target.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  
+  const start = new Date(istNowStr);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(istTargetStr);
+  end.setHours(0, 0, 0, 0);
+  
+  // Calculate difference in whole days
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  
   return diffDays > 0 ? diffDays : 0;
 };
 
@@ -108,7 +121,6 @@ export const calculateLockInScore = (
   const baseScore = (consistencyScore * 0.30) + (hoursScore * 0.30) + (progressScore * 0.10) + (qualityScore * 0.30);
   
   // 5. PENALTY: Distractions / Breaches
-  // Every distraction subtracts 2 points from the final integrity score
   const totalDistractions = logsLast30.reduce((acc, l) => acc + (l.distractions || 0), 0);
   const penalty = totalDistractions * 2;
 
