@@ -40,8 +40,9 @@ const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean,
           password,
         });
         if (signUpError) throw signUpError;
-        setSuccessMsg("Enlisted successfully. Check your email to confirm your account before logging in.");
-        setMode('login');
+        setSuccessMsg("ENLISTMENT PENDING: CHECK YOUR EMAIL AND CONFIRM TO ACTIVATE CLOUD SYNC.");
+        setEmail('');
+        setPassword('');
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
@@ -115,13 +116,13 @@ const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean,
         </div>
 
         {error && (
-          <div className="mt-6 p-4 border border-red-900/50 text-red-500 bg-red-500/5 text-[10px] font-black uppercase text-center">
+          <div className="mt-6 p-4 border border-red-900/50 text-red-500 bg-red-500/5 text-[10px] font-black uppercase text-center animate-in zoom-in-95 duration-200">
             {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="mt-6 p-4 border border-green-900/50 text-green-500 bg-green-500/5 text-[10px] font-black uppercase text-center">
+          <div className="mt-6 p-4 border border-green-900/50 text-green-500 bg-green-500/5 text-[10px] font-black uppercase text-center animate-in zoom-in-95 duration-200">
             {successMsg}
           </div>
         )}
@@ -454,7 +455,7 @@ const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], 
   );
 };
 
-const ReviewTab = ({ logs, score, onClearData, theme, user }: any) => {
+const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth }: any) => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.reload();
@@ -494,19 +495,26 @@ const ReviewTab = ({ logs, score, onClearData, theme, user }: any) => {
 
       <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
         <div>
-          <h4 className="text-sm font-black uppercase">Data Management</h4>
-          <p className="text-xs text-zinc-500 font-bold">Manage your profile and study history.</p>
+          <h4 className="text-sm font-black uppercase">Account & Data</h4>
+          <p className="text-xs text-zinc-500 font-bold">
+            {user ? `Logged in as ${user.email}` : 'Local mode active. Progress is only stored on this device.'}
+          </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap justify-center">
           {user ? (
             <button 
               onClick={handleSignOut}
               className="px-6 py-2 text-[10px] font-black uppercase border border-zinc-700 hover:bg-zinc-800 transition-all rounded-lg"
             >
-              Sign Out
+              Sign Out / Switch Account
             </button>
           ) : (
-             <p className="text-[9px] font-black uppercase text-zinc-700 italic">LOCAL MODE ACTIVE</p>
+            <button 
+              onClick={onOpenAuth}
+              className="px-6 py-2 text-[10px] font-black uppercase border border-[#E10600] text-[#E10600] hover:bg-[#E10600]/10 transition-all rounded-lg"
+            >
+              Sync / Log In
+            </button>
           )}
           <button 
             onClick={onClearData}
@@ -551,89 +559,123 @@ const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const syncTimeoutRef = useRef<number | null>(null);
+  const isInitialSyncDone = useRef(false);
+  const isSyncingRef = useRef(false);
+  const pendingSyncRef = useRef(false);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) handleInitialSync(session.user.id);
+      if (session?.user && !isInitialSyncDone.current) handleInitialSync(session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) handleInitialSync(session.user.id);
+      const newUser = session?.user ?? null;
+      setUser(newUser);
+      if (newUser && !isInitialSyncDone.current) handleInitialSync(newUser.id);
+      if (!newUser) {
+        isInitialSyncDone.current = false;
+        setSyncStatus('local');
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleInitialSync = async (userId: string) => {
+    if (isInitialSyncDone.current) return;
     setSyncStatus('syncing');
     try {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('state')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
-      if (data) {
+      if (data && data.state) {
         const remoteState = data.state as AppState;
-        setState(prev => {
-          // Merge logic: prefer remote for settings, but merge logs/tasks/progress by ID
+        setState(localState => {
+          // Robust Merge Logic
           const mergedLogs = [...remoteState.logs];
-          prev.logs.forEach(localLog => {
-             if (!mergedLogs.find(rl => rl.id === localLog.id)) {
-               mergedLogs.push(localLog);
-             }
+          localState.logs.forEach(l => {
+             if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
           });
           
           const mergedTasks = [...remoteState.tasks];
-          prev.tasks.forEach(localTask => {
-             if (!mergedTasks.find(rt => rt.id === localTask.id)) {
-               mergedTasks.push(localTask);
+          localState.tasks.forEach(t => {
+             if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
+          });
+
+          const mergedProgress = [...remoteState.progress];
+          localState.progress.forEach(p => {
+             const exists = mergedProgress.find(rp => rp.classId === p.classId && rp.subject === p.subject && rp.chapter === p.chapter);
+             if (!exists) {
+               mergedProgress.push(p);
+             } else if (p.status !== 'not_started' && exists.status === 'not_started') {
+               exists.status = p.status;
              }
           });
 
-          const finalProgress = remoteState.progress.length >= prev.progress.length ? remoteState.progress : prev.progress;
-
           return { 
+            ...localState, 
             ...remoteState, 
             logs: mergedLogs, 
             tasks: mergedTasks, 
-            progress: finalProgress,
-            theme: prev.theme || remoteState.theme || 'dark'
+            progress: mergedProgress,
+            theme: localState.theme || remoteState.theme || 'dark'
           };
         });
       }
+      isInitialSyncDone.current = true;
       setSyncStatus('synced');
     } catch (err) {
-      console.error('Sync Error:', err);
+      console.error('Initial Sync Error:', err);
       setSyncStatus('error');
+    }
+  };
+
+  // Instant Cloud Sync Logic
+  const triggerSync = async () => {
+    if (!user || !isInitialSyncDone.current) return;
+    
+    if (isSyncingRef.current) {
+      pendingSyncRef.current = true;
+      return;
+    }
+
+    isSyncingRef.current = true;
+    setSyncStatus('syncing');
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({ id: user.id, state: stateRef.current, updated_at: new Date() });
+      
+      if (error) throw error;
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Cloud Update Failed:', err);
+      setSyncStatus('error');
+    } finally {
+      isSyncingRef.current = false;
+      if (pendingSyncRef.current) {
+        pendingSyncRef.current = false;
+        triggerSync();
+      }
     }
   };
 
   useEffect(() => {
     localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
-    
-    if (user) {
-      setSyncStatus('syncing');
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-      
-      syncTimeoutRef.current = window.setTimeout(async () => {
-        try {
-          const { error } = await supabase
-            .from('user_profiles')
-            .upsert({ id: user.id, state: state, updated_at: new Date() });
-          
-          if (error) throw error;
-          setSyncStatus('synced');
-        } catch (err) {
-          console.error('Cloud Save Error:', err);
-          setSyncStatus('error');
-        }
-      }, 3000);
+    if (user && isInitialSyncDone.current) {
+      triggerSync();
     }
   }, [state, user]);
 
@@ -758,6 +800,7 @@ const App: React.FC = () => {
         onClose={() => setIsAuthModalOpen(false)} 
         theme={theme}
         onAuthSuccess={() => {
+          isInitialSyncDone.current = false; 
           setSyncStatus('syncing');
         }}
       />
@@ -793,6 +836,7 @@ const App: React.FC = () => {
             onClearData={clearLogs}
             theme={theme}
             user={user}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
           />
         )}
       </main>
