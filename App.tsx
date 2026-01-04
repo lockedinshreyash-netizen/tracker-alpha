@@ -16,6 +16,19 @@ const generateId = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
+const DEFAULT_STATE: AppState = { 
+  currentClass: 11, 
+  logs: [], 
+  progress: [], 
+  lastUsedTab: 'Today', 
+  timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics', isLockInActive: false, distractions: 0 }, 
+  isLockInModeEnabled: false, 
+  allowList: [], 
+  tasks: [], 
+  theme: 'dark',
+  dailyGoalHours: 8
+};
+
 // --- Sub-components ---
 
 const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean, onClose: () => void, theme: 'dark' | 'light', onAuthSuccess: () => void }) => {
@@ -40,7 +53,7 @@ const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean,
           password,
         });
         if (signUpError) throw signUpError;
-        setSuccessMsg("ENLISTMENT PENDING: CHECK YOUR EMAIL AND CONFIRM TO ACTIVATE CLOUD SYNC.");
+        setSuccessMsg("CHECK YOUR EMAIL AND CONFIRM TO ACTIVATE CLOUD SYNC.");
         setEmail('');
         setPassword('');
       } else {
@@ -455,12 +468,7 @@ const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], 
   );
 };
 
-const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth }: any) => {
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
-
+const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut }: any) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -497,13 +505,13 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth }: any) =
         <div>
           <h4 className="text-sm font-black uppercase">Account & Data</h4>
           <p className="text-xs text-zinc-500 font-bold">
-            {user ? `Logged in as ${user.email}` : 'Local mode active. Progress is only stored on this device.'}
+            {user ? `Logged in as ${user.email}` : 'Offline Mode: Progress is local only.'}
           </p>
         </div>
         <div className="flex gap-4 flex-wrap justify-center">
           {user ? (
             <button 
-              onClick={handleSignOut}
+              onClick={onSignOut}
               className="px-6 py-2 text-[10px] font-black uppercase border border-zinc-700 hover:bg-zinc-800 transition-all rounded-lg"
             >
               Sign Out / Switch Account
@@ -533,27 +541,15 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth }: any) =
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('locked_in_state_v2');
-    const defaultState: AppState = { 
-      currentClass: 11, 
-      logs: [], 
-      progress: [], 
-      lastUsedTab: 'Today', 
-      timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics', isLockInActive: false, distractions: 0 }, 
-      isLockInModeEnabled: false, 
-      allowList: [], 
-      tasks: [], 
-      theme: 'dark',
-      dailyGoalHours: 8
-    };
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...defaultState, ...parsed };
+        return { ...DEFAULT_STATE, ...parsed };
       } catch (e) {
-        return defaultState;
+        return DEFAULT_STATE;
       }
     }
-    return defaultState;
+    return DEFAULT_STATE;
   });
 
   const [user, setUser] = useState<any>(null);
@@ -571,14 +567,15 @@ const App: React.FC = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user && !isInitialSyncDone.current) handleInitialSync(session.user.id);
+      if (session?.user) handleInitialSync(session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      if (newUser && !isInitialSyncDone.current) handleInitialSync(newUser.id);
-      if (!newUser) {
+      if (newUser && !isInitialSyncDone.current) {
+        handleInitialSync(newUser.id);
+      } else if (!newUser) {
         isInitialSyncDone.current = false;
         setSyncStatus('local');
       }
@@ -602,7 +599,13 @@ const App: React.FC = () => {
       if (data && data.state) {
         const remoteState = data.state as AppState;
         setState(localState => {
-          // Robust Merge Logic
+          // Strict Overwrite / Clean Merge Logic
+          // If local state is essentially empty, just take remote.
+          if (localState.logs.length === 0 && localState.progress.length === 0 && localState.tasks.length === 0) {
+            return { ...localState, ...remoteState, theme: localState.theme || remoteState.theme || 'dark' };
+          }
+
+          // Otherwise, merge unique by ID to avoid "random data" (duplicates)
           const mergedLogs = [...remoteState.logs];
           localState.logs.forEach(l => {
              if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
@@ -613,13 +616,18 @@ const App: React.FC = () => {
              if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
           });
 
+          // For progress, we prefer the status that is more "advanced" in the cycle
           const mergedProgress = [...remoteState.progress];
           localState.progress.forEach(p => {
              const exists = mergedProgress.find(rp => rp.classId === p.classId && rp.subject === p.subject && rp.chapter === p.chapter);
              if (!exists) {
                mergedProgress.push(p);
-             } else if (p.status !== 'not_started' && exists.status === 'not_started') {
-               exists.status = p.status;
+             } else {
+               const localIdx = STATUS_CYCLE.indexOf(p.status);
+               const remoteIdx = STATUS_CYCLE.indexOf(exists.status);
+               if (localIdx > remoteIdx) {
+                 exists.status = p.status;
+               }
              }
           });
 
@@ -641,10 +649,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Instant Cloud Sync Logic
   const triggerSync = async () => {
     if (!user || !isInitialSyncDone.current) return;
-    
     if (isSyncingRef.current) {
       pendingSyncRef.current = true;
       return;
@@ -678,6 +684,15 @@ const App: React.FC = () => {
       triggerSync();
     }
   }, [state, user]);
+
+  const handleSignOut = async () => {
+    if (window.confirm("SIGN OUT? Your local unsynced progress will be cleared to ensure security.")) {
+      await supabase.auth.signOut();
+      localStorage.removeItem('locked_in_state_v2');
+      setState(DEFAULT_STATE);
+      window.location.reload();
+    }
+  };
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
@@ -767,9 +782,9 @@ const App: React.FC = () => {
   };
 
   const clearLogs = () => {
-    if (window.confirm("RESET SYSTEM: This will permanently wipe all study logs. Are you sure?")) {
+    if (window.confirm("RESET SYSTEM: This will permanently wipe all study logs on this device. Are you sure?")) {
       localStorage.removeItem('locked_in_state_v2');
-      window.location.reload();
+      setState(DEFAULT_STATE);
     }
   };
 
@@ -837,6 +852,7 @@ const App: React.FC = () => {
             theme={theme}
             user={user}
             onOpenAuth={() => setIsAuthModalOpen(true)}
+            onSignOut={handleSignOut}
           />
         )}
       </main>
