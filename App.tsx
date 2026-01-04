@@ -53,7 +53,7 @@ const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean,
           password,
         });
         if (signUpError) throw signUpError;
-        setSuccessMsg("CHECK YOUR EMAIL AND CONFIRM TO ACTIVATE CLOUD SYNC.");
+        setSuccessMsg("VERIFICATION SENT: Check your inbox to activate cloud sync.");
         setEmail('');
         setPassword('');
       } else {
@@ -502,33 +502,33 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
       </div>
 
       <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
-        <div>
-          <h4 className="text-sm font-black uppercase">Account & Data</h4>
-          <p className="text-xs text-zinc-500 font-bold">
-            {user ? `Logged in as ${user.email}` : 'Offline Mode: Progress is local only.'}
+        <div className="flex-1">
+          <h4 className="text-sm font-black uppercase">Account & Privacy</h4>
+          <p className="text-[11px] text-zinc-500 font-bold mt-1">
+            {user ? `ENROLLED AS: ${user.email.toUpperCase()}` : 'OFFLINE MODE: PROGRESS STORED ON DEVICE ONLY.'}
           </p>
         </div>
         <div className="flex gap-4 flex-wrap justify-center">
           {user ? (
             <button 
               onClick={onSignOut}
-              className="px-6 py-2 text-[10px] font-black uppercase border border-zinc-700 hover:bg-zinc-800 transition-all rounded-lg"
+              className="px-6 py-3 text-[10px] font-black uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all rounded-xl"
             >
-              Sign Out / Switch Account
+              Log Out
             </button>
           ) : (
             <button 
               onClick={onOpenAuth}
-              className="px-6 py-2 text-[10px] font-black uppercase border border-[#E10600] text-[#E10600] hover:bg-[#E10600]/10 transition-all rounded-lg"
+              className="px-6 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl shadow-lg shadow-red-900/20"
             >
-              Sync / Log In
+              Sign In to Sync
             </button>
           )}
           <button 
             onClick={onClearData}
-            className="px-6 py-2 text-[10px] font-black uppercase border border-red-900 text-red-500 hover:bg-red-900/10 transition-all rounded-lg"
+            className="px-6 py-3 text-[10px] font-black uppercase border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-all rounded-xl"
           >
-            System Reset
+            Reset Device
           </button>
         </div>
       </div>
@@ -544,6 +544,7 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // Ensure we strictly follow the default structure but merge saved values
         return { ...DEFAULT_STATE, ...parsed };
       } catch (e) {
         return DEFAULT_STATE;
@@ -559,23 +560,30 @@ const App: React.FC = () => {
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
   const stateRef = useRef(state);
+  const preventSyncOnUpdate = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
   useEffect(() => {
+    // Auth Listener
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) handleInitialSync(session.user.id);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        handleInitialSync(u.id);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
+      
       if (newUser && !isInitialSyncDone.current) {
         handleInitialSync(newUser.id);
       } else if (!newUser) {
+        // Clear everything on signout to prevent "random data" leakage
         isInitialSyncDone.current = false;
         setSyncStatus('local');
       }
@@ -598,17 +606,18 @@ const App: React.FC = () => {
 
       if (data && data.state) {
         const remoteState = data.state as AppState;
+        
+        // STRICTURE MERGE: Prefer cloud state as absolute truth for logged sessions
+        // Only merge local logs if they truly are new (based on unique ID)
         setState(localState => {
-          // Strict Overwrite / Clean Merge Logic
-          // If local state is essentially empty, just take remote.
-          if (localState.logs.length === 0 && localState.progress.length === 0 && localState.tasks.length === 0) {
-            return { ...localState, ...remoteState, theme: localState.theme || remoteState.theme || 'dark' };
-          }
-
-          // Otherwise, merge unique by ID to avoid "random data" (duplicates)
+          preventSyncOnUpdate.current = true; // Block push-back while updating from cloud
+          
           const mergedLogs = [...remoteState.logs];
           localState.logs.forEach(l => {
-             if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
+             if (!mergedLogs.some(rl => rl.id === l.id)) {
+                // Only add local logs if they aren't already in cloud
+                mergedLogs.push(l);
+             }
           });
           
           const mergedTasks = [...remoteState.tasks];
@@ -616,7 +625,7 @@ const App: React.FC = () => {
              if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
           });
 
-          // For progress, we prefer the status that is more "advanced" in the cycle
+          // For progress, take the most advanced status
           const mergedProgress = [...remoteState.progress];
           localState.progress.forEach(p => {
              const exists = mergedProgress.find(rp => rp.classId === p.classId && rp.subject === p.subject && rp.chapter === p.chapter);
@@ -625,9 +634,7 @@ const App: React.FC = () => {
              } else {
                const localIdx = STATUS_CYCLE.indexOf(p.status);
                const remoteIdx = STATUS_CYCLE.indexOf(exists.status);
-               if (localIdx > remoteIdx) {
-                 exists.status = p.status;
-               }
+               if (localIdx > remoteIdx) exists.status = p.status;
              }
           });
 
@@ -646,11 +653,14 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Initial Sync Error:', err);
       setSyncStatus('error');
+    } finally {
+      setTimeout(() => { preventSyncOnUpdate.current = false; }, 100);
     }
   };
 
   const triggerSync = async () => {
-    if (!user || !isInitialSyncDone.current) return;
+    if (!user || !isInitialSyncDone.current || preventSyncOnUpdate.current) return;
+    
     if (isSyncingRef.current) {
       pendingSyncRef.current = true;
       return;
@@ -667,7 +677,7 @@ const App: React.FC = () => {
       if (error) throw error;
       setSyncStatus('synced');
     } catch (err) {
-      console.error('Cloud Update Failed:', err);
+      console.error('Cloud Sync Failed:', err);
       setSyncStatus('error');
     } finally {
       isSyncingRef.current = false;
@@ -680,35 +690,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
-    if (user && isInitialSyncDone.current) {
+    if (user && isInitialSyncDone.current && !preventSyncOnUpdate.current) {
       triggerSync();
     }
   }, [state, user]);
 
   const handleSignOut = async () => {
-    if (window.confirm("SIGN OUT? Your local unsynced progress will be cleared to ensure security.")) {
+    if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
       await supabase.auth.signOut();
       localStorage.removeItem('locked_in_state_v2');
       setState(DEFAULT_STATE);
+      // Hard refresh to ensure all listeners and refs reset
       window.location.reload();
     }
-  };
-
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallClick = () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    installPrompt.userChoice.then(() => setInstallPrompt(null));
   };
 
   const theme = state.theme || 'dark';
@@ -742,7 +736,7 @@ const App: React.FC = () => {
   };
 
   const deleteLog = (id: string) => {
-    if (window.confirm("Delete this focus session record?")) {
+    if (window.confirm("ERASE SESSION? This cannot be undone.")) {
       setState(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== id) }));
     }
   };
@@ -782,7 +776,7 @@ const App: React.FC = () => {
   };
 
   const clearLogs = () => {
-    if (window.confirm("RESET SYSTEM: This will permanently wipe all study logs on this device. Are you sure?")) {
+    if (window.confirm("FACTORY RESET DEVICE? This will wipe ALL local progress. If you are signed in, cloud data remains.")) {
       localStorage.removeItem('locked_in_state_v2');
       setState(DEFAULT_STATE);
     }
@@ -802,8 +796,8 @@ const App: React.FC = () => {
           daysRemaining={daysRemaining} 
           theme={theme} 
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-          installPrompt={installPrompt}
-          onInstall={handleInstallClick}
+          installPrompt={null}
+          onInstall={() => {}}
           syncStatus={syncStatus}
           user={user}
           onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -1046,10 +1040,6 @@ const TodayTab = ({
            {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
         
-        <div className="w-full max-w-lg mt-8 md:mt-12 bg-zinc-900/40 p-4 md:p-6 border border-zinc-800 rounded-xl overflow-y-auto max-h-[40vh]">
-          <TaskSection tasks={tasks} onToggleTask={onToggleTask} activeSubject={timer.subject} theme="dark" minimal />
-        </div>
-
         <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
           <button 
             disabled={!canEndSession}
