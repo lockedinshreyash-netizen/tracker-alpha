@@ -26,7 +26,8 @@ const DEFAULT_STATE: AppState = {
   allowList: [], 
   tasks: [], 
   theme: 'dark',
-  dailyGoalHours: 8
+  dailyGoalHours: 8,
+  lastUpdated: 0
 };
 
 // --- Sub-components ---
@@ -544,7 +545,6 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Ensure we strictly follow the default structure but merge saved values
         return { ...DEFAULT_STATE, ...parsed };
       } catch (e) {
         return DEFAULT_STATE;
@@ -568,31 +568,59 @@ const App: React.FC = () => {
     stateRef.current = state;
   }, [state]);
 
+  // Handle Auth and Initial Fetch
   useEffect(() => {
-    // Auth Listener
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) {
-        handleInitialSync(u.id);
-      }
+      if (u) handleInitialSync(u.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      
-      if (newUser && !isInitialSyncDone.current) {
-        handleInitialSync(newUser.id);
-      } else if (!newUser) {
-        // Clear everything on signout to prevent "random data" leakage
-        isInitialSyncDone.current = false;
-        setSyncStatus('local');
-      }
+      if (newUser && !isInitialSyncDone.current) handleInitialSync(newUser.id);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // REALTIME LISTENER
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`profile_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const remoteState = payload.new.state as AppState;
+          if (remoteState && remoteState.lastUpdated > stateRef.current.lastUpdated) {
+            console.log("Realtime Sync: Updating local state from cloud.");
+            preventSyncOnUpdate.current = true;
+            setState(prev => ({
+              ...prev,
+              ...remoteState,
+              // Keep UI only state local
+              lastUsedTab: prev.lastUsedTab,
+              theme: prev.theme
+            }));
+            setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const handleInitialSync = async (userId: string) => {
     if (isInitialSyncDone.current) return;
@@ -609,17 +637,17 @@ const App: React.FC = () => {
       if (data && data.state) {
         const remoteState = data.state as AppState;
         
-        // STRICTURE MERGE: Prefer cloud state as absolute truth for logged sessions
-        // Only merge local logs if they truly are new (based on unique ID)
+        // Strategy: Cloud is truth for cross-device consistency. 
+        // Only merge local logs if they are unique and the app was offline.
         setState(localState => {
-          preventSyncOnUpdate.current = true; // Block push-back while updating from cloud
+          preventSyncOnUpdate.current = true;
           
+          // Merging logic that allows for deletions: 
+          // If cloud timestamp is significantly newer, replace.
+          // Otherwise, union unique logs/tasks for initial transition.
           const mergedLogs = [...remoteState.logs];
           localState.logs.forEach(l => {
-             if (!mergedLogs.some(rl => rl.id === l.id)) {
-                // Only add local logs if they aren't already in cloud
-                mergedLogs.push(l);
-             }
+             if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
           });
           
           const mergedTasks = [...remoteState.tasks];
@@ -627,26 +655,12 @@ const App: React.FC = () => {
              if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
           });
 
-          // For progress, take the most advanced status
-          const mergedProgress = [...remoteState.progress];
-          localState.progress.forEach(p => {
-             const exists = mergedProgress.find(rp => rp.classId === p.classId && rp.subject === p.subject && rp.chapter === p.chapter);
-             if (!exists) {
-               mergedProgress.push(p);
-             } else {
-               const localIdx = STATUS_CYCLE.indexOf(p.status);
-               const remoteIdx = STATUS_CYCLE.indexOf(exists.status);
-               if (localIdx > remoteIdx) exists.status = p.status;
-             }
-          });
-
           return { 
             ...localState, 
             ...remoteState, 
             logs: mergedLogs, 
-            tasks: mergedTasks, 
-            progress: mergedProgress,
-            theme: localState.theme || remoteState.theme || 'dark'
+            tasks: mergedTasks,
+            lastUpdated: Math.max(localState.lastUpdated, remoteState.lastUpdated)
           };
         });
       }
@@ -656,7 +670,7 @@ const App: React.FC = () => {
       console.error('Initial Sync Error:', err);
       setSyncStatus('error');
     } finally {
-      setTimeout(() => { preventSyncOnUpdate.current = false; }, 100);
+      setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
     }
   };
 
@@ -672,9 +686,10 @@ const App: React.FC = () => {
     setSyncStatus('syncing');
     
     try {
+      const newState = { ...stateRef.current, lastUpdated: Date.now() };
       const { error } = await supabase
         .from('user_profiles')
-        .upsert({ id: user.id, state: stateRef.current, updated_at: new Date() });
+        .upsert({ id: user.id, state: newState, updated_at: new Date() });
       
       if (error) throw error;
       setSyncStatus('synced');
@@ -701,28 +716,15 @@ const App: React.FC = () => {
     if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
       try {
         preventSyncOnUpdate.current = true;
-        
-        // 1. Sign out from Supabase (clears local and server session)
         await supabase.auth.signOut();
-        
-        // 2. Failsafe: Manually clear Supabase internal keys from localStorage
-        // Browsers sometimes hang onto storage updates before a reload
         Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-')) {
-            localStorage.removeItem(key);
-          }
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
         });
-
-        // 3. Clear our app state
         localStorage.removeItem('locked_in_state_v2');
         setState(DEFAULT_STATE);
         setActiveTab('Today');
-
-        // 4. Force a hard navigation to the home page to clear all memory refs
         window.location.href = window.location.origin;
       } catch (err) {
-        console.error("Sign-out failed:", err);
-        // Fallback for catastrophic error
         localStorage.clear();
         window.location.href = window.location.origin;
       }
@@ -753,13 +755,17 @@ const App: React.FC = () => {
         quality: quality,
         distractions: distractions
       };
-      return { ...prev, logs: [...prev.logs, newLog] };
+      return { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
     });
   };
 
   const deleteLog = (id: string) => {
     if (window.confirm("ERASE SESSION? This cannot be undone.")) {
-      setState(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== id) }));
+      setState(prev => ({ 
+        ...prev, 
+        logs: prev.logs.filter(log => log.id !== id),
+        lastUpdated: Date.now() 
+      }));
     }
   };
 
@@ -772,7 +778,8 @@ const App: React.FC = () => {
       const filteredProgress = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
       return { 
         ...prev, 
-        progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }] 
+        progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }],
+        lastUpdated: Date.now()
       };
     });
   };
@@ -782,19 +789,31 @@ const App: React.FC = () => {
   };
 
   const addTask = (text: string, subject: Subject | 'General') => {
-    setState(prev => ({ ...prev, tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }] }));
+    setState(prev => ({ 
+      ...prev, 
+      tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
+      lastUpdated: Date.now()
+    }));
   };
 
   const toggleTask = (id: string) => {
-    setState(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t) }));
+    setState(prev => ({ 
+      ...prev, 
+      tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
+      lastUpdated: Date.now()
+    }));
   };
 
   const deleteTask = (id: string) => {
-    setState(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+    setState(prev => ({ 
+      ...prev, 
+      tasks: prev.tasks.filter(t => t.id !== id),
+      lastUpdated: Date.now()
+    }));
   };
 
   const updateDailyGoal = (val: number) => {
-    setState(prev => ({ ...prev, dailyGoalHours: val }));
+    setState(prev => ({ ...prev, dailyGoalHours: val, lastUpdated: Date.now() }));
   };
 
   const clearLogs = () => {

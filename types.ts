@@ -51,4 +51,5 @@ export interface AppState {
   tasks: Task[];
   theme?: 'dark' | 'light';
   dailyGoalHours: number;
+  lastUpdated: number; // Timestamp for sync resolution
 }
