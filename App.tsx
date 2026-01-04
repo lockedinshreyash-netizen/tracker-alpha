@@ -1,9 +1,15 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, TabType, DailyLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task } from './types';
-import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES } from './constants';
+import { createClient } from '@supabase/supabase-js';
+import { AppState, TabType, DailyLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus } from './types';
+import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, SUBJECTS, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, getLast7DaysStats, getSubjectDistribution } from './utils';
 import { JEE_2027_DATE } from './constants';
+
+// --- Supabase Configuration ---
+const SUPABASE_URL = 'https://ipwmgkctxkopuszkuebh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_6c9JTFFjI7_wxw64kZdHsA_4PCuX84A';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- Global Helpers ---
 const generateId = () => {
@@ -12,6 +18,118 @@ const generateId = () => {
 
 // --- Sub-components ---
 
+const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean, onClose: () => void, theme: 'dark' | 'light', onAuthSuccess: () => void }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    setLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      if (mode === 'signup') {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signUpError) throw signUpError;
+        setSuccessMsg("Enlisted successfully. Check your email to confirm your account before logging in.");
+        setMode('login');
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+        onAuthSuccess();
+        onClose();
+      }
+    } catch (err: any) {
+      setError(err.message || "An authentication error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
+      <div className={`max-w-md w-full p-8 md:p-10 border-2 rounded-2xl relative ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800' : 'bg-white border-zinc-200 shadow-2xl'}`}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white font-black text-xl">×</button>
+        <h2 className="text-2xl font-black italic tracking-tighter mb-2 text-[#E10600]">
+          {mode === 'login' ? 'ACCESS ACCOUNT' : 'ENLIST NOW'}
+        </h2>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-8 leading-relaxed">
+          {mode === 'login' ? 'Resume your mission. Synchronize local progress.' : 'Create a permanent record. Enable cross-device persistence.'}
+        </p>
+        
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Email Address</label>
+            <input 
+              type="email" 
+              required
+              placeholder="YOUR@EMAIL.COM" 
+              className={`w-full p-4 text-xs font-bold uppercase border focus:outline-none focus:ring-1 focus:ring-[#E10600] transition-all ${theme === 'dark' ? 'bg-[#141417] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Secret Key (Password)</label>
+            <input 
+              type="password" 
+              required
+              placeholder="••••••••" 
+              className={`w-full p-4 text-xs font-bold uppercase border focus:outline-none focus:ring-1 focus:ring-[#E10600] transition-all ${theme === 'dark' ? 'bg-[#141417] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          
+          <button 
+            type="submit"
+            disabled={loading}
+            className={`w-full py-5 mt-4 bg-[#E10600] text-white font-black uppercase tracking-[0.3em] hover:bg-red-700 transition-all rounded-xl disabled:opacity-50 shadow-lg shadow-red-900/20`}
+          >
+            {loading ? 'PROCESSING...' : (mode === 'login' ? 'LOGIN & SYNC' : 'CREATE ACCOUNT')}
+          </button>
+        </form>
+
+        <div className="mt-8 pt-6 border-t border-zinc-900 text-center">
+          <button 
+            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setSuccessMsg(null); setError(null); }}
+            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-[#E10600] transition-colors"
+          >
+            {mode === 'login' ? "DON'T HAVE AN ACCOUNT? SIGN UP" : "ALREADY ENLISTED? LOG IN"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-6 p-4 border border-red-900/50 text-red-500 bg-red-500/5 text-[10px] font-black uppercase text-center">
+            {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="mt-6 p-4 border border-green-900/50 text-green-500 bg-green-500/5 text-[10px] font-black uppercase text-center">
+            {successMsg}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Header = ({ 
   currentClass, 
   onClassChange, 
@@ -19,7 +137,10 @@ const Header = ({
   theme, 
   onToggleTheme,
   installPrompt,
-  onInstall
+  onInstall,
+  syncStatus,
+  user,
+  onOpenAuth
 }: { 
   currentClass: 11 | 12, 
   onClassChange: (c: 11 | 12) => void, 
@@ -27,43 +148,69 @@ const Header = ({
   theme: 'dark' | 'light',
   onToggleTheme: () => void,
   installPrompt: any,
-  onInstall: () => void
-}) => (
-  <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
-    <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
-      <div className="relative">
-        <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-          LOCK IN
-        </h1>
-        <p className={`text-[10px] md:text-xs uppercase tracking-widest font-bold ${theme === 'dark' ? 'text-[#A1A1AA]' : 'text-zinc-500'}`}>
-          Mains '27: <span className={theme === 'dark' ? 'text-white' : 'text-black'}>{daysRemaining}d REMAINING</span>
-        </p>
-      </div>
-      <div className="flex gap-2">
-        {installPrompt && (
+  onInstall: () => void,
+  syncStatus: SyncStatus,
+  user: any,
+  onOpenAuth: () => void
+}) => {
+  const syncColors = {
+    local: 'text-zinc-600',
+    syncing: 'text-yellow-500 animate-pulse',
+    synced: 'text-green-500',
+    error: 'text-red-500'
+  };
+
+  return (
+    <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
+      <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
+        <div className="relative">
+          <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+            LOCK IN
+          </h1>
+          <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+            <p className={`text-[10px] md:text-xs uppercase tracking-widest font-bold ${theme === 'dark' ? 'text-[#A1A1AA]' : 'text-zinc-500'}`}>
+              JEE '27: <span className={theme === 'dark' ? 'text-white' : 'text-black'}>{daysRemaining}d REMAINING</span>
+            </p>
+            <div className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
+               <span className="text-[6px]">●</span>
+               <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {!user && (
+            <button 
+              onClick={onOpenAuth}
+              className={`text-[10px] font-black uppercase px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-white transition-all`}
+            >
+              SYNC
+            </button>
+          )}
+          {installPrompt && (
+            <button 
+              onClick={onInstall}
+              className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
+            >
+              INSTALL
+            </button>
+          )}
           <button 
-            onClick={onInstall}
-            className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
+            onClick={onToggleTheme}
+            className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
           >
-            INSTALL
+            {theme === 'dark' ? '☀️' : '🌙'}
           </button>
-        )}
-        <button 
-          onClick={onToggleTheme}
-          className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
-        >
-          {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
-        <button 
-          onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
-          className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
-        >
-          C-{currentClass} ▾
-        </button>
+          <button 
+            onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
+            className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
+          >
+            C-{currentClass} ▾
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: TabType, onTabChange: (t: TabType) => void, isLockInActive: boolean, theme: 'dark' | 'light' }) => {
   if (isLockInActive) return null; 
@@ -184,6 +331,197 @@ const TaskSection = ({
   );
 };
 
+const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
+  const [activeSubject, setActiveSubject] = useState<Subject>('Physics');
+  const chapters = SYLLABUS_DATA[currentClass as 11 | 12][activeSubject];
+
+  const subjectStats = useMemo(() => {
+    const subjectProgress = progress.filter((p: any) => p.classId === currentClass && p.subject === activeSubject);
+    const completed = subjectProgress.filter((p: any) => p.status === 'completed').length;
+    const revision = subjectProgress.filter((p: any) => p.status === 'revision_pending').length;
+    const active = subjectProgress.filter((p: any) => p.status === 'in_progress').length;
+    return {
+      completed,
+      revision,
+      active,
+      total: chapters.length,
+      percent: Math.round((completed / chapters.length) * 100)
+    };
+  }, [currentClass, activeSubject, progress, chapters]);
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <div className="flex justify-center gap-2 mb-6">
+        {SUBJECTS.map(s => (
+          <button
+            key={s}
+            onClick={() => setActiveSubject(s)}
+            className={`px-4 md:px-6 py-2 text-[10px] font-black uppercase tracking-widest border transition-all rounded-lg ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg shadow-red-900/20' : (theme === 'dark' ? 'border-[#1F1F23] text-zinc-500 hover:border-zinc-700' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className={`mb-8 p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-1">Subject Mastery</h3>
+            <p className="text-2xl font-black italic">{activeSubject.toUpperCase()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-black italic">{subjectStats.completed}<span className="text-zinc-500 text-sm not-italic ml-1">/ {subjectStats.total}</span></p>
+            <p className="text-[9px] font-black uppercase text-zinc-600">Chapters Completed</p>
+          </div>
+        </div>
+        <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-[#E10600] transition-all duration-700" 
+            style={{ width: `${subjectStats.percent}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {chapters.map(chapter => {
+          const prog = progress.find((p: any) => p.classId === currentClass && p.subject === activeSubject && p.chapter === chapter);
+          const status = prog?.status || 'not_started';
+          const colors = STATUS_COLORS[status as SyllabusStatus];
+
+          return (
+            <div 
+              key={chapter}
+              onClick={() => onToggle(currentClass, activeSubject, chapter)}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[120px] ${colors.border} ${colors.bg} ${theme === 'dark' ? '' : 'shadow-sm'}`}
+            >
+              <div>
+                <div className={`text-[8px] font-black uppercase tracking-widest mb-2 px-2 py-0.5 rounded border w-fit ${colors.label}`}>
+                  {STATUS_LABELS[status as SyllabusStatus]}
+                </div>
+                <h4 className={`text-[11px] md:text-xs font-black uppercase leading-tight tracking-tight ${theme === 'dark' ? 'text-zinc-100' : 'text-black'}`}>
+                  {chapter}
+                </h4>
+              </div>
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5">
+                <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">TAP TO CYCLE</p>
+                <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], theme: 'dark' | 'light' }) => {
+  const days = getLast7DaysStats(logs);
+  
+  return (
+    <div className="space-y-12 animate-in fade-in duration-500">
+      <div className="text-center py-10 md:py-16 rounded-3xl border-2 border-dashed border-[#E10600] bg-[#E10600]/5">
+         <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#E10600] mb-4">CURRENT STREAK</p>
+         <h2 className="text-8xl md:text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(225,6,0,0.4)]">
+           {streak}
+         </h2>
+         <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 mt-4">DAYS OF UNDIVIDED FOCUS</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-8">PAST 7 DAYS ACTIVITY</h3>
+          <div className="flex items-end justify-between h-40 gap-2">
+            {days.map((d, i) => (
+              <div key={i} className="flex flex-col items-center flex-1 gap-2">
+                <div 
+                  className="w-full bg-[#E10600] rounded-t transition-all duration-1000" 
+                  style={{ height: `${Math.min(100, (d.hours / 12) * 100)}%` }} 
+                />
+                <span className="text-[10px] font-black uppercase text-zinc-600">{d.date}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">CONSISTENCY ADVICE</p>
+          <p className="text-base md:text-lg font-black italic leading-tight">
+            "YOU DON'T NEED MOTIVATION. YOU NEED DISCIPLINE. SHOW UP EVEN WHEN YOU FEEL LIKE QUITTING."
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReviewTab = ({ logs, score, onClearData, theme, user }: any) => {
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className={`md:col-span-2 p-8 md:p-12 rounded-3xl border-2 flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-black border-zinc-800' : 'bg-white border-zinc-200'}`}>
+          <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500 mb-6">COMPOSITE PERFORMANCE</p>
+          <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4">{score}</h2>
+          <p className="text-xs font-black uppercase tracking-widest text-zinc-400">LOCK-IN SCORE / 100</p>
+          
+          <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
+            <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Hours Logged</p>
+            <p className="text-3xl font-black italic">{logs.reduce((a: any, b: any) => a + b.hours, 0).toFixed(1)}H</p>
+          </div>
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Sessions</p>
+            <p className="text-3xl font-black italic">{logs.length}</p>
+          </div>
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Avg Quality</p>
+            <p className="text-3xl font-black italic">
+              {logs.length > 0 ? (logs.reduce((a: any, b: any) => a + b.quality, 0) / logs.length).toFixed(1) : '0.0'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+        <div>
+          <h4 className="text-sm font-black uppercase">Data Management</h4>
+          <p className="text-xs text-zinc-500 font-bold">Manage your profile and study history.</p>
+        </div>
+        <div className="flex gap-4">
+          {user ? (
+            <button 
+              onClick={handleSignOut}
+              className="px-6 py-2 text-[10px] font-black uppercase border border-zinc-700 hover:bg-zinc-800 transition-all rounded-lg"
+            >
+              Sign Out
+            </button>
+          ) : (
+             <p className="text-[9px] font-black uppercase text-zinc-700 italic">LOCAL MODE ACTIVE</p>
+          )}
+          <button 
+            onClick={onClearData}
+            className="px-6 py-2 text-[10px] font-black uppercase border border-red-900 text-red-500 hover:bg-red-900/10 transition-all rounded-lg"
+          >
+            System Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App Component ---
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('locked_in_state_v2');
@@ -210,6 +548,95 @@ const App: React.FC = () => {
     return defaultState;
   });
 
+  const [user, setUser] = useState<any>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const syncTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) handleInitialSync(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) handleInitialSync(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleInitialSync = async (userId: string) => {
+    setSyncStatus('syncing');
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('state')
+        .eq('id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        const remoteState = data.state as AppState;
+        setState(prev => {
+          // Merge logic: prefer remote for settings, but merge logs/tasks/progress by ID
+          const mergedLogs = [...remoteState.logs];
+          prev.logs.forEach(localLog => {
+             if (!mergedLogs.find(rl => rl.id === localLog.id)) {
+               mergedLogs.push(localLog);
+             }
+          });
+          
+          const mergedTasks = [...remoteState.tasks];
+          prev.tasks.forEach(localTask => {
+             if (!mergedTasks.find(rt => rt.id === localTask.id)) {
+               mergedTasks.push(localTask);
+             }
+          });
+
+          const finalProgress = remoteState.progress.length >= prev.progress.length ? remoteState.progress : prev.progress;
+
+          return { 
+            ...remoteState, 
+            logs: mergedLogs, 
+            tasks: mergedTasks, 
+            progress: finalProgress,
+            theme: prev.theme || remoteState.theme || 'dark'
+          };
+        });
+      }
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Sync Error:', err);
+      setSyncStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
+    
+    if (user) {
+      setSyncStatus('syncing');
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      
+      syncTimeoutRef.current = window.setTimeout(async () => {
+        try {
+          const { error } = await supabase
+            .from('user_profiles')
+            .upsert({ id: user.id, state: state, updated_at: new Date() });
+          
+          if (error) throw error;
+          setSyncStatus('synced');
+        } catch (err) {
+          console.error('Cloud Save Error:', err);
+          setSyncStatus('error');
+        }
+      }, 3000);
+    }
+  }, [state, user]);
+
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
@@ -224,23 +651,15 @@ const App: React.FC = () => {
   const handleInstallClick = () => {
     if (!installPrompt) return;
     installPrompt.prompt();
-    installPrompt.userChoice.then((choiceResult: any) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('User accepted the A2HS prompt');
-      } else {
-        console.log('User dismissed the A2HS prompt');
-      }
-      setInstallPrompt(null);
-    });
+    installPrompt.userChoice.then(() => setInstallPrompt(null));
   };
 
   const theme = state.theme || 'dark';
 
   useEffect(() => {
-    localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
     document.body.style.backgroundColor = theme === 'dark' ? '#0B0B0D' : '#FFFFFF';
     document.body.style.color = theme === 'dark' ? '#FFFFFF' : '#000000';
-  }, [state, theme]);
+  }, [theme]);
 
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
 
@@ -249,27 +668,24 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, lastUsedTab: tab }));
   };
 
-  const logStudy = (subject: Subject, hours: number, quality: number, distractions: number, append: boolean = true) => {
+  const logStudy = (subject: Subject, hours: number, quality: number, distractions: number) => {
     if (hours <= 0) return;
     const today = getISTDateString();
     setState(prev => {
-      const existing = prev.logs.find(l => l.date === today && l.subject === subject);
-      const filteredLogs = prev.logs.filter(l => !(l.date === today && l.subject === subject));
-      const newHours = append && existing ? existing.hours + hours : hours;
       const newLog: DailyLog = {
         id: generateId(), 
         date: today,
         subject,
-        hours: parseFloat(newHours.toFixed(2)),
+        hours: parseFloat(hours.toFixed(2)),
         quality: quality,
-        distractions: (existing?.distractions || 0) + distractions
+        distractions: distractions
       };
-      return { ...prev, logs: [...filteredLogs, newLog] };
+      return { ...prev, logs: [...prev.logs, newLog] };
     });
   };
 
   const deleteLog = (id: string) => {
-    if (window.confirm("Delete this focus record?")) {
+    if (window.confirm("Delete this focus session record?")) {
       setState(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== id) }));
     }
   };
@@ -285,14 +701,6 @@ const App: React.FC = () => {
         ...prev, 
         progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }] 
       };
-    });
-  };
-
-  const updateChapterNotes = (classId: 11 | 12, subject: Subject, chapter: string, notes: string | undefined) => {
-    setState(prev => {
-      const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
-      const filteredProgress = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
-      return { ...prev, progress: [...filteredProgress, { classId, subject, chapter, status: existing?.status || 'not_started', notes }] };
     });
   };
 
@@ -339,8 +747,20 @@ const App: React.FC = () => {
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
           installPrompt={installPrompt}
           onInstall={handleInstallClick}
+          syncStatus={syncStatus}
+          user={user}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
       )}
+
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        theme={theme}
+        onAuthSuccess={() => {
+          setSyncStatus('syncing');
+        }}
+      />
 
       <main className={`max-w-5xl mx-auto w-full relative z-20 ${isCurrentlyLockInActive ? 'p-0' : 'px-4 md:px-6 py-8'}`}>
         {activeTab === 'Today' && (
@@ -362,7 +782,6 @@ const App: React.FC = () => {
             currentClass={state.currentClass} 
             progress={state.progress} 
             onToggle={toggleChapterStatus} 
-            onUpdateNotes={updateChapterNotes}
             theme={theme}
           />
         )}
@@ -371,11 +790,9 @@ const App: React.FC = () => {
           <ReviewTab 
             logs={state.logs} 
             score={lockInScore} 
-            currentClass={state.currentClass} 
-            progress={state.progress}
             onClearData={clearLogs}
-            onDeleteLog={deleteLog}
             theme={theme}
+            user={user}
           />
         )}
       </main>
@@ -388,6 +805,7 @@ const App: React.FC = () => {
 const TodayTab = ({ 
   state,
   onLog, 
+  onDeleteLog,
   onTimerUpdate,
   onToggleLockInMode,
   onAddTask,
@@ -399,7 +817,6 @@ const TodayTab = ({
   const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
-  const [displayMs, setDisplayMs] = useState(0);
   const [showWarning, setShowWarning] = useState(false);
   const [showBreach, setShowBreach] = useState(false);
   const [quoteIdx, setQuoteIdx] = useState(0);
@@ -409,22 +826,23 @@ const TodayTab = ({
   const timerRef = useRef(timer);
   useEffect(() => { timerRef.current = timer; }, [timer]);
 
-  const REQUIRED_FOCUS_MS = 15 * 60 * 1000; // 15 Minutes
-  const WIPE_HOLD_MS = 15 * 1000; // 15 Seconds hold
+  const REQUIRED_FOCUS_MS = 15 * 60 * 1000; 
+  const WIPE_HOLD_MS = 15000; 
+
+  const [currentDisplayMs, setCurrentDisplayMs] = useState(0);
 
   useEffect(() => {
     let interval: number;
     if (timer.isRunning && timer.startTime) {
       interval = window.setInterval(() => {
-        setDisplayMs(Date.now() - timer.startTime! + timer.accumulatedMs);
+        setCurrentDisplayMs(Date.now() - timer.startTime! + timer.accumulatedMs);
       }, 100);
     } else {
-      setDisplayMs(timer.accumulatedMs);
+      setCurrentDisplayMs(timer.accumulatedMs);
     }
     return () => clearInterval(interval);
   }, [timer.isRunning, timer.startTime, timer.accumulatedMs]);
 
-  // Breach Detection
   useEffect(() => {
     if (timer.isLockInActive) {
       const handleFsChange = () => {
@@ -433,7 +851,7 @@ const TodayTab = ({
             isRunning: false, 
             accumulatedMs: Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs, 
             startTime: null,
-            distractions: timerRef.current.distractions + 1 
+            distractions: (timerRef.current.distractions || 0) + 1 
           });
           setShowBreach(true);
         }
@@ -450,7 +868,6 @@ const TodayTab = ({
     }
   }, [timer.isLockInActive]);
 
-  // Emergency Wipe Progress Timer
   useEffect(() => {
     let interval: number;
     if (wipeHoldStart !== null) {
@@ -484,7 +901,7 @@ const TodayTab = ({
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
     const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, currentTimer.distractions, true);
+    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, currentTimer.distractions || 0);
     onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, isLockInActive: false, distractions: 0 });
     if (document.fullscreenElement) document.exitFullscreen();
     setShowBreach(false);
@@ -515,13 +932,16 @@ const TodayTab = ({
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const todayLogs = logs.filter((l: any) => l.date === getISTDateString());
+  const todayLogs = useMemo(() => 
+    logs.filter((l: any) => l.date === getISTDateString()).reverse(), 
+  [logs]);
+
   const totalToday = todayLogs.reduce((a: any, b: any) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
   const subjectDist = getSubjectDistribution(logs);
   
-  const canEndSession = displayMs >= REQUIRED_FOCUS_MS;
-  const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - displayMs);
+  const canEndSession = currentDisplayMs >= REQUIRED_FOCUS_MS;
+  const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - currentDisplayMs);
 
   if (timer.isLockInActive) {
     return (
@@ -560,10 +980,10 @@ const TodayTab = ({
             <p className="text-[12px] md:text-[14px] text-zinc-500 uppercase font-black animate-pulse">{LOCK_IN_QUOTES[quoteIdx]}</p>
         </div>
 
-        <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(displayMs)}</p>
+        <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
         <div className="flex flex-col items-center gap-2 mt-4">
            <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
-           {timer.distractions > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
+           {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
         
         <div className="w-full max-w-lg mt-8 md:mt-12 bg-zinc-900/40 p-4 md:p-6 border border-zinc-800 rounded-xl overflow-y-auto max-h-[40vh]">
@@ -580,7 +1000,7 @@ const TodayTab = ({
           </button>
           
           <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mt-2">
-             <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((displayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
+             <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((currentDisplayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
           </div>
           
           <div className="relative w-full mt-8 flex flex-col items-center">
@@ -605,7 +1025,6 @@ const TodayTab = ({
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Overview Card */}
       {!timer.isRunning && (
         <section className={`p-5 md:p-8 rounded-2xl border flex flex-col gap-6 md:gap-8 transition-all ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full">
@@ -642,11 +1061,10 @@ const TodayTab = ({
         </section>
       )}
 
-      {/* Timer Section */}
       <section className={`p-8 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600] bg-[#E10600]/5' : (theme === 'dark' ? 'bg-[#141417]/40 border-[#1F1F23]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
         <p className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-6">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
-        <p className="text-[14vw] md:text-8xl font-mono font-black tabular-nums tracking-tighter leading-none">{formatTime(displayMs)}</p>
+        <p className="text-[14vw] md:text-8xl font-mono font-black tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
         
         {!timer.isRunning ? (
           <>
@@ -664,7 +1082,7 @@ const TodayTab = ({
             <div className="flex flex-col items-center mt-8 gap-4">
               <button 
                 onClick={handleStartTimer} 
-                className="w-full max-w-sm py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-200 transition-all active:scale-95 shadow-2xl rounded-xl"
+                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-200 transition-all active:scale-95 shadow-2xl rounded-xl"
               >
                 START SESSION
               </button>
@@ -696,236 +1114,51 @@ const TodayTab = ({
         )}
       </section>
 
-      {/* Task Section */}
       <TaskSection tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} theme={theme} activeSubject={timer.isRunning ? timer.subject : null} />
 
-      {/* Protocol Warning Modal */}
+      <section className="space-y-4">
+        <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
+           <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>SESSION HISTORY (TODAY)</h3>
+        </div>
+        <div className="grid gap-3">
+          {todayLogs.length === 0 ? (
+            <p className="text-[10px] text-zinc-700 font-black uppercase py-4 text-center italic">No sessions recorded today.</p>
+          ) : (
+            todayLogs.map((l: any) => (
+              <div key={l.id} className={`flex justify-between items-center p-4 rounded-xl border transition-all group ${theme === 'dark' ? 'bg-[#141417] border-zinc-900' : 'bg-white border-zinc-100 shadow-sm'}`}>
+                <div>
+                  <p className="text-[8px] font-black text-[#E10600] uppercase mb-0.5">{l.subject}</p>
+                  <p className="text-base font-black italic">{l.hours}h <span className="text-[10px] not-italic text-zinc-500 font-bold ml-2">Q: {l.quality}/5</span></p>
+                </div>
+                <button 
+                  onClick={() => onDeleteLog(l.id)} 
+                  className="text-[10px] font-black uppercase text-zinc-600 hover:text-red-500 px-3 py-1 border border-zinc-800 rounded opacity-40 group-hover:opacity-100 transition-all"
+                >
+                  WIPE
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       {showWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
           <div className={`max-w-md w-full p-6 md:p-10 border-2 rounded-2xl ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#E10600]' : 'bg-white border-[#E10600]'}`}>
-             <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-[#E10600] mb-4 md:mb-6">LOCK-IN MODE</h3>
-             <div className={`space-y-4 mb-8 md:mb-10 text-[10px] md:text-[11px] font-bold uppercase tracking-tight leading-relaxed ${theme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                <p>• <span className="text-[#E10600]">STRICT FULLSCREEN:</span> Browser focus is enforced. Any exit triggers a pause and distraction log.</p>
-                <p>• <span className="text-white">15-MINUTE MINIMUM:</span> You cannot end a focus session before the 15-minute mark.</p>
-                <p>• <span className="text-white">INTEGRITY PENALTY:</span> Every breach recorded in Lock-In mode subtracts 2 points from your Integrity Score.</p>
-             </div>
-             <div className="flex flex-col gap-3">
-                <button 
-                  onClick={() => { onToggleLockInMode(true); setShowWarning(false); }}
-                  className="bg-[#E10600] text-white font-black py-4 md:py-5 uppercase tracking-[0.2em] md:tracking-[0.3em] rounded-xl shadow-xl hover:bg-red-700 transition-all"
-                >
-                  ACTIVATE LOCK-IN
-                </button>
-                <button onClick={() => setShowWarning(false)} className="text-[9px] font-black uppercase text-zinc-500 hover:text-white py-2">CANCEL</button>
-             </div>
+            <h2 className="text-2xl font-black italic tracking-tighter mb-4 text-[#E10600]">ACTIVATE LOCK-IN?</h2>
+            <div className="space-y-4 text-xs font-bold uppercase tracking-tight text-zinc-500 leading-relaxed">
+              <p>1. FULLSCREEN IS MANDATORY.</p>
+              <p>2. EXITING FULLSCREEN PAUSES THE TIMER AND RECORDS A BREACH.</p>
+              <p>3. YOU MUST FOCUS FOR AT LEAST 15 MINUTES TO LOG THE SESSION.</p>
+              <p>4. TAB SWITCHING IS DETECTED.</p>
+            </div>
+            <div className="mt-8 flex gap-4">
+              <button onClick={() => { onToggleLockInMode(true); setShowWarning(false); }} className="flex-1 py-4 bg-white text-black font-black uppercase tracking-widest rounded-lg hover:bg-zinc-200">ENGAGE</button>
+              <button onClick={() => setShowWarning(false)} className="flex-1 py-4 bg-zinc-900 text-zinc-500 font-black uppercase tracking-widest rounded-lg">ABORT</button>
+            </div>
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const SyllabusTab = ({ currentClass, progress, onToggle, onUpdateNotes, theme }: any) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [editingChapter, setEditingChapter] = useState<{ subject: Subject, chapter: string } | null>(null);
-
-  const stats = useMemo(() => {
-    const res: any = {};
-    const classData = SYLLABUS_DATA[currentClass as 11|12];
-    Object.keys(classData).forEach(sub => {
-      const chapters = classData[sub as Subject];
-      const completed = progress.filter((p: any) => p.subject === sub && p.classId === currentClass && p.status === 'completed').length;
-      res[sub] = Math.round((completed / chapters.length) * 100);
-    });
-    return res;
-  }, [progress, currentClass]);
-
-  const filteredData = useMemo(() => {
-    const data = SYLLABUS_DATA[currentClass as 11|12];
-    if (!searchTerm) return data;
-    const lowerSearch = searchTerm.toLowerCase();
-    const res: any = {};
-    Object.entries(data).forEach(([sub, chapters]: any) => {
-      const filtered = chapters.filter((ch: string) => ch.toLowerCase().includes(lowerSearch));
-      if (filtered.length > 0) res[sub] = filtered;
-    });
-    return res;
-  }, [currentClass, searchTerm]);
-
-  return (
-    <div className="space-y-8 md:space-y-10 pb-24 animate-in fade-in duration-500">
-      <div className="sticky top-0 z-40 pb-4 pt-4 bg-inherit border-b border-zinc-900/50">
-        <input 
-          type="text" 
-          placeholder="SEARCH CHAPTERS..." 
-          className={`w-full p-4 rounded-xl text-xs font-black uppercase border focus:outline-none focus:ring-1 focus:ring-[#E10600] transition-all ${theme === 'dark' ? 'bg-[#141417] border-zinc-900 text-white' : 'bg-zinc-50 border-zinc-200'}`}
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {Object.entries(filteredData).map(([subject, chapters]: any) => (
-        <div key={subject} className="space-y-4 md:space-y-6">
-          <div className="flex justify-between items-end border-b-2 border-zinc-900 pb-2">
-            <h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter italic">{subject}</h2>
-            <span className="text-[10px] md:text-xs font-black text-[#E10600] tracking-widest">{stats[subject]}% MASTERY</span>
-          </div>
-          <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
-            {chapters.map((ch: string) => {
-              const p = progress.find((x: any) => x.chapter === ch && x.subject === subject);
-              const currentStatus: SyllabusStatus = p?.status || 'not_started';
-              const styles = STATUS_COLORS[currentStatus];
-              return (
-                <div key={ch} className={`p-3 md:p-4 border rounded-xl flex items-center gap-3 transition-all ${styles.border} ${styles.bg} ${theme === 'dark' ? 'bg-opacity-10' : 'bg-opacity-20'} ${theme === 'dark' ? 'bg-[#0B0B0D]' : 'bg-white'}`}>
-                  <button onClick={() => onToggle(currentClass, subject as Subject, ch)} className={`flex-1 text-[10px] md:text-[11px] font-bold uppercase text-left tracking-tight ${styles.text} ${currentStatus === 'not_started' && (theme === 'dark' ? 'text-zinc-200' : 'text-zinc-900')}`}>
-                    {ch}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setEditingChapter({ subject: subject as Subject, chapter: ch })} className="p-2 rounded bg-zinc-900/40 border border-zinc-800 text-[10px]">✏️</button>
-                    <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border min-w-[70px] md:min-w-[80px] text-center ${styles.label}`}>{currentStatus.replace('_', ' ')}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {editingChapter && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/95 animate-in fade-in duration-200">
-          <div className={`w-full max-w-xl rounded-2xl border-2 ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800' : 'bg-white border-zinc-200'} p-6 md:p-8 shadow-2xl`}>
-             <div className="flex justify-between items-start mb-6">
-                <div>
-                   <p className="text-[10px] font-black uppercase text-[#E10600]">{editingChapter.subject}</p>
-                   <h3 className={`text-xl md:text-2xl font-black italic tracking-tighter ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{editingChapter.chapter}</h3>
-                </div>
-                <button onClick={() => setEditingChapter(null)} className="text-zinc-600 font-black text-xl px-2">✕</button>
-             </div>
-             <textarea
-                placeholder="STUDY NOTES: KEY FORMULAE, WEAK CONCEPTS, OR PENDING TASKS..."
-                className={`w-full text-xs md:text-sm p-4 font-bold uppercase rounded-xl border focus:outline-none focus:border-[#E10600] h-64 md:h-80 ${theme === 'dark' ? 'bg-black border-zinc-900 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-800'}`}
-                value={progress.find((p: any) => p.chapter === editingChapter.chapter && p.subject === editingChapter.subject)?.notes || ''}
-                onChange={(e) => onUpdateNotes(currentClass, editingChapter.subject, editingChapter.chapter, e.target.value)}
-             />
-             <div className="mt-6">
-                <button 
-                  onClick={() => setEditingChapter(null)}
-                  className="w-full bg-[#E10600] text-white font-black py-4 uppercase tracking-widest rounded-xl"
-                >
-                  SAVE NOTES
-                </button>
-             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], theme: string }) => {
-  const stats7d = getLast7DaysStats(logs);
-  const maxHours = Math.max(...stats7d.map(s => s.hours), 1);
-
-  return (
-    <div className="space-y-8 md:space-y-12 animate-in fade-in duration-700">
-      <div className="text-center py-12 md:py-20 relative overflow-hidden rounded-3xl border border-[#E10600]/20">
-         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-600 via-transparent to-transparent animate-pulse" />
-         <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.5em] text-[#E10600] mb-4">CONSISTENCY SCORE</h2>
-         <p className="text-8xl md:text-[10rem] font-black tracking-tighter italic leading-none">{streak}</p>
-         <p className="text-xl md:text-2xl font-black uppercase tracking-widest text-zinc-500">Day Streak</p>
-      </div>
-
-      <div className="space-y-6">
-         <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">FOCUS INTENSITY (LAST 7D)</h3>
-         <div className="flex items-end justify-between h-48 gap-2 md:gap-4 px-2">
-            {stats7d.map((day, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full">
-                <div className="flex-1 w-full flex items-end justify-center group relative">
-                  <div 
-                    className={`w-full max-w-[40px] rounded-t-lg transition-all duration-1000 group-hover:bg-[#E10600] ${day.hours > 0 ? 'bg-zinc-800' : 'bg-zinc-900/20'}`} 
-                    style={{ height: `${(day.hours / maxHours) * 100}%` }}
-                  />
-                  <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-[#E10600] text-white text-[9px] font-black px-2 py-1 rounded">
-                    {day.hours}H
-                  </div>
-                </div>
-                <span className="text-[9px] font-black uppercase text-zinc-600">{day.date}</span>
-              </div>
-            ))}
-         </div>
-      </div>
-    </div>
-  );
-};
-
-const ReviewTab = ({ logs, score, currentClass, progress, onClearData, onDeleteLog, theme }: any) => {
-  const subjectDistribution = getSubjectDistribution(logs);
-  const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
-
-  return (
-    <div className="space-y-8 md:space-y-10 pb-24 animate-in fade-in duration-700">
-      <div className={`p-8 md:p-12 rounded-3xl border ${theme === 'dark' ? 'bg-[#141417] border-zinc-900' : 'bg-white border-zinc-100 shadow-xl'} flex flex-col items-center text-center`}>
-         <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">INTEGRITY SCORE</h2>
-         <div className="relative w-32 h-32 md:w-48 md:h-48 mb-6">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className={theme === 'dark' ? 'text-zinc-900' : 'text-zinc-50'} />
-              <circle cx="50" cy="50" r="42" stroke="#E10600" strokeWidth="8" fill="transparent" strokeDasharray="264" strokeDashoffset={264 - (264 * score / 100)} strokeLinecap="round" className="transition-all duration-1000" />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-               <span className="text-4xl md:text-6xl font-black tracking-tighter italic leading-none">{score}</span>
-            </div>
-         </div>
-         <p className="text-[11px] font-bold uppercase tracking-tight text-zinc-500 max-w-xs leading-relaxed">
-           A composite metric tracking consistency, volume, and focus quality. <br/>
-           <span className="text-[#E10600]">Distractions subtract 2 points each.</span>
-         </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-6">TOTAL TIME EXPENDED</h3>
-            <div className="space-y-4">
-               {Object.entries(subjectDistribution).map(([sub, hours]: any) => (
-                 <div key={sub}>
-                    <div className="flex justify-between text-[11px] font-black uppercase mb-1">
-                       <span>{sub}</span>
-                       <span>{hours.toFixed(1)}H</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-                       <div className="h-full bg-[#E10600]" style={{ width: `${Math.min((hours / 500) * 100, 100)}%` }} />
-                    </div>
-                 </div>
-               ))}
-            </div>
-         </div>
-         <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-6">FOCUS SESSION LOGS</h3>
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 no-scrollbar">
-               {sortedLogs.length === 0 ? (
-                 <p className="text-[10px] uppercase font-black text-zinc-700 italic">No historical records.</p>
-               ) : sortedLogs.map((log: any) => (
-                 <div key={log.id} className="flex justify-between items-center p-3 rounded-lg bg-black/20 border border-zinc-900 group">
-                    <div className="flex-1">
-                       <p className="text-[8px] font-black text-zinc-500 uppercase">{log.date}</p>
-                       <p className="text-[10px] font-black uppercase text-white">{log.subject} — {log.hours}h</p>
-                       {log.distractions > 0 && <p className="text-[7px] text-red-500 font-black uppercase tracking-widest mt-0.5">{log.distractions} BREACH(ES) DETECTED</p>}
-                    </div>
-                    <button onClick={() => onDeleteLog(log.id)} className="opacity-0 group-hover:opacity-100 text-xs hover:text-red-500 transition-all">✕</button>
-                 </div>
-               ))}
-            </div>
-         </div>
-      </div>
-
-      <div className="pt-12 flex flex-col items-center gap-6">
-         <p className="text-[10px] font-black uppercase text-zinc-700">DANGER ZONE</p>
-         <button 
-           onClick={onClearData}
-           className="px-8 py-3 rounded-full border border-zinc-900 text-zinc-700 hover:border-red-600 hover:text-red-600 text-[10px] font-black uppercase tracking-widest transition-all"
-         >
-           RESET DATABASE
-         </button>
-      </div>
     </div>
   );
 };

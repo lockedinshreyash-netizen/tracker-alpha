@@ -30,73 +30,76 @@ export const STATUS_LABELS: Record<SyllabusStatus, string> = {
   revision_pending: 'Revision'
 };
 
-export const STATUS_COLORS: Record<SyllabusStatus, { border: string, bg: string, text: string, label: string }> = {
+export const STATUS_COLORS: Record<SyllabusStatus, { border: string, bg: string, text: string, label: string, dot: string }> = {
   not_started: {
     border: 'border-zinc-800',
     bg: 'bg-transparent',
     text: 'text-zinc-500',
-    label: 'border-zinc-800 text-zinc-600'
+    label: 'border-zinc-800 text-zinc-600',
+    dot: 'bg-zinc-800'
   },
   in_progress: {
-    border: 'border-yellow-600',
-    bg: 'bg-yellow-600/10',
+    border: 'border-yellow-600/50',
+    bg: 'bg-yellow-600/5',
     text: 'text-yellow-500',
-    label: 'border-yellow-600/50 text-yellow-600'
+    label: 'border-yellow-600/50 text-yellow-600',
+    dot: 'bg-yellow-500'
   },
   completed: {
-    border: 'border-green-600',
+    border: 'border-green-600/50',
     bg: 'bg-green-600/10',
     text: 'text-green-500',
-    label: 'border-green-600/50 text-green-500'
+    label: 'border-green-600/50 text-green-500',
+    dot: 'bg-green-500'
   },
   revision_pending: {
-    border: 'border-blue-600',
-    bg: 'bg-blue-600/10',
+    border: 'border-blue-600/50',
+    bg: 'bg-blue-600/5',
     text: 'text-blue-400',
-    label: 'border-blue-600/50 text-blue-400'
+    label: 'border-blue-600/50 text-blue-400',
+    dot: 'bg-blue-400'
   }
 };
 
 export const SYLLABUS_DATA = {
   11: {
     Physics: [
-      'Physical world & measurement', 'Units & dimensions', 'Motion in a straight line',
-      'Motion in a plane', 'Laws of motion', 'Work, energy & power',
-      'Centre of mass & rotational motion', 'Gravitation', 'Mechanical properties of solids',
-      'Mechanical properties of fluids', 'Thermal properties of matter', 'Thermodynamics',
-      'Kinetic theory', 'Oscillations & waves'
+      'Units & Measurements', 'Motion in a Straight Line', 'Motion in a Plane',
+      'Laws of Motion', 'Work, Energy & Power', 'System of Particles & Rotational Motion',
+      'Gravitation', 'Mechanical Properties of Solids', 'Mechanical Properties of Fluids',
+      'Thermal Properties of Matter', 'Thermodynamics', 'Kinetic Theory',
+      'Oscillations', 'Waves'
     ],
     Chemistry: [
-      'Some basic concepts of chemistry', 'Structure of atom', 'States of matter',
-      'Thermodynamics', 'Equilibrium', 'Classification of elements & periodicity',
-      'Chemical bonding & molecular structure', 'Basic organic chemistry (GOC)', 'Hydrocarbons'
+      'Some Basic Concepts of Chemistry', 'Structure of Atom', 'Classification of Elements & Periodicity',
+      'Chemical Bonding & Molecular Structure', 'Thermodynamics', 'Equilibrium',
+      'Redox Reactions', 'Organic Chemistry: Basic Principles & Techniques', 'Hydrocarbons'
     ],
     Maths: [
-      'Sets', 'Relations & functions', 'Trigonometric functions', 'Complex numbers & quadratic equations',
-      'Linear inequalities', 'Permutations & combinations', 'Binomial theorem', 'Sequences & series',
-      'Straight lines', 'Conic sections', 'Introduction to 3D geometry', 'Limits & derivatives',
-      'Mathematical reasoning', 'Statistics & probability'
+      'Sets', 'Relations & Functions', 'Trigonometric Functions', 'Complex Numbers & Quadratic Equations',
+      'Linear Inequalities', 'Permutations & Combinations', 'Binomial Theorem', 'Sequences & Series',
+      'Straight Lines', 'Conic Sections', 'Introduction to 3D Geometry', 'Limits & Derivatives',
+      'Statistics', 'Probability'
     ]
   },
   12: {
     Physics: [
-      'Electrostatics', 'Current electricity', 'Magnetic effects of current',
-      'Electromagnetic induction', 'Alternating current', 'Electromagnetic waves',
-      'Ray optics', 'Wave optics', 'Dual nature of radiation & matter', 'Atoms',
-      'Nuclei', 'Semiconductor electronics'
+      'Electric Charges & Fields', 'Electrostatic Potential & Capacitance', 'Current Electricity',
+      'Moving Charges & Magnetism', 'Magnetism & Matter', 'Electromagnetic Induction',
+      'Alternating Current', 'Electromagnetic Waves', 'Ray Optics & Optical Instruments',
+      'Wave Optics', 'Dual Nature of Radiation & Matter', 'Atoms', 'Nuclei',
+      'Semiconductor Electronics'
     ],
     Chemistry: [
-      'Solid state', 'Solutions', 'Electrochemistry', 'Chemical kinetics',
-      'Surface chemistry', 'General principles of metallurgy', 'p-Block elements',
-      'd- & f-Block elements', 'Coordination compounds', 'Haloalkanes & haloarenes',
-      'Alcohols, phenols & ethers', 'Aldehydes, ketones & carboxylic acids', 'Amines',
-      'Biomolecules', 'Polymers', 'Chemistry in everyday life'
+      'Solutions', 'Electrochemistry', 'Chemical Kinetics', 'd- & f-Block Elements',
+      'Coordination Compounds', 'Haloalkanes & Haloarenes', 'Alcohols, Phenols & Ethers',
+      'Aldehydes, Ketones & Carboxylic Acids', 'Amines', 'Biomolecules'
     ],
     Maths: [
-      'Relations & functions', 'Inverse trigonometric functions', 'Matrices',
-      'Determinants', 'Continuity & differentiability', 'Applications of derivatives',
-      'Integrals', 'Applications of integrals', 'Differential equations', 'Vector algebra',
-      '3D geometry', 'Linear programming', 'Probability'
+      'Relations & Functions', 'Inverse Trigonometric Functions', 'Matrices',
+      'Determinants', 'Continuity & Differentiability', 'Applications of Derivatives',
+      'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vector Algebra',
+      'Three Dimensional Geometry', 'Linear Programming', 'Probability'
     ]
   }
 };

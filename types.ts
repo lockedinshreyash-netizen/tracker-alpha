@@ -3,6 +3,8 @@ export type Subject = 'Physics' | 'Chemistry' | 'Maths';
 
 export type SyllabusStatus = 'not_started' | 'in_progress' | 'completed' | 'revision_pending';
 
+export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
+
 export interface DailyLog {
   id: string;
   date: string; // YYYY-MM-DD (IST)
