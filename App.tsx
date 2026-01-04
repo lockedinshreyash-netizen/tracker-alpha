@@ -556,6 +556,8 @@ const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
+  
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
@@ -697,11 +699,33 @@ const App: React.FC = () => {
 
   const handleSignOut = async () => {
     if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
-      await supabase.auth.signOut();
-      localStorage.removeItem('locked_in_state_v2');
-      setState(DEFAULT_STATE);
-      // Hard refresh to ensure all listeners and refs reset
-      window.location.reload();
+      try {
+        preventSyncOnUpdate.current = true;
+        
+        // 1. Sign out from Supabase (clears local and server session)
+        await supabase.auth.signOut();
+        
+        // 2. Failsafe: Manually clear Supabase internal keys from localStorage
+        // Browsers sometimes hang onto storage updates before a reload
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+
+        // 3. Clear our app state
+        localStorage.removeItem('locked_in_state_v2');
+        setState(DEFAULT_STATE);
+        setActiveTab('Today');
+
+        // 4. Force a hard navigation to the home page to clear all memory refs
+        window.location.href = window.location.origin;
+      } catch (err) {
+        console.error("Sign-out failed:", err);
+        // Fallback for catastrophic error
+        localStorage.clear();
+        window.location.href = window.location.origin;
+      }
     }
   };
 
@@ -711,8 +735,6 @@ const App: React.FC = () => {
     document.body.style.backgroundColor = theme === 'dark' ? '#0B0B0D' : '#FFFFFF';
     document.body.style.color = theme === 'dark' ? '#FFFFFF' : '#000000';
   }, [theme]);
-
-  const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -779,6 +801,7 @@ const App: React.FC = () => {
     if (window.confirm("FACTORY RESET DEVICE? This will wipe ALL local progress. If you are signed in, cloud data remains.")) {
       localStorage.removeItem('locked_in_state_v2');
       setState(DEFAULT_STATE);
+      setActiveTab('Today');
     }
   };
 
