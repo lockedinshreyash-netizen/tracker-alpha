@@ -64,22 +64,25 @@ export const getLast7DaysStats = (
 ): { date: string; hours: number }[] => {
   const stats: { date: string; hours: number }[] = [];
 
-  // Anchor to "today" in IST
-  const todayStr = getISTDateString();
-  const todayDate = new Date(todayStr);
+  // Build last 7 IST date STRINGS only
+  const dates: string[] = [];
+  let base = new Date();
 
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(todayDate);
+    const d = new Date(base);
     d.setDate(d.getDate() - i);
+    dates.push(getISTDateString(d));
+  }
 
-    const dateStr = getISTDateString(d);
-
+  for (const dateStr of dates) {
     const totalHours = logs
       .filter(l => l.date === dateStr)
       .reduce((sum, l) => sum + l.hours, 0);
 
     stats.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d),
+      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(
+        new Date(dateStr + "T12:00:00")
+      ),
       hours: Number(totalHours.toFixed(1))
     });
   }
