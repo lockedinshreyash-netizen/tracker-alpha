@@ -61,17 +61,24 @@ export const calculateStreak = (logs: DailyLog[]): number => {
 
 export const getLast7DaysStats = (logs: DailyLog[]): { date: string, hours: number }[] => {
   const stats = [];
-  const now = new Date();
+
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 86400000);
-    const dateStr = getISTDateString(d);
-    const dayLogs = logs.filter(l => l.date === dateStr);
-    const totalHours = dayLogs.reduce((acc, l) => acc + l.hours, 0);
+    // IMPORTANT: generate the date using IST directly
+    const dateStr = getISTDateString(
+      new Date(Date.now() - i * 86400000)
+    );
+
+    const totalHours = logs
+      .filter(l => l.date === dateStr)
+      .reduce((acc, l) => acc + l.hours, 0);
+
     stats.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d),
-      hours: parseFloat(totalHours.toFixed(1))
+      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' })
+        .format(new Date(dateStr)),
+      hours: Number(totalHours.toFixed(1))
     });
   }
+
   return stats;
 };
 
