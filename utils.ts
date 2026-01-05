@@ -59,35 +59,23 @@ export const calculateStreak = (logs: DailyLog[]): number => {
   return streak;
 };
 
-export const getLast7DaysStats = (
-  logs: DailyLog[]
-): { date: string; hours: number }[] => {
-  const stats: { date: string; hours: number }[] = [];
+export const getLast7DaysStats = (logs: DailyLog[]) => {
+  const map = new Map<string, number>();
 
-  // Build last 7 IST date STRINGS only
-  const dates: string[] = [];
-  let base = new Date();
-
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(d.getDate() - i);
-    dates.push(getISTDateString(d));
+  // Sum hours per date
+  for (const log of logs) {
+    map.set(log.date, (map.get(log.date) || 0) + log.hours);
   }
 
-  for (const dateStr of dates) {
-    const totalHours = logs
-      .filter(l => l.date === dateStr)
-      .reduce((sum, l) => sum + l.hours, 0);
+  // Get unique dates, sorted descending
+  const sortedDates = Array.from(map.keys()).sort().slice(-7);
 
-    stats.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(
-        new Date(dateStr + "T12:00:00")
-      ),
-      hours: Number(totalHours.toFixed(1))
-    });
-  }
-
-  return stats;
+  // Build stats
+  return sortedDates.map(dateStr => ({
+    date: new Intl.DateTimeFormat('en-US', { weekday: 'short' })
+      .format(new Date(dateStr + 'T12:00:00')),
+    hours: Number(map.get(dateStr)?.toFixed(1) || 0)
+  }));
 };
 export const getSubjectDistribution = (logs: DailyLog[]): Record<Subject, number> => {
   const dist: Record<Subject, number> = { Physics: 0, Chemistry: 0, Maths: 0 };
