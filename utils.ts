@@ -59,29 +59,33 @@ export const calculateStreak = (logs: DailyLog[]): number => {
   return streak;
 };
 
-export const getLast7DaysStats = (logs: DailyLog[]): { date: string, hours: number }[] => {
-  const stats = [];
+export const getLast7DaysStats = (
+  logs: DailyLog[]
+): { date: string; hours: number }[] => {
+  const stats: { date: string; hours: number }[] = [];
+
+  // Anchor to "today" in IST
+  const todayStr = getISTDateString();
+  const todayDate = new Date(todayStr);
 
   for (let i = 6; i >= 0; i--) {
-    // IMPORTANT: generate the date using IST directly
-    const dateStr = getISTDateString(
-      new Date(Date.now() - i * 86400000)
-    );
+    const d = new Date(todayDate);
+    d.setDate(d.getDate() - i);
+
+    const dateStr = getISTDateString(d);
 
     const totalHours = logs
       .filter(l => l.date === dateStr)
-      .reduce((acc, l) => acc + l.hours, 0);
+      .reduce((sum, l) => sum + l.hours, 0);
 
     stats.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' })
-        .format(new Date(dateStr)),
+      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d),
       hours: Number(totalHours.toFixed(1))
     });
   }
 
   return stats;
 };
-
 export const getSubjectDistribution = (logs: DailyLog[]): Record<Subject, number> => {
   const dist: Record<Subject, number> = { Physics: 0, Chemistry: 0, Maths: 0 };
   const today = getISTDateString();
