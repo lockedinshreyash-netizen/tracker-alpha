@@ -450,7 +450,7 @@ const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], 
               <div key={i} className="flex flex-col items-center flex-1 gap-2">
                 <div 
                   className="w-full bg-[#E10600] rounded-t transition-all duration-1000" 
-                  style={{ height: `${d.hours * 15}%` }}
+                  style={{ height: `${Math.min(100, (d.hours / 12) * 100)}%` }} 
                 />
                 <span className="text-[10px] font-black uppercase text-zinc-600">{d.date}</span>
               </div>
