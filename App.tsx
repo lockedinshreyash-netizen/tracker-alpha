@@ -1002,7 +1002,7 @@ const TodayTab = ({
     return () => clearInterval(interval);
   }, [wipeHoldStart]);
 
-  .const handleStartTimer = () => {
+  const handleStartTimer = () => {
     onTimerUpdate({ isRunning: true, startTime: Date.now(), subject: manualSubject });
   };
 
@@ -1154,7 +1154,7 @@ const TodayTab = ({
         </div>
       </section>
 
-      
+
     </div>
   );
 };
