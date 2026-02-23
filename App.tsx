@@ -663,17 +663,23 @@ const App: React.FC = () => {
         quality: quality,
         distractions: distractions
       };
-      return { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
+      const nextState = { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
+      stateRef.current = nextState;
+      return nextState;
     });
   };
 
   const deleteLog = (id: string) => {
     if (window.confirm("ERASE SESSION? This cannot be undone.")) {
-      setState(prev => ({
-        ...prev,
-        logs: prev.logs.filter(log => log.id !== id),
-        lastUpdated: Date.now()
-      }));
+      setState(prev => {
+        const nextState = {
+          ...prev,
+          logs: prev.logs.filter(log => log.id !== id),
+          lastUpdated: Date.now()
+        };
+        stateRef.current = nextState;
+        return nextState;
+      });
     }
   };
 
@@ -684,44 +690,66 @@ const App: React.FC = () => {
       const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
       const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
       const filteredProgress = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
-      return {
+      const nextState = {
         ...prev,
         progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }],
         lastUpdated: Date.now()
       };
+      stateRef.current = nextState;
+      return nextState;
     });
   };
 
   const updateTimer = (timerUpdate: Partial<TimerState>) => {
-    setState(prev => ({ ...prev, timer: { ...prev.timer!, ...timerUpdate } }));
+    setState(prev => {
+      const nextState = { ...prev, timer: { ...prev.timer!, ...timerUpdate } };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const addTask = (text: string, subject: Subject | 'General') => {
-    setState(prev => ({
-      ...prev,
-      tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
-      lastUpdated: Date.now()
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const toggleTask = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
-      lastUpdated: Date.now()
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const deleteTask = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      tasks: prev.tasks.filter(t => t.id !== id),
-      lastUpdated: Date.now()
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.filter(t => t.id !== id),
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const updateDailyGoal = (val: number) => {
-    setState(prev => ({ ...prev, dailyGoalHours: val, lastUpdated: Date.now() }));
+    setState(prev => {
+      const nextState = { ...prev, dailyGoalHours: val, lastUpdated: Date.now() };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const clearLogs = () => {
