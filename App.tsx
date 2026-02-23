@@ -1027,6 +1027,29 @@ const App: React.FC = () => {
             onToggleTask={toggleTask}
             onDeleteTask={deleteTask}
             onUpdateDailyGoal={updateDailyGoal}
+            onAddAllowedSite={(url: string) =>
+              setState(prev => {
+                if (prev.allowList.includes(url)) return prev;
+                const nextState = {
+                  ...prev,
+                  allowList: [...prev.allowList, url],
+                  lastUpdated: Date.now(),
+                };
+                stateRef.current = nextState;
+                return nextState;
+              })
+            }
+            onRemoveAllowedSite={(url: string) =>
+              setState(prev => {
+                const nextState = {
+                  ...prev,
+                  allowList: prev.allowList.filter(u => u !== url),
+                  lastUpdated: Date.now(),
+                };
+                stateRef.current = nextState;
+                return nextState;
+              })
+            }
             theme={theme}
           />
         )}
@@ -1076,9 +1099,11 @@ const TodayTab = ({
   onToggleTask,
   onDeleteTask,
   onUpdateDailyGoal,
-  theme
+  onAddAllowedSite,
+  onRemoveAllowedSite,
+  theme,
 }: any) => {
-  const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours } = state;
+  const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours, allowList } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
   const [showWarning, setShowWarning] = useState(false);
@@ -1086,8 +1111,11 @@ const TodayTab = ({
   const [quoteIdx, setQuoteIdx] = useState(0);
   const [wipeHoldStart, setWipeHoldStart] = useState<number | null>(null);
   const [wipeProgress, setWipeProgress] = useState(0);
+  const [allowedUrlInput, setAllowedUrlInput] = useState('');
 
   const timerRef = useRef(timer);
+  const ignoreFullscreenExitRef = useRef(false);
+  const wasHiddenRef = useRef(false);
   useEffect(() => { timerRef.current = timer; }, [timer]);
 
   const REQUIRED_FOCUS_MS = 15 * 60 * 1000;
@@ -1108,22 +1136,56 @@ const TodayTab = ({
   }, [timer.isRunning, timer.startTime, timer.accumulatedMs]);
 
   useEffect(() => {
-    if (timer.isLockInActive) {
-      const handleFsChange = () => {
-        if (!document.fullscreenElement) {
-          onTimerUpdate({
-            isRunning: false,
-            accumulatedMs: Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs,
-            startTime: null,
-            distractions: (timerRef.current.distractions || 0) + 1
-          });
-          setShowBreach(true);
+    if (!timer.isLockInActive) return;
+
+    const handleFsChange = () => {
+      // Only treat deliberate fullscreen exits as breaches.
+      if (!document.fullscreenElement) {
+        if (ignoreFullscreenExitRef.current) {
+          // Allowed website navigation or controlled transitions.
+          ignoreFullscreenExitRef.current = false;
+          return;
         }
-      };
-      document.addEventListener('fullscreenchange', handleFsChange);
-      return () => document.removeEventListener('fullscreenchange', handleFsChange);
-    }
+        onTimerUpdate({
+          isRunning: false,
+          accumulatedMs:
+            Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs,
+          startTime: null,
+          distractions: (timerRef.current.distractions || 0) + 1,
+        });
+        setShowBreach(true);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, [timer.isLockInActive, onTimerUpdate]);
+
+  // Page Visibility handling – keep session running when screen turns off,
+  // and distinguish that from deliberate fullscreen exit.
+  useEffect(() => {
+    if (!timer.isLockInActive) return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        wasHiddenRef.current = true;
+      } else if (document.visibilityState === 'visible') {
+        // If we were simply hidden (e.g. screen off on mobile) and fullscreen was lost,
+        // attempt to restore fullscreen without counting it as a breach.
+        if (wasHiddenRef.current && !document.fullscreenElement) {
+          ignoreFullscreenExitRef.current = true;
+          document.documentElement.requestFullscreen().catch(() => {
+            // If this fails the user can manually re-enter fullscreen;
+            // we still don't count this as a breach.
+          });
+        }
+        wasHiddenRef.current = false;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [timer.isLockInActive]);
 
   useEffect(() => {
     if (timer.isLockInActive) {
@@ -1279,6 +1341,36 @@ const TodayTab = ({
             )}
           </div>
         </div>
+
+        {allowList.length > 0 && (
+          <div className="mt-10 w-full max-w-md mx-auto text-center">
+            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2">
+              Allowed Websites (PC Only)
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {allowList.map(url => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => {
+                    ignoreFullscreenExitRef.current = true;
+                    window.open(url, '_blank', 'noopener');
+                  }}
+                  className="px-3 py-1.5 rounded-full border border-zinc-700 text-[9px] font-bold text-zinc-300 hover:border-[#E10600] hover:text-white transition-colors max-w-[180px] truncate"
+                >
+                  {(() => {
+                    try {
+                      const u = new URL(url);
+                      return u.hostname;
+                    } catch {
+                      return url;
+                    }
+                  })()}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1318,6 +1410,69 @@ const TodayTab = ({
               </div>
             ))}
           </div>
+
+          {/* Allowed websites configuration for LOCK-IN (PC) – editable only before session starts */}
+          {!timer.isLockInActive && (
+            <div className="mt-4 space-y-3">
+              <h4 className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                Allowed Websites (LOCK-IN)
+              </h4>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="https://example.com"
+                  className={`flex-1 text-[11px] px-3 py-2 rounded-lg border font-bold ${
+                    theme === 'dark'
+                      ? 'bg-[#0B0B0D] border-[#27272a] text-white'
+                      : 'bg-zinc-50 border-zinc-200 text-black'
+                  }`}
+                  value={allowedUrlInput}
+                  onChange={e => setAllowedUrlInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const raw = allowedUrlInput.trim();
+                    if (!raw) return;
+                    let url = raw;
+                    if (!/^https?:\/\//i.test(url)) {
+                      url = `https://${url}`;
+                    }
+                    if (!allowList.includes(url)) {
+                      onAddAllowedSite(url);
+                    }
+                    setAllowedUrlInput('');
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-red-700 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {allowList.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {allowList.map(url => (
+                    <div
+                      key={url}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold ${
+                        theme === 'dark'
+                          ? 'border-zinc-800 bg-[#09090b] text-zinc-300'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-700'
+                      }`}
+                    >
+                      <span className="truncate max-w-[140px]">{url}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveAllowedSite(url)}
+                        className="text-zinc-500 hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
