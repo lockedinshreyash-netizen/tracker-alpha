@@ -16,15 +16,15 @@ const generateId = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
-const DEFAULT_STATE: AppState = { 
-  currentClass: 11, 
-  logs: [], 
-  progress: [], 
-  lastUsedTab: 'Today', 
-  timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics', isLockInActive: false, distractions: 0 }, 
-  isLockInModeEnabled: false, 
-  allowList: [], 
-  tasks: [], 
+const DEFAULT_STATE: AppState = {
+  currentClass: 11,
+  logs: [],
+  progress: [],
+  lastUsedTab: 'Today',
+  timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics', isLockInActive: false, distractions: 0 },
+  isLockInModeEnabled: false,
+  allowList: [],
+  tasks: [],
   theme: 'dark',
   dailyGoalHours: 8,
   lastUpdated: 0
@@ -40,126 +40,21 @@ const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean,
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-    setLoading(true);
-    setError(null);
-    setSuccessMsg(null);
-
-    try {
-      if (mode === 'signup') {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (signUpError) throw signUpError;
-        setSuccessMsg("VERIFICATION SENT: Check your inbox to activate cloud sync.");
-        setEmail('');
-        setPassword('');
-      } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) throw signInError;
-        onAuthSuccess();
-        onClose();
-      }
-    } catch (err: any) {
-      setError(err.message || "An authentication error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-300">
-      <div className={`max-w-md w-full p-8 md:p-10 border-2 rounded-2xl relative ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800' : 'bg-white border-zinc-200 shadow-2xl'}`}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white font-black text-xl">×</button>
-        <h2 className="text-2xl font-black italic tracking-tighter mb-2 text-[#E10600]">
-          {mode === 'login' ? 'ACCESS ACCOUNT' : 'ENLIST NOW'}
-        </h2>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-8 leading-relaxed">
-          {mode === 'login' ? 'Resume your mission. Synchronize local progress.' : 'Create a permanent record. Enable cross-device persistence.'}
-        </p>
-        
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Email Address</label>
-            <input 
-              type="email" 
-              required
-              placeholder="YOUR@EMAIL.COM" 
-              className={`w-full p-4 text-xs font-bold uppercase border focus:outline-none focus:ring-1 focus:ring-[#E10600] transition-all ${theme === 'dark' ? 'bg-[#141417] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Secret Key (Password)</label>
-            <input 
-              type="password" 
-              required
-              placeholder="••••••••" 
-              className={`w-full p-4 text-xs font-bold uppercase border focus:outline-none focus:ring-1 focus:ring-[#E10600] transition-all ${theme === 'dark' ? 'bg-[#141417] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          
-          <button 
-            type="submit"
-            disabled={loading}
-            className={`w-full py-5 mt-4 bg-[#E10600] text-white font-black uppercase tracking-[0.3em] hover:bg-red-700 transition-all rounded-xl disabled:opacity-50 shadow-lg shadow-red-900/20`}
-          >
-            {loading ? 'PROCESSING...' : (mode === 'login' ? 'LOGIN & SYNC' : 'CREATE ACCOUNT')}
-          </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-zinc-900 text-center">
-          <button 
-            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setSuccessMsg(null); setError(null); }}
-            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-[#E10600] transition-colors"
-          >
-            {mode === 'login' ? "DON'T HAVE AN ACCOUNT? SIGN UP" : "ALREADY ENLISTED? LOG IN"}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-6 p-4 border border-red-900/50 text-red-500 bg-red-500/5 text-[10px] font-black uppercase text-center animate-in zoom-in-95 duration-200">
-            {error}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mt-6 p-4 border border-green-900/50 text-green-500 bg-green-500/5 text-[10px] font-black uppercase text-center animate-in zoom-in-95 duration-200">
-            {successMsg}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const Header = ({ 
-  currentClass, 
-  onClassChange, 
-  daysRemaining, 
-  theme, 
+const Header = ({
+  currentClass,
+  onClassChange,
+  daysRemaining,
+  theme,
   onToggleTheme,
   installPrompt,
   onInstall,
   syncStatus,
   user,
   onOpenAuth
-}: { 
-  currentClass: 11 | 12, 
-  onClassChange: (c: 11 | 12) => void, 
-  daysRemaining: number, 
+}: {
+  currentClass: 11 | 12,
+  onClassChange: (c: 11 | 12) => void,
+  daysRemaining: number,
   theme: 'dark' | 'light',
   onToggleTheme: () => void,
   installPrompt: any,
@@ -194,7 +89,7 @@ const Header = ({
         </div>
         <div className="flex gap-2">
           {!user && (
-            <button 
+            <button
               onClick={onOpenAuth}
               className={`text-[10px] font-black uppercase px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-white transition-all`}
             >
@@ -202,20 +97,20 @@ const Header = ({
             </button>
           )}
           {installPrompt && (
-            <button 
+            <button
               onClick={onInstall}
               className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
             >
               INSTALL
             </button>
           )}
-          <button 
+          <button
             onClick={onToggleTheme}
             className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
-          <button 
+          <button
             onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
             className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
           >
@@ -228,7 +123,7 @@ const Header = ({
 };
 
 const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: TabType, onTabChange: (t: TabType) => void, isLockInActive: boolean, theme: 'dark' | 'light' }) => {
-  if (isLockInActive) return null; 
+  if (isLockInActive) return null;
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Review'];
   return (
     <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/80 backdrop-blur-md border-[#1F1F23]' : 'bg-white/80 backdrop-blur-md border-zinc-200 shadow-lg'}`}>
@@ -250,14 +145,14 @@ const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: 
   );
 };
 
-const TaskSection = ({ 
-  tasks, 
-  onAddTask, 
-  onToggleTask, 
-  onDeleteTask, 
+const TaskSection = ({
+  tasks,
+  onAddTask,
+  onToggleTask,
+  onDeleteTask,
   activeSubject,
   theme,
-  minimal = false 
+  minimal = false
 }: any) => {
   const [newTaskText, setNewTaskText] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<Subject | 'General'>('General');
@@ -281,7 +176,7 @@ const TaskSection = ({
            <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>FOCUS TASKS</h3>
         </div>
       )}
-      
+
       {!minimal && (
         <div className="space-y-3 mb-6">
           <div className="flex flex-wrap gap-2">
@@ -296,15 +191,15 @@ const TaskSection = ({
             ))}
           </div>
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder={`ADD ${selectedSubject.toUpperCase()} TASK...`} 
+            <input
+              type="text"
+              placeholder={`ADD ${selectedSubject.toUpperCase()} TASK...`}
               className={`flex-1 text-xs p-3 md:p-4 focus:outline-none focus:ring-1 focus:ring-[#E10600] font-bold uppercase border transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#2F2F33] text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
               value={newTaskText}
               onChange={e => setNewTaskText(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAdd()}
             />
-            <button 
+            <button
               onClick={handleAdd}
               className={`text-[10px] font-black px-4 md:px-8 transition-all ${theme === 'dark' ? 'bg-white text-black hover:bg-zinc-300' : 'bg-black text-white hover:bg-zinc-800'}`}
             >
@@ -320,11 +215,11 @@ const TaskSection = ({
             <p className="text-[10px] font-black uppercase tracking-widest italic">No Pending Tasks</p>
           </div>
         ) : filteredTasks.map((task: any) => (
-          <div 
-            key={task.id} 
+          <div
+            key={task.id}
             className={`flex items-start gap-4 p-4 border rounded-lg transition-all group ${task.completed ? 'opacity-30' : 'hover:border-[#E10600]'} ${theme === 'dark' ? 'border-[#1F1F23] bg-[#141417]' : 'border-zinc-100 bg-white shadow-sm'}`}
           >
-            <button 
+            <button
               onClick={() => onToggleTask(task.id)}
               className={`mt-1 w-5 h-5 border-2 rounded-md flex items-center justify-center transition-all ${task.completed ? 'bg-[#E10600] border-[#E10600]' : 'border-zinc-700'}`}
             >
@@ -390,8 +285,8 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
           </div>
         </div>
         <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-[#E10600] transition-all duration-700" 
+          <div
+            className="h-full bg-[#E10600] transition-all duration-700"
             style={{ width: `${subjectStats.percent}%` }}
           />
         </div>
@@ -404,7 +299,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
           const colors = STATUS_COLORS[status as SyllabusStatus];
 
           return (
-            <div 
+            <div
               key={chapter}
               onClick={() => onToggle(currentClass, activeSubject, chapter)}
               className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[120px] ${colors.border} ${colors.bg} ${theme === 'dark' ? '' : 'shadow-sm'}`}
@@ -431,7 +326,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
 
 const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], theme: 'dark' | 'light' }) => {
   const days = getLast7DaysStats(logs);
-  
+
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
       <div className="text-center py-10 md:py-16 rounded-3xl border-2 border-dashed border-[#E10600] bg-[#E10600]/5">
@@ -442,21 +337,21 @@ const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], 
          <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 mt-4">DAYS OF UNDIVIDED FOCUS</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-8">PAST 7 DAYS ACTIVITY</h3>
-          <div className="flex items-end justify-between h-40 gap-2">
-            {days.map((d, i) => (
-              <div key={i} className="flex flex-col items-center flex-1 gap-2">
-                <div 
-                  className="w-full bg-[#E10600] rounded-t transition-all duration-1000" 
-                  style={{ height: `${Math.min(100, (d.hours / 12) * 100)}%` }} 
-                />
-                <span className="text-[10px] font-black uppercase text-zinc-600">{d.date}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      //<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        //<div className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+          //<h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-8">PAST 7 DAYS ACTIVITY</h3>
+          //<div className="flex items-end justify-between h-40 gap-2">
+          //  {days.map((d, i) => (
+              //<div key={i} className="flex flex-col items-center flex-1 gap-2">
+              //  <div
+                //  className="w-full bg-[#E10600] rounded-t transition-all duration-1000"
+              //    style={{ height: `${Math.min(100, (d.hours / 12) * 100)}%` }}
+              //  />
+            //    <span className="text-[10px] font-black uppercase text-zinc-600">{d.date}</span>
+        //      </div>
+          //  ))}
+      //    </div>
+    //    </div>
 
         <div className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
           <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">CONSISTENCY ADVICE</p>
@@ -478,7 +373,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500 mb-6">COMPOSITE PERFORMANCE</p>
           <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4">{score}</h2>
           <p className="text-xs font-black uppercase tracking-widest text-zinc-400">LOCK-IN SCORE / 100</p>
-          
+
           <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
             <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
           </div>
@@ -511,21 +406,21 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
         <div className="flex gap-4 flex-wrap justify-center">
           {user ? (
-            <button 
+            <button
               onClick={onSignOut}
               className="px-6 py-3 text-[10px] font-black uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all rounded-xl"
             >
               Log Out
             </button>
           ) : (
-            <button 
+            <button
               onClick={onOpenAuth}
               className="px-6 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl shadow-lg shadow-red-900/20"
             >
               Sign In to Sync
             </button>
           )}
-          <button 
+          <button
             onClick={onClearData}
             className="px-6 py-3 text-[10px] font-black uppercase border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-all rounded-xl"
           >
@@ -557,7 +452,7 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
-  
+
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
@@ -636,31 +531,44 @@ const App: React.FC = () => {
 
       if (data && data.state) {
         const remoteState = data.state as AppState;
-        
-        // Strategy: Cloud is truth for cross-device consistency. 
-        // Only merge local logs if they are unique and the app was offline.
+
         setState(localState => {
           preventSyncOnUpdate.current = true;
-          
-          // Merging logic that allows for deletions: 
-          // If cloud timestamp is significantly newer, replace.
-          // Otherwise, union unique logs/tasks for initial transition.
-          const mergedLogs = [...remoteState.logs];
-          localState.logs.forEach(l => {
-             if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
-          });
-          
-          const mergedTasks = [...remoteState.tasks];
-          localState.tasks.forEach(t => {
-             if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
+
+          const cloudIsNewer = (remoteState.lastUpdated || 0) >= (localState.lastUpdated || 0);
+
+          if (cloudIsNewer) {
+            // Cloud is the source of truth for cross‑device consistency.
+            // This ensures server-side deletions (like task removal) propagate everywhere.
+            return {
+              ...localState,
+              ...remoteState,
+              // Preserve UI‑only preferences from the current device.
+              lastUsedTab: localState.lastUsedTab,
+              theme: localState.theme,
+            };
+          }
+
+          // Local is newer: merge in any unique remote logs/tasks without resurrecting deletions.
+          const mergedLogs = [...localState.logs];
+          remoteState.logs.forEach(l => {
+            if (!mergedLogs.some(rl => rl.id === l.id)) mergedLogs.push(l);
           });
 
-          return { 
-            ...localState, 
-            ...remoteState, 
-            logs: mergedLogs, 
+          const mergedTasks = [...localState.tasks];
+          remoteState.tasks.forEach(t => {
+            if (!mergedTasks.some(rt => rt.id === t.id)) mergedTasks.push(t);
+          });
+
+          return {
+            ...localState,
+            ...remoteState,
+            logs: mergedLogs,
             tasks: mergedTasks,
-            lastUpdated: Math.max(localState.lastUpdated, remoteState.lastUpdated)
+            lastUpdated: localState.lastUpdated,
+            // Preserve UI‑only preferences from the current device.
+            lastUsedTab: localState.lastUsedTab,
+            theme: localState.theme,
           };
         });
       }
@@ -676,7 +584,7 @@ const App: React.FC = () => {
 
   const triggerSync = async () => {
     if (!user || !isInitialSyncDone.current || preventSyncOnUpdate.current) return;
-    
+
     if (isSyncingRef.current) {
       pendingSyncRef.current = true;
       return;
@@ -684,13 +592,13 @@ const App: React.FC = () => {
 
     isSyncingRef.current = true;
     setSyncStatus('syncing');
-    
+
     try {
       const newState = { ...stateRef.current, lastUpdated: Date.now() };
       const { error } = await supabase
         .from('user_profiles')
         .upsert({ id: user.id, state: newState, updated_at: new Date() });
-      
+
       if (error) throw error;
       setSyncStatus('synced');
     } catch (err) {
@@ -748,7 +656,7 @@ const App: React.FC = () => {
     const today = getISTDateString();
     setState(prev => {
       const newLog: DailyLog = {
-        id: generateId(), 
+        id: generateId(),
         date: today,
         subject,
         hours: parseFloat(hours.toFixed(2)),
@@ -761,10 +669,10 @@ const App: React.FC = () => {
 
   const deleteLog = (id: string) => {
     if (window.confirm("ERASE SESSION? This cannot be undone.")) {
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         logs: prev.logs.filter(log => log.id !== id),
-        lastUpdated: Date.now() 
+        lastUpdated: Date.now()
       }));
     }
   };
@@ -776,8 +684,8 @@ const App: React.FC = () => {
       const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
       const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
       const filteredProgress = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
-      return { 
-        ...prev, 
+      return {
+        ...prev,
         progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }],
         lastUpdated: Date.now()
       };
@@ -789,24 +697,24 @@ const App: React.FC = () => {
   };
 
   const addTask = (text: string, subject: Subject | 'General') => {
-    setState(prev => ({ 
-      ...prev, 
+    setState(prev => ({
+      ...prev,
       tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
       lastUpdated: Date.now()
     }));
   };
 
   const toggleTask = (id: string) => {
-    setState(prev => ({ 
-      ...prev, 
+    setState(prev => ({
+      ...prev,
       tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
       lastUpdated: Date.now()
     }));
   };
 
   const deleteTask = (id: string) => {
-    setState(prev => ({ 
-      ...prev, 
+    setState(prev => ({
+      ...prev,
       tasks: prev.tasks.filter(t => t.id !== id),
       lastUpdated: Date.now()
     }));
@@ -832,11 +740,11 @@ const App: React.FC = () => {
   return (
     <div className={`min-h-screen pb-24 relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${isCurrentlyLockInActive ? 'bg-black' : (theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-white text-black')}`}>
       {!isCurrentlyLockInActive && (
-        <Header 
-          currentClass={state.currentClass} 
-          onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))} 
-          daysRemaining={daysRemaining} 
-          theme={theme} 
+        <Header
+          currentClass={state.currentClass}
+          onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
+          daysRemaining={daysRemaining}
+          theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
           installPrompt={null}
           onInstall={() => {}}
@@ -846,21 +754,21 @@ const App: React.FC = () => {
         />
       )}
 
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
         theme={theme}
         onAuthSuccess={() => {
-          isInitialSyncDone.current = false; 
+          isInitialSyncDone.current = false;
           setSyncStatus('syncing');
         }}
       />
 
       <main className={`max-w-5xl mx-auto w-full relative z-20 ${isCurrentlyLockInActive ? 'p-0' : 'px-4 md:px-6 py-8'}`}>
         {activeTab === 'Today' && (
-          <TodayTab 
+          <TodayTab
             state={state}
-            onLog={logStudy} 
+            onLog={logStudy}
             onDeleteLog={deleteLog}
             onTimerUpdate={updateTimer}
             onToggleLockInMode={(val: boolean) => setState(p => ({ ...p, isLockInModeEnabled: val }))}
@@ -872,18 +780,18 @@ const App: React.FC = () => {
           />
         )}
         {!isCurrentlyLockInActive && activeTab === 'Syllabus' && (
-          <SyllabusTab 
-            currentClass={state.currentClass} 
-            progress={state.progress} 
-            onToggle={toggleChapterStatus} 
+          <SyllabusTab
+            currentClass={state.currentClass}
+            progress={state.progress}
+            onToggle={toggleChapterStatus}
             theme={theme}
           />
         )}
         {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} theme={theme} />}
         {!isCurrentlyLockInActive && activeTab === 'Review' && (
-          <ReviewTab 
-            logs={state.logs} 
-            score={lockInScore} 
+          <ReviewTab
+            logs={state.logs}
+            score={lockInScore}
             onClearData={clearLogs}
             theme={theme}
             user={user}
@@ -898,9 +806,9 @@ const App: React.FC = () => {
   );
 };
 
-const TodayTab = ({ 
+const TodayTab = ({
   state,
-  onLog, 
+  onLog,
   onDeleteLog,
   onTimerUpdate,
   onToggleLockInMode,
@@ -908,7 +816,7 @@ const TodayTab = ({
   onToggleTask,
   onDeleteTask,
   onUpdateDailyGoal,
-  theme 
+  theme
 }: any) => {
   const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
@@ -918,12 +826,12 @@ const TodayTab = ({
   const [quoteIdx, setQuoteIdx] = useState(0);
   const [wipeHoldStart, setWipeHoldStart] = useState<number | null>(null);
   const [wipeProgress, setWipeProgress] = useState(0);
-  
+
   const timerRef = useRef(timer);
   useEffect(() => { timerRef.current = timer; }, [timer]);
 
-  const REQUIRED_FOCUS_MS = 15 * 60 * 1000; 
-  const WIPE_HOLD_MS = 15000; 
+  const REQUIRED_FOCUS_MS = 15 * 60 * 1000;
+  const WIPE_HOLD_MS = 15000;
 
   const [currentDisplayMs, setCurrentDisplayMs] = useState(0);
 
@@ -943,11 +851,11 @@ const TodayTab = ({
     if (timer.isLockInActive) {
       const handleFsChange = () => {
         if (!document.fullscreenElement) {
-          onTimerUpdate({ 
-            isRunning: false, 
-            accumulatedMs: Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs, 
+          onTimerUpdate({
+            isRunning: false,
+            accumulatedMs: Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs,
             startTime: null,
-            distractions: (timerRef.current.distractions || 0) + 1 
+            distractions: (timerRef.current.distractions || 0) + 1
           });
           setShowBreach(true);
         }
@@ -1028,14 +936,14 @@ const TodayTab = ({
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const todayLogs = useMemo(() => 
-    logs.filter((l: any) => l.date === getISTDateString()).reverse(), 
+  const todayLogs = useMemo(() =>
+    logs.filter((l: any) => l.date === getISTDateString()).reverse(),
   [logs]);
 
   const totalToday = todayLogs.reduce((a: any, b: any) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
   const subjectDist = getSubjectDistribution(logs);
-  
+
   const canEndSession = currentDisplayMs >= REQUIRED_FOCUS_MS;
   const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - currentDisplayMs);
 
@@ -1046,14 +954,14 @@ const TodayTab = ({
           <div className="absolute inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
              <h2 className="text-[#E10600] text-3xl md:text-5xl font-black italic tracking-tighter mb-4">SESSION BREACHED</h2>
              <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center">Focus interrupted. Session paused. 1 Distraction recorded.</p>
-             <button 
+             <button
                onClick={handleResumeBreach}
                className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
              >
                RESUME FOCUS
              </button>
              <div className="mt-12 relative flex flex-col items-center">
-                <button 
+                <button
                   onMouseDown={() => setWipeHoldStart(Date.now())}
                   onMouseUp={() => setWipeHoldStart(null)}
                   onMouseLeave={() => setWipeHoldStart(null)}
@@ -1081,22 +989,22 @@ const TodayTab = ({
            <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
            {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
-        
+
         <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
-          <button 
+          <button
             disabled={!canEndSession}
             onClick={handleStopTimer}
             className={`w-full py-6 md:py-8 font-black uppercase tracking-[0.4em] md:tracking-[0.6em] border-2 transition-all rounded-xl active:scale-95 ${canEndSession ? 'bg-white text-black border-white hover:bg-transparent hover:text-white shadow-[0_0_50px_rgba(255,255,255,0.05)]' : 'bg-zinc-900 text-zinc-700 border-zinc-800 opacity-50 cursor-not-allowed'}`}
           >
             {canEndSession ? 'SESSION FINISHED' : `LOCK-OUT: ${formatTime(timeRemainingToEnd)}`}
           </button>
-          
+
           <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mt-2">
              <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((currentDisplayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
           </div>
-          
+
           <div className="relative w-full mt-8 flex flex-col items-center">
-            <button 
+            <button
               onMouseDown={() => setWipeHoldStart(Date.now())}
               onMouseUp={() => setWipeHoldStart(null)}
               onMouseLeave={() => setWipeHoldStart(null)}
@@ -1141,7 +1049,7 @@ const TodayTab = ({
               </div>
             </div>
           </div>
-          
+
           <div className="w-full grid grid-cols-3 gap-2 md:gap-4">
             {(['Physics', 'Chemistry', 'Maths'] as Subject[]).map(s => (
               <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
@@ -1157,14 +1065,14 @@ const TodayTab = ({
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
         <p className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-6">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
         <p className="text-[14vw] md:text-8xl font-mono font-black tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
-        
+
         {!timer.isRunning ? (
           <>
             <div className="flex flex-wrap justify-center gap-2 mt-10">
               {(['Physics', 'Chemistry', 'Maths'] as Subject[]).map(s => (
-                <button 
-                  key={s} 
-                  onClick={() => setManualSubject(s)} 
+                <button
+                  key={s}
+                  onClick={() => setManualSubject(s)}
                   className={`px-4 md:px-6 py-2 text-[10px] font-black uppercase border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg' : 'border-zinc-800 text-zinc-500 hover:border-zinc-500'}`}
                 >
                   {s}
@@ -1172,13 +1080,13 @@ const TodayTab = ({
               ))}
             </div>
             <div className="flex flex-col items-center mt-8 gap-4">
-              <button 
-                onClick={handleStartTimer} 
+              <button
+                onClick={handleStartTimer}
                 className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-200 transition-all active:scale-95 shadow-2xl rounded-xl"
               >
                 START SESSION
               </button>
-              <button 
+              <button
                 onClick={() => isLockInModeEnabled ? onToggleLockInMode(false) : setShowWarning(true)}
                 className={`text-[9px] font-black uppercase tracking-widest px-6 py-2 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-zinc-800 text-zinc-500'}`}
               >
@@ -1196,8 +1104,8 @@ const TodayTab = ({
                    ))}
                 </div>
              </div>
-             <button 
-                onClick={handleStopTimer} 
+             <button
+                onClick={handleStopTimer}
                 className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/20 rounded-xl"
              >
                END SESSION
@@ -1222,8 +1130,8 @@ const TodayTab = ({
                   <p className="text-[8px] font-black text-[#E10600] uppercase mb-0.5">{l.subject}</p>
                   <p className="text-base font-black italic">{l.hours}h <span className="text-[10px] not-italic text-zinc-500 font-bold ml-2">Q: {l.quality}/5</span></p>
                 </div>
-                <button 
-                  onClick={() => onDeleteLog(l.id)} 
+                <button
+                  onClick={() => onDeleteLog(l.id)}
                   className="text-[10px] font-black uppercase text-zinc-600 hover:text-red-500 px-3 py-1 border border-zinc-800 rounded opacity-40 group-hover:opacity-100 transition-all"
                 >
                   WIPE
