@@ -32,6 +32,50 @@ const DEFAULT_STATE: AppState = {
 
 // --- Sub-components ---
 
+const InstallBanner = ({
+  visible,
+  onInstall,
+  onDismiss,
+  theme,
+}: {
+  visible: boolean;
+  onInstall: () => void;
+  onDismiss: () => void;
+  theme: 'dark' | 'light';
+}) => {
+  if (!visible) return null;
+
+  return (
+    <div className="fixed left-0 right-0 bottom-16 z-40 px-4">
+      <div
+        className={`max-w-5xl mx-auto flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg ${
+          theme === 'dark'
+            ? 'bg-[#141417] border-[#27272a] text-white'
+            : 'bg-white border-zinc-200 text-black'
+        }`}
+      >
+        <p className="text-[11px] font-black uppercase tracking-widest">
+          Add to Home Screen for the best experience
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onDismiss}
+            className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-zinc-600 text-zinc-400 hover:text-white hover:border-zinc-300 transition-colors"
+          >
+            Dismiss
+          </button>
+          <button
+            onClick={onInstall}
+            className="text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full bg-[#E10600] text-white hover:bg-red-700 transition-colors"
+          >
+            Install
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AuthModal = ({
   isOpen,
   onClose,
@@ -568,6 +612,9 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
 
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
@@ -577,6 +624,47 @@ const App: React.FC = () => {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Handle PWA install banner (mobile only)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+
+    const isMobile =
+      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      window.matchMedia('(pointer: coarse)').matches;
+
+    const alreadyInstalled =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      // iOS Safari
+      (navigator as any).standalone ||
+      localStorage.getItem('pwa_installed') === '1';
+
+    const dismissedThisSession = sessionStorage.getItem('install_banner_dismissed') === '1';
+
+    if (!isMobile || alreadyInstalled || dismissedThisSession) {
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    const handleAppInstalled = () => {
+      localStorage.setItem('pwa_installed', '1');
+      setShowInstallBanner(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   // Handle Auth and Initial Fetch
   useEffect(() => {
@@ -766,6 +854,26 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, lastUsedTab: tab }));
   };
 
+  const handleInstallBannerDismiss = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('install_banner_dismissed', '1');
+  };
+
+  const handleInstallBannerInstall = async () => {
+    if (!deferredPrompt) return;
+    try {
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      if (choiceResult.outcome === 'accepted') {
+        localStorage.setItem('pwa_installed', '1');
+        setShowInstallBanner(false);
+      }
+    } catch {
+      // ignore; user can try again
+    }
+  };
+
   const logStudy = (subject: Subject, hours: number, quality: number, distractions: number) => {
     if (hours <= 0) return;
     const today = getISTDateString();
@@ -943,6 +1051,15 @@ const App: React.FC = () => {
           />
         )}
       </main>
+
+      {!isCurrentlyLockInActive && (
+        <InstallBanner
+          visible={showInstallBanner && !!deferredPrompt}
+          onInstall={handleInstallBannerInstall}
+          onDismiss={handleInstallBannerDismiss}
+          theme={theme}
+        />
+      )}
 
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isLockInActive={isCurrentlyLockInActive} theme={theme} />
     </div>
