@@ -133,10 +133,11 @@ const AuthModal = ({
   >
     {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
   </button>
+  </div>
 </div>
-  );
+</div>
+);
 };
-
 const Header = ({
   currentClass,
   onClassChange,
