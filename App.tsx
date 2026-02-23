@@ -443,7 +443,7 @@ const StreakTab = ({
           {days.map((d, i) => {
             const heightPct = Math.min(100, (d.hours / maxHours) * 100);
             return (
-              <div key={i} className="flex flex-col items-center flex-1 gap-1 md:gap-2">
+              <div key={i} className="flex flex-col items-center flex-1 gap-1 md:gap-2 h-full">
                 <div
                   className="w-full rounded-t-md transition-all duration-700 bg-[#E10600]"
                   style={{ height: `${heightPct}%` }}
