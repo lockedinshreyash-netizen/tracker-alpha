@@ -100,22 +100,40 @@ const AuthModal = ({
         </div>
 
         <div className="flex flex-col gap-3">
-          <button
-            disabled={loading}
-            className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
-          >
-            {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
-          >
-            {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
-          </button>
-        </div>
-      </div>
-    </div>
+  <button
+    disabled={loading}
+    onClick={async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (mode === 'login') {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.auth.signUp({ email, password });
+          if (error) throw error;
+          setSuccessMsg('Check your email to confirm your account.');
+        }
+        onAuthSuccess();
+        onClose();
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }}
+    className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
+  >
+    {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
+  </button>
+  <button
+    type="button"
+    onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+    className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+  >
+    {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
+  </button>
+</div>
   );
 };
 
