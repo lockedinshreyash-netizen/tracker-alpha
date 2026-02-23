@@ -613,6 +613,69 @@ const App: React.FC = () => {
     }
   };
 
+  // Apply updates using the cloud as the single source of truth.
+  const applyCloudUpdate = async (updater: (base: AppState) => AppState) => {
+    // If there is no signed-in user, fall back to local-only updates.
+    if (!user) {
+      setState(prev => {
+        const nextState = updater(prev);
+        stateRef.current = nextState;
+        return nextState;
+      });
+      return;
+    }
+
+    setSyncStatus('syncing');
+    try {
+      // Always start from the latest cloud state for this user.
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('state')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const remoteState = (data?.state as AppState | null) || null;
+      const baseState: AppState = remoteState || stateRef.current;
+
+      const updated = updater(baseState);
+      const finalState: AppState = { ...updated, lastUpdated: Date.now() };
+
+      preventSyncOnUpdate.current = true;
+
+      // Update local UI state while preserving device-specific preferences.
+      setState(prev => ({
+        ...prev,
+        ...finalState,
+        lastUsedTab: prev.lastUsedTab,
+        theme: prev.theme
+      }));
+      stateRef.current = finalState;
+
+      const { error: upsertError } = await supabase
+        .from('user_profiles')
+        .upsert({ id: user.id, state: finalState, updated_at: new Date() });
+
+      if (upsertError) throw upsertError;
+
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Cloud update failed:', err);
+      setSyncStatus('error');
+      // On failure, still apply the update locally so the user doesn't lose work.
+      setState(prev => {
+        const nextState = updater(prev);
+        stateRef.current = nextState;
+        return nextState;
+      });
+    } finally {
+      setTimeout(() => {
+        preventSyncOnUpdate.current = false;
+      }, 200);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
     if (user && isInitialSyncDone.current && !preventSyncOnUpdate.current) {
@@ -709,39 +772,24 @@ const App: React.FC = () => {
   };
 
   const addTask = (text: string, subject: Subject | 'General') => {
-    setState(prev => {
-      const nextState = {
-        ...prev,
-        tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
-        lastUpdated: Date.now()
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
+    applyCloudUpdate(base => ({
+      ...base,
+      tasks: [...base.tasks, { id: generateId(), text, completed: false, subject }]
+    }));
   };
 
   const toggleTask = (id: string) => {
-    setState(prev => {
-      const nextState = {
-        ...prev,
-        tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
-        lastUpdated: Date.now()
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
+    applyCloudUpdate(base => ({
+      ...base,
+      tasks: base.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
+    }));
   };
 
   const deleteTask = (id: string) => {
-    setState(prev => {
-      const nextState = {
-        ...prev,
-        tasks: prev.tasks.filter(t => t.id !== id),
-        lastUpdated: Date.now()
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
+    applyCloudUpdate(base => ({
+      ...base,
+      tasks: base.tasks.filter(t => t.id !== id)
+    }));
   };
 
   const updateDailyGoal = (val: number) => {
