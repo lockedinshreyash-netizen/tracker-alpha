@@ -324,41 +324,75 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
   );
 };
 
-const StreakTab = ({ streak, logs, theme }: { streak: number, logs: DailyLog[], theme: 'dark' | 'light' }) => {
+const StreakTab = ({
+  streak,
+  logs,
+  theme,
+}: {
+  streak: number;
+  logs: DailyLog[];
+  theme: 'dark' | 'light';
+}) => {
   const days = getLast7DaysStats(logs);
+  const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
+      {/* Current streak card */}
       <div className="text-center py-10 md:py-16 rounded-3xl border-2 border-dashed border-[#E10600] bg-[#E10600]/5">
-         <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#E10600] mb-4">CURRENT STREAK</p>
-         <h2 className="text-8xl md:text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(225,6,0,0.4)]">
-           {streak}
-         </h2>
-         <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 mt-4">DAYS OF UNDIVIDED FOCUS</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#E10600] mb-4">
+          CURRENT STREAK
+        </p>
+        <h2 className="text-8xl md:text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(225,6,0,0.4)]">
+          {streak}
+        </h2>
+        <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 mt-4">
+          DAYS OF UNDIVIDED FOCUS
+        </p>
       </div>
 
-      //<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        //<div className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-          //<h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-8">PAST 7 DAYS ACTIVITY</h3>
-          //<div className="flex items-end justify-between h-40 gap-2">
-          //  {days.map((d, i) => (
-              //<div key={i} className="flex flex-col items-center flex-1 gap-2">
-              //  <div
-                //  className="w-full bg-[#E10600] rounded-t transition-all duration-1000"
-              //    style={{ height: `${Math.min(100, (d.hours / 12) * 100)}%` }}
-              //  />
-            //    <span className="text-[10px] font-black uppercase text-zinc-600">{d.date}</span>
-        //      </div>
-          //  ))}
-      //    </div>
-    //    </div>
-
-        <div className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-          <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">CONSISTENCY ADVICE</p>
-          <p className="text-base md:text-lg font-black italic leading-tight">
-            "YOU DON'T NEED MOTIVATION. YOU NEED DISCIPLINE. SHOW UP EVEN WHEN YOU FEEL LIKE QUITTING."
-          </p>
+      {/* 7‑day focus hours graph */}
+      <div
+        className={`p-8 rounded-2xl border ${
+          theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
+        }`}
+      >
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">
+          PAST 7 DAYS ACTIVITY
+        </h3>
+        <div className="flex items-end justify-between h-40 gap-2 md:gap-3">
+          {days.map((d, i) => {
+            const heightPct = Math.min(100, (d.hours / maxHours) * 100);
+            return (
+              <div key={i} className="flex flex-col items-center flex-1 gap-1 md:gap-2">
+                <div
+                  className="w-full rounded-t-md transition-all duration-700 bg-[#E10600]"
+                  style={{ height: `${heightPct}%` }}
+                />
+                <span className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500">
+                  {d.date}
+                </span>
+                <span className="text-[9px] font-black text-zinc-400">
+                  {d.hours.toFixed(1)}h
+                </span>
+              </div>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Advice card (unchanged style) */}
+      <div
+        className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${
+          theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
+        }`}
+      >
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">
+          CONSISTENCY ADVICE
+        </p>
+        <p className="text-base md:text-lg font-black italic leading-tight">
+          "YOU DON'T NEED MOTIVATION. YOU NEED DISCIPLINE. SHOW UP EVEN WHEN YOU FEEL LIKE QUITTING."
+        </p>
       </div>
     </div>
   );
@@ -613,69 +647,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Apply updates using the cloud as the single source of truth.
-  const applyCloudUpdate = async (updater: (base: AppState) => AppState) => {
-    // If there is no signed-in user, fall back to local-only updates.
-    if (!user) {
-      setState(prev => {
-        const nextState = updater(prev);
-        stateRef.current = nextState;
-        return nextState;
-      });
-      return;
-    }
-
-    setSyncStatus('syncing');
-    try {
-      // Always start from the latest cloud state for this user.
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('state')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      const remoteState = (data?.state as AppState | null) || null;
-      const baseState: AppState = remoteState || stateRef.current;
-
-      const updated = updater(baseState);
-      const finalState: AppState = { ...updated, lastUpdated: Date.now() };
-
-      preventSyncOnUpdate.current = true;
-
-      // Update local UI state while preserving device-specific preferences.
-      setState(prev => ({
-        ...prev,
-        ...finalState,
-        lastUsedTab: prev.lastUsedTab,
-        theme: prev.theme
-      }));
-      stateRef.current = finalState;
-
-      const { error: upsertError } = await supabase
-        .from('user_profiles')
-        .upsert({ id: user.id, state: finalState, updated_at: new Date() });
-
-      if (upsertError) throw upsertError;
-
-      setSyncStatus('synced');
-    } catch (err) {
-      console.error('Cloud update failed:', err);
-      setSyncStatus('error');
-      // On failure, still apply the update locally so the user doesn't lose work.
-      setState(prev => {
-        const nextState = updater(prev);
-        stateRef.current = nextState;
-        return nextState;
-      });
-    } finally {
-      setTimeout(() => {
-        preventSyncOnUpdate.current = false;
-      }, 200);
-    }
-  };
-
   useEffect(() => {
     localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
     if (user && isInitialSyncDone.current && !preventSyncOnUpdate.current) {
@@ -772,24 +743,39 @@ const App: React.FC = () => {
   };
 
   const addTask = (text: string, subject: Subject | 'General') => {
-    applyCloudUpdate(base => ({
-      ...base,
-      tasks: [...base.tasks, { id: generateId(), text, completed: false, subject }]
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const toggleTask = (id: string) => {
-    applyCloudUpdate(base => ({
-      ...base,
-      tasks: base.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const deleteTask = (id: string) => {
-    applyCloudUpdate(base => ({
-      ...base,
-      tasks: base.tasks.filter(t => t.id !== id)
-    }));
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.filter(t => t.id !== id),
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
   };
 
   const updateDailyGoal = (val: number) => {
