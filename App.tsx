@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, TabType, DailyLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus } from './types';
-import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, SUBJECTS, STATUS_LABELS } from './constants';
+import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, SUBJECTS, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, getLast7DaysStats, getSubjectDistribution } from './utils';
 import { JEE_2027_DATE } from './constants';
 
@@ -21,9 +21,7 @@ const DEFAULT_STATE: AppState = {
   logs: [],
   progress: [],
   lastUsedTab: 'Today',
-  timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics', isLockInActive: false, distractions: 0 },
-  isLockInModeEnabled: false,
-  allowList: [],
+  timer: { isRunning: false, startTime: null, accumulatedMs: 0, subject: 'Physics' },
   tasks: [],
   theme: 'dark',
   dailyGoalHours: 8,
@@ -31,50 +29,6 @@ const DEFAULT_STATE: AppState = {
 };
 
 // --- Sub-components ---
-
-const InstallBanner = ({
-  visible,
-  onInstall,
-  onDismiss,
-  theme,
-}: {
-  visible: boolean;
-  onInstall: () => void;
-  onDismiss: () => void;
-  theme: 'dark' | 'light';
-}) => {
-  if (!visible) return null;
-
-  return (
-    <div className="fixed left-0 right-0 bottom-16 z-40 px-4">
-      <div
-        className={`max-w-5xl mx-auto flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg ${
-          theme === 'dark'
-            ? 'bg-[#141417] border-[#27272a] text-white'
-            : 'bg-white border-zinc-200 text-black'
-        }`}
-      >
-        <p className="text-[11px] font-black uppercase tracking-widest">
-          Add to Home Screen for the best experience
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onDismiss}
-            className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-zinc-600 text-zinc-400 hover:text-white hover:border-zinc-300 transition-colors"
-          >
-            Dismiss
-          </button>
-          <button
-            onClick={onInstall}
-            className="text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full bg-[#E10600] text-white hover:bg-red-700 transition-colors"
-          >
-            Install
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const AuthModal = ({
   isOpen,
@@ -245,8 +199,7 @@ const Header = ({
   );
 };
 
-const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: TabType, onTabChange: (t: TabType) => void, isLockInActive: boolean, theme: 'dark' | 'light' }) => {
-  if (isLockInActive) return null;
+const Navbar = ({ activeTab, onTabChange, theme }: { activeTab: TabType, onTabChange: (t: TabType) => void, theme: 'dark' | 'light' }) => {
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Review'];
   return (
     <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/80 backdrop-blur-md border-[#1F1F23]' : 'bg-white/80 backdrop-blur-md border-zinc-200 shadow-lg'}`}>
@@ -612,9 +565,6 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
 
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
-
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
@@ -624,47 +574,6 @@ const App: React.FC = () => {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
-
-  // Handle PWA install banner (mobile only)
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
-
-    const isMobile =
-      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      window.matchMedia('(pointer: coarse)').matches;
-
-    const alreadyInstalled =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      // iOS Safari
-      (navigator as any).standalone ||
-      localStorage.getItem('pwa_installed') === '1';
-
-    const dismissedThisSession = sessionStorage.getItem('install_banner_dismissed') === '1';
-
-    if (!isMobile || alreadyInstalled || dismissedThisSession) {
-      return;
-    }
-
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallBanner(true);
-    };
-
-    const handleAppInstalled = () => {
-      localStorage.setItem('pwa_installed', '1');
-      setShowInstallBanner(false);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
 
   // Handle Auth and Initial Fetch
   useEffect(() => {
@@ -854,26 +763,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, lastUsedTab: tab }));
   };
 
-  const handleInstallBannerDismiss = () => {
-    setShowInstallBanner(false);
-    sessionStorage.setItem('install_banner_dismissed', '1');
-  };
-
-  const handleInstallBannerInstall = async () => {
-    if (!deferredPrompt) return;
-    try {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
-      if (choiceResult.outcome === 'accepted') {
-        localStorage.setItem('pwa_installed', '1');
-        setShowInstallBanner(false);
-      }
-    } catch {
-      // ignore; user can try again
-    }
-  };
-
   const logStudy = (subject: Subject, hours: number, quality: number, distractions: number) => {
     if (hours <= 0) return;
     const today = getISTDateString();
@@ -1027,29 +916,6 @@ const App: React.FC = () => {
             onToggleTask={toggleTask}
             onDeleteTask={deleteTask}
             onUpdateDailyGoal={updateDailyGoal}
-            onAddAllowedSite={(url: string) =>
-              setState(prev => {
-                if (prev.allowList.includes(url)) return prev;
-                const nextState = {
-                  ...prev,
-                  allowList: [...prev.allowList, url],
-                  lastUpdated: Date.now(),
-                };
-                stateRef.current = nextState;
-                return nextState;
-              })
-            }
-            onRemoveAllowedSite={(url: string) =>
-              setState(prev => {
-                const nextState = {
-                  ...prev,
-                  allowList: prev.allowList.filter(u => u !== url),
-                  lastUpdated: Date.now(),
-                };
-                stateRef.current = nextState;
-                return nextState;
-              })
-            }
             theme={theme}
           />
         )}
@@ -1075,15 +941,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {!isCurrentlyLockInActive && (
-        <InstallBanner
-          visible={showInstallBanner && !!deferredPrompt}
-          onInstall={handleInstallBannerInstall}
-          onDismiss={handleInstallBannerDismiss}
-          theme={theme}
-        />
-      )}
-
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isLockInActive={isCurrentlyLockInActive} theme={theme} />
     </div>
   );
@@ -1099,23 +956,14 @@ const TodayTab = ({
   onToggleTask,
   onDeleteTask,
   onUpdateDailyGoal,
-  onAddAllowedSite,
-  onRemoveAllowedSite,
-  theme,
+  theme
 }: any) => {
-  const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours, allowList } = state;
+  const { timer, tasks, logs, dailyGoalHours } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
-  const [showWarning, setShowWarning] = useState(false);
-  const [showBreach, setShowBreach] = useState(false);
-  const [quoteIdx, setQuoteIdx] = useState(0);
-  const [wipeHoldStart, setWipeHoldStart] = useState<number | null>(null);
-  const [wipeProgress, setWipeProgress] = useState(0);
-  const [allowedUrlInput, setAllowedUrlInput] = useState('');
+
 
   const timerRef = useRef(timer);
-  const ignoreFullscreenExitRef = useRef(false);
-  const wasHiddenRef = useRef(false);
   useEffect(() => { timerRef.current = timer; }, [timer]);
 
   const REQUIRED_FOCUS_MS = 15 * 60 * 1000;
@@ -1135,64 +983,7 @@ const TodayTab = ({
     return () => clearInterval(interval);
   }, [timer.isRunning, timer.startTime, timer.accumulatedMs]);
 
-  useEffect(() => {
-    if (!timer.isLockInActive) return;
 
-    const handleFsChange = () => {
-      // Only treat deliberate fullscreen exits as breaches.
-      if (!document.fullscreenElement) {
-        if (ignoreFullscreenExitRef.current) {
-          // Allowed website navigation or controlled transitions.
-          ignoreFullscreenExitRef.current = false;
-          return;
-        }
-        onTimerUpdate({
-          isRunning: false,
-          accumulatedMs:
-            Date.now() - (timerRef.current.startTime || Date.now()) + timerRef.current.accumulatedMs,
-          startTime: null,
-          distractions: (timerRef.current.distractions || 0) + 1,
-        });
-        setShowBreach(true);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, [timer.isLockInActive, onTimerUpdate]);
-
-  // Page Visibility handling – keep session running when screen turns off,
-  // and distinguish that from deliberate fullscreen exit.
-  useEffect(() => {
-    if (!timer.isLockInActive) return;
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        wasHiddenRef.current = true;
-      } else if (document.visibilityState === 'visible') {
-        // If we were simply hidden (e.g. screen off on mobile) and fullscreen was lost,
-        // attempt to restore fullscreen without counting it as a breach.
-        if (wasHiddenRef.current && !document.fullscreenElement) {
-          ignoreFullscreenExitRef.current = true;
-          document.documentElement.requestFullscreen().catch(() => {
-            // If this fails the user can manually re-enter fullscreen;
-            // we still don't count this as a breach.
-          });
-        }
-        wasHiddenRef.current = false;
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [timer.isLockInActive]);
-
-  useEffect(() => {
-    if (timer.isLockInActive) {
-      const qInterval = setInterval(() => setQuoteIdx(p => (p + 1) % LOCK_IN_QUOTES.length), 10000);
-      return () => clearInterval(qInterval);
-    }
-  }, [timer.isLockInActive]);
 
   useEffect(() => {
     let interval: number;
@@ -1211,44 +1002,19 @@ const TodayTab = ({
     return () => clearInterval(interval);
   }, [wipeHoldStart]);
 
-  const handleStartTimer = async () => {
-    if (isLockInModeEnabled) {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (err) {
-        alert("LOCK-IN REQUIREMENT: Fullscreen access is mandatory.");
-        return;
-      }
-    }
-    onTimerUpdate({ isRunning: true, startTime: Date.now(), subject: manualSubject, isLockInActive: isLockInModeEnabled });
+  .const handleStartTimer = () => {
+    onTimerUpdate({ isRunning: true, startTime: Date.now(), subject: manualSubject });
   };
 
   const handleStopTimer = () => {
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
     const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, currentTimer.distractions || 0);
-    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, isLockInActive: false, distractions: 0 });
-    if (document.fullscreenElement) document.exitFullscreen();
-    setShowBreach(false);
+    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality);
+    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0 });
   };
 
-  const handleWipeSession = () => {
-    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, isLockInActive: false, distractions: 0 });
-    if (document.fullscreenElement) document.exitFullscreen();
-    setWipeHoldStart(null);
-    setShowBreach(false);
-  };
 
-  const handleResumeBreach = async () => {
-    try {
-      await document.documentElement.requestFullscreen();
-      setShowBreach(false);
-      onTimerUpdate({ isRunning: true, startTime: Date.now() });
-    } catch (err) {
-      alert("CRITICAL: Fullscreen required to resume focus.");
-    }
-  };
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -1266,114 +1032,8 @@ const TodayTab = ({
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
   const subjectDist = getSubjectDistribution(logs);
 
-  const canEndSession = currentDisplayMs >= REQUIRED_FOCUS_MS;
-  const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - currentDisplayMs);
 
-  if (timer.isLockInActive) {
-    return (
-      <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center p-4 md:p-8 select-none overflow-hidden font-mono">
-        {showBreach && (
-          <div className="absolute inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-             <h2 className="text-[#E10600] text-3xl md:text-5xl font-black italic tracking-tighter mb-4">SESSION BREACHED</h2>
-             <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center">Focus interrupted. Session paused. 1 Distraction recorded.</p>
-             <button
-               onClick={handleResumeBreach}
-               className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
-             >
-               RESUME FOCUS
-             </button>
-             <div className="mt-12 relative flex flex-col items-center">
-                <button
-                  onMouseDown={() => setWipeHoldStart(Date.now())}
-                  onMouseUp={() => setWipeHoldStart(null)}
-                  onMouseLeave={() => setWipeHoldStart(null)}
-                  onTouchStart={() => setWipeHoldStart(Date.now())}
-                  onTouchEnd={() => setWipeHoldStart(null)}
-                  className="text-[10px] font-black uppercase text-zinc-700 hover:text-red-500 transition-colors py-2"
-                >
-                  {wipeHoldStart ? `WIPING IN ${(15 - (wipeProgress * 15 / 100)).toFixed(1)}s` : 'HOLD FOR 15s TO DISCARD SESSION'}
-                </button>
-                {wipeProgress > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 transition-all" style={{ width: `${wipeProgress}%` }} />
-                )}
-             </div>
-          </div>
-        )}
 
-        <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900 via-transparent to-transparent animate-pulse" />
-        <div className="absolute top-12 left-0 right-0 text-center px-4">
-            <p className="text-[10px] text-[#E10600] uppercase font-black tracking-[0.5em] md:tracking-[1em] mb-2">ACTIVE FOCUS SESSION</p>
-            <p className="text-[12px] md:text-[14px] text-zinc-500 uppercase font-black animate-pulse">{LOCK_IN_QUOTES[quoteIdx]}</p>
-        </div>
-
-        <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
-        <div className="flex flex-col items-center gap-2 mt-4">
-           <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
-           {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
-        </div>
-
-        <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
-          <button
-            disabled={!canEndSession}
-            onClick={handleStopTimer}
-            className={`w-full py-6 md:py-8 font-black uppercase tracking-[0.4em] md:tracking-[0.6em] border-2 transition-all rounded-xl active:scale-95 ${canEndSession ? 'bg-white text-black border-white hover:bg-transparent hover:text-white shadow-[0_0_50px_rgba(255,255,255,0.05)]' : 'bg-zinc-900 text-zinc-700 border-zinc-800 opacity-50 cursor-not-allowed'}`}
-          >
-            {canEndSession ? 'SESSION FINISHED' : `LOCK-OUT: ${formatTime(timeRemainingToEnd)}`}
-          </button>
-
-          <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mt-2">
-             <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((currentDisplayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
-          </div>
-
-          <div className="relative w-full mt-8 flex flex-col items-center">
-            <button
-              onMouseDown={() => setWipeHoldStart(Date.now())}
-              onMouseUp={() => setWipeHoldStart(null)}
-              onMouseLeave={() => setWipeHoldStart(null)}
-              onTouchStart={() => setWipeHoldStart(Date.now())}
-              onTouchEnd={() => setWipeHoldStart(null)}
-              className="text-[9px] font-black uppercase text-zinc-800 hover:text-zinc-400 transition-colors py-2"
-            >
-              {wipeHoldStart ? `WIPING IN ${(15 - (wipeProgress * 15 / 100)).toFixed(1)}s` : 'HOLD FOR 15s TO WIPE SESSION'}
-            </button>
-            {wipeProgress > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-600 transition-all" style={{ width: `${wipeProgress}%` }} />
-            )}
-          </div>
-        </div>
-
-        {allowList.length > 0 && (
-          <div className="mt-10 w-full max-w-md mx-auto text-center">
-            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2">
-              Allowed Websites (PC Only)
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {allowList.map(url => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => {
-                    ignoreFullscreenExitRef.current = true;
-                    window.open(url, '_blank', 'noopener');
-                  }}
-                  className="px-3 py-1.5 rounded-full border border-zinc-700 text-[9px] font-bold text-zinc-300 hover:border-[#E10600] hover:text-white transition-colors max-w-[180px] truncate"
-                >
-                  {(() => {
-                    try {
-                      const u = new URL(url);
-                      return u.hostname;
-                    } catch {
-                      return url;
-                    }
-                  })()}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -1410,69 +1070,6 @@ const TodayTab = ({
               </div>
             ))}
           </div>
-
-          {/* Allowed websites configuration for LOCK-IN (PC) – editable only before session starts */}
-          {!timer.isLockInActive && (
-            <div className="mt-4 space-y-3">
-              <h4 className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
-                Allowed Websites (LOCK-IN)
-              </h4>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="https://example.com"
-                  className={`flex-1 text-[11px] px-3 py-2 rounded-lg border font-bold ${
-                    theme === 'dark'
-                      ? 'bg-[#0B0B0D] border-[#27272a] text-white'
-                      : 'bg-zinc-50 border-zinc-200 text-black'
-                  }`}
-                  value={allowedUrlInput}
-                  onChange={e => setAllowedUrlInput(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const raw = allowedUrlInput.trim();
-                    if (!raw) return;
-                    let url = raw;
-                    if (!/^https?:\/\//i.test(url)) {
-                      url = `https://${url}`;
-                    }
-                    if (!allowList.includes(url)) {
-                      onAddAllowedSite(url);
-                    }
-                    setAllowedUrlInput('');
-                  }}
-                  className="px-4 py-2 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-red-700 transition-colors"
-                >
-                  Add
-                </button>
-              </div>
-              {allowList.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {allowList.map(url => (
-                    <div
-                      key={url}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold ${
-                        theme === 'dark'
-                          ? 'border-zinc-800 bg-[#09090b] text-zinc-300'
-                          : 'border-zinc-200 bg-zinc-50 text-zinc-700'
-                      }`}
-                    >
-                      <span className="truncate max-w-[140px]">{url}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveAllowedSite(url)}
-                        className="text-zinc-500 hover:text-red-500"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </section>
       )}
 
@@ -1557,23 +1154,7 @@ const TodayTab = ({
         </div>
       </section>
 
-      {showWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className={`max-w-md w-full p-6 md:p-10 border-2 rounded-2xl ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#E10600]' : 'bg-white border-[#E10600]'}`}>
-            <h2 className="text-2xl font-black italic tracking-tighter mb-4 text-[#E10600]">ACTIVATE LOCK-IN?</h2>
-            <div className="space-y-4 text-xs font-bold uppercase tracking-tight text-zinc-500 leading-relaxed">
-              <p>1. FULLSCREEN IS MANDATORY.</p>
-              <p>2. EXITING FULLSCREEN PAUSES THE TIMER AND RECORDS A BREACH.</p>
-              <p>3. YOU MUST FOCUS FOR AT LEAST 15 MINUTES TO LOG THE SESSION.</p>
-              <p>4. TAB SWITCHING IS DETECTED.</p>
-            </div>
-            <div className="mt-8 flex gap-4">
-              <button onClick={() => { onToggleLockInMode(true); setShowWarning(false); }} className="flex-1 py-4 bg-white text-black font-black uppercase tracking-widest rounded-lg hover:bg-zinc-200">ENGAGE</button>
-              <button onClick={() => setShowWarning(false)} className="flex-1 py-4 bg-zinc-900 text-zinc-500 font-black uppercase tracking-widest rounded-lg">ABORT</button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };
