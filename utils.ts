@@ -134,7 +134,10 @@ export const calculateLockInScore = (
   // Composite Base Score
   const baseScore = (consistencyScore * 0.30) + (hoursScore * 0.30) + (progressScore * 0.10) + (qualityScore * 0.30);
 
+  // 5. PENALTY: Distractions / Breaches
+  const totalDistractions = logsLast30.reduce((acc, l) => acc + (l.distractions || 0), 0);
+  const penalty = totalDistractions * 2;
 
-  const finalScore = Math.max(0, Math.round(baseScore));
+  const finalScore = Math.max(0, Math.round(baseScore - penalty));
   return finalScore;
 };
