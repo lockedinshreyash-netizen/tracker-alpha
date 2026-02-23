@@ -11,7 +11,6 @@ export interface DailyLog {
   subject: Subject;
   hours: number;
   quality: number; // 1-5
-  distractions: number; // Count of tab switches/blur events
 }
 
 export interface Task {
@@ -36,8 +35,6 @@ export interface TimerState {
   startTime: number | null;
   accumulatedMs: number;
   subject: Subject;
-  isLockInActive: boolean;
-  distractions: number;
 }
 
 export interface AppState {
@@ -46,8 +43,6 @@ export interface AppState {
   progress: ChapterProgress[];
   lastUsedTab: TabType;
   timer: TimerState;
-  isLockInModeEnabled: boolean;
-  allowList: string[];
   tasks: Task[];
   theme?: 'dark' | 'light';
   dailyGoalHours: number;
