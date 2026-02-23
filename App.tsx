@@ -32,13 +32,92 @@ const DEFAULT_STATE: AppState = {
 
 // --- Sub-components ---
 
-const AuthModal = ({ isOpen, onClose, theme, onAuthSuccess }: { isOpen: boolean, onClose: () => void, theme: 'dark' | 'light', onAuthSuccess: () => void }) => {
+const AuthModal = ({
+  isOpen,
+  onClose,
+  theme,
+  onAuthSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  theme: 'dark' | 'light';
+  onAuthSuccess: () => void;
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+      <div
+        className={`w-full max-w-sm rounded-2xl border p-6 space-y-4 ${
+          theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-black uppercase tracking-[0.3em]">
+            {mode === 'login' ? 'Sign In' : 'Create Account'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+          >
+            Close
+          </button>
+        </div>
+
+        {error && <p className="text-[11px] font-bold text-red-500">{error}</p>}
+        {successMsg && <p className="text-[11px] font-bold text-green-500">{successMsg}</p>}
+
+        <div className="space-y-3">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${
+              theme === 'dark'
+                ? 'bg-[#18181b] border-[#27272a] text-white'
+                : 'bg-zinc-50 border-zinc-200 text-black'
+            }`}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${
+              theme === 'dark'
+                ? 'bg-[#18181b] border-[#27272a] text-white'
+                : 'bg-zinc-50 border-zinc-200 text-black'
+            }`}
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button
+            disabled={loading}
+            className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
+          >
+            {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+          >
+            {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Header = ({
   currentClass,
