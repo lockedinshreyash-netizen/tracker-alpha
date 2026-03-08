@@ -548,7 +548,7 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
   const monthName = currentDate.toLocaleString('default', { month: 'long' });
 
   const getDayColor = (hours: number) => {
-    if (hours === 0) return theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-zinc-100';
+    if (hours === 0) return theme === 'dark' ? 'bg-[#1F1F23] border border-[#2A2A2E]' : 'bg-zinc-50 border border-zinc-200';
     const percent = (hours / dailyGoalHours) * 100;
     if (percent < 30) return theme === 'dark' ? 'bg-red-900/20' : 'bg-red-100';
     if (percent < 60) return theme === 'dark' ? 'bg-red-900/50' : 'bg-red-300';
