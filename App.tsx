@@ -419,13 +419,112 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
   );
 };
 
+const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dailyGoalHours: number, theme: 'dark' | 'light' }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  // Adjust so Monday is 0, Sunday is 6
+  const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanksArray = Array.from({ length: startOffset }, (_, i) => i);
+
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
+  const monthName = currentDate.toLocaleString('default', { month: 'long' });
+
+  const getDayColor = (hours: number) => {
+    if (hours === 0) return theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-zinc-100';
+    const percent = (hours / dailyGoalHours) * 100;
+    if (percent < 30) return theme === 'dark' ? 'bg-red-900/20' : 'bg-red-100';
+    if (percent < 60) return theme === 'dark' ? 'bg-red-900/50' : 'bg-red-300';
+    if (percent < 90) return 'bg-[#E10600]/70';
+    return 'bg-[#E10600]';
+  };
+
+  return (
+    <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-zinc-500">
+          Monthly Heatmap
+        </h3>
+        <div className="flex items-center gap-4">
+          <button onClick={prevMonth} className="text-zinc-500 hover:text-[#E10600] transition-colors p-1">&lt;</button>
+          <span className="text-xs md:text-sm font-black uppercase w-32 text-center">{monthName} {year}</span>
+          <button onClick={nextMonth} className="text-zinc-500 hover:text-[#E10600] transition-colors p-1">&gt;</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div key={i} className="text-center text-[8px] md:text-[10px] font-black text-zinc-600 uppercase">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 md:gap-2">
+        {blanksArray.map(b => (
+          <div key={`blank-${b}`} className="aspect-square rounded-md opacity-0" />
+        ))}
+        {daysArray.map(day => {
+          const formattedMonth = String(month + 1).padStart(2, '0');
+          const formattedDay = String(day).padStart(2, '0');
+          const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+
+          const dayLogs = logs.filter(l => l.date === dateStr);
+          const totalHours = dayLogs.reduce((sum, l) => sum + l.hours, 0);
+          const avgQuality = dayLogs.length > 0 ? (dayLogs.reduce((sum, l) => sum + l.quality, 0) / dayLogs.length).toFixed(1) : '0';
+          const sessions = dayLogs.length;
+          const metGoal = totalHours >= dailyGoalHours;
+
+          return (
+            <div key={day} className="relative group aspect-square">
+              <div className={`w-full h-full rounded-sm md:rounded-md transition-all duration-300 ${getDayColor(totalHours)}`} />
+
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-white opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl hidden md:block">
+                <p className="text-[10px] font-black uppercase text-[#E10600] mb-2">{dateStr}</p>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-bold">Hours Base:</span>
+                    <span className="font-black">{totalHours.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-bold">Sessions:</span>
+                    <span className="font-black">{sessions}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500 font-bold">Avg Quality:</span>
+                    <span className="font-black">{avgQuality}</span>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-zinc-800 text-center text-[9px] font-black uppercase tracking-widest">
+                    {totalHours > 0 ? (metGoal ? <span className="text-green-500">Goal Met</span> : <span className="text-yellow-500">Below Goal</span>) : <span className="text-zinc-600">No Activity</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const StreakTab = ({
   streak,
   logs,
+  dailyGoalHours,
   theme,
 }: {
   streak: number;
   logs: DailyLog[];
+  dailyGoalHours: number;
   theme: 'dark' | 'light';
 }) => {
   const days = getLast7DaysStats(logs);
@@ -477,18 +576,7 @@ const StreakTab = ({
         </div>
       </div>
 
-      {/* Advice card (unchanged style) */}
-      <div
-        className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
-          }`}
-      >
-        <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">
-          CONSISTENCY ADVICE
-        </p>
-        <p className="text-base md:text-lg font-black italic leading-tight">
-          "YOU DON'T NEED MOTIVATION. YOU NEED DISCIPLINE. SHOW UP EVEN WHEN YOU FEEL LIKE QUITTING."
-        </p>
-      </div>
+      <MonthlyHeatmap logs={logs} dailyGoalHours={dailyGoalHours} theme={theme} />
     </div>
   );
 };
@@ -1007,7 +1095,7 @@ const App: React.FC = () => {
             theme={theme}
           />
         )}
-        {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} theme={theme} />}
+        {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} />}
         {!isCurrentlyLockInActive && activeTab === 'Review' && (
           <ReviewTab
             logs={state.logs}
