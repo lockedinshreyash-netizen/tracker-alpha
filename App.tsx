@@ -166,51 +166,71 @@ const Header = ({
   };
 
   return (
-    <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
-      <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
-        <div className="relative">
-          <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-            LOCK IN
-          </h1>
-          <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
-            <p className={`text-[10px] md:text-xs uppercase tracking-widest font-bold ${theme === 'dark' ? 'text-[#A1A1AA]' : 'text-zinc-500'}`}>
-              JEE '27: <span className={theme === 'dark' ? 'text-white' : 'text-black'}>{daysRemaining}d REMAINING</span>
-            </p>
-            <div className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
-              <span className="text-[6px]">●</span>
-              <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
+    <div className="w-full">
+      <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
+        <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
+          <div className="relative">
+            <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+              LOCK IN
+            </h1>
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+              <div className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
+                <span className="text-[6px]">●</span>
+                <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
+              </div>
             </div>
           </div>
+          <div className="flex gap-2">
+            {!user && (
+              <button
+                onClick={onOpenAuth}
+                className={`text-[10px] font-black uppercase px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-white transition-all`}
+              >
+                SYNC
+              </button>
+            )}
+            {installPrompt && (
+              <button
+                onClick={onInstall}
+                className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
+              >
+                INSTALL
+              </button>
+            )}
+            <button
+              onClick={onToggleTheme}
+              className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
+              className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
+            >
+              C-{currentClass} ▾
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          {!user && (
-            <button
-              onClick={onOpenAuth}
-              className={`text-[10px] font-black uppercase px-3 py-1 rounded border border-zinc-700 text-zinc-400 hover:text-white transition-all`}
-            >
-              SYNC
-            </button>
-          )}
-          {installPrompt && (
-            <button
-              onClick={onInstall}
-              className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
-            >
-              INSTALL
-            </button>
-          )}
-          <button
-            onClick={onToggleTheme}
-            className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <button
-            onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
-            className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
-          >
-            C-{currentClass} ▾
-          </button>
+      </div>
+
+      {/* Burn Bar */}
+      <div className="w-full relative px-6 mt-4">
+        <div className="flex justify-between items-center mb-1">
+          <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>JEE MAINS 2027</span>
+          <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>{daysRemaining} DAYS LEFT</span>
+        </div>
+      </div>
+      <div
+        className="w-full h-[6px] bg-zinc-800/50 group relative cursor-crosshair overflow-hidden"
+        title={`${daysRemaining} days remaining`}
+      >
+        <div
+          className="h-full bg-[#E10600] transition-all duration-1000 shadow-[0_4px_15px_-3px_rgba(225,6,0,0.5)]"
+          style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2025-04-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
+        />
+        {/* Tooltip */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded border border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap pointer-events-none shadow-xl hidden md:block">
+          {daysRemaining} DAYS REMAINING — {Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2025-04-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100)).toFixed(1)}% ELAPSED
         </div>
       </div>
     </div>
