@@ -421,6 +421,13 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
 
 const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dailyGoalHours: number, theme: 'dark' | 'light' }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setSelectedDay(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -433,8 +440,8 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const blanksArray = Array.from({ length: startOffset }, (_, i) => i);
 
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const prevMonth = () => { setCurrentDate(new Date(year, month - 1, 1)); setSelectedDay(null); };
+  const nextMonth = () => { setCurrentDate(new Date(year, month + 1, 1)); setSelectedDay(null); };
 
   const monthName = currentDate.toLocaleString('default', { month: 'long' });
 
@@ -460,57 +467,68 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-          <div key={i} className="text-center text-[8px] md:text-[10px] font-black text-zinc-600 uppercase">
-            {d}
-          </div>
-        ))}
-      </div>
+      <div className="flex flex-col items-center">
+        <div className="grid grid-cols-7 gap-[3px] md:gap-1 mb-1 w-fit">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <div key={i} className="text-center text-[8px] md:text-[10px] font-black text-zinc-600 uppercase w-6 md:w-8">
+              {d}
+            </div>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-7 gap-1 md:gap-2">
-        {blanksArray.map(b => (
-          <div key={`blank-${b}`} className="aspect-square rounded-md opacity-0" />
-        ))}
-        {daysArray.map(day => {
-          const formattedMonth = String(month + 1).padStart(2, '0');
-          const formattedDay = String(day).padStart(2, '0');
-          const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+        <div className="grid grid-cols-7 gap-[3px] md:gap-1 w-fit">
+          {blanksArray.map(b => (
+            <div key={`blank-${b}`} className="w-6 h-6 md:w-8 md:h-8 rounded-sm opacity-0" />
+          ))}
+          {daysArray.map(day => {
+            const formattedMonth = String(month + 1).padStart(2, '0');
+            const formattedDay = String(day).padStart(2, '0');
+            const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
 
-          const dayLogs = logs.filter(l => l.date === dateStr);
-          const totalHours = dayLogs.reduce((sum, l) => sum + l.hours, 0);
-          const avgQuality = dayLogs.length > 0 ? (dayLogs.reduce((sum, l) => sum + l.quality, 0) / dayLogs.length).toFixed(1) : '0';
-          const sessions = dayLogs.length;
-          const metGoal = totalHours >= dailyGoalHours;
+            const dayLogs = logs.filter(l => l.date === dateStr);
+            const totalHours = dayLogs.reduce((sum, l) => sum + l.hours, 0);
+            const avgQuality = dayLogs.length > 0 ? (dayLogs.reduce((sum, l) => sum + l.quality, 0) / dayLogs.length).toFixed(1) : '0';
+            const sessions = dayLogs.length;
+            const metGoal = totalHours >= dailyGoalHours;
 
-          return (
-            <div key={day} className="relative group aspect-square">
-              <div className={`w-full h-full rounded-sm md:rounded-md transition-all duration-300 ${getDayColor(totalHours)}`} />
+            const isSelected = selectedDay === dateStr;
 
-              {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-white opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl hidden md:block">
-                <p className="text-[10px] font-black uppercase text-[#E10600] mb-2">{dateStr}</p>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500 font-bold">Hours Base:</span>
-                    <span className="font-black">{totalHours.toFixed(1)}h</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500 font-bold">Sessions:</span>
-                    <span className="font-black">{sessions}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500 font-bold">Avg Quality:</span>
-                    <span className="font-black">{avgQuality}</span>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-zinc-800 text-center text-[9px] font-black uppercase tracking-widest">
-                    {totalHours > 0 ? (metGoal ? <span className="text-green-500">Goal Met</span> : <span className="text-yellow-500">Below Goal</span>) : <span className="text-zinc-600">No Activity</span>}
+            return (
+              <div
+                key={day}
+                className="relative group cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDay(isSelected ? null : dateStr);
+                }}
+              >
+                <div className={`w-6 h-6 md:w-8 md:h-8 rounded-sm md:rounded-md transition-all duration-300 ${getDayColor(totalHours)} ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-black' : ''}`} />
+
+                {/* Tooltip */}
+                <div className={`absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-48 p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-white transition-opacity duration-200 z-[90] shadow-xl pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'}`}>
+                  <p className="text-[10px] font-black uppercase text-[#E10600] mb-2">{dateStr}</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-bold">Hours Base:</span>
+                      <span className="font-black">{totalHours.toFixed(1)}h</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-bold">Sessions:</span>
+                      <span className="font-black">{sessions}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-bold">Avg Quality:</span>
+                      <span className="font-black">{avgQuality}</span>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-zinc-800 text-center text-[9px] font-black uppercase tracking-widest">
+                      {totalHours > 0 ? (metGoal ? <span className="text-green-500">Goal Met</span> : <span className="text-yellow-500">Below Goal</span>) : <span className="text-zinc-600">No Activity</span>}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
