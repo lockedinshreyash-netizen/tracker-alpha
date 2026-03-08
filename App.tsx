@@ -145,7 +145,8 @@ const Header = ({
   onInstall,
   syncStatus,
   user,
-  onOpenAuth
+  onOpenAuth,
+  logs
 }: {
   currentClass: 11 | 12,
   onClassChange: (c: 11 | 12) => void,
@@ -156,8 +157,17 @@ const Header = ({
   onInstall: () => void,
   syncStatus: SyncStatus,
   user: any,
-  onOpenAuth: () => void
+  onOpenAuth: () => void,
+  logs: DailyLog[]
 }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowTooltip(false);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const syncColors = {
     local: 'text-zinc-600',
     syncing: 'text-yellow-500 animate-pulse',
@@ -222,15 +232,87 @@ const Header = ({
       </div>
       <div
         className="w-full h-[6px] bg-zinc-800/50 group relative cursor-crosshair overflow-hidden"
-        title={`${daysRemaining} days remaining`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowTooltip(!showTooltip);
+        }}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
       >
         <div
           className="h-full bg-[#E10600] transition-all duration-1000 shadow-[0_4px_15px_-3px_rgba(225,6,0,0.5)]"
-          style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2025-04-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
+          style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
         />
         {/* Tooltip */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded border border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap pointer-events-none shadow-xl hidden md:block">
-          {daysRemaining} DAYS REMAINING — {Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2025-04-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100)).toFixed(1)}% ELAPSED
+        <div className={`absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 md:w-80 p-4 bg-[#0B0B0D] border border-[#E10600] rounded-xl shadow-[0_0_15px_rgba(225,6,0,0.15)] transition-opacity duration-300 z-[90] pointer-events-none ${showTooltip ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Time left</span>
+                <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until JEE Mains 2027</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Time elapsed</span>
+                <span className="text-[#E10600] font-black text-sm md:text-base block">{(Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))).toFixed(1)}% of your preparation time is already gone</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Projected finishing hours</span>
+                <span className="text-white font-bold text-xs md:text-sm">At your current daily average you will finish with {(() => {
+                  if (logs.length === 0) return '0';
+                  const firstLogDate = new Date(logs[0].date).getTime();
+                  const now = new Date().getTime();
+                  const daysSinceFirstLog = Math.max(1, Math.ceil((now - firstLogDate) / (1000 * 60 * 60 * 24)));
+                  const totalHrs = logs.reduce((sum, l) => sum + l.hours, 0);
+                  const avg = totalHrs / daysSinceFirstLog;
+                  return Math.round(totalHrs + (avg * daysRemaining));
+                })()} total hours studied by exam day</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Required pace</span>
+                <span className="text-white font-bold text-xs md:text-sm">You need {(() => {
+                  const totalHrs = logs.reduce((sum, l) => sum + l.hours, 0);
+                  const needed = 1000 - totalHrs;
+                  return needed <= 0 ? '0' : (needed / Math.max(1, daysRemaining)).toFixed(1);
+                })()} hours per day from today to reach 1000 total hours by Mains</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Consistency</span>
+                <span className="text-white font-bold text-xs md:text-sm">Current streak: {calculateStreak(logs)} days</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <span className="text-[#E10600] mt-1 text-[8px]">●</span>
+              <div>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Missed days</span>
+                <span className="text-white font-bold text-xs md:text-sm">Days with zero study logged: {(() => {
+                  if (logs.length === 0) return 0;
+                  const firstLogDate = new Date(logs[0].date).getTime();
+                  const now = new Date().getTime();
+                  const totalDays = Math.max(1, Math.ceil((now - firstLogDate) / (1000 * 60 * 60 * 24)));
+                  const uniqueLogDays = new Set(logs.map(l => l.date)).size;
+                  return Math.max(0, totalDays - uniqueLogDays);
+                })()}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1097,6 +1179,7 @@ const App: React.FC = () => {
           syncStatus={syncStatus}
           user={user}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          logs={state.logs}
         />
       )}
 
