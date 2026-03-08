@@ -90,7 +90,7 @@ export const getLast7DaysStats = (
   return stats;
 };
 export const getSubjectDistribution = (logs: DailyLog[]): Record<Subject, number> => {
-  const dist: Record<Subject, number> = { Physics: 0, Chemistry: 0, Maths: 0 };
+  const dist: Record<Subject, number> = { Physics: 0, Chemistry: 0, Maths: 0, General: 0 };
   const today = getISTDateString();
   logs.filter(l => l.date === today).forEach(l => {
     dist[l.subject] += l.hours;

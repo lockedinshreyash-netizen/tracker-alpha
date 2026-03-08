@@ -1,5 +1,5 @@
 
-export type Subject = 'Physics' | 'Chemistry' | 'Maths';
+export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'General';
 
 export type SyllabusStatus = 'not_started' | 'in_progress' | 'completed' | 'revision_pending';
 
@@ -18,7 +18,7 @@ export interface Task {
   id: string;
   text: string;
   completed: boolean;
-  subject?: Subject | 'General';
+  subject?: Subject;
 }
 
 export interface ChapterProgress {

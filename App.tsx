@@ -80,8 +80,8 @@ const AuthModal = ({
             value={email}
             onChange={e => setEmail(e.target.value)}
             className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
-                ? 'bg-[#18181b] border-[#27272a] text-white'
-                : 'bg-zinc-50 border-zinc-200 text-black'
+              ? 'bg-[#18181b] border-[#27272a] text-white'
+              : 'bg-zinc-50 border-zinc-200 text-black'
               }`}
           />
           <input
@@ -90,8 +90,8 @@ const AuthModal = ({
             value={password}
             onChange={e => setPassword(e.target.value)}
             className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
-                ? 'bg-[#18181b] border-[#27272a] text-white'
-                : 'bg-zinc-50 border-zinc-200 text-black'
+              ? 'bg-[#18181b] border-[#27272a] text-white'
+              : 'bg-zinc-50 border-zinc-200 text-black'
               }`}
           />
         </div>
@@ -585,6 +585,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
               <option value="Physics">Physics</option>
               <option value="Chemistry">Chemistry</option>
               <option value="Maths">Maths</option>
+              <option value="General">General</option>
             </select>
           </div>
           <div className="flex-1 flex flex-col gap-2">
@@ -1270,8 +1271,8 @@ const TodayTab = ({
             </div>
           </div>
 
-          <div className="w-full grid grid-cols-3 gap-2 md:gap-4">
-            {(['Physics', 'Chemistry', 'Maths'] as Subject[]).map(s => (
+          <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+            {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
               <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
                 <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mb-1">{s.substring(0, 3)}</p>
                 <p className="text-sm md:text-base font-black">{subjectDist[s].toFixed(1)}h</p>
@@ -1289,7 +1290,7 @@ const TodayTab = ({
         {!timer.isRunning ? (
           <>
             <div className="flex flex-wrap justify-center gap-2 mt-10">
-              {(['Physics', 'Chemistry', 'Maths'] as Subject[]).map(s => (
+              {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setManualSubject(s)}

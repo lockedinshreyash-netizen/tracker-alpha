@@ -3,7 +3,7 @@ import { Subject, SyllabusStatus } from './types';
 
 export const JEE_2027_DATE = new Date('2027-01-01');
 
-export const SUBJECTS: Subject[] = ['Physics', 'Chemistry', 'Maths'];
+export const SUBJECTS: Subject[] = ['Physics', 'Chemistry', 'Maths', 'General'];
 
 export const LOCK_IN_QUOTES = [
   "THE COMPETITION IS STUDYING. ARE YOU?",
