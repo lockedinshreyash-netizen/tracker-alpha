@@ -780,6 +780,40 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
       </div>
 
+      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+        <div className="flex-1">
+          <h4 className="text-sm font-black uppercase">CONTACT & SOCIALS</h4>
+          <p className="text-[11px] text-zinc-500 font-bold mt-1 uppercase">
+            FEEDBACK, BUG REPORTS, OR JUST SAY HI
+          </p>
+        </div>
+        <div className="flex gap-6 flex-wrap justify-center">
+          <a
+            href="https://instagram.com/trackeralpha"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+            </svg>
+            @trackeralpha
+          </a>
+          <a
+            href="mailto:lockinhq@gmail.com"
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            lockinhq@gmail.com
+          </a>
+        </div>
+      </div>
+
       <form onSubmit={handleManualLog} className={`p-8 rounded-2xl border flex flex-col gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
         <h4 className="text-sm font-black uppercase">Manual Log</h4>
         <div className="flex flex-col md:flex-row gap-4">
