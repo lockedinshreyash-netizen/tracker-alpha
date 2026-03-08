@@ -55,9 +55,8 @@ const AuthModal = ({
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
       <div
-        className={`w-full max-w-sm rounded-2xl border p-6 space-y-4 ${
-          theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'
-        }`}
+        className={`w-full max-w-sm rounded-2xl border p-6 space-y-4 ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'
+          }`}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-black uppercase tracking-[0.3em]">
@@ -80,63 +79,61 @@ const AuthModal = ({
             placeholder="Email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${
-              theme === 'dark'
+            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
                 ? 'bg-[#18181b] border-[#27272a] text-white'
                 : 'bg-zinc-50 border-zinc-200 text-black'
-            }`}
+              }`}
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${
-              theme === 'dark'
+            className={`w-full rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
                 ? 'bg-[#18181b] border-[#27272a] text-white'
                 : 'bg-zinc-50 border-zinc-200 text-black'
-            }`}
+              }`}
           />
         </div>
 
         <div className="flex flex-col gap-3">
-  <button
-    disabled={loading}
-    onClick={async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (mode === 'login') {
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.auth.signUp({ email, password });
-          if (error) throw error;
-          setSuccessMsg('Check your email to confirm your account.');
-        }
-        onAuthSuccess();
-        onClose();
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }}
-    className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
-  >
-    {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
-  </button>
-  <button
-    type="button"
-    onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-    className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
-  >
-    {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
-  </button>
-  </div>
-</div>
-</div>
-);
+          <button
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                if (mode === 'login') {
+                  const { error } = await supabase.auth.signInWithPassword({ email, password });
+                  if (error) throw error;
+                } else {
+                  const { error } = await supabase.auth.signUp({ email, password });
+                  if (error) throw error;
+                  setSuccessMsg('Check your email to confirm your account.');
+                }
+                onAuthSuccess();
+                onClose();
+              } catch (err: any) {
+                setError(err.message);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
+          >
+            {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+          >
+            {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 const Header = ({
   currentClass,
@@ -180,8 +177,8 @@ const Header = ({
               JEE '27: <span className={theme === 'dark' ? 'text-white' : 'text-black'}>{daysRemaining}d REMAINING</span>
             </p>
             <div className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
-               <span className="text-[6px]">●</span>
-               <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
+              <span className="text-[6px]">●</span>
+              <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
             </div>
           </div>
         </div>
@@ -271,7 +268,7 @@ const TaskSection = ({
     <div className={`space-y-4 relative z-10 ${minimal ? 'max-w-md w-full mx-auto' : ''}`}>
       {!minimal && (
         <div className="flex justify-between items-end mb-4 border-b border-zinc-800 pb-2">
-           <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>FOCUS TASKS</h3>
+          <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>FOCUS TASKS</h3>
         </div>
       )}
 
@@ -324,8 +321,8 @@ const TaskSection = ({
               {task.completed && <div className="w-2 h-2 bg-white rounded-sm" />}
             </button>
             <div className="flex-1">
-               <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${task.subject === 'General' ? 'text-zinc-600' : 'text-[#E10600]'}`}>{task.subject}</span>
-               <p className={`text-[11px] font-bold uppercase tracking-tight break-words ${task.completed ? 'line-through' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>{task.text}</p>
+              <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${task.subject === 'General' ? 'text-zinc-600' : 'text-[#E10600]'}`}>{task.subject}</span>
+              <p className={`text-[11px] font-bold uppercase tracking-tight break-words ${task.completed ? 'line-through' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>{task.text}</p>
             </div>
             {!minimal && (
               <button onClick={() => window.confirm('Discard task?') && onDeleteTask(task.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1">
@@ -451,9 +448,8 @@ const StreakTab = ({
 
       {/* 7‑day focus hours graph */}
       <div
-        className={`p-8 rounded-2xl border ${
-          theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
-        }`}
+        className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
+          }`}
       >
         <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">
           PAST 7 DAYS ACTIVITY
@@ -483,9 +479,8 @@ const StreakTab = ({
 
       {/* Advice card (unchanged style) */}
       <div
-        className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${
-          theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
-        }`}
+        className={`p-8 rounded-2xl border flex flex-col justify-center text-center ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
+          }`}
       >
         <p className="text-[10px] font-black uppercase tracking-widest text-[#E10600] mb-4">
           CONSISTENCY ADVICE
@@ -498,7 +493,21 @@ const StreakTab = ({
   );
 };
 
-const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut }: any) => {
+const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog }: any) => {
+  const [manualSubject, setManualSubject] = useState<Subject>('Physics');
+  const [manualHours, setManualHours] = useState<string>('');
+  const [manualQuality, setManualQuality] = useState<number>(3);
+
+  const handleManualLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    const h = parseFloat(manualHours);
+    if (!isNaN(h) && h > 0) {
+      onLog(manualSubject, h, manualQuality, 0);
+      setManualHours('');
+      setManualQuality(3);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -562,6 +571,54 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           </button>
         </div>
       </div>
+
+      <form onSubmit={handleManualLog} className={`p-8 rounded-2xl border flex flex-col gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+        <h4 className="text-sm font-black uppercase">Manual Log</h4>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 flex flex-col gap-2">
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Subject</label>
+            <select
+              value={manualSubject}
+              onChange={(e) => setManualSubject(e.target.value as Subject)}
+              className={`p-3 rounded-lg border text-sm font-black uppercase focus:outline-none cursor-pointer ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+            >
+              <option value="Physics">Physics</option>
+              <option value="Chemistry">Chemistry</option>
+              <option value="Maths">Maths</option>
+            </select>
+          </div>
+          <div className="flex-1 flex flex-col gap-2">
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Hours</label>
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              value={manualHours}
+              onChange={(e) => setManualHours(e.target.value)}
+              placeholder="e.g. 1.5"
+              required
+              className={`p-3 rounded-lg border text-sm font-black uppercase focus:outline-none ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800 text-white placeholder-zinc-800' : 'bg-zinc-50 border-zinc-200 text-black placeholder-zinc-300'}`}
+            />
+          </div>
+          <div className="flex-1 flex flex-col gap-2">
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Quality (1-5)</label>
+            <select
+              value={manualQuality}
+              onChange={(e) => setManualQuality(parseInt(e.target.value))}
+              className={`p-3 rounded-lg border text-sm font-black uppercase focus:outline-none cursor-pointer ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+            >
+              {[1, 2, 3, 4, 5].map(q => (
+                <option key={q} value={q}>{q}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end pb-0.5">
+            <button type="submit" className="w-full md:w-auto px-8 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all shadow-lg shadow-red-900/20 active:scale-95">
+              Add Log
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 };
@@ -909,7 +966,7 @@ const App: React.FC = () => {
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
           installPrompt={null}
-          onInstall={() => {}}
+          onInstall={() => { }}
           syncStatus={syncStatus}
           user={user}
           onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -959,6 +1016,7 @@ const App: React.FC = () => {
             user={user}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onSignOut={handleSignOut}
+            onLog={logStudy}
           />
         )}
       </main>
@@ -1100,7 +1158,7 @@ const TodayTab = ({
 
   const todayLogs = useMemo(() =>
     logs.filter((l: any) => l.date === getISTDateString()).reverse(),
-  [logs]);
+    [logs]);
 
   const totalToday = todayLogs.reduce((a: any, b: any) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
@@ -1114,42 +1172,42 @@ const TodayTab = ({
       <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center p-4 md:p-8 select-none overflow-hidden font-mono">
         {showBreach && (
           <div className="absolute inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-             <h2 className="text-[#E10600] text-3xl md:text-5xl font-black italic tracking-tighter mb-4">SESSION BREACHED</h2>
-             <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center">Focus interrupted. Session paused. 1 Distraction recorded.</p>
-             <button
-               onClick={handleResumeBreach}
-               className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
-             >
-               RESUME FOCUS
-             </button>
-             <div className="mt-12 relative flex flex-col items-center">
-                <button
-                  onMouseDown={() => setWipeHoldStart(Date.now())}
-                  onMouseUp={() => setWipeHoldStart(null)}
-                  onMouseLeave={() => setWipeHoldStart(null)}
-                  onTouchStart={() => setWipeHoldStart(Date.now())}
-                  onTouchEnd={() => setWipeHoldStart(null)}
-                  className="text-[10px] font-black uppercase text-zinc-700 hover:text-red-500 transition-colors py-2"
-                >
-                  {wipeHoldStart ? `WIPING IN ${(15 - (wipeProgress * 15 / 100)).toFixed(1)}s` : 'HOLD FOR 15s TO DISCARD SESSION'}
-                </button>
-                {wipeProgress > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 transition-all" style={{ width: `${wipeProgress}%` }} />
-                )}
-             </div>
+            <h2 className="text-[#E10600] text-3xl md:text-5xl font-black italic tracking-tighter mb-4">SESSION BREACHED</h2>
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center">Focus interrupted. Session paused. 1 Distraction recorded.</p>
+            <button
+              onClick={handleResumeBreach}
+              className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
+            >
+              RESUME FOCUS
+            </button>
+            <div className="mt-12 relative flex flex-col items-center">
+              <button
+                onMouseDown={() => setWipeHoldStart(Date.now())}
+                onMouseUp={() => setWipeHoldStart(null)}
+                onMouseLeave={() => setWipeHoldStart(null)}
+                onTouchStart={() => setWipeHoldStart(Date.now())}
+                onTouchEnd={() => setWipeHoldStart(null)}
+                className="text-[10px] font-black uppercase text-zinc-700 hover:text-red-500 transition-colors py-2"
+              >
+                {wipeHoldStart ? `WIPING IN ${(15 - (wipeProgress * 15 / 100)).toFixed(1)}s` : 'HOLD FOR 15s TO DISCARD SESSION'}
+              </button>
+              {wipeProgress > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 transition-all" style={{ width: `${wipeProgress}%` }} />
+              )}
+            </div>
           </div>
         )}
 
         <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900 via-transparent to-transparent animate-pulse" />
         <div className="absolute top-12 left-0 right-0 text-center px-4">
-            <p className="text-[10px] text-[#E10600] uppercase font-black tracking-[0.5em] md:tracking-[1em] mb-2">ACTIVE FOCUS SESSION</p>
-            <p className="text-[12px] md:text-[14px] text-zinc-500 uppercase font-black animate-pulse">{LOCK_IN_QUOTES[quoteIdx]}</p>
+          <p className="text-[10px] text-[#E10600] uppercase font-black tracking-[0.5em] md:tracking-[1em] mb-2">ACTIVE FOCUS SESSION</p>
+          <p className="text-[12px] md:text-[14px] text-zinc-500 uppercase font-black animate-pulse">{LOCK_IN_QUOTES[quoteIdx]}</p>
         </div>
 
         <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
         <div className="flex flex-col items-center gap-2 mt-4">
-           <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
-           {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
+          <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
+          {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
 
         <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
@@ -1162,7 +1220,7 @@ const TodayTab = ({
           </button>
 
           <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden mt-2">
-             <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((currentDisplayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
+            <div className="h-full bg-white transition-all duration-500" style={{ width: `${Math.min((currentDisplayMs / REQUIRED_FOCUS_MS) * 100, 100)}%` }} />
           </div>
 
           <div className="relative w-full mt-8 flex flex-col items-center">
@@ -1203,11 +1261,11 @@ const TodayTab = ({
             <div className="flex flex-col justify-center flex-1">
               <p className="text-2xl md:text-4xl font-black italic tracking-tighter leading-none">{totalToday.toFixed(1)}<span className="text-zinc-500 text-sm md:text-lg not-italic ml-2 font-black">/ {dailyGoalHours}H</span></p>
               <div className="flex gap-2 mt-4 items-center">
-                 <div className="flex gap-1">
-                    <button onClick={() => onUpdateDailyGoal(Math.max(1, dailyGoalHours - 1))} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">-</button>
-                    <button onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">+</button>
-                 </div>
-                 <span className="text-[10px] uppercase font-black text-zinc-500 tracking-wider">Daily Target</span>
+                <div className="flex gap-1">
+                  <button onClick={() => onUpdateDailyGoal(Math.max(1, dailyGoalHours - 1))} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">-</button>
+                  <button onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">+</button>
+                </div>
+                <span className="text-[10px] uppercase font-black text-zinc-500 tracking-wider">Daily Target</span>
               </div>
             </div>
           </div>
@@ -1215,8 +1273,8 @@ const TodayTab = ({
           <div className="w-full grid grid-cols-3 gap-2 md:gap-4">
             {(['Physics', 'Chemistry', 'Maths'] as Subject[]).map(s => (
               <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
-                 <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mb-1">{s.substring(0, 3)}</p>
-                 <p className="text-sm md:text-base font-black">{subjectDist[s].toFixed(1)}h</p>
+                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mb-1">{s.substring(0, 3)}</p>
+                <p className="text-sm md:text-base font-black">{subjectDist[s].toFixed(1)}h</p>
               </div>
             ))}
           </div>
@@ -1258,20 +1316,20 @@ const TodayTab = ({
           </>
         ) : (
           <div className="mt-12 flex flex-col items-center gap-6">
-             <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
-                <span className="text-[10px] font-black uppercase text-zinc-500">Focus Quality:</span>
-                <div className="flex gap-1">
-                   {[1,2,3,4,5].map(v => (
-                     <button key={v} onClick={() => setQuality(v)} className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${quality >= v ? 'bg-[#E10600] text-white' : 'bg-zinc-800 text-zinc-500'}`}>{v}</button>
-                   ))}
-                </div>
-             </div>
-             <button
-                onClick={handleStopTimer}
-                className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/20 rounded-xl"
-             >
-               END SESSION
-             </button>
+            <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
+              <span className="text-[10px] font-black uppercase text-zinc-500">Focus Quality:</span>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(v => (
+                  <button key={v} onClick={() => setQuality(v)} className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${quality >= v ? 'bg-[#E10600] text-white' : 'bg-zinc-800 text-zinc-500'}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handleStopTimer}
+              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/20 rounded-xl"
+            >
+              END SESSION
+            </button>
           </div>
         )}
       </section>
@@ -1280,7 +1338,7 @@ const TodayTab = ({
 
       <section className="space-y-4">
         <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
-           <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>SESSION HISTORY (TODAY)</h3>
+          <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>SESSION HISTORY (TODAY)</h3>
         </div>
         <div className="grid gap-3">
           {todayLogs.length === 0 ? (
