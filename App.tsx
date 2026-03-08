@@ -357,7 +357,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <div className="flex justify-center gap-2 mb-6">
-        {SUBJECTS.map(s => (
+        {SUBJECTS.filter(s => s !== 'General').map(s => (
           <button
             key={s}
             onClick={() => setActiveSubject(s)}
