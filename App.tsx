@@ -231,7 +231,7 @@ const Header = ({
         </div>
       </div>
       <div
-        className="w-full h-[6px] bg-zinc-800/50 group relative cursor-crosshair overflow-hidden"
+        className="w-full h-[6px] bg-zinc-800/50 group relative cursor-crosshair"
         onClick={(e) => {
           e.stopPropagation();
           setShowTooltip(!showTooltip);
