@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QSubject, QuestionTrackingState } from '../types';
-import { getTodayLog, getTodayTotal, computeDailyTargets } from './utils';
+import { getTodayProgress, computeDailyTargets, computeEffectiveGoals } from './utils';
 
 interface Props {
   questionTracking: QuestionTrackingState;
@@ -14,27 +14,29 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
   const [toast, setToast] = useState<string | null>(null);
   const [animatedTotal, setAnimatedTotal] = useState(0);
 
-  const todayLog = getTodayLog(questionTracking.dailyQuestionsLog);
-  const todayTotal = getTodayTotal(questionTracking.dailyQuestionsLog);
+  const todayProgress = getTodayProgress(questionTracking.dailyQuestionsLog);
   const targets = computeDailyTargets(questionTracking);
+  const goals = computeEffectiveGoals(questionTracking);
+  const hasGoal = goals.activeSubjects.length > 0;
+  const remaining = Math.max(0, targets.total - todayProgress.total);
 
-  // Animate total on change
+  // Animate counter
   useEffect(() => {
-    const diff = todayTotal - animatedTotal;
+    const diff = todayProgress.total - animatedTotal;
     if (diff === 0) return;
     const step = diff > 0 ? 1 : -1;
     const interval = setInterval(() => {
       setAnimatedTotal(prev => {
         const next = prev + step;
-        if ((step > 0 && next >= todayTotal) || (step < 0 && next <= todayTotal)) {
+        if ((step > 0 && next >= todayProgress.total) || (step < 0 && next <= todayProgress.total)) {
           clearInterval(interval);
-          return todayTotal;
+          return todayProgress.total;
         }
         return next;
       });
     }, 30);
     return () => clearInterval(interval);
-  }, [todayTotal]);
+  }, [todayProgress.total]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -58,22 +60,15 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
   };
 
   const subjects: { key: QSubject; label: string }[] = [
-    { key: 'physics', label: 'Physics' },
-    { key: 'chemistry', label: 'Chemistry' },
-    { key: 'math', label: 'Math' },
+    { key: 'physics', label: 'PHY' },
+    { key: 'chemistry', label: 'CHEM' },
+    { key: 'math', label: 'MATH' },
   ];
-
-  const subjectCount = (s: QSubject): number => {
-    if (!todayLog) return 0;
-    if (s === 'physics') return todayLog.physicsCount;
-    if (s === 'chemistry') return todayLog.chemistryCount;
-    return todayLog.mathCount;
-  };
 
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-6 md:p-8 rounded-2xl border relative overflow-hidden transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-6 md:p-10 rounded-2xl border relative overflow-hidden transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       {/* Toast */}
       {toast && (
         <div className="absolute top-4 right-4 z-30 px-4 py-2 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-widest animate-slide-up">
@@ -81,61 +76,57 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
         </div>
       )}
 
-      <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-        Questions Solved Today
-      </h3>
-
       {/* Large Counter */}
       <div className="text-center mb-8">
-        <p className="text-7xl md:text-8xl font-black italic tracking-tighter leading-none tabular-nums">
-          {animatedTotal}
+        <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-4 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          Questions Solved Today
         </p>
-        <p className={`text-[10px] font-black uppercase tracking-widest mt-3 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-          Questions Today
+        <p className="text-8xl md:text-9xl font-black italic tracking-tighter leading-none tabular-nums">
+          {animatedTotal}
         </p>
       </div>
 
-      {/* Today vs Target */}
-      {targets.total > 0 && (
-        <div className={`flex justify-center gap-8 mb-8 py-4 rounded-xl border ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+      {/* Target / Completed / Remaining row */}
+      {hasGoal && targets.total > 0 && (
+        <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-xl border ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
           <div className="text-center">
-            <p className="text-lg font-black italic">{todayTotal}</p>
-            <p className={`text-[8px] font-black uppercase tracking-widest ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Completed</p>
+            <p className="text-lg md:text-xl font-black italic text-[#E10600]">{targets.total}</p>
+            <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>🎯 Target</p>
           </div>
-          <div className={`w-px ${dark ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
           <div className="text-center">
-            <p className="text-lg font-black italic text-[#E10600]">{targets.total}</p>
-            <p className={`text-[8px] font-black uppercase tracking-widest ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Target</p>
+            <p className="text-lg md:text-xl font-black italic">{todayProgress.total}</p>
+            <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>✅ Done</p>
+          </div>
+          <div className="text-center">
+            <p className={`text-lg md:text-xl font-black italic ${remaining > 0 ? (dark ? 'text-yellow-500' : 'text-yellow-600') : 'text-green-500'}`}>{remaining}</p>
+            <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{remaining > 0 ? '⏳ Left' : '🎉 Done!'}</p>
           </div>
         </div>
       )}
 
       {/* Subject Selector */}
-      <div className="flex justify-center gap-2 mb-6">
+      <div className="flex justify-center gap-2 mb-5">
         {subjects.map(s => (
           <button
             key={s.key}
             onClick={() => setSelectedSubject(s.key)}
-            className={`px-4 md:px-6 py-2 text-[10px] font-black uppercase tracking-widest border rounded-lg transition-all ${selectedSubject === s.key
+            className={`px-5 md:px-6 py-2.5 text-[10px] font-black uppercase tracking-widest border rounded-lg transition-all ${selectedSubject === s.key
               ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg shadow-red-900/20'
               : (dark ? 'border-[#1F1F23] text-zinc-500 hover:border-zinc-700' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')
               }`}
           >
             {s.label}
-            <span className={`ml-2 ${selectedSubject === s.key ? 'text-white/70' : 'text-zinc-700'}`}>
-              {subjectCount(s.key)}
-            </span>
           </button>
         ))}
       </div>
 
-      {/* Quick Add Buttons */}
-      <div className="flex justify-center gap-2 mb-4">
+      {/* Quick Add + Manual Input */}
+      <div className="flex justify-center gap-2 mb-3">
         {[1, 5, 10].map(n => (
           <button
             key={n}
             onClick={() => handleAdd(n)}
-            className={`px-5 md:px-8 py-3 text-[10px] font-black uppercase border rounded-lg transition-all active:scale-95 ${dark
+            className={`px-6 md:px-8 py-3 text-[11px] font-black border rounded-lg transition-all active:scale-95 ${dark
               ? 'bg-[#0B0B0D] border-[#2F2F33] text-white hover:border-[#E10600]'
               : 'bg-zinc-50 border-zinc-200 text-black hover:border-[#E10600]'
               }`}
@@ -144,8 +135,6 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           </button>
         ))}
       </div>
-
-      {/* Manual Input */}
       <div className="flex gap-2 max-w-xs mx-auto">
         <input
           type="number"

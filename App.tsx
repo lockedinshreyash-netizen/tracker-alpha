@@ -8,6 +8,7 @@ import { JEE_2027_DATE } from './constants';
 import QuestionsTab from './questions/QuestionsTab';
 import QuestionsBarChart from './review/QuestionsBarChart';
 import QuestionsHeatmap from './review/QuestionsHeatmap';
+import Sidebar from './Sidebar';
 
 // --- Supabase Configuration ---
 const SUPABASE_URL = 'https://ipwmgkctxkopuszkuebh.supabase.co';
@@ -1259,21 +1260,9 @@ const App: React.FC = () => {
   const isCurrentlyLockInActive = state.timer.isLockInActive;
 
   return (
-    <div className={`min-h-screen pb-24 relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${isCurrentlyLockInActive ? 'bg-black' : (theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-white text-black')}`}>
+    <div className={`min-h-screen relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${isCurrentlyLockInActive ? 'bg-black' : (theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-white text-black')}`}>
       {!isCurrentlyLockInActive && (
-        <Header
-          currentClass={state.currentClass}
-          onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
-          daysRemaining={daysRemaining}
-          theme={theme}
-          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-          installPrompt={null}
-          onInstall={() => { }}
-          syncStatus={syncStatus}
-          user={user}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
-          logs={state.logs}
-        />
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isLockInActive={isCurrentlyLockInActive} theme={theme} />
       )}
 
       <AuthModal
@@ -1286,54 +1275,70 @@ const App: React.FC = () => {
         }}
       />
 
-      <main className={`max-w-5xl mx-auto w-full relative z-20 ${isCurrentlyLockInActive ? 'p-0' : 'px-4 md:px-6 py-8'}`}>
-        {activeTab === 'Today' && (
-          <TodayTab
-            state={state}
-            onLog={logStudy}
-            onDeleteLog={deleteLog}
-            onTimerUpdate={updateTimer}
-            onToggleLockInMode={(val: boolean) => setState(p => ({ ...p, isLockInModeEnabled: val }))}
-            onAddTask={addTask}
-            onToggleTask={toggleTask}
-            onDeleteTask={deleteTask}
-            onUpdateDailyGoal={updateDailyGoal}
-            theme={theme}
-          />
-        )}
-        {!isCurrentlyLockInActive && activeTab === 'Syllabus' && (
-          <SyllabusTab
+      <div className={`transition-all duration-300 ${isCurrentlyLockInActive ? '' : 'md:ml-[200px] pt-14 md:pt-0'}`}>
+        {!isCurrentlyLockInActive && (
+          <Header
             currentClass={state.currentClass}
-            progress={state.progress}
-            onToggle={toggleChapterStatus}
+            onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
+            daysRemaining={daysRemaining}
             theme={theme}
-          />
-        )}
-        {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} />}
-        {!isCurrentlyLockInActive && activeTab === 'Questions' && (
-          <QuestionsTab
-            questionTracking={state.questionTracking}
-            onUpdateTracking={updateQuestionTracking}
-            onLogQuestions={logQuestions}
-            theme={theme}
-          />
-        )}
-        {!isCurrentlyLockInActive && activeTab === 'Review' && (
-          <ReviewTab
-            logs={state.logs}
-            score={lockInScore}
-            onClearData={clearLogs}
-            theme={theme}
+            onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
+            installPrompt={null}
+            onInstall={() => { }}
+            syncStatus={syncStatus}
             user={user}
             onOpenAuth={() => setIsAuthModalOpen(true)}
-            onSignOut={handleSignOut}
-            onLog={logStudy}
-            dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
+            logs={state.logs}
           />
         )}
-      </main>
 
-      <Navbar activeTab={activeTab} onTabChange={handleTabChange} isLockInActive={isCurrentlyLockInActive} theme={theme} />
+        <main className={`max-w-5xl mx-auto w-full relative z-20 ${isCurrentlyLockInActive ? 'p-0' : 'px-4 md:px-6 py-8 pb-16'}`}>
+          {activeTab === 'Today' && (
+            <TodayTab
+              state={state}
+              onLog={logStudy}
+              onDeleteLog={deleteLog}
+              onTimerUpdate={updateTimer}
+              onToggleLockInMode={(val: boolean) => setState(p => ({ ...p, isLockInModeEnabled: val }))}
+              onAddTask={addTask}
+              onToggleTask={toggleTask}
+              onDeleteTask={deleteTask}
+              onUpdateDailyGoal={updateDailyGoal}
+              theme={theme}
+            />
+          )}
+          {!isCurrentlyLockInActive && activeTab === 'Syllabus' && (
+            <SyllabusTab
+              currentClass={state.currentClass}
+              progress={state.progress}
+              onToggle={toggleChapterStatus}
+              theme={theme}
+            />
+          )}
+          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} />}
+          {!isCurrentlyLockInActive && activeTab === 'Questions' && (
+            <QuestionsTab
+              questionTracking={state.questionTracking}
+              onUpdateTracking={updateQuestionTracking}
+              onLogQuestions={logQuestions}
+              theme={theme}
+            />
+          )}
+          {!isCurrentlyLockInActive && activeTab === 'Review' && (
+            <ReviewTab
+              logs={state.logs}
+              score={lockInScore}
+              onClearData={clearLogs}
+              theme={theme}
+              user={user}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onSignOut={handleSignOut}
+              onLog={logStudy}
+              dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 };

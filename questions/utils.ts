@@ -188,7 +188,19 @@ const distributeAmongSubjects = (
   return result;
 };
 
-// --- Daily adaptive targets ---
+// --- Weekly progress EXCLUDING today (for locked daily target) ---
+
+export const computeWeeklyProgressBeforeToday = (logs: DailyQuestionsLog[]): WeeklyProgress => {
+  const today = getISTDateString();
+  const { start, end } = getISTWeekBounds();
+  const weekLogsBeforeToday = logs.filter(l => l.date >= start && l.date <= end && l.date !== today);
+  const p = weekLogsBeforeToday.reduce((s, l) => s + l.physicsCount, 0);
+  const c = weekLogsBeforeToday.reduce((s, l) => s + l.chemistryCount, 0);
+  const m = weekLogsBeforeToday.reduce((s, l) => s + l.mathCount, 0);
+  return { physicsCompleted: p, chemistryCompleted: c, mathCompleted: m, totalCompleted: p + c + m };
+};
+
+// --- Daily adaptive targets (LOCKED at start of day) ---
 
 export interface DailyTargets {
   total: number;
@@ -199,7 +211,8 @@ export interface DailyTargets {
 
 export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets => {
   const goals = computeEffectiveGoals(state);
-  const progress = computeWeeklyProgress(state.dailyQuestionsLog);
+  // Use progress BEFORE today so target stays locked all day
+  const progressBeforeToday = computeWeeklyProgressBeforeToday(state.dailyQuestionsLog);
   const daysLeft = getDaysLeftInWeek();
 
   const nullTarget: DailyTargets = { total: 0, physics: null, chemistry: null, math: null };
@@ -212,13 +225,33 @@ export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets 
     return Math.ceil(remaining / daysLeft);
   };
 
-  const pTarget = calcTarget(goals.physics, progress.physicsCompleted);
-  const cTarget = calcTarget(goals.chemistry, progress.chemistryCompleted);
-  const mTarget = calcTarget(goals.math, progress.mathCompleted);
+  const pTarget = calcTarget(goals.physics, progressBeforeToday.physicsCompleted);
+  const cTarget = calcTarget(goals.chemistry, progressBeforeToday.chemistryCompleted);
+  const mTarget = calcTarget(goals.math, progressBeforeToday.mathCompleted);
 
   const total = (pTarget || 0) + (cTarget || 0) + (mTarget || 0);
 
   return { total, physics: pTarget, chemistry: cTarget, math: mTarget };
+};
+
+// --- Today's progress ---
+
+export interface TodayProgress {
+  total: number;
+  physics: number;
+  chemistry: number;
+  math: number;
+}
+
+export const getTodayProgress = (logs: DailyQuestionsLog[]): TodayProgress => {
+  const log = getTodayLog(logs);
+  if (!log) return { total: 0, physics: 0, chemistry: 0, math: 0 };
+  return {
+    total: log.physicsCount + log.chemistryCount + log.mathCount,
+    physics: log.physicsCount,
+    chemistry: log.chemistryCount,
+    math: log.mathCount,
+  };
 };
 
 // --- Adaptive feedback ---
@@ -243,7 +276,6 @@ export const computeFeedback = (state: QuestionTrackingState): AdaptiveFeedback 
   const { start } = getISTWeekBounds();
   const today = getISTDateString();
 
-  // Days elapsed since week start (1-indexed)
   const startDate = new Date(start + 'T00:00:00');
   const todayDate = new Date(today + 'T00:00:00');
   const daysElapsed = Math.max(1, Math.floor((todayDate.getTime() - startDate.getTime()) / 86400000) + 1);
@@ -252,7 +284,7 @@ export const computeFeedback = (state: QuestionTrackingState): AdaptiveFeedback 
   const dailyTarget = computeDailyTargets(state).total;
 
   const diff = progress.totalCompleted - expectedByNow;
-  const tolerance = Math.max(5, Math.round(totalGoal * 0.03)); // 3% tolerance
+  const tolerance = Math.max(5, Math.round(totalGoal * 0.03));
 
   if (diff < -tolerance) {
     return { status: 'behind', message: `You're behind pace. Target adjusted to ${dailyTarget} today.`, dailyTarget };
