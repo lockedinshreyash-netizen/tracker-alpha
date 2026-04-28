@@ -492,7 +492,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
             <p className="text-[9px] font-bold uppercase text-zinc-600 font-ui">Chapters Completed</p>
           </div>
         </div>
-        <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+        <div className={`w-full h-1.5 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
           <div
             className="h-full bg-[#E10600] transition-all duration-700"
             style={{ width: `${subjectStats.percent}%` }}
@@ -666,11 +666,11 @@ const StreakTab = ({
   return (
     <div className="space-y-14 animate-in fade-in duration-500">
       {/* Current streak card */}
-      <div className="text-center py-16 md:py-24 rounded-2xl border border-white/[0.06] bg-[#111114]">
+      <div className={`text-center py-16 md:py-24 rounded-2xl border ${theme === 'dark' ? 'border-white/[0.06] bg-[#111114]' : 'border-zinc-200 bg-zinc-50'}`}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-500 mb-6 font-ui">
           Current Streak
         </p>
-        <h2 className="text-[120px] md:text-[160px] font-black italic tracking-tighter text-white num-hero">
+        <h2 className={`text-[120px] md:text-[160px] tracking-tighter num-hero ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
           {streak}
         </h2>
         <div className="accent-line mt-4 mb-6" />
@@ -748,8 +748,8 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           <div className="accent-line mb-4" />
           <p className="text-xs font-semibold uppercase tracking-[0.06em] text-zinc-500 font-ui">Lock-In Score / 100</p>
 
-          <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
-            <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
+          <div className={`w-full max-w-xs h-1 rounded-full mt-10 overflow-hidden ${theme === 'dark' ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
+            <div className={`h-full transition-all duration-1000 ${theme === 'dark' ? 'bg-white' : 'bg-black'}`} style={{ width: `${score}%` }} />
           </div>
         </div>
 
@@ -1616,7 +1616,7 @@ const TodayTab = ({
                 <button
                   key={s}
                   onClick={() => setManualSubject(s)}
-                  className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]'}`}
+                  className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-300 text-zinc-500 hover:border-zinc-400')}`}
                 >
                   {s}
                 </button>
@@ -1625,13 +1625,13 @@ const TodayTab = ({
             <div className="flex flex-col items-center mt-12 gap-6">
               <button
                 onClick={handleStartTimer}
-                className="w-full max-sm:px-4 py-6 md:py-7 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl font-ui"
+                className={`w-full max-sm:px-4 py-6 md:py-7 font-black uppercase tracking-[0.3em] md:tracking-[0.5em] transition-all active:scale-[0.98] shadow-md rounded-xl font-ui ${theme === 'dark' ? 'bg-white text-black hover:bg-zinc-100' : 'bg-black text-white hover:bg-zinc-900'}`}
               >
                 START SESSION
               </button>
               <button
                 onClick={() => isLockInModeEnabled ? onToggleLockInMode(false) : setShowWarning(true)}
-                className={`text-[9px] font-bold uppercase tracking-[0.1em] px-8 py-2.5 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.08] text-zinc-500 hover:border-white/[0.14]'}`}
+                className={`text-[9px] font-bold uppercase tracking-[0.1em] px-8 py-2.5 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : (theme === 'dark' ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.14]' : 'border-zinc-300 text-zinc-500 hover:border-zinc-400')}`}
               >
                 {isLockInModeEnabled ? '🔒 LOCK-IN ACTIVE' : '🔓 LOCK-IN DISABLED'}
               </button>
@@ -1643,7 +1643,7 @@ const TodayTab = ({
               <span className="text-[10px] font-black uppercase text-zinc-500">Focus Quality:</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map(v => (
-                  <button key={v} onClick={() => setQuality(v)} className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${quality >= v ? 'bg-[#E10600] text-white' : 'bg-zinc-800 text-zinc-500'}`}>{v}</button>
+                  <button key={v} onClick={() => setQuality(v)} className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${quality >= v ? 'bg-[#E10600] text-white' : (theme === 'dark' ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-200 text-zinc-500')}`}>{v}</button>
                 ))}
               </div>
             </div>

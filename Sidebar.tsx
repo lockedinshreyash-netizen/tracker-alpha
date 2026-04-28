@@ -8,12 +8,49 @@ interface Props {
   theme: 'dark' | 'light';
 }
 
-const TAB_ICONS: Record<TabType, string> = {
-  Today: '⚡',
-  Syllabus: '📚',
-  Streak: '🔥',
-  Questions: '✏️',
-  Review: '📊',
+/* ── Clean SVG icons — 18×18, stroke-based, modern ── */
+const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, className = '' }) => {
+  const props = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className };
+
+  switch (tab) {
+    case 'Today':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case 'Syllabus':
+      return (
+        <svg {...props}>
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          <line x1="9" y1="7" x2="16" y2="7" />
+          <line x1="9" y1="11" x2="14" y2="11" />
+        </svg>
+      );
+    case 'Streak':
+      return (
+        <svg {...props}>
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+        </svg>
+      );
+    case 'Questions':
+      return (
+        <svg {...props}>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        </svg>
+      );
+    case 'Review':
+      return (
+        <svg {...props}>
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      );
+  }
 };
 
 const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, theme }) => {
@@ -107,13 +144,13 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
               >
                 {/* Active indicator */}
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-zinc-400 rounded-r-full" />
+                  <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 rounded-r-full ${dark ? 'bg-zinc-400' : 'bg-zinc-600'}`} />
                 )}
 
-                <span className="text-base flex-shrink-0">{TAB_ICONS[tab]}</span>
+                <TabIcon tab={tab} className="flex-shrink-0" />
 
                 {!collapsed && (
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? 'text-white' : ''}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? (dark ? 'text-white' : 'text-black') : ''}`}>
                     {tab}
                   </span>
                 )}
@@ -136,7 +173,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
               Tracker Alpha
             </p>
           ) : (
-            <div className="w-2 h-2 rounded-full bg-zinc-700 mx-auto" />
+            <div className={`w-2 h-2 rounded-full mx-auto ${dark ? 'bg-zinc-700' : 'bg-zinc-300'}`} />
           )}
         </div>
       </aside>
