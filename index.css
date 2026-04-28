@@ -29,23 +29,26 @@ body {
 }
 
 /* ── Global micro-interactions ── */
-button, a, [role="button"] {
+button,
+a,
+[role="button"] {
   transition: opacity var(--transition-default),
-              transform var(--transition-fast),
-              background-color var(--transition-default),
-              border-color var(--transition-default),
-              color var(--transition-default),
-              box-shadow var(--transition-default);
+    transform var(--transition-fast),
+    background-color var(--transition-default),
+    border-color var(--transition-default),
+    color var(--transition-default),
+    box-shadow var(--transition-default);
 }
 
-button:active, [role="button"]:active {
+button:active,
+[role="button"]:active {
   transform: scale(0.97);
 }
 
 /* ── Card hover lift (opt-in via class) ── */
 .card-interactive {
   transition: border-color var(--transition-smooth),
-              background-color var(--transition-smooth);
+    background-color var(--transition-smooth);
 }
 
 .card-interactive:hover {
@@ -78,7 +81,8 @@ button:active, [role="button"]:active {
 
 .font-display {
   font-family: var(--font-display);
-  font-weight: 400; /* Anton only has 400 */
+  font-weight: 400;
+  /* Anton only has 400 */
   font-style: normal;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -102,7 +106,7 @@ button:active, [role="button"]:active {
 .num-hero {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+
   line-height: 0.85;
   text-transform: uppercase;
 }
