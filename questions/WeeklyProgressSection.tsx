@@ -23,7 +23,7 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Progress
       </h3>
@@ -42,13 +42,8 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
       {/* Animated gradient progress bar */}
       <div className={`w-full h-3 rounded-full overflow-hidden ${dark ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
         <div
-          className="h-full rounded-full transition-all duration-700 ease-out"
-          style={{
-            width: `${percent}%`,
-            background: 'linear-gradient(90deg, #E10600, #ff4d4d, #E10600)',
-            backgroundSize: '200% 100%',
-            animation: 'gradientShift 3s ease infinite',
-          }}
+          className="h-full rounded-full bg-[#E10600] transition-all duration-700 ease-out"
+          style={{ width: `${percent}%` }}
         />
       </div>
 
@@ -60,14 +55,6 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
         }
       </p>
 
-      {/* Inline keyframes for gradient animation */}
-      <style>{`
-        @keyframes gradientShift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `}</style>
     </section>
   );
 };

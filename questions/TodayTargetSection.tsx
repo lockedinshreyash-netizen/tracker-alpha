@@ -26,7 +26,7 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
   return (
     <>
       {/* Today's Target */}
-      <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           To stay on track today
         </h3>
@@ -44,19 +44,19 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
         {/* Subject breakdown */}
         <div className="flex justify-center gap-3 md:gap-4">
           {targets.physics !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Phy</p>
               <p className="text-lg font-black italic">{targets.physics}</p>
             </div>
           )}
           {targets.chemistry !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Chem</p>
               <p className="text-lg font-black italic">{targets.chemistry}</p>
             </div>
           )}
           {targets.math !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Math</p>
               <p className="text-lg font-black italic">{targets.math}</p>
             </div>

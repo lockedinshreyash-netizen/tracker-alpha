@@ -27,7 +27,7 @@ const WeakSubjectSection: React.FC<Props> = ({ questionTracking, onUpdateTrackin
   };
 
   return (
-    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Focus Boost (optional)
       </h3>
@@ -40,10 +40,10 @@ const WeakSubjectSection: React.FC<Props> = ({ questionTracking, onUpdateTrackin
           <button
             key={opt.label}
             onClick={() => handleSelect(opt.key)}
-            className={`px-4 md:px-6 py-2.5 text-[10px] font-black uppercase tracking-widest border rounded-lg transition-all active:scale-95 ${current === opt.key
-              ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg shadow-red-900/20'
+            className={`px-4 md:px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest border rounded-lg transition-all active:scale-95 ${current === opt.key
+              ? 'bg-[#E10600] border-[#E10600] text-white'
               : (dark
-                ? 'border-[#1F1F23] text-zinc-500 hover:border-zinc-700'
+                ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]'
                 : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')
               }`}
           >

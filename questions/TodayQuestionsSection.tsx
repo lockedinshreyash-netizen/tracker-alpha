@@ -68,7 +68,7 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-6 md:p-10 rounded-2xl border relative overflow-hidden transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-6 md:p-10 rounded-2xl border relative overflow-hidden transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       {/* Toast */}
       {toast && (
         <div className="absolute top-4 right-4 z-30 px-4 py-2 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-widest animate-slide-up">
@@ -88,7 +88,7 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
 
       {/* Target / Completed / Remaining row */}
       {hasGoal && targets.total > 0 && (
-        <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-xl border ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+        <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
           <div className="text-center">
             <p className="text-lg md:text-xl font-black italic text-[#E10600]">{targets.total}</p>
             <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>🎯 Target</p>
@@ -110,9 +110,9 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           <button
             key={s.key}
             onClick={() => setSelectedSubject(s.key)}
-            className={`px-5 md:px-6 py-2.5 text-[10px] font-black uppercase tracking-widest border rounded-lg transition-all ${selectedSubject === s.key
-              ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg shadow-red-900/20'
-              : (dark ? 'border-[#1F1F23] text-zinc-500 hover:border-zinc-700' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')
+            className={`px-5 md:px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest border rounded-lg transition-all ${selectedSubject === s.key
+              ? 'bg-[#E10600] border-[#E10600] text-white'
+              : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')
               }`}
           >
             {s.label}
@@ -127,8 +127,8 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
             key={n}
             onClick={() => handleAdd(n)}
             className={`px-6 md:px-8 py-3 text-[11px] font-black border rounded-lg transition-all active:scale-95 ${dark
-              ? 'bg-[#0B0B0D] border-[#2F2F33] text-white hover:border-[#E10600]'
-              : 'bg-zinc-50 border-zinc-200 text-black hover:border-[#E10600]'
+              ? 'bg-[#0D0D10] border-white/[0.06] text-white hover:border-white/[0.12]'
+              : 'bg-zinc-50 border-zinc-200 text-black hover:border-zinc-300'
               }`}
           >
             +{n}
@@ -143,14 +143,14 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           value={manualInput}
           onChange={e => setManualInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
-          className={`flex-1 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-[#E10600] font-bold uppercase border rounded-lg transition-colors text-center ${dark
-            ? 'bg-[#0B0B0D] border-[#2F2F33] text-white placeholder-zinc-700'
+          className={`flex-1 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-white/20 font-bold uppercase border rounded-lg transition-colors text-center ${dark
+            ? 'bg-[#0D0D10] border-white/[0.06] text-white placeholder-zinc-700'
             : 'bg-zinc-50 border-zinc-200 text-black placeholder-zinc-300'
             }`}
         />
         <button
           onClick={handleManualSubmit}
-          className="px-6 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/20"
+          className="px-6 py-3 text-[10px] font-bold uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95"
         >
           Add
         </button>

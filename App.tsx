@@ -188,7 +188,7 @@ const Header = ({
 
   return (
     <div className="w-full">
-      <div className={`pt-8 pb-4 border-b relative z-20 ${theme === 'dark' ? 'border-[#1F1F23]' : 'border-zinc-200'}`}>
+      <div className={`pt-8 pb-5 relative z-20 ${theme === 'dark' ? 'border-b border-white/[0.04]' : 'border-b border-zinc-200'}`}>
         <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
           <div className="relative">
             <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
@@ -213,20 +213,20 @@ const Header = ({
             {installPrompt && (
               <button
                 onClick={onInstall}
-                className={`text-[10px] font-black uppercase px-3 py-1 rounded border bg-[#E10600] border-[#E10600] text-white hover:bg-red-700 transition-all`}
+                className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-all`}
               >
                 INSTALL
               </button>
             )}
             <button
               onClick={onToggleTheme}
-              className={`p-2 rounded border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
+              className={`p-2 rounded-lg border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-zinc-300'}`}
             >
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
             <button
               onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
-              className={`text-[10px] font-black uppercase px-3 py-1 rounded border transition-colors ${theme === 'dark' ? 'bg-[#1F1F23] border-[#2F2F33] text-white hover:border-[#E10600]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-[#E10600]'}`}
+              className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg border transition-colors ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-zinc-300'}`}
             >
               C-{currentClass} ▾
             </button>
@@ -237,8 +237,8 @@ const Header = ({
       {/* Burn Bar */}
       <div className="w-full relative px-6 mt-4">
         <div className="flex justify-between items-center mb-1">
-          <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>JEE MAINS 2027</span>
-          <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>{daysRemaining} DAYS LEFT</span>
+          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>JEE Mains 2027</span>
+          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{daysRemaining} days left</span>
         </div>
       </div>
       <div
@@ -251,11 +251,11 @@ const Header = ({
         onMouseLeave={() => setShowTooltip(false)}
       >
         <div
-          className="h-full bg-[#E10600] transition-all duration-1000 shadow-[0_4px_15px_-3px_rgba(225,6,0,0.5)]"
+          className="h-full bg-[#E10600] transition-all duration-1000"
           style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
         />
         {/* Tooltip */}
-        <div className={`absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 md:w-80 p-4 bg-[#0B0B0D] border border-[#E10600] rounded-xl shadow-[0_0_15px_rgba(225,6,0,0.15)] transition-opacity duration-300 z-[90] pointer-events-none ${showTooltip ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 md:w-80 p-4 bg-[#111114] border border-white/[0.08] rounded-xl shadow-xl transition-opacity duration-300 z-[90] pointer-events-none ${showTooltip ? 'opacity-100' : 'opacity-0'}`}>
           <div className="space-y-2">
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
@@ -334,18 +334,18 @@ const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: 
   if (isLockInActive) return null;
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Review'];
   return (
-    <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/80 backdrop-blur-md border-[#1F1F23]' : 'bg-white/80 backdrop-blur-md border-zinc-200 shadow-lg'}`}>
+    <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/90 backdrop-blur-xl border-white/[0.04]' : 'bg-white/80 backdrop-blur-md border-zinc-200 shadow-lg'}`}>
       <div className="max-w-5xl mx-auto flex justify-around items-center h-16 safe-area-inset-bottom">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab ? 'scale-110' : 'opacity-40 hover:opacity-100'}`}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab ? '' : 'opacity-35 hover:opacity-70'}`}
           >
-            <span className={`text-[10px] uppercase tracking-[0.2em] font-black ${activeTab === tab ? 'text-[#E10600]' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>
+            <span className={`text-[10px] uppercase tracking-wider font-bold ${activeTab === tab ? 'text-white' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>
               {tab}
             </span>
-            {activeTab === tab && <div className="w-1 h-1 rounded-full bg-[#E10600]" />}
+            {activeTab === tab && <div className="w-4 h-[2px] rounded-full bg-[#E10600]" />}
           </button>
         ))}
       </div>
@@ -380,8 +380,8 @@ const TaskSection = ({
   return (
     <div className={`space-y-4 relative z-10 ${minimal ? 'max-w-md w-full mx-auto' : ''}`}>
       {!minimal && (
-        <div className="flex justify-between items-end mb-4 border-b border-zinc-800 pb-2">
-          <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>FOCUS TASKS</h3>
+        <div className="flex justify-between items-end mb-4 pb-2">
+          <h3 className={`text-[10px] uppercase font-semibold tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus Tasks</h3>
         </div>
       )}
 
@@ -392,7 +392,7 @@ const TaskSection = ({
               <button
                 key={s}
                 onClick={() => setSelectedSubject(s)}
-                className={`text-[9px] px-3 py-1.5 font-black uppercase border transition-all ${selectedSubject === s ? 'bg-[#E10600] text-white border-[#E10600]' : (theme === 'dark' ? 'border-[#1F1F23] text-zinc-600' : 'border-zinc-200 text-zinc-400')}`}
+                className={`text-[9px] px-3 py-1.5 font-bold uppercase border rounded-lg transition-all ${selectedSubject === s ? 'bg-[#E10600] text-white border-[#E10600]' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400')}`}
               >
                 {s}
               </button>
@@ -402,7 +402,7 @@ const TaskSection = ({
             <input
               type="text"
               placeholder={`ADD ${selectedSubject.toUpperCase()} TASK...`}
-              className={`flex-1 text-xs p-3 md:p-4 focus:outline-none focus:ring-1 focus:ring-[#E10600] font-bold uppercase border transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#2F2F33] text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+              className={`flex-1 text-xs p-3 md:p-4 focus:outline-none focus:ring-1 focus:ring-white/20 font-bold uppercase border rounded-lg transition-colors ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
               value={newTaskText}
               onChange={e => setNewTaskText(e.target.value)}
               onKeyPress={e => e.key === 'Enter' && handleAdd()}
@@ -419,13 +419,13 @@ const TaskSection = ({
 
       <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
         {filteredTasks.length === 0 ? (
-          <div className={`col-span-full py-8 text-center border border-dashed rounded-lg ${theme === 'dark' ? 'border-zinc-900 text-zinc-700' : 'border-zinc-200 text-zinc-300'}`}>
+          <div className={`col-span-full py-8 text-center border rounded-lg ${theme === 'dark' ? 'border-white/[0.04] text-zinc-700' : 'border-zinc-200 text-zinc-300'}`}>
             <p className="text-[10px] font-black uppercase tracking-widest italic">No Pending Tasks</p>
           </div>
         ) : filteredTasks.map((task: any) => (
           <div
             key={task.id}
-            className={`flex items-start gap-4 p-4 border rounded-lg transition-all group ${task.completed ? 'opacity-30' : 'hover:border-[#E10600]'} ${theme === 'dark' ? 'border-[#1F1F23] bg-[#141417]' : 'border-zinc-100 bg-white shadow-sm'}`}
+            className={`flex items-start gap-4 p-4 border rounded-lg transition-all group card-interactive ${task.completed ? 'opacity-30' : ''} ${theme === 'dark' ? 'border-white/[0.06] bg-[#111114]' : 'border-zinc-100 bg-white shadow-sm'}`}
           >
             <button
               onClick={() => onToggleTask(task.id)}
@@ -474,17 +474,17 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
           <button
             key={s}
             onClick={() => setActiveSubject(s)}
-            className={`px-4 md:px-6 py-2 text-[10px] font-black uppercase tracking-widest border transition-all rounded-lg ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg shadow-red-900/20' : (theme === 'dark' ? 'border-[#1F1F23] text-zinc-500 hover:border-zinc-700' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
+            className={`px-4 md:px-6 py-2 text-[10px] font-bold uppercase tracking-widest border transition-all rounded-lg ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
           >
             {s}
           </button>
         ))}
       </div>
 
-      <div className={`mb-8 p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <div className={`mb-8 p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <div className="flex justify-between items-end mb-4">
           <div>
-            <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-1">Subject Mastery</h3>
+            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-widest mb-1">Subject Mastery</h3>
             <p className="text-2xl font-black italic">{activeSubject.toUpperCase()}</p>
           </div>
           <div className="text-right">
@@ -510,7 +510,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
             <div
               key={chapter}
               onClick={() => onToggle(currentClass, activeSubject, chapter)}
-              className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[120px] ${colors.border} ${colors.bg} ${theme === 'dark' ? '' : 'shadow-sm'}`}
+              className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[120px] card-interactive ${colors.border} ${colors.bg} ${theme === 'dark' ? '' : 'shadow-sm'}`}
             >
               <div>
                 <div className={`text-[8px] font-black uppercase tracking-widest mb-2 px-2 py-0.5 rounded border w-fit ${colors.label}`}>
@@ -568,7 +568,7 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
   };
 
   return (
-    <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-zinc-500">
           Monthly Heatmap
@@ -652,11 +652,13 @@ const StreakTab = ({
   logs,
   dailyGoalHours,
   theme,
+  dailyQuestionsLog,
 }: {
   streak: number;
   logs: DailyLog[];
   dailyGoalHours: number;
   theme: 'dark' | 'light';
+  dailyQuestionsLog?: DailyQuestionsLog[];
 }) => {
   const days = getLast7DaysStats(logs);
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
@@ -664,24 +666,25 @@ const StreakTab = ({
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
       {/* Current streak card */}
-      <div className="text-center py-10 md:py-16 rounded-3xl border-2 border-dashed border-[#E10600] bg-[#E10600]/5">
-        <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#E10600] mb-4">
-          CURRENT STREAK
+      <div className="text-center py-14 md:py-20 rounded-2xl border border-white/[0.06] bg-[#111114]">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
+          Current Streak
         </p>
-        <h2 className="text-8xl md:text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(225,6,0,0.4)]">
+        <h2 className="text-[120px] md:text-[160px] font-black italic tracking-tighter text-white num-hero">
           {streak}
         </h2>
-        <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 mt-4">
-          DAYS OF UNDIVIDED FOCUS
+        <div className="accent-line mt-4 mb-6" />
+        <p className="text-sm font-medium tracking-wide text-zinc-600 mt-2">
+          days of undivided focus
         </p>
       </div>
 
       {/* 7‑day focus hours graph */}
       <div
-        className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'
+        className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
           }`}
       >
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">
+        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
           PAST 7 DAYS ACTIVITY
         </h3>
         <div className="flex items-end justify-between h-40 gap-2 md:gap-3">
@@ -708,6 +711,14 @@ const StreakTab = ({
       </div>
 
       <MonthlyHeatmap logs={logs} dailyGoalHours={dailyGoalHours} theme={theme} />
+
+      {/* Question Analytics */}
+      {dailyQuestionsLog && dailyQuestionsLog.length > 0 && (
+        <>
+          <QuestionsBarChart dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
+          <QuestionsHeatmap dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
+        </>
+      )}
     </div>
   );
 };
@@ -730,11 +741,12 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`md:col-span-2 p-8 md:p-12 rounded-3xl border-2 flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-black border-zinc-800' : 'bg-white border-zinc-200'}`}>
+        <div className={`md:col-span-2 p-8 md:p-12 rounded-2xl border flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-200'}`}>
           <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500 mb-6">COMPOSITE PERFORMANCE</p>
-          <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4">{score}</h2>
-          <p className="text-xs font-black uppercase tracking-widest text-zinc-400">LOCK-IN SCORE / 100</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-500 mb-6">Composite Performance</p>
+          <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4 num-hero">{score}</h2>
+          <div className="accent-line mb-4" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Lock-In Score / 100</p>
 
           <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
             <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
@@ -742,15 +754,15 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
 
         <div className="space-y-4">
-          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
             <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Hours Logged</p>
             <p className="text-3xl font-black italic">{logs.reduce((a: any, b: any) => a + b.hours, 0).toFixed(1)}H</p>
           </div>
-          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
             <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Sessions</p>
             <p className="text-3xl font-black italic">{logs.length}</p>
           </div>
-          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+          <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
             <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Avg Quality</p>
             <p className="text-3xl font-black italic">
               {logs.length > 0 ? (logs.reduce((a: any, b: any) => a + b.quality, 0) / logs.length).toFixed(1) : '0.0'}
@@ -759,7 +771,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
       </div>
 
-      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">
           <h4 className="text-sm font-black uppercase">Account & Privacy</h4>
           <p className="text-[11px] text-zinc-500 font-bold mt-1">
@@ -777,7 +789,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           ) : (
             <button
               onClick={onOpenAuth}
-              className="px-6 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl shadow-lg shadow-red-900/20"
+              className="px-6 py-3 text-[10px] font-bold uppercase bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl"
             >
               Sign In to Sync
             </button>
@@ -791,7 +803,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
       </div>
 
-      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">
           <h4 className="text-sm font-black uppercase">CONTACT & SOCIALS</h4>
           <p className="text-[11px] text-zinc-500 font-bold mt-1 uppercase">
@@ -825,7 +837,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         </div>
       </div>
 
-      <form onSubmit={handleManualLog} className={`p-8 rounded-2xl border flex flex-col gap-6 ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100'}`}>
+      <form onSubmit={handleManualLog} className={`p-8 rounded-2xl border flex flex-col gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <h4 className="text-sm font-black uppercase">Manual Log</h4>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-2">
@@ -867,20 +879,14 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
             </select>
           </div>
           <div className="flex items-end pb-0.5">
-            <button type="submit" className="w-full md:w-auto px-8 py-3 text-[10px] font-black uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all shadow-lg shadow-red-900/20 active:scale-95">
+            <button type="submit" className="w-full md:w-auto px-8 py-3 text-[10px] font-bold uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95">
               Add Log
             </button>
           </div>
         </div>
       </form>
 
-      {/* Question Analytics */}
-      {dailyQuestionsLog && dailyQuestionsLog.length > 0 && (
-        <>
-          <QuestionsBarChart dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
-          <QuestionsHeatmap dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
-        </>
-      )}
+
     </div>
   );
 };
@@ -1315,7 +1321,7 @@ const App: React.FC = () => {
               theme={theme}
             />
           )}
-          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} />}
+          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} />}
           {!isCurrentlyLockInActive && activeTab === 'Questions' && (
             <QuestionsTab
               questionTracking={state.questionTracking}
@@ -1515,10 +1521,10 @@ const TodayTab = ({
           </div>
         )}
 
-        <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900 via-transparent to-transparent animate-pulse" />
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900 via-transparent to-transparent" />
         <div className="absolute top-12 left-0 right-0 text-center px-4">
           <p className="text-[10px] text-[#E10600] uppercase font-black tracking-[0.5em] md:tracking-[1em] mb-2">ACTIVE FOCUS SESSION</p>
-          <p className="text-[12px] md:text-[14px] text-zinc-500 uppercase font-black animate-pulse">{LOCK_IN_QUOTES[quoteIdx]}</p>
+          <p className="text-[12px] md:text-[14px] text-zinc-600 uppercase font-bold">{LOCK_IN_QUOTES[quoteIdx]}</p>
         </div>
 
         <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
@@ -1561,9 +1567,9 @@ const TodayTab = ({
   }
 
   return (
-    <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {!timer.isRunning && (
-        <section className={`p-5 md:p-8 rounded-2xl border flex flex-col gap-6 md:gap-8 transition-all ${theme === 'dark' ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+        <section className={`p-5 md:p-8 rounded-2xl border flex flex-col gap-6 md:gap-8 transition-all ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full">
             <div className="relative w-20 h-20 md:w-32 md:h-32 flex-shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
@@ -1589,7 +1595,7 @@ const TodayTab = ({
 
           <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
-              <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}>
+              <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
                 <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mb-1">{s.substring(0, 3)}</p>
                 <p className="text-sm md:text-base font-black">{subjectDist[s].toFixed(1)}h</p>
               </div>
@@ -1598,7 +1604,7 @@ const TodayTab = ({
         </section>
       )}
 
-      <section className={`p-8 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600] bg-[#E10600]/5' : (theme === 'dark' ? 'bg-[#141417]/40 border-[#1F1F23]' : 'bg-zinc-50 border-zinc-100')}`}>
+      <section className={`p-8 md:p-16 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
         <p className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-6">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
         <p className="text-[14vw] md:text-8xl font-mono font-black tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
@@ -1610,7 +1616,7 @@ const TodayTab = ({
                 <button
                   key={s}
                   onClick={() => setManualSubject(s)}
-                  className={`px-4 md:px-6 py-2 text-[10px] font-black uppercase border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white shadow-lg' : 'border-zinc-800 text-zinc-500 hover:border-zinc-500'}`}
+                  className={`px-4 md:px-6 py-2 text-[10px] font-bold uppercase border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]'}`}
                 >
                   {s}
                 </button>
@@ -1619,13 +1625,13 @@ const TodayTab = ({
             <div className="flex flex-col items-center mt-8 gap-4">
               <button
                 onClick={handleStartTimer}
-                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-200 transition-all active:scale-95 shadow-2xl rounded-xl"
+                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl"
               >
                 START SESSION
               </button>
               <button
                 onClick={() => isLockInModeEnabled ? onToggleLockInMode(false) : setShowWarning(true)}
-                className={`text-[9px] font-black uppercase tracking-widest px-6 py-2 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-zinc-800 text-zinc-500'}`}
+                className={`text-[9px] font-bold uppercase tracking-widest px-6 py-2 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.08] text-zinc-500 hover:border-white/[0.14]'}`}
               >
                 {isLockInModeEnabled ? '🔒 LOCK-IN ACTIVE' : '🔓 LOCK-IN DISABLED'}
               </button>
@@ -1643,7 +1649,7 @@ const TodayTab = ({
             </div>
             <button
               onClick={handleStopTimer}
-              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/20 rounded-xl"
+              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-[0.98] rounded-xl"
             >
               END SESSION
             </button>
@@ -1654,15 +1660,15 @@ const TodayTab = ({
       <TaskSection tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} theme={theme} activeSubject={timer.isRunning ? timer.subject : null} />
 
       <section className="space-y-4">
-        <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
-          <h3 className={`text-[10px] uppercase font-black tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>SESSION HISTORY (TODAY)</h3>
+        <div className="flex justify-between items-end pb-2">
+          <h3 className={`text-[10px] uppercase font-semibold tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Session History (Today)</h3>
         </div>
         <div className="grid gap-3">
           {todayLogs.length === 0 ? (
             <p className="text-[10px] text-zinc-700 font-black uppercase py-4 text-center italic">No sessions recorded today.</p>
           ) : (
             todayLogs.map((l: any) => (
-              <div key={l.id} className={`flex justify-between items-center p-4 rounded-xl border transition-all group ${theme === 'dark' ? 'bg-[#141417] border-zinc-900' : 'bg-white border-zinc-100 shadow-sm'}`}>
+              <div key={l.id} className={`flex justify-between items-center p-4 rounded-xl border transition-all group card-interactive ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
                 <div>
                   <p className="text-[8px] font-black text-[#E10600] uppercase mb-0.5">{l.subject}</p>
                   <p className="text-base font-black italic">{l.hours}h <span className="text-[10px] not-italic text-zinc-500 font-bold ml-2">Q: {l.quality}/5</span></p>

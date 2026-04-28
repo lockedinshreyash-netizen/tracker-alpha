@@ -22,7 +22,7 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme }) => {
   ].filter(s => goals.activeSubjects.includes(s.key));
 
   return (
-    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Subject Breakdown
       </h3>
@@ -33,7 +33,7 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme }) => {
           return (
             <div
               key={s.key}
-              className={`p-5 rounded-xl border transition-all ${dark ? 'bg-[#0B0B0D] border-zinc-900' : 'bg-zinc-50 border-zinc-100'}`}
+              className={`p-5 rounded-xl border transition-all ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}
             >
               <div className="flex justify-between items-start mb-3">
                 <p className={`text-[9px] font-black uppercase tracking-widest ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
