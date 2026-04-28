@@ -5,6 +5,8 @@ export type SyllabusStatus = 'not_started' | 'in_progress' | 'completed' | 'revi
 
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
+export type QSubject = 'physics' | 'chemistry' | 'math';
+
 export interface DailyLog {
   id: string;
   date: string; // YYYY-MM-DD (IST)
@@ -12,6 +14,27 @@ export interface DailyLog {
   hours: number;
   quality: number; // 1-5
   distractions: number; // Count of tab switches/blur events
+}
+
+export interface DailyQuestionsLog {
+  date: string; // YYYY-MM-DD (IST)
+  physicsCount: number;
+  chemistryCount: number;
+  mathCount: number;
+}
+
+export interface WeeklyGoalBySubject {
+  physicsGoal: number | null;
+  chemistryGoal: number | null;
+  mathGoal: number | null;
+}
+
+export interface QuestionTrackingState {
+  weeklyGoalTotal: number | null;
+  weeklyGoalBySubject: WeeklyGoalBySubject;
+  dailyQuestionsLog: DailyQuestionsLog[];
+  weakSubject: QSubject | null;
+  goalStartDate: string | null; // ISO date when current goal was set (IST)
 }
 
 export interface Task {
@@ -29,7 +52,7 @@ export interface ChapterProgress {
   notes?: string;
 }
 
-export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Review';
+export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Review';
 
 export interface TimerState {
   isRunning: boolean;
@@ -52,4 +75,5 @@ export interface AppState {
   theme?: 'dark' | 'light';
   dailyGoalHours: number;
   lastUpdated: number; // Timestamp for sync resolution
+  questionTracking: QuestionTrackingState;
 }

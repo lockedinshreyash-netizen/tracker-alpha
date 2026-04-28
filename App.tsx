@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus } from './types';
+import { AppState, TabType, DailyLog, DailyQuestionsLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus, QSubject, QuestionTrackingState } from './types';
 import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, SUBJECTS, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, getLast7DaysStats, getSubjectDistribution } from './utils';
 import { JEE_2027_DATE } from './constants';
+import QuestionsTab from './questions/QuestionsTab';
+import QuestionsBarChart from './review/QuestionsBarChart';
+import QuestionsHeatmap from './review/QuestionsHeatmap';
 
 // --- Supabase Configuration ---
 const SUPABASE_URL = 'https://ipwmgkctxkopuszkuebh.supabase.co';
@@ -27,7 +30,14 @@ const DEFAULT_STATE: AppState = {
   tasks: [],
   theme: 'dark',
   dailyGoalHours: 8,
-  lastUpdated: 0
+  lastUpdated: 0,
+  questionTracking: {
+    weeklyGoalTotal: null,
+    weeklyGoalBySubject: { physicsGoal: null, chemistryGoal: null, mathGoal: null },
+    dailyQuestionsLog: [],
+    weakSubject: null,
+    goalStartDate: null,
+  }
 };
 
 // --- Sub-components ---
@@ -321,7 +331,7 @@ const Header = ({
 
 const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: TabType, onTabChange: (t: TabType) => void, isLockInActive: boolean, theme: 'dark' | 'light' }) => {
   if (isLockInActive) return null;
-  const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Review'];
+  const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Review'];
   return (
     <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/80 backdrop-blur-md border-[#1F1F23]' : 'bg-white/80 backdrop-blur-md border-zinc-200 shadow-lg'}`}>
       <div className="max-w-5xl mx-auto flex justify-around items-center h-16 safe-area-inset-bottom">
@@ -701,7 +711,7 @@ const StreakTab = ({
   );
 };
 
-const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog }: any) => {
+const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, dailyQuestionsLog }: any) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
@@ -862,6 +872,14 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           </div>
         </div>
       </form>
+
+      {/* Question Analytics */}
+      {dailyQuestionsLog && dailyQuestionsLog.length > 0 && (
+        <>
+          <QuestionsBarChart dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
+          <QuestionsHeatmap dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
+        </>
+      )}
     </div>
   );
 };
@@ -1186,6 +1204,47 @@ const App: React.FC = () => {
     });
   };
 
+  const updateQuestionTracking = (update: Partial<QuestionTrackingState>) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        questionTracking: { ...prev.questionTracking, ...update },
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const logQuestions = (subject: QSubject, count: number) => {
+    const today = getISTDateString();
+    setState(prev => {
+      const logs = [...prev.questionTracking.dailyQuestionsLog];
+      const idx = logs.findIndex(l => l.date === today);
+      if (idx >= 0) {
+        const updated = { ...logs[idx] };
+        if (subject === 'physics') updated.physicsCount += count;
+        else if (subject === 'chemistry') updated.chemistryCount += count;
+        else updated.mathCount += count;
+        logs[idx] = updated;
+      } else {
+        logs.push({
+          date: today,
+          physicsCount: subject === 'physics' ? count : 0,
+          chemistryCount: subject === 'chemistry' ? count : 0,
+          mathCount: subject === 'math' ? count : 0,
+        });
+      }
+      const nextState = {
+        ...prev,
+        questionTracking: { ...prev.questionTracking, dailyQuestionsLog: logs },
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
   const clearLogs = () => {
     if (window.confirm("FACTORY RESET DEVICE? This will wipe ALL local progress. If you are signed in, cloud data remains.")) {
       localStorage.removeItem('locked_in_state_v2');
@@ -1251,6 +1310,14 @@ const App: React.FC = () => {
           />
         )}
         {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} />}
+        {!isCurrentlyLockInActive && activeTab === 'Questions' && (
+          <QuestionsTab
+            questionTracking={state.questionTracking}
+            onUpdateTracking={updateQuestionTracking}
+            onLogQuestions={logQuestions}
+            theme={theme}
+          />
+        )}
         {!isCurrentlyLockInActive && activeTab === 'Review' && (
           <ReviewTab
             logs={state.logs}
@@ -1261,6 +1328,7 @@ const App: React.FC = () => {
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onSignOut={handleSignOut}
             onLog={logStudy}
+            dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
           />
         )}
       </main>
