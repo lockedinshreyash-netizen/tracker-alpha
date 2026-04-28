@@ -1604,14 +1604,14 @@ const TodayTab = ({
         </section>
       )}
 
-      <section className={`p-8 md:p-16 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
+      <section className={`p-10 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
-        <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-6 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
+        <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-10 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
         <p className="text-[14vw] md:text-8xl tabular-nums tracking-tighter leading-none num-timer">{formatTime(currentDisplayMs)}</p>
 
         {!timer.isRunning ? (
           <>
-            <div className="flex flex-wrap justify-center gap-2 mt-10">
+            <div className="flex flex-wrap justify-center gap-3 mt-14">
               {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
                 <button
                   key={s}
@@ -1622,7 +1622,7 @@ const TodayTab = ({
                 </button>
               ))}
             </div>
-            <div className="flex flex-col items-center mt-8 gap-4">
+            <div className="flex flex-col items-center mt-12 gap-6">
               <button
                 onClick={handleStartTimer}
                 className="w-full max-sm:px-4 py-6 md:py-7 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl font-ui"
