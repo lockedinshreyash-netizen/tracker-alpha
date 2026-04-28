@@ -111,7 +111,7 @@ button:active, [role="button"]:active {
 .num-timer {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.12em;
   line-height: 1;
 }
 

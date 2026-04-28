@@ -1607,7 +1607,7 @@ const TodayTab = ({
       <section className={`p-10 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
         <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-10 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
-        <p className="text-[14vw] md:text-8xl tabular-nums tracking-tighter leading-none num-timer">{formatTime(currentDisplayMs)}</p>
+        <p className="text-[14vw] md:text-8xl tabular-nums leading-none num-timer">{formatTime(currentDisplayMs)}</p>
 
         {!timer.isRunning ? (
           <>
