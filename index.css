@@ -18,7 +18,7 @@
 
   /* ── Typography Tokens ── */
   --font-display: 'Anton', sans-serif;
-  --font-ui: 'Arial Narrow', 'Arial', 'Helvetica Neue', sans-serif;
+  --font-ui: 'Satoshi', system-ui, sans-serif;
   --font-accent: 'Playfair Display', serif;
 }
 
@@ -84,7 +84,7 @@ button:active, [role="button"]:active {
   letter-spacing: 0.02em;
 }
 
-/* ── ARIAL NARROW: Primary UI font ──
+/* ── SATOSHI: Primary UI font ──
    Use for: body, labels, buttons, nav, inputs, charts, general UI */
 
 .font-ui {
