@@ -1604,10 +1604,10 @@ const TodayTab = ({
         </section>
       )}
 
-      <section className={`p-10 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
-        {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
-        <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-10 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
-        <p className="text-[14vw] md:text-8xl tabular-nums leading-none num-timer">{formatTime(currentDisplayMs)}</p>
+      <section className={`p-10 md:p-20 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'timer-active-bg' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
+        {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
+        <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-10 font-ui relative z-10">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
+        <p className="text-[14vw] md:text-8xl tabular-nums leading-none num-timer relative z-10">{formatTime(currentDisplayMs)}</p>
 
         {!timer.isRunning ? (
           <>
@@ -1638,7 +1638,7 @@ const TodayTab = ({
             </div>
           </>
         ) : (
-          <div className="mt-12 flex flex-col items-center gap-6">
+          <div className="mt-12 flex flex-col items-center gap-6 relative z-10">
             <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
               <span className="text-[10px] font-black uppercase text-zinc-500">Focus Quality:</span>
               <div className="flex gap-1">
