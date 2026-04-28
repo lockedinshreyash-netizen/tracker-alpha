@@ -70,7 +70,7 @@ const AuthModal = ({
           }`}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-black uppercase tracking-[0.3em]">
+          <h2 className="text-sm font-bold uppercase tracking-[0.2em] font-ui">
             {mode === 'login' ? 'Sign In' : 'Create Account'}
           </h2>
           <button
@@ -130,7 +130,7 @@ const AuthModal = ({
                 setLoading(false);
               }
             }}
-            className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-red-700 disabled:opacity-60"
+            className="w-full py-3 rounded-lg bg-[#E10600] text-white text-[10px] font-bold uppercase tracking-[0.15em] font-ui hover:bg-red-700 disabled:opacity-60"
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
           </button>
@@ -191,11 +191,11 @@ const Header = ({
       <div className={`pt-8 pb-5 relative z-20 ${theme === 'dark' ? 'border-b border-white/[0.04]' : 'border-b border-zinc-200'}`}>
         <div className="max-w-5xl mx-auto flex justify-between items-start mb-2 px-6">
           <div className="relative">
-            <h1 className={`text-xl md:text-2xl font-black tracking-tighter italic flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+            <h1 className={`text-xl md:text-2xl logo-text flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
               LOCK IN
             </h1>
             <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
-              <div className={`text-[8px] font-black uppercase tracking-tighter flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
+              <div className={`text-[8px] font-bold uppercase tracking-wide font-ui flex items-center gap-1.5 ${syncColors[syncStatus]}`}>
                 <span className="text-[6px]">●</span>
                 <span>{user ? (syncStatus === 'synced' ? 'CLOUD ACTIVE' : syncStatus.toUpperCase()) : 'OFFLINE MODE'}</span>
               </div>
@@ -342,7 +342,7 @@ const Navbar = ({ activeTab, onTabChange, isLockInActive, theme }: { activeTab: 
             onClick={() => onTabChange(tab)}
             className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab ? '' : 'opacity-35 hover:opacity-70'}`}
           >
-            <span className={`text-[10px] uppercase tracking-wider font-bold ${activeTab === tab ? 'text-white' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>
+            <span className={`text-[10px] uppercase tracking-wider font-bold font-ui ${activeTab === tab ? 'text-white' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>
               {tab}
             </span>
             {activeTab === tab && <div className="w-4 h-[2px] rounded-full bg-[#E10600]" />}
@@ -381,7 +381,7 @@ const TaskSection = ({
     <div className={`space-y-4 relative z-10 ${minimal ? 'max-w-md w-full mx-auto' : ''}`}>
       {!minimal && (
         <div className="flex justify-between items-end mb-4 pb-2">
-          <h3 className={`text-[10px] uppercase font-semibold tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus Tasks</h3>
+          <h3 className={`text-[10px] uppercase font-semibold tracking-widest font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus Tasks</h3>
         </div>
       )}
 
@@ -484,12 +484,12 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
       <div className={`mb-8 p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <div className="flex justify-between items-end mb-4">
           <div>
-            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-widest mb-1">Subject Mastery</h3>
-            <p className="text-2xl font-black italic">{activeSubject.toUpperCase()}</p>
+            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-widest mb-1 font-ui">Subject Mastery</h3>
+            <p className="text-2xl font-black italic font-ui">{activeSubject.toUpperCase()}</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black italic">{subjectStats.completed}<span className="text-zinc-500 text-sm not-italic ml-1">/ {subjectStats.total}</span></p>
-            <p className="text-[9px] font-black uppercase text-zinc-600">Chapters Completed</p>
+            <p className="text-2xl num-stat">{subjectStats.completed}<span className="text-zinc-500 text-sm not-italic ml-1 font-ui">/ {subjectStats.total}</span></p>
+            <p className="text-[9px] font-bold uppercase text-zinc-600 font-ui">Chapters Completed</p>
           </div>
         </div>
         <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
@@ -667,14 +667,14 @@ const StreakTab = ({
     <div className="space-y-12 animate-in fade-in duration-500">
       {/* Current streak card */}
       <div className="text-center py-14 md:py-20 rounded-2xl border border-white/[0.06] bg-[#111114]">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6 font-ui">
           Current Streak
         </p>
         <h2 className="text-[120px] md:text-[160px] font-black italic tracking-tighter text-white num-hero">
           {streak}
         </h2>
         <div className="accent-line mt-4 mb-6" />
-        <p className="text-sm font-medium tracking-wide text-zinc-600 mt-2">
+        <p className="text-sm font-medium tracking-wide text-zinc-600 mt-2 font-ui">
           days of undivided focus
         </p>
       </div>
@@ -684,7 +684,7 @@ const StreakTab = ({
         className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
           }`}
       >
-        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
+        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6 font-ui">
           PAST 7 DAYS ACTIVITY
         </h3>
         <div className="flex items-end justify-between h-40 gap-2 md:gap-3">
@@ -743,10 +743,10 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className={`md:col-span-2 p-8 md:p-12 rounded-2xl border flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-200'}`}>
           <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
-          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-500 mb-6">Composite Performance</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-500 mb-6 font-ui">Composite Performance</p>
           <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4 num-hero">{score}</h2>
           <div className="accent-line mb-4" />
-          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Lock-In Score / 100</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 font-ui">Lock-In Score / 100</p>
 
           <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
             <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
@@ -755,16 +755,16 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
 
         <div className="space-y-4">
           <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
-            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Hours Logged</p>
-            <p className="text-3xl font-black italic">{logs.reduce((a: any, b: any) => a + b.hours, 0).toFixed(1)}H</p>
+            <p className="text-[9px] font-bold text-zinc-600 uppercase mb-2 font-ui">Total Hours Logged</p>
+            <p className="text-3xl num-stat">{logs.reduce((a: any, b: any) => a + b.hours, 0).toFixed(1)}H</p>
           </div>
           <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
-            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Total Sessions</p>
-            <p className="text-3xl font-black italic">{logs.length}</p>
+            <p className="text-[9px] font-bold text-zinc-600 uppercase mb-2 font-ui">Total Sessions</p>
+            <p className="text-3xl num-stat">{logs.length}</p>
           </div>
           <div className={`p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
-            <p className="text-[9px] font-black text-zinc-600 uppercase mb-2">Avg Quality</p>
-            <p className="text-3xl font-black italic">
+            <p className="text-[9px] font-bold text-zinc-600 uppercase mb-2 font-ui">Avg Quality</p>
+            <p className="text-3xl num-stat">
               {logs.length > 0 ? (logs.reduce((a: any, b: any) => a + b.quality, 0) / logs.length).toFixed(1) : '0.0'}
             </p>
           </div>
@@ -773,7 +773,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
 
       <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">
-          <h4 className="text-sm font-black uppercase">Account & Privacy</h4>
+          <h4 className="text-sm font-bold uppercase font-ui">Account & Privacy</h4>
           <p className="text-[11px] text-zinc-500 font-bold mt-1">
             {user ? `ENROLLED AS: ${user.email.toUpperCase()}` : 'OFFLINE MODE: PROGRESS STORED ON DEVICE ONLY.'}
           </p>
@@ -805,7 +805,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
 
       <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">
-          <h4 className="text-sm font-black uppercase">CONTACT & SOCIALS</h4>
+          <h4 className="text-sm font-bold uppercase font-ui">Contact & Socials</h4>
           <p className="text-[11px] text-zinc-500 font-bold mt-1 uppercase">
             FEEDBACK, BUG REPORTS, OR JUST SAY HI
           </p>
@@ -838,7 +838,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
       </div>
 
       <form onSubmit={handleManualLog} className={`p-8 rounded-2xl border flex flex-col gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
-        <h4 className="text-sm font-black uppercase">Manual Log</h4>
+        <h4 className="text-sm font-bold uppercase font-ui">Manual Log</h4>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-2">
             <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Subject</label>
@@ -1495,8 +1495,8 @@ const TodayTab = ({
       <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center p-4 md:p-8 select-none overflow-hidden font-mono">
         {showBreach && (
           <div className="absolute inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-            <h2 className="text-[#E10600] text-3xl md:text-5xl font-black italic tracking-tighter mb-4">SESSION BREACHED</h2>
-            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center">Focus interrupted. Session paused. 1 Distraction recorded.</p>
+            <h2 className="text-3xl md:text-5xl tracking-tighter mb-4 text-[#E10600] font-display">SESSION BREACHED</h2>
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center font-ui">Focus interrupted. Session paused. 1 Distraction recorded.</p>
             <button
               onClick={handleResumeBreach}
               className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
@@ -1523,14 +1523,14 @@ const TodayTab = ({
 
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-900 via-transparent to-transparent" />
         <div className="absolute top-12 left-0 right-0 text-center px-4">
-          <p className="text-[10px] text-[#E10600] uppercase font-black tracking-[0.5em] md:tracking-[1em] mb-2">ACTIVE FOCUS SESSION</p>
-          <p className="text-[12px] md:text-[14px] text-zinc-600 uppercase font-bold">{LOCK_IN_QUOTES[quoteIdx]}</p>
+          <p className="text-[10px] text-[#E10600] uppercase tracking-[0.5em] md:tracking-[0.8em] mb-2 font-ui font-bold">ACTIVE FOCUS SESSION</p>
+          <p className="text-[12px] md:text-[14px] text-zinc-600 uppercase font-bold font-ui">{LOCK_IN_QUOTES[quoteIdx]}</p>
         </div>
 
-        <p className="text-[18vw] md:text-[10vw] font-black text-white tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
+        <p className="text-[18vw] md:text-[10vw] text-white tabular-nums tracking-tight leading-none num-timer">{formatTime(currentDisplayMs)}</p>
         <div className="flex flex-col items-center gap-2 mt-4">
-          <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.4em] font-black">{timer.subject} — DEEP FOCUS</p>
-          {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-black uppercase tracking-widest">{timer.distractions} BREACH(ES) RECORDED</p>}
+          <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.3em] font-bold font-ui">{timer.subject} — DEEP FOCUS</p>
+          {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-bold uppercase tracking-widest font-ui">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
 
         <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
@@ -1577,18 +1577,18 @@ const TodayTab = ({
                 <circle cx="50" cy="50" r="42" stroke="#E10600" strokeWidth="8" fill="transparent" strokeDasharray="264" strokeDashoffset={264 - (264 * progressPercent) / 100} strokeLinecap="round" className="transition-all duration-1000" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-base md:text-xl font-black leading-none">{Math.round(progressPercent)}%</span>
-                <span className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mt-1">Goal</span>
+                <span className="text-base md:text-xl leading-none num-stat">{Math.round(progressPercent)}%</span>
+                <span className="text-[8px] md:text-[10px] font-bold uppercase text-zinc-500 mt-1 font-ui">Goal</span>
               </div>
             </div>
             <div className="flex flex-col justify-center flex-1">
-              <p className="text-2xl md:text-4xl font-black italic tracking-tighter leading-none">{totalToday.toFixed(1)}<span className="text-zinc-500 text-sm md:text-lg not-italic ml-2 font-black">/ {dailyGoalHours}H</span></p>
+              <p className="text-2xl md:text-4xl tracking-tighter leading-none num-stat">{totalToday.toFixed(1)}<span className="text-zinc-500 text-sm md:text-lg ml-2 font-ui font-bold">/ {dailyGoalHours}H</span></p>
               <div className="flex gap-2 mt-4 items-center">
                 <div className="flex gap-1">
                   <button onClick={() => onUpdateDailyGoal(Math.max(1, dailyGoalHours - 1))} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">-</button>
                   <button onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">+</button>
                 </div>
-                <span className="text-[10px] uppercase font-black text-zinc-500 tracking-wider">Daily Target</span>
+                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider font-ui">Daily Target</span>
               </div>
             </div>
           </div>
@@ -1596,8 +1596,8 @@ const TodayTab = ({
           <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
               <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-                <p className="text-[8px] md:text-[10px] font-black uppercase text-zinc-500 mb-1">{s.substring(0, 3)}</p>
-                <p className="text-sm md:text-base font-black">{subjectDist[s].toFixed(1)}h</p>
+                <p className="text-[8px] md:text-[10px] font-bold uppercase text-zinc-500 mb-1 font-ui">{s.substring(0, 3)}</p>
+                <p className="text-sm md:text-base num-stat">{subjectDist[s].toFixed(1)}h</p>
               </div>
             ))}
           </div>
@@ -1606,8 +1606,8 @@ const TodayTab = ({
 
       <section className={`p-8 md:p-16 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
-        <p className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-6">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
-        <p className="text-[14vw] md:text-8xl font-mono font-black tabular-nums tracking-tighter leading-none">{formatTime(currentDisplayMs)}</p>
+        <p className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 mb-6 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
+        <p className="text-[14vw] md:text-8xl tabular-nums tracking-tighter leading-none num-timer">{formatTime(currentDisplayMs)}</p>
 
         {!timer.isRunning ? (
           <>
@@ -1625,7 +1625,7 @@ const TodayTab = ({
             <div className="flex flex-col items-center mt-8 gap-4">
               <button
                 onClick={handleStartTimer}
-                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl"
+                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl font-ui"
               >
                 START SESSION
               </button>
@@ -1649,7 +1649,7 @@ const TodayTab = ({
             </div>
             <button
               onClick={handleStopTimer}
-              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-[0.98] rounded-xl"
+              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-[0.98] rounded-xl font-ui"
             >
               END SESSION
             </button>
@@ -1661,7 +1661,7 @@ const TodayTab = ({
 
       <section className="space-y-4">
         <div className="flex justify-between items-end pb-2">
-          <h3 className={`text-[10px] uppercase font-semibold tracking-widest ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Session History (Today)</h3>
+          <h3 className={`text-[10px] uppercase font-semibold tracking-widest font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Session History (Today)</h3>
         </div>
         <div className="grid gap-3">
           {todayLogs.length === 0 ? (

@@ -19,8 +19,8 @@ const QuestionsBarChart: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
   if (!hasData) return null;
 
   return (
-    <div className={`p-6 md:p-8 rounded-2xl border ${dark ? 'bg-[#141417] border-[#1F1F23]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-      <h3 className={`text-[10px] md:text-xs font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+    <div className={`p-6 md:p-8 rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <h3 className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Questions
       </h3>
 

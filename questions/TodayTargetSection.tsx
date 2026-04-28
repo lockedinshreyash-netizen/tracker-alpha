@@ -33,7 +33,7 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
 
         {/* Total target */}
         <div className="text-center mb-6">
-          <p className="text-5xl md:text-6xl font-black italic tracking-tighter leading-none text-[#E10600]">
+          <p className="text-5xl md:text-6xl tracking-tighter leading-none text-[#E10600] num-hero">
             {targets.total}
           </p>
           <p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -46,19 +46,19 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
           {targets.physics !== null && (
             <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Phy</p>
-              <p className="text-lg font-black italic">{targets.physics}</p>
+              <p className="text-lg num-stat">{targets.physics}</p>
             </div>
           )}
           {targets.chemistry !== null && (
             <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Chem</p>
-              <p className="text-lg font-black italic">{targets.chemistry}</p>
+              <p className="text-lg num-stat">{targets.chemistry}</p>
             </div>
           )}
           {targets.math !== null && (
             <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Math</p>
-              <p className="text-lg font-black italic">{targets.math}</p>
+              <p className="text-lg num-stat">{targets.math}</p>
             </div>
           )}
         </div>

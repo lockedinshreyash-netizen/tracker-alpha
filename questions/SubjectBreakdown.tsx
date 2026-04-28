@@ -46,7 +46,7 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme }) => {
                 )}
               </div>
 
-              <p className="text-2xl font-black italic tracking-tighter">
+              <p className="text-2xl tracking-tighter num-stat">
                 {s.completed}
                 {s.goal !== null && (
                   <span className={`text-xs not-italic ml-1.5 font-black ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>

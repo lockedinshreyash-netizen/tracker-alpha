@@ -78,10 +78,10 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
 
       {/* Large Counter */}
       <div className="text-center mb-8">
-        <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-4 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+        <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] mb-4 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           Questions Solved Today
         </p>
-        <p className="text-8xl md:text-9xl font-black italic tracking-tighter leading-none tabular-nums">
+        <p className="text-8xl md:text-9xl tracking-tighter leading-none tabular-nums num-hero">
           {animatedTotal}
         </p>
       </div>
@@ -90,15 +90,15 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
       {hasGoal && targets.total > 0 && (
         <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
           <div className="text-center">
-            <p className="text-lg md:text-xl font-black italic text-[#E10600]">{targets.total}</p>
+            <p className="text-lg md:text-xl num-stat text-[#E10600]">{targets.total}</p>
             <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>🎯 Target</p>
           </div>
           <div className="text-center">
-            <p className="text-lg md:text-xl font-black italic">{todayProgress.total}</p>
+            <p className="text-lg md:text-xl num-stat">{todayProgress.total}</p>
             <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>✅ Done</p>
           </div>
           <div className="text-center">
-            <p className={`text-lg md:text-xl font-black italic ${remaining > 0 ? (dark ? 'text-yellow-500' : 'text-yellow-600') : 'text-green-500'}`}>{remaining}</p>
+            <p className={`text-lg md:text-xl num-stat ${remaining > 0 ? (dark ? 'text-yellow-500' : 'text-yellow-600') : 'text-green-500'}`}>{remaining}</p>
             <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{remaining > 0 ? '⏳ Left' : '🎉 Done!'}</p>
           </div>
         </div>

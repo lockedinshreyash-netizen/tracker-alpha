@@ -46,7 +46,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
             )}
           </svg>
         </button>
-        <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${dark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] font-ui ${dark ? 'text-zinc-400' : 'text-zinc-500'}`}>
           {activeTab}
         </span>
         <div className="w-8" />
@@ -71,7 +71,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
         {/* Logo + Collapse Toggle */}
         <div className={`flex items-center h-16 px-4 border-b ${dark ? 'border-white/[0.04]' : 'border-zinc-200'}`}>
           {!collapsed && (
-            <span className={`text-sm font-black tracking-tighter italic flex-1 ${dark ? 'text-white' : 'text-black'}`}>
+            <span className={`text-sm logo-text flex-1 ${dark ? 'text-white' : 'text-black'}`}>
               LOCK IN
             </span>
           )}
@@ -113,14 +113,14 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
                 <span className="text-base flex-shrink-0">{TAB_ICONS[tab]}</span>
 
                 {!collapsed && (
-                  <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${isActive ? 'text-white' : ''}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap font-ui ${isActive ? 'text-white' : ''}`}>
                     {tab}
                   </span>
                 )}
 
                 {/* Tooltip on collapsed */}
                 {collapsed && (
-                  <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 ${dark ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-white'}`}>
+                  <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-white'}`}>
                     {tab}
                   </div>
                 )}

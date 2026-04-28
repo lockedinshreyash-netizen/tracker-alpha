@@ -24,7 +24,7 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
 
   return (
     <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-      <h3 className={`text-[10px] font-black uppercase tracking-widest mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+      <h3 className={`text-[10px] font-bold uppercase tracking-widest mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Progress
       </h3>
 
@@ -32,11 +32,11 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
       <div className="flex justify-between items-end mb-3">
         <p className="text-2xl md:text-3xl font-black italic tracking-tighter">
           {progress.totalCompleted}
-          <span className={`text-sm not-italic ml-2 font-black ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          <span className={`text-sm not-italic ml-2 font-bold font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             / {totalGoal} questions
           </span>
         </p>
-        <p className="text-xl font-black italic text-[#E10600]">{percent}%</p>
+        <p className="text-xl num-stat text-[#E10600]">{percent}%</p>
       </div>
 
       {/* Animated gradient progress bar */}

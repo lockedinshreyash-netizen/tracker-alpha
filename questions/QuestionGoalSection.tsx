@@ -115,25 +115,25 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
           {goals.totalGoal !== null && (
             <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Total</p>
-              <p className="text-xl font-black italic">{goals.totalGoal}</p>
+              <p className="text-xl num-stat">{goals.totalGoal}</p>
             </div>
           )}
           {goals.physics !== null && (
             <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Phy</p>
-              <p className="text-xl font-black italic">{goals.physics}</p>
+              <p className="text-xl num-stat">{goals.physics}</p>
             </div>
           )}
           {goals.chemistry !== null && (
             <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Chem</p>
-              <p className="text-xl font-black italic">{goals.chemistry}</p>
+              <p className="text-xl num-stat">{goals.chemistry}</p>
             </div>
           )}
           {goals.math !== null && (
             <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Math</p>
-              <p className="text-xl font-black italic">{goals.math}</p>
+              <p className="text-xl num-stat">{goals.math}</p>
             </div>
           )}
         </div>
