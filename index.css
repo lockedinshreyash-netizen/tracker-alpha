@@ -20,6 +20,7 @@
   --font-display: 'Anton', sans-serif;
   --font-ui: 'Satoshi', system-ui, sans-serif;
   --font-accent: 'Playfair Display', serif;
+  --font-timer: 'Averia Serif Libre', serif;
 }
 
 /* ── Background depth ── */
@@ -111,11 +112,12 @@ button:active,
   text-transform: uppercase;
 }
 
-/* ── Timer display — monospaced feel with Anton ── */
+/* ── Timer display — distinct clock feel ── */
 .num-timer {
-  font-family: var(--font-display);
+  font-family: var(--font-timer);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   line-height: 1;
 }
 
