@@ -23,8 +23,8 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-6 md:p-8 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-      <h3 className={`text-[10px] font-bold uppercase tracking-widest mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+    <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <h3 className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Progress
       </h3>
 
@@ -48,7 +48,7 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
       </div>
 
       {/* Remaining */}
-      <p className={`text-[10px] font-black uppercase tracking-widest mt-4 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+      <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mt-4 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
         {remaining > 0
           ? `${remaining} questions remaining this week`
           : '🎯 Weekly goal reached!'

@@ -75,7 +75,7 @@ const AuthModal = ({
           </h2>
           <button
             onClick={onClose}
-            className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+            className="text-xs font-black uppercase tracking-[0.06em] text-zinc-500 hover:text-zinc-300"
           >
             Close
           </button>
@@ -137,7 +137,7 @@ const AuthModal = ({
           <button
             type="button"
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-zinc-300"
+            className="text-[10px] font-medium uppercase tracking-[0.06em] text-zinc-500 hover:text-zinc-300"
           >
             {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
           </button>
@@ -213,7 +213,7 @@ const Header = ({
             {installPrompt && (
               <button
                 onClick={onInstall}
-                className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-all`}
+                className={`text-[10px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-all`}
               >
                 INSTALL
               </button>
@@ -226,7 +226,7 @@ const Header = ({
             </button>
             <button
               onClick={() => onClassChange(currentClass === 11 ? 12 : 11)}
-              className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg border transition-colors ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-zinc-300'}`}
+              className={`text-[10px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg border transition-colors ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-zinc-100 border-zinc-200 text-black hover:border-zinc-300'}`}
             >
               C-{currentClass} ▾
             </button>
@@ -260,7 +260,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Time left</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Time left</span>
                 <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until JEE Mains 2027</span>
               </div>
             </div>
@@ -268,7 +268,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Time elapsed</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Time elapsed</span>
                 <span className="text-[#E10600] font-black text-sm md:text-base block">{(Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))).toFixed(1)}% of your preparation time is already gone</span>
               </div>
             </div>
@@ -276,7 +276,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Projected finishing hours</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Projected finishing hours</span>
                 <span className="text-white font-bold text-xs md:text-sm">At your current daily average you will finish with {(() => {
                   if (logs.length === 0) return '0';
                   const firstLogDate = new Date(logs[0].date).getTime();
@@ -292,7 +292,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Required pace</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Required pace</span>
                 <span className="text-white font-bold text-xs md:text-sm">You need {(() => {
                   const totalHrs = logs.reduce((sum, l) => sum + l.hours, 0);
                   const needed = 1000 - totalHrs;
@@ -304,7 +304,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Consistency</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Consistency</span>
                 <span className="text-white font-bold text-xs md:text-sm">Current streak: {calculateStreak(logs)} days</span>
               </div>
             </div>
@@ -312,7 +312,7 @@ const Header = ({
             <div className="flex items-start gap-2">
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
-                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-widest font-black block">Missed days</span>
+                <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Missed days</span>
                 <span className="text-white font-bold text-xs md:text-sm">Days with zero study logged: {(() => {
                   if (logs.length === 0) return 0;
                   const firstLogDate = new Date(logs[0].date).getTime();
@@ -381,7 +381,7 @@ const TaskSection = ({
     <div className={`space-y-4 relative z-10 ${minimal ? 'max-w-md w-full mx-auto' : ''}`}>
       {!minimal && (
         <div className="flex justify-between items-end mb-4 pb-2">
-          <h3 className={`text-[10px] uppercase font-semibold tracking-widest font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus Tasks</h3>
+          <h3 className={`text-[10px] uppercase font-semibold tracking-[0.06em] font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus Tasks</h3>
         </div>
       )}
 
@@ -392,7 +392,7 @@ const TaskSection = ({
               <button
                 key={s}
                 onClick={() => setSelectedSubject(s)}
-                className={`text-[9px] px-3 py-1.5 font-bold uppercase border rounded-lg transition-all ${selectedSubject === s ? 'bg-[#E10600] text-white border-[#E10600]' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400')}`}
+                className={`text-[9px] px-4 py-2 font-bold uppercase tracking-[0.06em] border rounded-lg transition-all ${selectedSubject === s ? 'bg-[#E10600] text-white border-[#E10600]' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400')}`}
               >
                 {s}
               </button>
@@ -420,7 +420,7 @@ const TaskSection = ({
       <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
         {filteredTasks.length === 0 ? (
           <div className={`col-span-full py-8 text-center border rounded-lg ${theme === 'dark' ? 'border-white/[0.04] text-zinc-700' : 'border-zinc-200 text-zinc-300'}`}>
-            <p className="text-[10px] font-black uppercase tracking-widest italic">No Pending Tasks</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.06em] italic">No Pending Tasks</p>
           </div>
         ) : filteredTasks.map((task: any) => (
           <div
@@ -434,7 +434,7 @@ const TaskSection = ({
               {task.completed && <div className="w-2 h-2 bg-white rounded-sm" />}
             </button>
             <div className="flex-1">
-              <span className={`text-[8px] font-black uppercase tracking-widest block mb-0.5 ${task.subject === 'General' ? 'text-zinc-600' : 'text-[#E10600]'}`}>{task.subject}</span>
+              <span className={`text-[8px] font-medium uppercase tracking-[0.06em] block mb-0.5 ${task.subject === 'General' ? 'text-zinc-600' : 'text-[#E10600]'}`}>{task.subject}</span>
               <p className={`text-[11px] font-bold uppercase tracking-tight break-words ${task.completed ? 'line-through' : (theme === 'dark' ? 'text-white' : 'text-black')}`}>{task.text}</p>
             </div>
             {!minimal && (
@@ -474,17 +474,17 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
           <button
             key={s}
             onClick={() => setActiveSubject(s)}
-            className={`px-4 md:px-6 py-2 text-[10px] font-bold uppercase tracking-widest border transition-all rounded-lg ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
+            className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border transition-all rounded-lg ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (theme === 'dark' ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
           >
             {s}
           </button>
         ))}
       </div>
 
-      <div className={`mb-8 p-6 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <div className={`mb-10 p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <div className="flex justify-between items-end mb-4">
           <div>
-            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-widest mb-1 font-ui">Subject Mastery</h3>
+            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-[0.06em] mb-1 font-ui">Subject Mastery</h3>
             <p className="text-2xl font-black italic font-ui">{activeSubject.toUpperCase()}</p>
           </div>
           <div className="text-right">
@@ -513,7 +513,7 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
               className={`p-4 rounded-xl border cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[120px] card-interactive ${colors.border} ${colors.bg} ${theme === 'dark' ? '' : 'shadow-sm'}`}
             >
               <div>
-                <div className={`text-[8px] font-black uppercase tracking-widest mb-2 px-2 py-0.5 rounded border w-fit ${colors.label}`}>
+                <div className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-2 px-2 py-0.5 rounded border w-fit ${colors.label}`}>
                   {STATUS_LABELS[status as SyllabusStatus]}
                 </div>
                 <h4 className={`text-[11px] md:text-xs font-black uppercase leading-tight tracking-tight ${theme === 'dark' ? 'text-zinc-100' : 'text-black'}`}>
@@ -568,9 +568,9 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
   };
 
   return (
-    <div className={`p-6 md:p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`p-8 md:p-10 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-zinc-500">
+        <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.06em] text-zinc-500">
           Monthly Heatmap
         </h3>
         <div className="flex items-center gap-4">
@@ -633,7 +633,7 @@ const MonthlyHeatmap = ({ logs, dailyGoalHours, theme }: { logs: DailyLog[], dai
                       <span className="text-zinc-500 font-bold">Avg Quality:</span>
                       <span className="font-black">{avgQuality}</span>
                     </div>
-                    <div className="mt-2 pt-2 border-t border-zinc-800 text-center text-[9px] font-black uppercase tracking-widest">
+                    <div className="mt-2 pt-2 border-t border-zinc-800 text-center text-[9px] font-medium uppercase tracking-[0.06em]">
                       {totalHours > 0 ? (metGoal ? <span className="text-green-500">Goal Met</span> : <span className="text-yellow-500">Below Goal</span>) : <span className="text-zinc-600">No Activity</span>}
                     </div>
                   </div>
@@ -664,10 +664,10 @@ const StreakTab = ({
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500">
+    <div className="space-y-14 animate-in fade-in duration-500">
       {/* Current streak card */}
-      <div className="text-center py-14 md:py-20 rounded-2xl border border-white/[0.06] bg-[#111114]">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6 font-ui">
+      <div className="text-center py-16 md:py-24 rounded-2xl border border-white/[0.06] bg-[#111114]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-500 mb-6 font-ui">
           Current Streak
         </p>
         <h2 className="text-[120px] md:text-[160px] font-black italic tracking-tighter text-white num-hero">
@@ -681,10 +681,10 @@ const StreakTab = ({
 
       {/* 7‑day focus hours graph */}
       <div
-        className={`p-8 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
+        className={`p-8 md:p-10 rounded-2xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
           }`}
       >
-        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-6 font-ui">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-500 mb-6 font-ui">
           PAST 7 DAYS ACTIVITY
         </h3>
         <div className="flex items-end justify-between h-40 gap-2 md:gap-3">
@@ -739,14 +739,14 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-10 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`md:col-span-2 p-8 md:p-12 rounded-2xl border flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-200'}`}>
+        <div className={`md:col-span-2 p-10 md:p-14 rounded-2xl border flex flex-col justify-center items-center text-center relative overflow-hidden ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-200'}`}>
           <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
           <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-500 mb-6 font-ui">Composite Performance</p>
           <h2 className="text-9xl font-black italic tracking-tighter leading-none mb-4 num-hero">{score}</h2>
           <div className="accent-line mb-4" />
-          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 font-ui">Lock-In Score / 100</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-zinc-500 font-ui">Lock-In Score / 100</p>
 
           <div className="w-full max-w-xs h-1 bg-zinc-900 rounded-full mt-10 overflow-hidden">
             <div className="h-full bg-white transition-all duration-1000" style={{ width: `${score}%` }} />
@@ -782,21 +782,21 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           {user ? (
             <button
               onClick={onSignOut}
-              className="px-6 py-3 text-[10px] font-black uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all rounded-xl"
+              className="px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all rounded-xl"
             >
               Log Out
             </button>
           ) : (
             <button
               onClick={onOpenAuth}
-              className="px-6 py-3 text-[10px] font-bold uppercase bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl"
+              className="px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white hover:bg-red-700 transition-all rounded-xl"
             >
               Sign In to Sync
             </button>
           )}
           <button
             onClick={onClearData}
-            className="px-6 py-3 text-[10px] font-black uppercase border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-all rounded-xl"
+            className="px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-all rounded-xl"
           >
             Reset Device
           </button>
@@ -815,7 +815,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
             href="https://instagram.com/trackeralpha"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.06em] text-zinc-500 hover:text-white transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -826,7 +826,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
           </a>
           <a
             href="mailto:lockinhq@gmail.com"
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.06em] text-zinc-500 hover:text-white transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
@@ -841,7 +841,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
         <h4 className="text-sm font-bold uppercase font-ui">Manual Log</h4>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 flex flex-col gap-2">
-            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Subject</label>
+            <label className="text-[10px] uppercase font-black tracking-[0.06em] text-zinc-500">Subject</label>
             <select
               value={manualSubject}
               onChange={(e) => setManualSubject(e.target.value as Subject)}
@@ -854,7 +854,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
             </select>
           </div>
           <div className="flex-1 flex flex-col gap-2">
-            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Hours</label>
+            <label className="text-[10px] uppercase font-black tracking-[0.06em] text-zinc-500">Hours</label>
             <input
               type="number"
               step="0.1"
@@ -867,7 +867,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
             />
           </div>
           <div className="flex-1 flex flex-col gap-2">
-            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Quality (1-5)</label>
+            <label className="text-[10px] uppercase font-black tracking-[0.06em] text-zinc-500">Quality (1-5)</label>
             <select
               value={manualQuality}
               onChange={(e) => setManualQuality(parseInt(e.target.value))}
@@ -879,7 +879,7 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
             </select>
           </div>
           <div className="flex items-end pb-0.5">
-            <button type="submit" className="w-full md:w-auto px-8 py-3 text-[10px] font-bold uppercase bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95">
+            <button type="submit" className="w-full md:w-auto px-10 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95">
               Add Log
             </button>
           </div>
@@ -1496,7 +1496,7 @@ const TodayTab = ({
         {showBreach && (
           <div className="absolute inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
             <h2 className="text-3xl md:text-5xl tracking-tighter mb-4 text-[#E10600] font-display">SESSION BREACHED</h2>
-            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-8 text-center font-ui">Focus interrupted. Session paused. 1 Distraction recorded.</p>
+            <p className="text-zinc-500 font-bold uppercase tracking-[0.06em] text-[10px] md:text-xs mb-8 text-center font-ui">Focus interrupted. Session paused. 1 Distraction recorded.</p>
             <button
               onClick={handleResumeBreach}
               className="px-12 py-6 bg-white text-black font-black uppercase tracking-[0.4em] rounded-xl hover:bg-zinc-200 transition-all"
@@ -1530,7 +1530,7 @@ const TodayTab = ({
         <p className="text-[18vw] md:text-[10vw] text-white tabular-nums tracking-tight leading-none num-timer">{formatTime(currentDisplayMs)}</p>
         <div className="flex flex-col items-center gap-2 mt-4">
           <p className="text-[10px] md:text-[12px] text-zinc-600 uppercase tracking-[0.3em] font-bold font-ui">{timer.subject} — DEEP FOCUS</p>
-          {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-bold uppercase tracking-widest font-ui">{timer.distractions} BREACH(ES) RECORDED</p>}
+          {(timer.distractions || 0) > 0 && <p className="text-[8px] text-[#E10600] font-bold uppercase tracking-[0.06em] font-ui">{timer.distractions} BREACH(ES) RECORDED</p>}
         </div>
 
         <div className="mt-8 md:mt-12 w-full max-w-xs flex flex-col items-center gap-4">
@@ -1553,7 +1553,7 @@ const TodayTab = ({
               onMouseLeave={() => setWipeHoldStart(null)}
               onTouchStart={() => setWipeHoldStart(Date.now())}
               onTouchEnd={() => setWipeHoldStart(null)}
-              className="text-[9px] font-black uppercase text-zinc-800 hover:text-zinc-400 transition-colors py-2"
+              className="text-[9px] font-medium uppercase text-zinc-800 hover:text-zinc-400 transition-colors py-2"
             >
               {wipeHoldStart ? `WIPING IN ${(15 - (wipeProgress * 15 / 100)).toFixed(1)}s` : 'HOLD FOR 15s TO WIPE SESSION'}
             </button>
@@ -1569,7 +1569,7 @@ const TodayTab = ({
   return (
     <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {!timer.isRunning && (
-        <section className={`p-5 md:p-8 rounded-2xl border flex flex-col gap-6 md:gap-8 transition-all ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+        <section className={`p-6 md:p-10 rounded-2xl border flex flex-col gap-8 md:gap-10 transition-all ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full">
             <div className="relative w-20 h-20 md:w-32 md:h-32 flex-shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
@@ -1606,7 +1606,7 @@ const TodayTab = ({
 
       <section className={`p-8 md:p-16 text-center rounded-2xl border relative overflow-hidden transition-all ${timer.isRunning ? 'border-[#E10600]/30 bg-[#E10600]/[0.03]' : (theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100')}`}>
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full" />}
-        <p className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 mb-6 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
+        <p className="text-[10px] uppercase font-bold tracking-[0.06em] text-zinc-500 mb-6 font-ui">{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
         <p className="text-[14vw] md:text-8xl tabular-nums tracking-tighter leading-none num-timer">{formatTime(currentDisplayMs)}</p>
 
         {!timer.isRunning ? (
@@ -1616,7 +1616,7 @@ const TodayTab = ({
                 <button
                   key={s}
                   onClick={() => setManualSubject(s)}
-                  className={`px-4 md:px-6 py-2 text-[10px] font-bold uppercase border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]'}`}
+                  className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border rounded-lg transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]'}`}
                 >
                   {s}
                 </button>
@@ -1625,13 +1625,13 @@ const TodayTab = ({
             <div className="flex flex-col items-center mt-8 gap-4">
               <button
                 onClick={handleStartTimer}
-                className="w-full max-sm:px-4 py-5 md:py-6 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl font-ui"
+                className="w-full max-sm:px-4 py-6 md:py-7 bg-white text-black font-black uppercase tracking-[0.3em] md:tracking-[0.5em] hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-md rounded-xl font-ui"
               >
                 START SESSION
               </button>
               <button
                 onClick={() => isLockInModeEnabled ? onToggleLockInMode(false) : setShowWarning(true)}
-                className={`text-[9px] font-bold uppercase tracking-widest px-6 py-2 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.08] text-zinc-500 hover:border-white/[0.14]'}`}
+                className={`text-[9px] font-bold uppercase tracking-[0.1em] px-8 py-2.5 rounded-full border transition-all ${isLockInModeEnabled ? 'bg-[#E10600] border-[#E10600] text-white' : 'border-white/[0.08] text-zinc-500 hover:border-white/[0.14]'}`}
               >
                 {isLockInModeEnabled ? '🔒 LOCK-IN ACTIVE' : '🔓 LOCK-IN DISABLED'}
               </button>
@@ -1649,7 +1649,7 @@ const TodayTab = ({
             </div>
             <button
               onClick={handleStopTimer}
-              className="w-full max-w-xs py-5 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-[0.98] rounded-xl font-ui"
+              className="w-full max-w-xs py-6 bg-[#E10600] text-white font-black uppercase tracking-[0.4em] hover:bg-red-700 transition-all active:scale-[0.98] rounded-xl font-ui"
             >
               END SESSION
             </button>
@@ -1661,7 +1661,7 @@ const TodayTab = ({
 
       <section className="space-y-4">
         <div className="flex justify-between items-end pb-2">
-          <h3 className={`text-[10px] uppercase font-semibold tracking-widest font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Session History (Today)</h3>
+          <h3 className={`text-[10px] uppercase font-semibold tracking-[0.06em] font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Session History (Today)</h3>
         </div>
         <div className="grid gap-3">
           {todayLogs.length === 0 ? (
@@ -1696,8 +1696,8 @@ const TodayTab = ({
               <p>4. TAB SWITCHING IS DETECTED.</p>
             </div>
             <div className="mt-8 flex gap-4">
-              <button onClick={() => { onToggleLockInMode(true); setShowWarning(false); }} className="flex-1 py-4 bg-white text-black font-black uppercase tracking-widest rounded-lg hover:bg-zinc-200">ENGAGE</button>
-              <button onClick={() => setShowWarning(false)} className="flex-1 py-4 bg-zinc-900 text-zinc-500 font-black uppercase tracking-widest rounded-lg">ABORT</button>
+              <button onClick={() => { onToggleLockInMode(true); setShowWarning(false); }} className="flex-1 py-4 bg-white text-black font-black uppercase tracking-[0.06em] rounded-lg hover:bg-zinc-200">ENGAGE</button>
+              <button onClick={() => setShowWarning(false)} className="flex-1 py-4 bg-zinc-900 text-zinc-500 font-black uppercase tracking-[0.06em] rounded-lg">ABORT</button>
             </div>
           </div>
         </div>

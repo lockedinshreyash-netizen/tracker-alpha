@@ -16,7 +16,7 @@ interface Props {
 
 const QuestionsTab: React.FC<Props> = ({ questionTracking, onUpdateTracking, onLogQuestions, theme }) => {
   return (
-    <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
+    <div className="space-y-12 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
       {/* 1. TODAY — Primary action area */}
       <TodayQuestionsSection
         questionTracking={questionTracking}

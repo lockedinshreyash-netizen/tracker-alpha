@@ -52,9 +52,9 @@ const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
   };
 
   return (
-    <div className={`p-6 md:p-8 rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`p-8 md:p-10 rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex justify-between items-center mb-6">
-        <h3 className={`text-[10px] md:text-xs font-bold uppercase tracking-widest font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+        <h3 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           Questions Heatmap
         </h3>
         <div className="flex items-center gap-4">

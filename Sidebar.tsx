@@ -113,14 +113,14 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
                 <span className="text-base flex-shrink-0">{TAB_ICONS[tab]}</span>
 
                 {!collapsed && (
-                  <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap font-ui ${isActive ? 'text-white' : ''}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? 'text-white' : ''}`}>
                     {tab}
                   </span>
                 )}
 
                 {/* Tooltip on collapsed */}
                 {collapsed && (
-                  <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-white'}`}>
+                  <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-white'}`}>
                     {tab}
                   </div>
                 )}
@@ -132,7 +132,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
         {/* Bottom accent */}
         <div className={`px-4 py-4 border-t ${dark ? 'border-white/[0.04]' : 'border-zinc-200'}`}>
           {!collapsed ? (
-            <p className={`text-[8px] font-black uppercase tracking-widest ${dark ? 'text-zinc-700' : 'text-zinc-300'}`}>
+            <p className={`text-[8px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-700' : 'text-zinc-300'}`}>
               Tracker Alpha
             </p>
           ) : (
