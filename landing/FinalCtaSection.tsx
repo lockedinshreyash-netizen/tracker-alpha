@@ -58,7 +58,7 @@ const FinalCtaSection = ({ onCtaClick }: { onCtaClick: () => void }) => {
             "I used to think I was studying for 6 hours daily. Using tracker alpha made me realise it was only 3-4 hours. It's a wakeup call."
           </p>
           <p className="font-ui" style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '16px' }}>
-            — JEE 2027 ASPIRANT
+            — Abhiraj, JEE 2027 ASPIRANT
           </p>
         </div>
       </div>
