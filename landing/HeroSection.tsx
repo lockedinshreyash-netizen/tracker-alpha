@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const JEE_MAINS_2027 = new Date('2027-04-05T00:00:00+05:30').getTime();
+const JEE_MAINS_2027 = new Date('2027-04-01T00:00:00+05:30').getTime();
 
 const HeroSection = ({ onCtaClick }: { onCtaClick: () => void }) => {
   const [now, setNow] = useState(Date.now());
