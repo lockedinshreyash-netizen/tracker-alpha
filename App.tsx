@@ -9,6 +9,7 @@ import QuestionsTab from './questions/QuestionsTab';
 import QuestionsBarChart from './review/QuestionsBarChart';
 import QuestionsHeatmap from './review/QuestionsHeatmap';
 import Sidebar from './Sidebar';
+import LandingPage from './LandingPage';
 
 // --- Supabase Configuration ---
 const SUPABASE_URL = 'https://ipwmgkctxkopuszkuebh.supabase.co';
@@ -911,6 +912,7 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
+  const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
 
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
@@ -922,18 +924,28 @@ const App: React.FC = () => {
     stateRef.current = state;
   }, [state]);
 
-  // Handle Auth and Initial Fetch
+  // Handle Auth, Initial Fetch, and Landing Page gating
   useEffect(() => {
+    const hasVisited = localStorage.getItem('hasVisited') === 'true';
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) handleInitialSync(u.id);
+      if (u) {
+        handleInitialSync(u.id);
+        setShowLanding(false);
+      } else {
+        setShowLanding(!hasVisited);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      if (newUser && !isInitialSyncDone.current) handleInitialSync(newUser.id);
+      if (newUser) {
+        setShowLanding(false);
+        if (!isInitialSyncDone.current) handleInitialSync(newUser.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -1264,6 +1276,23 @@ const App: React.FC = () => {
   const streakCount = calculateStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress);
   const isCurrentlyLockInActive = state.timer.isLockInActive;
+
+  // While checking session, show nothing (prevents flash)
+  if (showLanding === null) {
+    return <div style={{ background: '#0a0a0a', width: '100vw', height: '100vh' }} />;
+  }
+
+  // Show landing page for first-time visitors with no session
+  if (showLanding) {
+    return (
+      <LandingPage
+        onCtaClick={() => {
+          setShowLanding(false);
+          setIsAuthModalOpen(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${isCurrentlyLockInActive ? 'bg-black' : (theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-white text-black')}`}>
