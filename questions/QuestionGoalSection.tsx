@@ -7,15 +7,19 @@ interface Props {
   questionTracking: QuestionTrackingState;
   onUpdateTracking: (update: Partial<QuestionTrackingState>) => void;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracking, theme }) => {
+const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracking, theme, coreSubjects }) => {
   const { weeklyGoalTotal, weeklyGoalBySubject, goalStartDate } = questionTracking;
   const [isEditing, setIsEditing] = useState(false);
   const [totalInput, setTotalInput] = useState(weeklyGoalTotal?.toString() || '');
-  const [physicsInput, setPhysicsInput] = useState(weeklyGoalBySubject.physicsGoal?.toString() || '');
-  const [chemistryInput, setChemistryInput] = useState(weeklyGoalBySubject.chemistryGoal?.toString() || '');
-  const [mathInput, setMathInput] = useState(weeklyGoalBySubject.mathGoal?.toString() || '');
+  
+  const initialInputs: Record<string, string> = {};
+  coreSubjects.forEach(s => {
+    initialInputs[s] = (weeklyGoalBySubject as any)[s]?.toString() || '';
+  });
+  const [subjectInputs, setSubjectInputs] = useState<Record<string, string>>(initialInputs);
 
   const dark = theme === 'dark';
   const goals = computeEffectiveGoals(questionTracking);
@@ -24,26 +28,27 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
 
   const syncInputsFromState = () => {
     setTotalInput(weeklyGoalTotal?.toString() || '');
-    setPhysicsInput(weeklyGoalBySubject.physicsGoal?.toString() || '');
-    setChemistryInput(weeklyGoalBySubject.chemistryGoal?.toString() || '');
-    setMathInput(weeklyGoalBySubject.mathGoal?.toString() || '');
+    const newInputs: Record<string, string> = {};
+    coreSubjects.forEach(s => {
+      newInputs[s] = (weeklyGoalBySubject as any)[s]?.toString() || '';
+    });
+    setSubjectInputs(newInputs);
   };
 
   const handleSave = () => {
     const total = totalInput.trim() ? parseInt(totalInput) : null;
-    const physics = physicsInput.trim() ? parseInt(physicsInput) : null;
-    const chemistry = chemistryInput.trim() ? parseInt(chemistryInput) : null;
-    const math = mathInput.trim() ? parseInt(mathInput) : null;
+    
+    const parsedSubjectGoals: Record<string, number | null> = {};
+    coreSubjects.forEach(s => {
+      const val = subjectInputs[s]?.trim();
+      parsedSubjectGoals[s] = val ? parseInt(val) : null;
+    });
 
     const isNewGoal = !hasGoal;
 
     onUpdateTracking({
       weeklyGoalTotal: total && total > 0 ? total : null,
-      weeklyGoalBySubject: {
-        physicsGoal: physics && physics > 0 ? physics : null,
-        chemistryGoal: chemistry && chemistry > 0 ? chemistry : null,
-        mathGoal: math && math > 0 ? math : null,
-      },
+      weeklyGoalBySubject: parsedSubjectGoals,
       goalStartDate: isNewGoal ? getISTDateString() : goalStartDate,
     });
     setIsEditing(false);
@@ -62,14 +67,14 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
     if (!window.confirm('DELETE GOAL? All targets and tracking will stop.')) return;
     onUpdateTracking({
       weeklyGoalTotal: null,
-      weeklyGoalBySubject: { physicsGoal: null, chemistryGoal: null, mathGoal: null },
+      weeklyGoalBySubject: {},
       weakSubject: null,
       goalStartDate: null,
     });
     setTotalInput('');
-    setPhysicsInput('');
-    setChemistryInput('');
-    setMathInput('');
+    const emptyInputs: Record<string, string> = {};
+    coreSubjects.forEach(s => emptyInputs[s] = '');
+    setSubjectInputs(emptyInputs);
     setIsEditing(false);
   };
 
@@ -118,24 +123,16 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
               <p className="text-xl num-stat">{goals.totalGoal}</p>
             </div>
           )}
-          {goals.physics !== null && (
-            <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Phy</p>
-              <p className="text-xl num-stat">{goals.physics}</p>
-            </div>
-          )}
-          {goals.chemistry !== null && (
-            <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Chem</p>
-              <p className="text-xl num-stat">{goals.chemistry}</p>
-            </div>
-          )}
-          {goals.math !== null && (
-            <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Math</p>
-              <p className="text-xl num-stat">{goals.math}</p>
-            </div>
-          )}
+          {coreSubjects.map(s => {
+            const subjectGoal = (goals as any)[s];
+            if (subjectGoal === null || subjectGoal === undefined) return null;
+            return (
+              <div key={s} className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+                <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{s.substring(0, 4)}</p>
+                <p className="text-xl num-stat">{subjectGoal}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Mid-week note */}
@@ -171,39 +168,19 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
 
         {/* Subject goals */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className={labelClass}>Physics (optional)</label>
-            <input
-              type="number"
-              min="1"
-              placeholder="e.g. 250"
-              value={physicsInput}
-              onChange={e => setPhysicsInput(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className={labelClass}>Chemistry (optional)</label>
-            <input
-              type="number"
-              min="1"
-              placeholder="e.g. 200"
-              value={chemistryInput}
-              onChange={e => setChemistryInput(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className={labelClass}>Math (optional)</label>
-            <input
-              type="number"
-              min="1"
-              placeholder="e.g. 250"
-              value={mathInput}
-              onChange={e => setMathInput(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          {coreSubjects.map(s => (
+            <div key={s} className="flex flex-col gap-1.5">
+              <label className={labelClass}>{s} (optional)</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="e.g. 250"
+                value={subjectInputs[s] || ''}
+                onChange={e => setSubjectInputs(prev => ({ ...prev, [s]: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+          ))}
         </div>
 
         <p className={`text-[9px] font-bold uppercase tracking-wider ${dark ? 'text-zinc-700' : 'text-zinc-300'}`}>

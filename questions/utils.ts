@@ -41,19 +41,14 @@ export const getWeekLogs = (logs: DailyQuestionsLog[]): DailyQuestionsLog[] => {
 
 // --- Weekly Progress (computed, not stored) ---
 
-export interface WeeklyProgress {
-  physicsCompleted: number;
-  chemistryCompleted: number;
-  mathCompleted: number;
-  totalCompleted: number;
-}
-
-export const computeWeeklyProgress = (logs: DailyQuestionsLog[]): WeeklyProgress => {
+export const computeWeeklyProgress = (logs: DailyQuestionsLog[]): Record<string, number> & { totalCompleted: number } => {
   const weekLogs = getWeekLogs(logs);
-  const p = weekLogs.reduce((s, l) => s + l.physicsCount, 0);
-  const c = weekLogs.reduce((s, l) => s + l.chemistryCount, 0);
-  const m = weekLogs.reduce((s, l) => s + l.mathCount, 0);
-  return { physicsCompleted: p, chemistryCompleted: c, mathCompleted: m, totalCompleted: p + c + m };
+  const progress: Record<string, number> & { totalCompleted: number } = { totalCompleted: 0 };
+  ['physics', 'chemistry', 'math', 'biology'].forEach(s => {
+    progress[s] = weekLogs.reduce((acc, l) => acc + (l.counts?.[s as QSubject] || 0), 0);
+    progress.totalCompleted += progress[s];
+  });
+  return progress;
 };
 
 // --- Days left in week (IST, minimum 1) ---
@@ -70,101 +65,85 @@ export const getDaysLeftInWeek = (): number => {
 
 // --- Effective goal per subject (deterministic mixed-goal logic) ---
 
-export interface EffectiveGoals {
-  physics: number | null;
-  chemistry: number | null;
-  math: number | null;
+export type EffectiveGoals = Record<string, number | null> & {
   totalGoal: number | null;
   activeSubjects: QSubject[];
-}
+};
 
 export const computeEffectiveGoals = (state: QuestionTrackingState): EffectiveGoals => {
   const { weeklyGoalTotal, weeklyGoalBySubject, weakSubject } = state;
-  const { physicsGoal, chemistryGoal, mathGoal } = weeklyGoalBySubject;
-
   const hasTotal = weeklyGoalTotal !== null && weeklyGoalTotal > 0;
-  const hasPhysics = physicsGoal !== null && physicsGoal > 0;
-  const hasChemistry = chemistryGoal !== null && chemistryGoal > 0;
-  const hasMath = mathGoal !== null && mathGoal > 0;
-  const hasAnySubject = hasPhysics || hasChemistry || hasMath;
+  
+  const subjects: QSubject[] = ['physics', 'chemistry', 'math', 'biology'];
+  const hasAnySubject = subjects.some(s => (weeklyGoalBySubject as any)[s] !== null && (weeklyGoalBySubject as any)[s] > 0);
+
+  const result: EffectiveGoals = { totalGoal: null, activeSubjects: [] } as any;
+  subjects.forEach(s => result[s] = null);
 
   // Case: No goals at all
   if (!hasTotal && !hasAnySubject) {
-    return { physics: null, chemistry: null, math: null, totalGoal: null, activeSubjects: [] };
+    return result;
   }
 
   // Case: Subject-specific only (no total)
   if (!hasTotal && hasAnySubject) {
-    const active: QSubject[] = [];
-    if (hasPhysics) active.push('physics');
-    if (hasChemistry) active.push('chemistry');
-    if (hasMath) active.push('math');
-    return {
-      physics: hasPhysics ? physicsGoal : null,
-      chemistry: hasChemistry ? chemistryGoal : null,
-      math: hasMath ? mathGoal : null,
-      totalGoal: null,
-      activeSubjects: active,
-    };
+    subjects.forEach(s => {
+      const g = (weeklyGoalBySubject as any)[s];
+      if (g !== null && g > 0) {
+        result[s] = g;
+        result.activeSubjects.push(s);
+      }
+    });
+    return result;
   }
+
+  // Define current active subjects based on what has goals or just default to all defined
+  // For total-only or mixed, we need to know the 'activeSubjects' of the app, but here we can just use the ones that have goals, or all 3 core if JEE.
+  // Actually, we should probably pass activeSubjects to this function, but for now let's just distribute among the ones that have goals or all that exist in weeklyGoalBySubject keys.
+  const core = Object.keys(weeklyGoalBySubject).length > 0 ? Object.keys(weeklyGoalBySubject) as QSubject[] : ['physics', 'chemistry', 'math'] as QSubject[];
 
   // Case: Total only (no subject goals)
   if (hasTotal && !hasAnySubject) {
-    const dist = distributeTotal(weeklyGoalTotal!, weakSubject);
-    return {
-      physics: dist.physics,
-      chemistry: dist.chemistry,
-      math: dist.math,
-      totalGoal: weeklyGoalTotal,
-      activeSubjects: ['physics', 'chemistry', 'math'],
-    };
+    const dist = distributeAmongSubjects(weeklyGoalTotal!, core, weakSubject);
+    core.forEach(s => result[s] = (dist as any)[s]);
+    result.totalGoal = weeklyGoalTotal;
+    result.activeSubjects = core;
+    return result;
   }
 
   // Case: Mixed (total + some subject goals)
-  // Subject goals are prioritized. Remaining from total is distributed to unset subjects.
-  const setSum = (physicsGoal || 0) + (chemistryGoal || 0) + (mathGoal || 0);
-  const remaining = Math.max(0, weeklyGoalTotal! - setSum);
-
+  let setSum = 0;
   const unsetSubjects: QSubject[] = [];
-  if (!hasPhysics) unsetSubjects.push('physics');
-  if (!hasChemistry) unsetSubjects.push('chemistry');
-  if (!hasMath) unsetSubjects.push('math');
+  core.forEach(s => {
+    const g = (weeklyGoalBySubject as any)[s];
+    if (g !== null && g > 0) {
+      result[s] = g;
+      setSum += g;
+    } else {
+      unsetSubjects.push(s);
+    }
+  });
 
-  let distPhysics = physicsGoal || 0;
-  let distChemistry = chemistryGoal || 0;
-  let distMath = mathGoal || 0;
-
+  const remaining = Math.max(0, weeklyGoalTotal! - setSum);
   if (unsetSubjects.length > 0 && remaining > 0) {
     const perUnset = distributeAmongSubjects(remaining, unsetSubjects, weakSubject);
-    if (!hasPhysics) distPhysics = perUnset.physics;
-    if (!hasChemistry) distChemistry = perUnset.chemistry;
-    if (!hasMath) distMath = perUnset.math;
+    unsetSubjects.forEach(s => result[s] = (perUnset as any)[s]);
   }
 
-  return {
-    physics: distPhysics,
-    chemistry: distChemistry,
-    math: distMath,
-    totalGoal: weeklyGoalTotal,
-    activeSubjects: ['physics', 'chemistry', 'math'],
-  };
+  result.totalGoal = weeklyGoalTotal;
+  result.activeSubjects = core;
+  return result;
 };
 
 // --- Distribute a total across 3 subjects with optional weak boost ---
-
-const distributeTotal = (
-  total: number,
-  weakSubject: QSubject | null
-): { physics: number; chemistry: number; math: number } => {
-  return distributeAmongSubjects(total, ['physics', 'chemistry', 'math'], weakSubject);
-};
 
 const distributeAmongSubjects = (
   total: number,
   subjects: QSubject[],
   weakSubject: QSubject | null
-): { physics: number; chemistry: number; math: number } => {
-  const result = { physics: 0, chemistry: 0, math: 0 };
+): Record<string, number> => {
+  const result: Record<string, number> = {};
+  subjects.forEach(s => result[s] = 0);
   if (subjects.length === 0) return result;
 
   const weights: Record<string, number> = {};
@@ -180,7 +159,9 @@ const distributeAmongSubjects = (
   }
 
   // Fix rounding
-  const diff = total - (result.physics + result.chemistry + result.math);
+  let sumAssigned = 0;
+  subjects.forEach(s => sumAssigned += result[s]);
+  const diff = total - sumAssigned;
   if (diff !== 0 && subjects.length > 0) {
     result[subjects[0]] += diff;
   }
@@ -190,24 +171,22 @@ const distributeAmongSubjects = (
 
 // --- Weekly progress EXCLUDING today (for locked daily target) ---
 
-export const computeWeeklyProgressBeforeToday = (logs: DailyQuestionsLog[]): WeeklyProgress => {
+export const computeWeeklyProgressBeforeToday = (logs: DailyQuestionsLog[]): Record<string, number> & { totalCompleted: number } => {
   const today = getISTDateString();
   const { start, end } = getISTWeekBounds();
   const weekLogsBeforeToday = logs.filter(l => l.date >= start && l.date <= end && l.date !== today);
-  const p = weekLogsBeforeToday.reduce((s, l) => s + l.physicsCount, 0);
-  const c = weekLogsBeforeToday.reduce((s, l) => s + l.chemistryCount, 0);
-  const m = weekLogsBeforeToday.reduce((s, l) => s + l.mathCount, 0);
-  return { physicsCompleted: p, chemistryCompleted: c, mathCompleted: m, totalCompleted: p + c + m };
+  
+  const progress: Record<string, number> & { totalCompleted: number } = { totalCompleted: 0 };
+  ['physics', 'chemistry', 'math', 'biology'].forEach(s => {
+    progress[s] = weekLogsBeforeToday.reduce((acc, l) => acc + (l.counts?.[s as QSubject] || 0), 0);
+    progress.totalCompleted += progress[s];
+  });
+  return progress;
 };
 
 // --- Daily adaptive targets (LOCKED at start of day) ---
 
-export interface DailyTargets {
-  total: number;
-  physics: number | null;
-  chemistry: number | null;
-  math: number | null;
-}
+export type DailyTargets = Record<string, number | null> & { total: number };
 
 export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets => {
   const goals = computeEffectiveGoals(state);
@@ -215,9 +194,10 @@ export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets 
   const progressBeforeToday = computeWeeklyProgressBeforeToday(state.dailyQuestionsLog);
   const daysLeft = getDaysLeftInWeek();
 
-  const nullTarget: DailyTargets = { total: 0, physics: null, chemistry: null, math: null };
+  const result: DailyTargets = { total: 0 };
+  ['physics', 'chemistry', 'math', 'biology'].forEach(s => result[s] = null);
 
-  if (goals.activeSubjects.length === 0) return nullTarget;
+  if (goals.activeSubjects.length === 0) return result;
 
   const calcTarget = (goal: number | null, completed: number): number | null => {
     if (goal === null) return null;
@@ -225,33 +205,32 @@ export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets 
     return Math.ceil(remaining / daysLeft);
   };
 
-  const pTarget = calcTarget(goals.physics, progressBeforeToday.physicsCompleted);
-  const cTarget = calcTarget(goals.chemistry, progressBeforeToday.chemistryCompleted);
-  const mTarget = calcTarget(goals.math, progressBeforeToday.mathCompleted);
+  goals.activeSubjects.forEach(s => {
+    const t = calcTarget(goals[s], progressBeforeToday[s]);
+    result[s] = t;
+    if (t) result.total += t;
+  });
 
-  const total = (pTarget || 0) + (cTarget || 0) + (mTarget || 0);
-
-  return { total, physics: pTarget, chemistry: cTarget, math: mTarget };
+  return result;
 };
 
 // --- Today's progress ---
 
-export interface TodayProgress {
-  total: number;
-  physics: number;
-  chemistry: number;
-  math: number;
-}
+export type TodayProgress = Record<string, number> & { total: number };
 
 export const getTodayProgress = (logs: DailyQuestionsLog[]): TodayProgress => {
   const log = getTodayLog(logs);
-  if (!log) return { total: 0, physics: 0, chemistry: 0, math: 0 };
-  return {
-    total: log.physicsCount + log.chemistryCount + log.mathCount,
-    physics: log.physicsCount,
-    chemistry: log.chemistryCount,
-    math: log.mathCount,
-  };
+  const result: TodayProgress = { total: 0 };
+  ['physics', 'chemistry', 'math', 'biology'].forEach(s => result[s] = 0);
+  
+  if (!log || !log.counts) return result;
+  
+  Object.keys(log.counts).forEach(s => {
+    result[s] = log.counts[s as QSubject] || 0;
+    result.total += result[s];
+  });
+  
+  return result;
 };
 
 // --- Adaptive feedback ---
@@ -304,8 +283,8 @@ export const getTodayLog = (logs: DailyQuestionsLog[]): DailyQuestionsLog | null
 
 export const getTodayTotal = (logs: DailyQuestionsLog[]): number => {
   const log = getTodayLog(logs);
-  if (!log) return 0;
-  return log.physicsCount + log.chemistryCount + log.mathCount;
+  if (!log || !log.counts) return 0;
+  return Object.values(log.counts).reduce((acc, c) => acc + (c || 0), 0);
 };
 
 // --- Check if goal started mid-week ---
@@ -346,7 +325,7 @@ export const getWeeklyQuestionTotals = (
     const endStr = formatDateStr(sun);
 
     const weekLogs = logs.filter(l => l.date >= startStr && l.date <= endStr);
-    const total = weekLogs.reduce((s, l) => s + l.physicsCount + l.chemistryCount + l.mathCount, 0);
+    const total = weekLogs.reduce((s, l) => s + (l.counts ? Object.values(l.counts).reduce((acc, c) => acc + (c || 0), 0) : 0), 0);
 
     result.push({ label: `Week ${weeksBack - w}`, total });
   }

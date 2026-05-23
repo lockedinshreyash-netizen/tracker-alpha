@@ -1,11 +1,13 @@
 
-export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'General';
+export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'Biology' | 'General';
+
+export type ExamPreference = 'JEE' | 'NEET';
 
 export type SyllabusStatus = 'not_started' | 'in_progress' | 'completed' | 'revision_pending';
 
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
-export type QSubject = 'physics' | 'chemistry' | 'math';
+export type QSubject = 'physics' | 'chemistry' | 'math' | 'biology';
 
 export interface DailyLog {
   id: string;
@@ -18,16 +20,10 @@ export interface DailyLog {
 
 export interface DailyQuestionsLog {
   date: string; // YYYY-MM-DD (IST)
-  physicsCount: number;
-  chemistryCount: number;
-  mathCount: number;
+  counts: Partial<Record<QSubject, number>>;
 }
 
-export interface WeeklyGoalBySubject {
-  physicsGoal: number | null;
-  chemistryGoal: number | null;
-  mathGoal: number | null;
-}
+export type WeeklyGoalBySubject = Partial<Record<QSubject, number | null>>;
 
 export interface QuestionTrackingState {
   weeklyGoalTotal: number | null;
@@ -65,6 +61,7 @@ export interface TimerState {
 
 export interface AppState {
   currentClass: 11 | 12;
+  examPreference?: ExamPreference;
   logs: DailyLog[];
   progress: ChapterProgress[];
   lastUsedTab: TabType;

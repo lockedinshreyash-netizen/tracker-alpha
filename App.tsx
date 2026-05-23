@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, DailyQuestionsLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus, QSubject, QuestionTrackingState } from './types';
-import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, SUBJECTS, STATUS_LABELS } from './constants';
+import { AppState, TabType, DailyLog, DailyQuestionsLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus, QSubject, QuestionTrackingState, ExamPreference } from './types';
+import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, getLast7DaysStats, getSubjectDistribution } from './utils';
-import { JEE_2027_DATE } from './constants';
 import QuestionsTab from './questions/QuestionsTab';
 import QuestionsBarChart from './review/QuestionsBarChart';
 import QuestionsHeatmap from './review/QuestionsHeatmap';
@@ -23,6 +21,7 @@ const generateId = () => {
 
 const DEFAULT_STATE: AppState = {
   currentClass: 11,
+  examPreference: 'JEE',
   logs: [],
   progress: [],
   lastUsedTab: 'Today',
@@ -35,7 +34,7 @@ const DEFAULT_STATE: AppState = {
   lastUpdated: 0,
   questionTracking: {
     weeklyGoalTotal: null,
-    weeklyGoalBySubject: { physicsGoal: null, chemistryGoal: null, mathGoal: null },
+    weeklyGoalBySubject: {},
     dailyQuestionsLog: [],
     weakSubject: null,
     goalStartDate: null,
@@ -53,11 +52,12 @@ const AuthModal = ({
   isOpen: boolean;
   onClose: () => void;
   theme: 'dark' | 'light';
-  onAuthSuccess: () => void;
+  onAuthSuccess: (examPref?: ExamPreference) => void;
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [examPref, setExamPref] = useState<ExamPreference>('JEE');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -106,6 +106,23 @@ const AuthModal = ({
               : 'bg-zinc-50 border-zinc-200 text-black'
               }`}
           />
+          {mode === 'signup' && (
+            <div className={`w-full rounded-lg px-3 py-2 border flex justify-between items-center ${theme === 'dark' ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'}`}>
+              <span className={`text-[10px] font-black uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Exam Target</span>
+              <div className="flex gap-2">
+                {(['JEE', 'NEET'] as const).map(e => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setExamPref(e)}
+                    className={`px-3 py-1 text-[10px] font-bold rounded ${examPref === e ? 'bg-[#E10600] text-white' : (theme === 'dark' ? 'bg-[#27272a] text-zinc-400' : 'bg-zinc-200 text-zinc-600')}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -118,12 +135,13 @@ const AuthModal = ({
                 if (mode === 'login') {
                   const { error } = await supabase.auth.signInWithPassword({ email, password });
                   if (error) throw error;
+                  onAuthSuccess();
                 } else {
-                  const { error } = await supabase.auth.signUp({ email, password });
+                  const { error } = await supabase.auth.signUp({ email, password, options: { data: { examPreference: examPref } } });
                   if (error) throw error;
                   setSuccessMsg('Check your email to confirm your account.');
+                  onAuthSuccess(examPref);
                 }
-                onAuthSuccess();
                 onClose();
               } catch (err: any) {
                 setError(err.message);
@@ -359,8 +377,9 @@ const TaskSection = ({
   onAddTask,
   onToggleTask,
   onDeleteTask,
-  activeSubject,
+  activeSubjectFilter,
   theme,
+  activeSubjects,
   minimal = false
 }: any) => {
   const [newTaskText, setNewTaskText] = useState('');
@@ -374,9 +393,9 @@ const TaskSection = ({
   };
 
   const filteredTasks = useMemo(() => {
-    if (activeSubject) return tasks.filter((t: any) => t.subject === activeSubject || t.subject === 'General');
+    if (activeSubjectFilter) return tasks.filter((t: any) => t.subject === activeSubjectFilter || t.subject === 'General');
     return tasks;
-  }, [tasks, activeSubject]);
+  }, [tasks, activeSubjectFilter]);
 
   return (
     <div className={`space-y-4 relative z-10 ${minimal ? 'max-w-md w-full mx-auto' : ''}`}>
@@ -389,7 +408,7 @@ const TaskSection = ({
       {!minimal && (
         <div className="space-y-3 mb-6">
           <div className="flex flex-wrap gap-2">
-            {(['General', 'Physics', 'Chemistry', 'Maths'] as const).map(s => (
+            {activeSubjects.map((s: Subject) => (
               <button
                 key={s}
                 onClick={() => setSelectedSubject(s)}
@@ -450,9 +469,9 @@ const TaskSection = ({
   );
 };
 
-const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
+const SyllabusTab = ({ currentClass, progress, onToggle, theme, activeSubjects }: any) => {
   const [activeSubject, setActiveSubject] = useState<Subject>('Physics');
-  const chapters = SYLLABUS_DATA[currentClass as 11 | 12][activeSubject];
+  const chapters = SYLLABUS_DATA[currentClass as 11 | 12][activeSubject as 'Physics'|'Chemistry'|'Maths'|'Biology'] || [];
 
   const subjectStats = useMemo(() => {
     const subjectProgress = progress.filter((p: any) => p.classId === currentClass && p.subject === activeSubject);
@@ -464,14 +483,14 @@ const SyllabusTab = ({ currentClass, progress, onToggle, theme }: any) => {
       revision,
       active,
       total: chapters.length,
-      percent: Math.round((completed / chapters.length) * 100)
+      percent: chapters.length > 0 ? Math.round((completed / chapters.length) * 100) : 0
     };
   }, [currentClass, activeSubject, progress, chapters]);
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <div className="flex justify-center gap-2 mb-6">
-        {SUBJECTS.filter(s => s !== 'General').map(s => (
+        {activeSubjects.filter((s: Subject) => s !== 'General').map((s: Subject) => (
           <button
             key={s}
             onClick={() => setActiveSubject(s)}
@@ -654,14 +673,18 @@ const StreakTab = ({
   dailyGoalHours,
   theme,
   dailyQuestionsLog,
+  coreSubjects,
+  activeSubjects,
 }: {
   streak: number;
   logs: DailyLog[];
   dailyGoalHours: number;
   theme: 'dark' | 'light';
   dailyQuestionsLog?: DailyQuestionsLog[];
+  coreSubjects: QSubject[];
+  activeSubjects: Subject[];
 }) => {
-  const days = getLast7DaysStats(logs);
+  const days = getLast7DaysStats(logs, activeSubjects);
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
 
   return (
@@ -717,14 +740,14 @@ const StreakTab = ({
       {dailyQuestionsLog && dailyQuestionsLog.length > 0 && (
         <>
           <QuestionsBarChart dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
-          <QuestionsHeatmap dailyQuestionsLog={dailyQuestionsLog} theme={theme} />
+          <QuestionsHeatmap dailyQuestionsLog={dailyQuestionsLog} theme={theme} coreSubjects={coreSubjects} />
         </>
       )}
     </div>
   );
 };
 
-const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, dailyQuestionsLog }: any) => {
+const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, dailyQuestionsLog, examPreference, onChangeExamPreference, activeSubjects }: any) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
@@ -806,6 +829,29 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
 
       <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">
+          <h4 className="text-sm font-bold uppercase font-ui">Exam Preference</h4>
+          <p className="text-[11px] text-zinc-500 font-bold mt-1">
+            CURRENT TARGET: {examPreference}
+          </p>
+          <p className="text-[9px] text-zinc-600 uppercase font-medium mt-1">
+            Your previous subject data is safe and will reappear if you switch back.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {(['JEE', 'NEET'] as const).map(e => (
+            <button
+              key={e}
+              onClick={() => onChangeExamPreference(e)}
+              className={`px-6 py-2 text-[10px] font-bold rounded-xl transition-all ${examPreference === e ? 'bg-[#E10600] text-white' : (theme === 'dark' ? 'bg-[#27272a] text-zinc-400 hover:text-white' : 'bg-zinc-200 text-zinc-600 hover:text-black')}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
+        <div className="flex-1">
           <h4 className="text-sm font-bold uppercase font-ui">Contact & Socials</h4>
           <p className="text-[11px] text-zinc-500 font-bold mt-1 uppercase">
             FEEDBACK, BUG REPORTS, OR JUST SAY HI
@@ -848,10 +894,9 @@ const ReviewTab = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOu
               onChange={(e) => setManualSubject(e.target.value as Subject)}
               className={`p-3 rounded-lg border text-sm font-black uppercase focus:outline-none cursor-pointer ${theme === 'dark' ? 'bg-[#0B0B0D] border-zinc-800 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
             >
-              <option value="Physics">Physics</option>
-              <option value="Chemistry">Chemistry</option>
-              <option value="Maths">Maths</option>
-              <option value="General">General</option>
+              {activeSubjects.map((s: Subject) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
           <div className="flex-1 flex flex-col gap-2">
@@ -900,6 +945,33 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        parsed.examPreference = parsed.examPreference || 'JEE';
+        
+        if (parsed.questionTracking?.dailyQuestionsLog) {
+          parsed.questionTracking.dailyQuestionsLog = parsed.questionTracking.dailyQuestionsLog.map((log: any) => {
+             if (!log.counts) {
+                log.counts = {};
+                if (typeof log.physicsCount === 'number') log.counts.physics = log.physicsCount;
+                if (typeof log.chemistryCount === 'number') log.counts.chemistry = log.chemistryCount;
+                if (typeof log.mathCount === 'number') log.counts.math = log.mathCount;
+                delete log.physicsCount;
+                delete log.chemistryCount;
+                delete log.mathCount;
+             }
+             return log;
+          });
+        }
+        if (parsed.questionTracking?.weeklyGoalBySubject) {
+           const w = parsed.questionTracking.weeklyGoalBySubject;
+           if (!('physics' in w) && !('chemistry' in w) && !('math' in w) && !('biology' in w)) {
+              parsed.questionTracking.weeklyGoalBySubject = {
+                physics: w.physicsGoal ?? null,
+                chemistry: w.chemistryGoal ?? null,
+                math: w.mathGoal ?? null
+              };
+           }
+        }
+
         return { ...DEFAULT_STATE, ...parsed };
       } catch (e) {
         return DEFAULT_STATE;
@@ -919,6 +991,10 @@ const App: React.FC = () => {
   const pendingSyncRef = useRef(false);
   const stateRef = useRef(state);
   const preventSyncOnUpdate = useRef(false);
+
+  const activeSubjects = getActiveSubjects(state.examPreference);
+  const coreSubjects = getCoreSubjects(state.examPreference);
+  const coreQSubjects = getCoreQSubjects(state.examPreference);
 
   useEffect(() => {
     stateRef.current = state;
@@ -1239,19 +1315,15 @@ const App: React.FC = () => {
     const today = getISTDateString();
     setState(prev => {
       const logs = [...prev.questionTracking.dailyQuestionsLog];
-      const idx = logs.findIndex(l => l.date === today);
+      const idx = logs.findIndex((l: any) => l.date === today);
       if (idx >= 0) {
         const updated = { ...logs[idx] };
-        if (subject === 'physics') updated.physicsCount += count;
-        else if (subject === 'chemistry') updated.chemistryCount += count;
-        else updated.mathCount += count;
+        updated.counts = { ...updated.counts, [subject]: (updated.counts?.[subject] || 0) + count };
         logs[idx] = updated;
       } else {
         logs.push({
           date: today,
-          physicsCount: subject === 'physics' ? count : 0,
-          chemistryCount: subject === 'chemistry' ? count : 0,
-          mathCount: subject === 'math' ? count : 0,
+          counts: { [subject]: count }
         });
       }
       const nextState = {
@@ -1274,7 +1346,7 @@ const App: React.FC = () => {
 
   const daysRemaining = getDaysRemaining(JEE_2027_DATE);
   const streakCount = calculateStreak(state.logs);
-  const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress);
+  const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
   const isCurrentlyLockInActive = state.timer.isLockInActive;
 
   // While checking session, show nothing (prevents flash)
@@ -1304,7 +1376,8 @@ const App: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         theme={theme}
-        onAuthSuccess={() => {
+        onAuthSuccess={(examPref?: ExamPreference) => {
+          if (examPref) setState(p => ({ ...p, examPreference: examPref }));
           isInitialSyncDone.current = false;
           setSyncStatus('syncing');
         }}
@@ -1340,6 +1413,7 @@ const App: React.FC = () => {
               onDeleteTask={deleteTask}
               onUpdateDailyGoal={updateDailyGoal}
               theme={theme}
+              activeSubjects={activeSubjects}
             />
           )}
           {!isCurrentlyLockInActive && activeTab === 'Syllabus' && (
@@ -1348,15 +1422,17 @@ const App: React.FC = () => {
               progress={state.progress}
               onToggle={toggleChapterStatus}
               theme={theme}
+              activeSubjects={activeSubjects}
             />
           )}
-          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} />}
+          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} coreSubjects={coreQSubjects} activeSubjects={activeSubjects} />}
           {!isCurrentlyLockInActive && activeTab === 'Questions' && (
             <QuestionsTab
               questionTracking={state.questionTracking}
               onUpdateTracking={updateQuestionTracking}
               onLogQuestions={logQuestions}
               theme={theme}
+              coreSubjects={coreQSubjects}
             />
           )}
           {!isCurrentlyLockInActive && activeTab === 'Review' && (
@@ -1370,6 +1446,9 @@ const App: React.FC = () => {
               onSignOut={handleSignOut}
               onLog={logStudy}
               dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
+              examPreference={state.examPreference}
+              onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
+              activeSubjects={activeSubjects}
             />
           )}
         </main>
@@ -1388,7 +1467,8 @@ const TodayTab = ({
   onToggleTask,
   onDeleteTask,
   onUpdateDailyGoal,
-  theme
+  theme,
+  activeSubjects
 }: any) => {
   const { timer, tasks, isLockInModeEnabled, logs, dailyGoalHours } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
@@ -1514,7 +1594,7 @@ const TodayTab = ({
 
   const totalToday = todayLogs.reduce((a: any, b: any) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
-  const subjectDist = getSubjectDistribution(logs);
+  const subjectDist = getSubjectDistribution(logs, activeSubjects);
 
   const canEndSession = currentDisplayMs >= REQUIRED_FOCUS_MS;
   const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - currentDisplayMs);
@@ -1623,10 +1703,10 @@ const TodayTab = ({
           </div>
 
           <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-            {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
+            {activeSubjects.map((s: Subject) => (
               <div key={s} className={`p-3 md:p-4 rounded-xl border ${theme === 'dark' ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
                 <p className="text-[8px] md:text-[10px] font-bold uppercase text-zinc-500 mb-1 font-ui">{s.substring(0, 3)}</p>
-                <p className="text-sm md:text-base num-stat">{subjectDist[s].toFixed(1)}h</p>
+                <p className="text-sm md:text-base num-stat">{(subjectDist[s] || 0).toFixed(1)}h</p>
               </div>
             ))}
           </div>
@@ -1641,7 +1721,7 @@ const TodayTab = ({
         {!timer.isRunning ? (
           <>
             <div className="flex flex-wrap justify-center gap-3 mt-14">
-              {(['Physics', 'Chemistry', 'Maths', 'General'] as Subject[]).map(s => (
+              {activeSubjects.map((s: Subject) => (
                 <button
                   key={s}
                   onClick={() => setManualSubject(s)}
@@ -1686,7 +1766,7 @@ const TodayTab = ({
         )}
       </section>
 
-      <TaskSection tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} theme={theme} activeSubject={timer.isRunning ? timer.subject : null} />
+      <TaskSection tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} theme={theme} activeSubjectFilter={timer.isRunning ? timer.subject : null} activeSubjects={activeSubjects} />
 
       <section className="space-y-4">
         <div className="flex justify-between items-end pb-2">

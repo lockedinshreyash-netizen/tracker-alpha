@@ -1,9 +1,25 @@
 
-import { Subject, SyllabusStatus } from './types';
+import { ExamPreference, Subject, SyllabusStatus } from './types';
 
 export const JEE_2027_DATE = new Date('2027-01-01');
 
-export const SUBJECTS: Subject[] = ['Physics', 'Chemistry', 'Maths', 'General'];
+export const getActiveSubjects = (preference: ExamPreference = 'JEE'): Subject[] => {
+  return preference === 'NEET' 
+    ? ['Physics', 'Chemistry', 'Biology', 'General'] 
+    : ['Physics', 'Chemistry', 'Maths', 'General'];
+};
+
+export const getCoreSubjects = (preference: ExamPreference = 'JEE'): Subject[] => {
+  return preference === 'NEET'
+    ? ['Physics', 'Chemistry', 'Biology']
+    : ['Physics', 'Chemistry', 'Maths'];
+};
+
+export const getCoreQSubjects = (preference: ExamPreference = 'JEE'): ('physics' | 'chemistry' | 'math' | 'biology')[] => {
+  return preference === 'NEET'
+    ? ['physics', 'chemistry', 'biology']
+    : ['physics', 'chemistry', 'math'];
+};
 
 export const LOCK_IN_QUOTES = [
   "THE COMPETITION IS STUDYING. ARE YOU?",
@@ -80,6 +96,14 @@ export const SYLLABUS_DATA = {
       'Linear Inequalities', 'Permutations & Combinations', 'Binomial Theorem', 'Sequences & Series',
       'Straight Lines', 'Conic Sections', 'Introduction to 3D Geometry', 'Limits & Derivatives',
       'Statistics', 'Probability'
+    ],
+    Biology: [
+      'The Living World', 'Biological Classification', 'Plant Kingdom', 'Animal Kingdom',
+      'Morphology of Flowering Plants', 'Anatomy of Flowering Plants', 'Structural Organisation in Animals',
+      'Cell: The Unit of Life', 'Biomolecules', 'Cell Cycle and Cell Division',
+      'Photosynthesis in Higher Plants', 'Respiration in Plants', 'Plant Growth and Development',
+      'Breathing and Exchange of Gases', 'Body Fluids and Circulation', 'Excretory Products and their Elimination',
+      'Locomotion and Movement', 'Neural Control and Coordination', 'Chemical Coordination and Integration'
     ]
   },
   12: {
@@ -100,6 +124,13 @@ export const SYLLABUS_DATA = {
       'Determinants', 'Continuity & Differentiability', 'Applications of Derivatives',
       'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vector Algebra',
       'Three Dimensional Geometry', 'Linear Programming', 'Probability'
+    ],
+    Biology: [
+      'Sexual Reproduction in Flowering Plants', 'Human Reproduction', 'Reproductive Health',
+      'Principles of Inheritance and Variation', 'Molecular Basis of Inheritance', 'Evolution',
+      'Human Health and Disease', 'Microbes in Human Welfare', 'Biotechnology: Principles and Processes',
+      'Biotechnology and its Applications', 'Organisms and Populations', 'Ecosystem',
+      'Biodiversity and Conservation'
     ]
   }
 };

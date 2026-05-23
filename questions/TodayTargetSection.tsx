@@ -1,13 +1,14 @@
 import React from 'react';
-import { QuestionTrackingState } from '../types';
+import { QuestionTrackingState, QSubject } from '../types';
 import { computeDailyTargets, computeEffectiveGoals, computeFeedback, HIGH_TARGET_THRESHOLD } from './utils';
 
 interface Props {
   questionTracking: QuestionTrackingState;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
+const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme, coreSubjects }) => {
   const goals = computeEffectiveGoals(questionTracking);
   const targets = computeDailyTargets(questionTracking);
   const feedback = computeFeedback(questionTracking);
@@ -43,24 +44,16 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme }) => {
 
         {/* Subject breakdown */}
         <div className="flex justify-center gap-3 md:gap-4">
-          {targets.physics !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Phy</p>
-              <p className="text-lg num-stat">{targets.physics}</p>
-            </div>
-          )}
-          {targets.chemistry !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Chem</p>
-              <p className="text-lg num-stat">{targets.chemistry}</p>
-            </div>
-          )}
-          {targets.math !== null && (
-            <div className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
-              <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Math</p>
-              <p className="text-lg num-stat">{targets.math}</p>
-            </div>
-          )}
+          {coreSubjects.map(s => {
+            const val = targets[s];
+            if (val === null || val === undefined) return null;
+            return (
+              <div key={s} className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+                <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{s.substring(0, 4)}</p>
+                <p className="text-lg num-stat">{val}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* High load warning */}

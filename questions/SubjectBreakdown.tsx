@@ -1,13 +1,14 @@
 import React from 'react';
-import { QuestionTrackingState } from '../types';
+import { QuestionTrackingState, QSubject } from '../types';
 import { computeWeeklyProgress, computeEffectiveGoals } from './utils';
 
 interface Props {
   questionTracking: QuestionTrackingState;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme }) => {
+const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme, coreSubjects }) => {
   const goals = computeEffectiveGoals(questionTracking);
   const progress = computeWeeklyProgress(questionTracking.dailyQuestionsLog);
 
@@ -15,11 +16,14 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme }) => {
 
   const dark = theme === 'dark';
 
-  const subjects = [
-    { key: 'physics' as const, label: 'Physics', completed: progress.physicsCompleted, goal: goals.physics },
-    { key: 'chemistry' as const, label: 'Chemistry', completed: progress.chemistryCompleted, goal: goals.chemistry },
-    { key: 'math' as const, label: 'Math', completed: progress.mathCompleted, goal: goals.math },
-  ].filter(s => goals.activeSubjects.includes(s.key));
+  const subjects = coreSubjects
+    .filter(s => goals.activeSubjects.includes(s))
+    .map(s => ({
+      key: s,
+      label: s.charAt(0).toUpperCase() + s.slice(1),
+      completed: progress[s] || 0,
+      goal: (goals as any)[s]
+    }));
 
   return (
     <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>

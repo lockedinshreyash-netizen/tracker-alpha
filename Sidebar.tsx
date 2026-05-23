@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TabType } from '../types';
+import { TabType } from './types';
 
 interface Props {
   activeTab: TabType;
@@ -73,6 +73,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
       <div className={`md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b backdrop-blur-xl ${dark ? 'bg-[#0B0B0D]/90 border-white/[0.04]' : 'bg-white/90 border-zinc-200'}`}>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
+          data-onboarding-mobile-menu="toggle"
           className={`p-2 rounded-lg transition-all ${dark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-zinc-500 hover:text-black hover:bg-zinc-100'}`}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -134,6 +135,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, them
               <button
                 key={tab}
                 onClick={() => handleTabClick(tab)}
+                data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : undefined}
                 className={`flex items-center gap-3 rounded-xl transition-all duration-200 group relative
                   ${collapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'}
                   ${isActive

@@ -6,9 +6,10 @@ interface Props {
   questionTracking: QuestionTrackingState;
   onLogQuestions: (subject: QSubject, count: number) => void;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestions, theme }) => {
+const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestions, theme, coreSubjects }) => {
   const [selectedSubject, setSelectedSubject] = useState<QSubject>('physics');
   const [manualInput, setManualInput] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -59,11 +60,10 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
     }
   };
 
-  const subjects: { key: QSubject; label: string }[] = [
-    { key: 'physics', label: 'PHY' },
-    { key: 'chemistry', label: 'CHEM' },
-    { key: 'math', label: 'MATH' },
-  ];
+  const subjects: { key: QSubject; label: string }[] = coreSubjects.map(s => ({
+    key: s,
+    label: s.substring(0, 4).toUpperCase()
+  }));
 
   const dark = theme === 'dark';
 

@@ -60,7 +60,8 @@ export const calculateStreak = (logs: DailyLog[]): number => {
 };
 
 export const getLast7DaysStats = (
-  logs: DailyLog[]
+  logs: DailyLog[],
+  activeSubjects: Subject[]
 ): { date: string; hours: number }[] => {
   const stats: { date: string; hours: number }[] = [];
 
@@ -76,7 +77,7 @@ export const getLast7DaysStats = (
 
   for (const dateStr of dates) {
     const totalHours = logs
-      .filter(l => l.date === dateStr)
+      .filter(l => l.date === dateStr && activeSubjects.includes(l.subject))
       .reduce((sum, l) => sum + l.hours, 0);
 
     stats.push({
@@ -89,11 +90,13 @@ export const getLast7DaysStats = (
 
   return stats;
 };
-export const getSubjectDistribution = (logs: DailyLog[]): Record<Subject, number> => {
-  const dist: Record<Subject, number> = { Physics: 0, Chemistry: 0, Maths: 0, General: 0 };
+export const getSubjectDistribution = (logs: DailyLog[], activeSubjects: Subject[]): Partial<Record<Subject, number>> => {
+  const dist: Partial<Record<Subject, number>> = {};
+  activeSubjects.forEach(s => dist[s] = 0);
+  
   const today = getISTDateString();
-  logs.filter(l => l.date === today).forEach(l => {
-    dist[l.subject] += l.hours;
+  logs.filter(l => l.date === today && activeSubjects.includes(l.subject)).forEach(l => {
+    dist[l.subject] = (dist[l.subject] || 0) + l.hours;
   });
   return dist;
 };
@@ -101,7 +104,8 @@ export const getSubjectDistribution = (logs: DailyLog[]): Record<Subject, number
 export const calculateLockInScore = (
   logs: DailyLog[],
   currentClass: 11 | 12,
-  progress: any[]
+  progress: any[],
+  activeSubjects: Subject[]
 ): number => {
   const now = new Date();
   const datesLast30: string[] = [];
@@ -109,7 +113,7 @@ export const calculateLockInScore = (
     datesLast30.push(getISTDateString(new Date(now.getTime() - i * 86400000)));
   }
 
-  const logsLast30 = logs.filter(l => datesLast30.includes(l.date));
+  const logsLast30 = logs.filter(l => datesLast30.includes(l.date) && activeSubjects.includes(l.subject));
 
   // 1. Consistency (30%) - Based on frequency of logs
   const loggedDaysLast30 = new Set(logsLast30.map(l => l.date)).size;
@@ -121,7 +125,7 @@ export const calculateLockInScore = (
   const hoursScore = Math.min((avgHoursLast30 / 10) * 100, 100);
 
   // 3. Syllabus Progress (10%)
-  const classProgress = progress.filter(p => p.classId === currentClass && p.status === 'completed').length;
+  const classProgress = progress.filter(p => p.classId === currentClass && activeSubjects.includes(p.subject) && p.status === 'completed').length;
   const totalChapters = 45;
   const progressScore = Math.min((classProgress / totalChapters) * 100, 100);
 

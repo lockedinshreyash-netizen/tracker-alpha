@@ -6,9 +6,10 @@ interface Props {
   questionTracking: QuestionTrackingState;
   onUpdateTracking: (update: Partial<QuestionTrackingState>) => void;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const WeakSubjectSection: React.FC<Props> = ({ questionTracking, onUpdateTracking, theme }) => {
+const WeakSubjectSection: React.FC<Props> = ({ questionTracking, onUpdateTracking, theme, coreSubjects }) => {
   const goals = computeEffectiveGoals(questionTracking);
   if (goals.activeSubjects.length === 0) return null;
 
@@ -17,9 +18,7 @@ const WeakSubjectSection: React.FC<Props> = ({ questionTracking, onUpdateTrackin
 
   const options: { key: QSubject | null; label: string }[] = [
     { key: null, label: 'None' },
-    { key: 'physics', label: 'Physics' },
-    { key: 'chemistry', label: 'Chemistry' },
-    { key: 'math', label: 'Math' },
+    ...coreSubjects.map(s => ({ key: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))
   ];
 
   const handleSelect = (key: QSubject | null) => {

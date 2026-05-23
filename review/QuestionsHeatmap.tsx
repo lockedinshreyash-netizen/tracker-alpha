@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { DailyQuestionsLog } from '../types';
+import { DailyQuestionsLog, QSubject } from '../types';
 
 interface Props {
   dailyQuestionsLog: DailyQuestionsLog[];
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
+const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme, coreSubjects }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -36,11 +37,11 @@ const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
 
   const getDayTotal = (dateStr: string): number => {
     const log = dailyQuestionsLog.find(l => l.date === dateStr);
-    if (!log) return 0;
-    return log.physicsCount + log.chemistryCount + log.mathCount;
+    if (!log || !log.counts) return 0;
+    return (Object.values(log.counts) as (number | undefined)[]).reduce((a: number, b) => a + (b || 0), 0);
   };
 
-  const maxQ = Math.max(1, ...dailyQuestionsLog.map(l => l.physicsCount + l.chemistryCount + l.mathCount));
+  const maxQ = Math.max(1, ...dailyQuestionsLog.map(l => l.counts ? (Object.values(l.counts) as (number | undefined)[]).reduce((a: number, b) => a + (b || 0), 0) : 0));
 
   const getDayColor = (total: number): string => {
     if (total === 0) return dark ? 'bg-[#1F1F23] border border-[#2A2A2E]' : 'bg-zinc-50 border border-zinc-200';
@@ -103,20 +104,18 @@ const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
                       <span className={`font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Total:</span>
                       <span className="font-black">{total}</span>
                     </div>
-                    {log && (
+                    {log && log.counts && (
                       <>
-                        <div className="flex justify-between">
-                          <span className={`font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Phy:</span>
-                          <span className="font-black">{log.physicsCount}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className={`font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Chem:</span>
-                          <span className="font-black">{log.chemistryCount}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className={`font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Math:</span>
-                          <span className="font-black">{log.mathCount}</span>
-                        </div>
+                        {coreSubjects.map(s => {
+                          const val = log.counts![s as QSubject];
+                          if (val === undefined || val === null) return null;
+                          return (
+                            <div key={s} className="flex justify-between">
+                              <span className={`font-bold ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>{s.substring(0, 4)}:</span>
+                              <span className="font-black">{val}</span>
+                            </div>
+                          );
+                        })}
                       </>
                     )}
                   </div>
