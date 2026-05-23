@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, TabType, DailyLog, DailyQuestionsLog, ChapterProgress, Subject, SyllabusStatus, TimerState, Task, SyncStatus, QSubject, QuestionTrackingState, ExamPreference } from './types';
-import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, STATUS_LABELS } from './constants';
+import { SYLLABUS_DATA, STATUS_CYCLE, STATUS_COLORS, LOCK_IN_QUOTES, getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, getLast7DaysStats, getSubjectDistribution } from './utils';
 import QuestionsTab from './questions/QuestionsTab';
 import QuestionsBarChart from './review/QuestionsBarChart';
@@ -256,7 +256,7 @@ const Header = ({
       {/* Burn Bar */}
       <div className="w-full relative px-6 mt-4">
         <div className="flex justify-between items-center mb-1">
-          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>JEE Mains 2027</span>
+          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{state.examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
           <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{daysRemaining} days left</span>
         </div>
       </div>
@@ -271,7 +271,7 @@ const Header = ({
       >
         <div
           className="h-full bg-[#E10600] transition-all duration-1000"
-          style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
+          style={{ width: `${Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((targetExamDate.getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))}%` }}
         />
         {/* Tooltip */}
         <div className={`absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 md:w-80 p-4 bg-[#111114] border border-white/[0.08] rounded-xl shadow-xl transition-opacity duration-300 z-[90] pointer-events-none ${showTooltip ? 'opacity-100' : 'opacity-0'}`}>
@@ -280,7 +280,7 @@ const Header = ({
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
                 <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Time left</span>
-                <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until JEE Mains 2027</span>
+                <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until {state.examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
               </div>
             </div>
 
@@ -288,7 +288,7 @@ const Header = ({
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
                 <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Time elapsed</span>
-                <span className="text-[#E10600] font-black text-sm md:text-base block">{(Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((new Date('2027-01-01').getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))).toFixed(1)}% of your preparation time is already gone</span>
+                <span className="text-[#E10600] font-black text-sm md:text-base block">{(Math.max(0, Math.min(100, (1 - (daysRemaining / Math.round((targetExamDate.getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)))) * 100))).toFixed(1)}% of your preparation time is already gone</span>
               </div>
             </div>
 
@@ -1344,7 +1344,8 @@ const App: React.FC = () => {
     }
   };
 
-  const daysRemaining = getDaysRemaining(JEE_2027_DATE);
+  const targetExamDate = state.examPreference === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE;
+  const daysRemaining = getDaysRemaining(targetExamDate);
   const streakCount = calculateStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
   const isCurrentlyLockInActive = state.timer.isLockInActive;

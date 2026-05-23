@@ -2,6 +2,7 @@
 import { ExamPreference, Subject, SyllabusStatus } from './types';
 
 export const JEE_2027_DATE = new Date('2027-01-01');
+export const NEET_2027_DATE = new Date('2027-05-02');
 
 export const getActiveSubjects = (preference: ExamPreference = 'JEE'): Subject[] => {
   return preference === 'NEET' 
