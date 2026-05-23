@@ -176,7 +176,9 @@ const Header = ({
   syncStatus,
   user,
   onOpenAuth,
-  logs
+  logs,
+  examPreference,
+  targetExamDate
 }: {
   currentClass: 11 | 12,
   onClassChange: (c: 11 | 12) => void,
@@ -188,7 +190,9 @@ const Header = ({
   syncStatus: SyncStatus,
   user: any,
   onOpenAuth: () => void,
-  logs: DailyLog[]
+  logs: DailyLog[],
+  examPreference: ExamPreference,
+  targetExamDate: Date
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -256,7 +260,7 @@ const Header = ({
       {/* Burn Bar */}
       <div className="w-full relative px-6 mt-4">
         <div className="flex justify-between items-center mb-1">
-          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{state.examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
+          <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
           <span className={`text-[9px] md:text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>{daysRemaining} days left</span>
         </div>
       </div>
@@ -280,7 +284,7 @@ const Header = ({
               <span className="text-[#E10600] mt-1 text-[8px]">●</span>
               <div>
                 <span className="text-zinc-500 text-[8px] md:text-[9px] uppercase tracking-[0.06em] font-black block">Time left</span>
-                <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until {state.examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
+                <span className="text-white font-bold text-xs md:text-sm">{daysRemaining} days remaining until {examPreference === 'NEET' ? 'NEET 2027' : 'JEE Mains 2027'}</span>
               </div>
             </div>
 
@@ -1398,6 +1402,8 @@ const App: React.FC = () => {
             user={user}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             logs={state.logs}
+            examPreference={state.examPreference || 'JEE'}
+            targetExamDate={targetExamDate}
           />
         )}
 
