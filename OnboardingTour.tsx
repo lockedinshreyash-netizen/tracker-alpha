@@ -303,7 +303,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ onNavigateToTab, onComp
               <div className="fixed right-0 bg-black/70" style={{ top: spotlightRect.top, left: spotlightRect.right, height: spotlightRect.height }} />
               <div className="fixed left-0 right-0 bottom-0 bg-black/70" style={{ top: spotlightRect.bottom }} />
               <div
-                className="fixed rounded-xl border border-[#E10600] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_36px_rgba(225,6,0,0.28)] transition-all duration-300"
+                className="fixed rounded-lg border border-[#E10600] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_36px_rgba(225,6,0,0.28)] transition-all duration-300"
                 style={{
                   top: spotlightRect.top,
                   left: spotlightRect.left,
@@ -319,7 +319,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ onNavigateToTab, onComp
           {tooltipPosition && (
             <div
               ref={tooltipRef}
-              className="fixed pointer-events-auto rounded-lg border border-zinc-700 bg-zinc-800 p-4 shadow-2xl transition-all duration-300"
+              className="fixed pointer-events-auto rounded-md border border-zinc-700 bg-zinc-800 p-4 shadow-2xl transition-all duration-300"
               style={{
                 top: tooltipPosition.top,
                 left: tooltipPosition.left,
@@ -333,14 +333,14 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ onNavigateToTab, onComp
           <button
             type="button"
             onClick={completeTour}
-            className="fixed bottom-5 left-5 pointer-events-auto rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 shadow-xl hover:text-white font-ui"
+            className="fixed bottom-5 left-5 pointer-events-auto rounded-md border border-zinc-700 bg-zinc-800 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 shadow-xl hover:text-white font-ui"
           >
             Skip tour
           </button>
           <button
             type="button"
             onClick={handlePrimaryAction}
-            className="fixed bottom-5 right-5 pointer-events-auto rounded-lg bg-[#E10600] px-6 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-xl hover:bg-red-700 font-ui"
+            className="fixed bottom-5 right-5 pointer-events-auto rounded-md bg-[#E10600] px-6 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-xl hover:bg-red-700 font-ui"
           >
             Next
           </button>
@@ -349,13 +349,13 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ onNavigateToTab, onComp
         <>
           <div className="fixed inset-0 bg-black/70" />
           <div className="fixed inset-0 flex items-center justify-center px-4">
-            <div className="pointer-events-auto w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-7 text-center shadow-2xl md:p-9">
+            <div className="pointer-events-auto w-full max-w-md rounded-md border border-zinc-700 bg-zinc-900 p-7 text-center shadow-2xl md:p-9">
               <h2 className="text-3xl font-black tracking-tight text-white md:text-4xl font-display">{currentStep.title}</h2>
               <p className="mt-4 text-sm font-bold leading-relaxed text-zinc-400 md:text-base font-ui">{currentStep.subtext}</p>
               <button
                 type="button"
                 onClick={handlePrimaryAction}
-                className="mt-8 w-full rounded-lg bg-[#E10600] px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-xl hover:bg-red-700 font-ui"
+                className="mt-8 w-full rounded-md bg-[#E10600] px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-xl hover:bg-red-700 font-ui"
               >
                 {currentStep.cta}
               </button>

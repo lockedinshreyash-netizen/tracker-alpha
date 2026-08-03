@@ -9,7 +9,7 @@ interface Props {
 }
 
 const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme, coreSubjects }) => {
-  const goals = computeEffectiveGoals(questionTracking);
+  const goals = computeEffectiveGoals(questionTracking, coreSubjects);
   const progress = computeWeeklyProgress(questionTracking.dailyQuestionsLog);
 
   if (goals.activeSubjects.length === 0) return null;
@@ -26,7 +26,7 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme, coreSubjec
     }));
 
   return (
-    <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Subject Breakdown
       </h3>
@@ -37,7 +37,7 @@ const SubjectBreakdown: React.FC<Props> = ({ questionTracking, theme, coreSubjec
           return (
             <div
               key={s.key}
-              className={`p-5 rounded-xl border transition-all ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}
+              className={`p-5 rounded-lg border transition-all ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}
             >
               <div className="flex justify-between items-start mb-3">
                 <p className={`text-[9px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>

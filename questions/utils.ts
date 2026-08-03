@@ -70,11 +70,11 @@ export type EffectiveGoals = Record<string, number | null> & {
   activeSubjects: QSubject[];
 };
 
-export const computeEffectiveGoals = (state: QuestionTrackingState): EffectiveGoals => {
+export const computeEffectiveGoals = (state: QuestionTrackingState, coreSubjects: QSubject[]): EffectiveGoals => {
   const { weeklyGoalTotal, weeklyGoalBySubject, weakSubject } = state;
   const hasTotal = weeklyGoalTotal !== null && weeklyGoalTotal > 0;
-  
-  const subjects: QSubject[] = ['physics', 'chemistry', 'math', 'biology'];
+
+  const subjects: QSubject[] = coreSubjects;
   const hasAnySubject = subjects.some(s => (weeklyGoalBySubject as any)[s] !== null && (weeklyGoalBySubject as any)[s] > 0);
 
   const result: EffectiveGoals = { totalGoal: null, activeSubjects: [] } as any;
@@ -97,10 +97,7 @@ export const computeEffectiveGoals = (state: QuestionTrackingState): EffectiveGo
     return result;
   }
 
-  // Define current active subjects based on what has goals or just default to all defined
-  // For total-only or mixed, we need to know the 'activeSubjects' of the app, but here we can just use the ones that have goals, or all 3 core if JEE.
-  // Actually, we should probably pass activeSubjects to this function, but for now let's just distribute among the ones that have goals or all that exist in weeklyGoalBySubject keys.
-  const core = Object.keys(weeklyGoalBySubject).length > 0 ? Object.keys(weeklyGoalBySubject) as QSubject[] : ['physics', 'chemistry', 'math'] as QSubject[];
+  const core = coreSubjects;
 
   // Case: Total only (no subject goals)
   if (hasTotal && !hasAnySubject) {
@@ -188,8 +185,8 @@ export const computeWeeklyProgressBeforeToday = (logs: DailyQuestionsLog[]): Rec
 
 export type DailyTargets = Record<string, number | null> & { total: number };
 
-export const computeDailyTargets = (state: QuestionTrackingState): DailyTargets => {
-  const goals = computeEffectiveGoals(state);
+export const computeDailyTargets = (state: QuestionTrackingState, coreSubjects: QSubject[]): DailyTargets => {
+  const goals = computeEffectiveGoals(state, coreSubjects);
   // Use progress BEFORE today so target stays locked all day
   const progressBeforeToday = computeWeeklyProgressBeforeToday(state.dailyQuestionsLog);
   const daysLeft = getDaysLeftInWeek();
@@ -243,12 +240,12 @@ export interface AdaptiveFeedback {
   dailyTarget: number;
 }
 
-export const computeFeedback = (state: QuestionTrackingState): AdaptiveFeedback | null => {
-  const goals = computeEffectiveGoals(state);
+export const computeFeedback = (state: QuestionTrackingState, coreSubjects: QSubject[]): AdaptiveFeedback | null => {
+  const goals = computeEffectiveGoals(state, coreSubjects);
   if (goals.activeSubjects.length === 0) return null;
 
   const totalGoal = goals.totalGoal ||
-    ((goals.physics || 0) + (goals.chemistry || 0) + (goals.math || 0));
+    goals.activeSubjects.reduce((sum, s) => sum + (goals[s] || 0), 0);
   if (totalGoal <= 0) return null;
 
   const progress = computeWeeklyProgress(state.dailyQuestionsLog);
@@ -260,7 +257,7 @@ export const computeFeedback = (state: QuestionTrackingState): AdaptiveFeedback 
   const daysElapsed = Math.max(1, Math.floor((todayDate.getTime() - startDate.getTime()) / 86400000) + 1);
 
   const expectedByNow = Math.round((totalGoal / 7) * daysElapsed);
-  const dailyTarget = computeDailyTargets(state).total;
+  const dailyTarget = computeDailyTargets(state, coreSubjects).total;
 
   const diff = progress.totalCompleted - expectedByNow;
   const tolerance = Math.max(5, Math.round(totalGoal * 0.03));

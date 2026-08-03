@@ -19,7 +19,7 @@ const QuestionsBarChart: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
   if (!hasData) return null;
 
   return (
-    <div className={`p-8 md:p-10 rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`p-8 md:p-10 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.06em] mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Questions
       </h3>
@@ -38,7 +38,7 @@ const QuestionsBarChart: React.FC<Props> = ({ dailyQuestionsLog, theme }) => {
             >
               {/* Tooltip */}
               {isHovered && (
-                <div className={`absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 px-3 py-2 rounded-lg text-center whitespace-nowrap z-10 pointer-events-none ${dark ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-zinc-200 shadow-md'}`}>
+                <div className={`absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 px-3 py-2 rounded-md text-center whitespace-nowrap z-10 pointer-events-none ${dark ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-zinc-200 shadow-md'}`}>
                   <p className="text-[10px] font-black text-[#E10600] uppercase">{w.label}</p>
                   <p className={`text-xs font-black ${dark ? 'text-white' : 'text-black'}`}>{w.total} questions</p>
                 </div>

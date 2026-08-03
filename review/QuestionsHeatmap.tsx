@@ -53,7 +53,7 @@ const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme, coreSubje
   };
 
   return (
-    <div className={`p-8 md:p-10 rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`p-8 md:p-10 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex justify-between items-center mb-6">
         <h3 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           Questions Heatmap
@@ -97,7 +97,7 @@ const QuestionsHeatmap: React.FC<Props> = ({ dailyQuestionsLog, theme, coreSubje
                 <div className={`w-6 h-6 md:w-8 md:h-8 rounded-sm md:rounded-md transition-all duration-300 ${getDayColor(total)} ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-black' : ''}`} />
 
                 {/* Tooltip */}
-                <div className={`absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-44 p-3 rounded-xl border shadow-xl transition-opacity duration-200 z-[90] pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'} ${dark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-black'}`}>
+                <div className={`absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-44 p-3 rounded-lg border shadow-xl transition-opacity duration-200 z-[90] pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'} ${dark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-black'}`}>
                   <p className="text-[10px] font-black uppercase text-[#E10600] mb-2">{dateStr}</p>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">

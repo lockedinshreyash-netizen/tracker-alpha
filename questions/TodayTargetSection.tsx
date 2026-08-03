@@ -9,9 +9,9 @@ interface Props {
 }
 
 const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme, coreSubjects }) => {
-  const goals = computeEffectiveGoals(questionTracking);
-  const targets = computeDailyTargets(questionTracking);
-  const feedback = computeFeedback(questionTracking);
+  const goals = computeEffectiveGoals(questionTracking, coreSubjects);
+  const targets = computeDailyTargets(questionTracking, coreSubjects);
+  const feedback = computeFeedback(questionTracking, coreSubjects);
 
   if (goals.activeSubjects.length === 0) return null;
 
@@ -27,7 +27,7 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme, coreSubj
   return (
     <>
       {/* Today's Target */}
-      <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <h3 className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           To stay on track today
         </h3>
@@ -48,7 +48,7 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme, coreSubj
             const val = targets[s];
             if (val === null || val === undefined) return null;
             return (
-              <div key={s} className={`flex-1 max-w-[140px] p-4 rounded-xl border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+              <div key={s} className={`flex-1 max-w-[140px] p-4 rounded-lg border text-center ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
                 <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{s.substring(0, 4)}</p>
                 <p className="text-lg num-stat">{val}</p>
               </div>
@@ -66,7 +66,7 @@ const TodayTargetSection: React.FC<Props> = ({ questionTracking, theme, coreSubj
 
       {/* Adaptive Feedback */}
       {feedback && (
-        <section className={`p-5 md:p-6 rounded-2xl border transition-all ${feedbackColors[feedback.status].bg}`}>
+        <section className={`p-5 md:p-6 rounded-xl border transition-all ${feedbackColors[feedback.status].bg}`}>
           <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${feedbackColors[feedback.status].dot}`} />
             <p className={`text-[11px] font-bold uppercase tracking-tight ${feedbackColors[feedback.status].text}`}>

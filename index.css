@@ -1,7 +1,7 @@
 /* ── LOCK IN — Premium Design System ── */
 
 :root {
-  /* ── Color Tokens ── */
+  /* ── Color Tokens — Dark (secondary theme, unchanged) ── */
   --bg-base: #0B0B0D;
   --bg-elevated: #111114;
   --bg-surface: #161619;
@@ -10,22 +10,30 @@
   --text-primary: #FAFAFA;
   --text-secondary: #71717A;
   --text-tertiary: #52525B;
+
+  /* ── Color Tokens — Light (default theme) — warm paper, not stark white ── */
+  --bg-base-light: #F2F0EC;
+  --bg-elevated-light: #FFFFFF;
+  --border-light: #E3E0D9;
+  --text-primary-light: #17150F;
+  --text-secondary-light: #6B675C;
+
   --accent: #E10600;
   --accent-subtle: rgba(225, 6, 0, 0.08);
   --transition-fast: 120ms ease;
   --transition-default: 200ms ease;
   --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ── Typography Tokens ── */
-  --font-display: 'Anton', sans-serif;
+  /* ── Typography Tokens — three deliberate roles ── */
   --font-ui: 'Satoshi', system-ui, sans-serif;
+  --font-display: 'Satoshi', system-ui, sans-serif;
   --font-accent: 'Playfair Display', serif;
-  --font-timer: 'Averia Serif Libre', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
-/* ── Background depth ── */
+/* ── Background — flat warm paper, matches the light default ── */
 body {
-  background: linear-gradient(180deg, #101014 0%, #0B0B0D 40%, #09090B 100%);
+  background: #F2F0EC;
   min-height: 100vh;
 }
 
@@ -57,48 +65,6 @@ button:active,
   background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* ── Timer active background — premium grainy gradient ── */
-.timer-active-bg {
-  background: radial-gradient(
-    ellipse 80% 70% at 50% 45%,
-    #18181B 0%,
-    #121214 40%,
-    #0C0C0E 70%,
-    #09090B 100%
-  );
-  border-color: rgba(255, 255, 255, 0.04) !important;
-}
-
-/* Red ambient glow — soft, blurred, behind content */
-.timer-active-bg::before {
-  content: "";
-  position: absolute;
-  inset: -20%;
-  background: radial-gradient(
-    circle at 50% 40%,
-    rgba(225, 6, 0, 0.08) 0%,
-    rgba(225, 6, 0, 0.03) 35%,
-    transparent 65%
-  );
-  filter: blur(40px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Grain overlay — visible but refined */
-.timer-active-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.10;
-  pointer-events: none;
-  z-index: 1;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 200px 200px;
-  mix-blend-mode: soft-light;
-}
-
 /* ── Refined thin accent — signature underline ── */
 .accent-line {
   width: 32px;
@@ -118,17 +84,16 @@ button:active,
    TYPOGRAPHY SYSTEM
    ══════════════════════════════════════════ */
 
-/* ── ANTON: Display font ──
-   Use ONLY for: logo, large hero numbers, timers, key stats
-   NEVER for: paragraphs, buttons, labels, small UI text */
+/* ── SATOSHI (bold/black weight): display role ──
+   Use for: logo, large hero numbers, key stats, big headlines.
+   Casing follows the copy itself — no forced uppercase here;
+   reserve uppercase for small functional labels instead. */
 
 .font-display {
   font-family: var(--font-display);
-  font-weight: 400;
-  /* Anton only has 400 */
+  font-weight: 800;
   font-style: normal;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
 /* ── SATOSHI: Primary UI font ──
@@ -138,49 +103,60 @@ button:active,
   font-family: var(--font-ui);
 }
 
-/* ── PLAYFAIR DISPLAY: Accent font ──
-   Use sparingly for: brand moments, taglines, occasional headings */
+/* ── PLAYFAIR DISPLAY ITALIC: emphasis accent ──
+   Use for exactly one emphasized word or short phrase per headline/body
+   moment. Never for the wordmark or functional UI chrome. */
 
 .font-accent {
   font-family: var(--font-accent);
+  font-style: italic;
 }
 
 /* ── Hero numbers — large stat displays ── */
 .num-hero {
   font-family: var(--font-display);
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-
-  line-height: 0.85;
-  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
 }
 
-/* ── Timer display — distinct clock feel ── */
+/* ── Timer display — monospace data readout, stable digit width ── */
 .num-timer {
-  font-family: var(--font-timer);
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+  letter-spacing: 0em;
   line-height: 1;
 }
 
 /* ── Stat numbers — medium-sized numerical displays ── */
 .num-stat {
   font-family: var(--font-display);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0em;
+  letter-spacing: -0.01em;
   line-height: 1;
+}
+
+/* ── IBM PLEX MONO: small data headings & labels ──
+   Use for: eyebrow labels, section micro-headings, stat unit tags,
+   timestamps — anything that reads as data rather than prose. */
+.font-data {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 /* ── Logo ── */
 .logo-text {
-  font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 /* ══════════════════════════════════════════
-   SCROLLBAR
+   SCROLLBAR — neutral, works on both themes
    ══════════════════════════════════════════ */
 
 ::-webkit-scrollbar {
@@ -192,12 +168,12 @@ button:active,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(120, 113, 98, 0.35);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(120, 113, 98, 0.55);
 }
 
 /* ── Selection ── */
