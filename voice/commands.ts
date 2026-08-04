@@ -105,7 +105,7 @@ const findTab = (tokens: string[]): TabType | null => {
 const FILLER = new Set([
   'the', 'a', 'an', 'my', 'me', 'to', 'on', 'in', 'for', 'with', 'now',
   'please', 'session', 'sessions', 'timer', 'study', 'studying', 'studies',
-  'focus', 'focusing', 'work', 'working', 'up', 'it', 'lock', 'and', 'let', 's',
+  'focus', 'focusing', 'work', 'working', 'up', 'it', 'and', 'let', 's',
   'go', 'open', 'show', 'switch', 'take', 'tab', 'page',
 ]);
 

@@ -22,10 +22,6 @@ export const getCoreQSubjects = (preference: ExamPreference = 'JEE'): ('physics'
     : ['physics', 'chemistry', 'math'];
 };
 
-/* A stopwatch session has to run this long before it can be ended and logged.
-   Shared so the timer UI and the voice command enforce the same floor. */
-export const REQUIRED_FOCUS_MS = 15 * 60 * 1000;
-
 export const LOCK_IN_QUOTES = [
   "THE COMPETITION IS STUDYING. ARE YOU?",
   "ONE CHAPTER TODAY. ONE RANK TOMORROW.",

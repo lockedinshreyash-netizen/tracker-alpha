@@ -55,8 +55,6 @@ export interface TimerState {
   startTime: number | null;
   accumulatedMs: number;
   subject: Subject;
-  isLockInActive: boolean;
-  distractions: number;
 }
 
 export type TimerMode = 'stopwatch' | 'pomodoro';
@@ -91,7 +89,6 @@ export interface AppState {
   progress: ChapterProgress[];
   lastUsedTab: TabType;
   timer: TimerState;
-  isLockInModeEnabled: boolean;
   tasks: Task[];
   theme?: 'dark' | 'light';
   dailyGoalHours: number;

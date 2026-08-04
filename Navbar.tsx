@@ -4,12 +4,10 @@ import { TabType } from './types';
 interface Props {
   activeTab: TabType;
   onTabChange: (t: TabType) => void;
-  isLockInActive: boolean;
   theme: 'dark' | 'light';
 }
 
-const Navbar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, theme }) => {
-  if (isLockInActive) return null;
+const Navbar: React.FC<Props> = ({ activeTab, onTabChange, theme }) => {
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Review'];
   return (
     <div className={`fixed bottom-0 left-0 right-0 border-t z-50 transition-colors ${theme === 'dark' ? 'bg-[#0B0B0D]/90 backdrop-blur-xl border-white/[0.04]' : 'bg-white/90 backdrop-blur-md border-[#E3E0D9]'}`}>

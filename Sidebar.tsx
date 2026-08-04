@@ -4,7 +4,6 @@ import { TabType } from './types';
 interface Props {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
-  isLockInActive: boolean;
   theme: 'dark' | 'light';
 }
 
@@ -53,11 +52,9 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, isLockInActive, theme }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  if (isLockInActive) return null;
 
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Review'];
   const dark = theme === 'dark';

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppState, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
-import { REQUIRED_FOCUS_MS } from '../constants';
 import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
 
@@ -77,8 +76,8 @@ const TodayTab: React.FC<Props> = ({
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
     const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, currentTimer.distractions || 0);
-    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, distractions: 0 });
+    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0);
+    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0 });
   };
 
   const formatTime = (ms: number) => {
@@ -96,9 +95,6 @@ const TodayTab: React.FC<Props> = ({
   const totalToday = todayLogs.reduce((a, b) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
   const subjectDist = getSubjectDistribution(logs, activeSubjects);
-
-  const canEndSession = currentDisplayMs >= REQUIRED_FOCUS_MS;
-  const timeRemainingToEnd = Math.max(0, REQUIRED_FOCUS_MS - currentDisplayMs);
 
   const dark = theme === 'dark';
   const isPomodoro = timerMode === 'pomodoro';
@@ -201,15 +197,6 @@ const TodayTab: React.FC<Props> = ({
                 >
                   START SESSION
                 </button>
-
-                {/* Lock-In is being rebuilt — the old version only detected
-                    fullscreen exits and failed outright on iOS. */}
-                <div
-                  aria-disabled="true"
-                  className={`text-[9px] font-bold uppercase tracking-[0.1em] px-8 py-2.5 rounded-full border select-none cursor-default ${dark ? 'border-white/[0.06] text-zinc-700' : 'border-[#E3E0D9] text-[#B5AFA0]'}`}
-                >
-                  🔒 Lock-in — coming soon
-                </div>
               </div>
             </>
           ) : (
@@ -223,11 +210,10 @@ const TodayTab: React.FC<Props> = ({
                 </div>
               </div>
               <button
-                disabled={!canEndSession}
                 onClick={handleStopTimer}
-                className={`w-full max-w-xs py-6 font-black uppercase tracking-[0.4em] transition-all active:scale-[0.98] rounded-xl font-ui ${canEndSession ? 'bg-[#E10600] text-white hover:bg-red-700' : (dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed')}`}
+                className="w-full max-w-xs py-6 font-black uppercase tracking-[0.4em] transition-all active:scale-[0.98] rounded-xl font-ui bg-[#E10600] text-white hover:bg-red-700"
               >
-                {canEndSession ? 'END SESSION' : `LOCK-OUT: ${formatTime(timeRemainingToEnd)}`}
+                END SESSION
               </button>
             </div>
           )}

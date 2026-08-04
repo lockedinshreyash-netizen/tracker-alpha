@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings } from './types';
-import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, REQUIRED_FOCUS_MS } from './constants';
+import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
 import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS } from './state';
@@ -17,7 +17,7 @@ import ReviewTab from './review/ReviewTab';
 import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
-import { PHASE_LABEL, formatCountdown, phaseDurationMs } from './today/pomodoro';
+import { PHASE_LABEL, phaseDurationMs } from './today/pomodoro';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -445,11 +445,8 @@ const App: React.FC = () => {
      a running timer hides the goal card the tour needs to point at, and a
      few seconds started mid-tour isn't real study data worth keeping. */
   const discardActiveSession = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => { /* already exited */ });
-    }
     setState(prev => {
-      if (!prev.timer.isRunning && !prev.timer.accumulatedMs && !prev.timer.isLockInActive) {
+      if (!prev.timer.isRunning && !prev.timer.accumulatedMs) {
         return prev;
       }
       const nextState = {
@@ -459,8 +456,6 @@ const App: React.FC = () => {
           isRunning: false,
           startTime: null,
           accumulatedMs: 0,
-          isLockInActive: false,
-          distractions: 0,
         },
       };
       stateRef.current = nextState;
@@ -605,13 +600,9 @@ const App: React.FC = () => {
         const t = current.timer;
         if (!t.isRunning && !t.accumulatedMs) return { ok: false, message: 'NOTHING RUNNING.' };
         const elapsedMs = (t.isRunning ? Date.now() - (t.startTime || Date.now()) : 0) + t.accumulatedMs;
-        // Voice gets no shortcut past the focus floor the button enforces.
-        if (elapsedMs < REQUIRED_FOCUS_MS) {
-          return { ok: false, message: `LOCK-OUT: ${formatCountdown(REQUIRED_FOCUS_MS - elapsedMs)} LEFT.` };
-        }
         const hours = elapsedMs / (1000 * 60 * 60);
-        logStudy(t.subject, hours, VOICE_QUALITY, t.distractions || 0);
-        updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0, distractions: 0 });
+        logStudy(t.subject, hours, VOICE_QUALITY, 0);
+        updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0 });
         return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
       }
 
@@ -645,7 +636,6 @@ const App: React.FC = () => {
   const daysRemaining = getDaysRemaining(targetExamDate);
   const streakCount = calculateStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
-  const isCurrentlyLockInActive = state.timer.isLockInActive;
 
   /* Onboarding waits on: the landing page being dismissed, the auth modal
      being closed (so it can't cover a sign-up the user just started), and the
@@ -671,10 +661,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${isCurrentlyLockInActive ? 'bg-black' : (theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-[#F2F0EC] text-[#17150F]')}`}>
-      {!isCurrentlyLockInActive && (
-        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isLockInActive={isCurrentlyLockInActive} theme={theme} />
-      )}
+    <div className={`min-h-screen relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-[#F2F0EC] text-[#17150F]'}`}>
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} theme={theme} />
 
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -687,26 +675,24 @@ const App: React.FC = () => {
         }}
       />
 
-      <div className={`transition-all duration-300 ${isCurrentlyLockInActive ? '' : 'md:ml-[200px] pt-14 md:pt-0'}`}>
-        {!isCurrentlyLockInActive && (
-          <Header
-            currentClass={state.currentClass}
-            onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
-            daysRemaining={daysRemaining}
-            theme={theme}
-            onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-            installPrompt={null}
-            onInstall={() => { }}
-            syncStatus={syncStatus}
-            user={user}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-            logs={state.logs}
-            examPreference={state.examPreference || 'JEE'}
-            targetExamDate={targetExamDate}
-          />
-        )}
+      <div className="transition-all duration-300 md:ml-[200px] pt-14 md:pt-0">
+        <Header
+          currentClass={state.currentClass}
+          onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
+          daysRemaining={daysRemaining}
+          theme={theme}
+          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
+          installPrompt={null}
+          onInstall={() => { }}
+          syncStatus={syncStatus}
+          user={user}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          logs={state.logs}
+          examPreference={state.examPreference || 'JEE'}
+          targetExamDate={targetExamDate}
+        />
 
-        <main className={`max-w-5xl mx-auto w-full relative z-20 ${isCurrentlyLockInActive ? 'p-0' : 'px-4 md:px-6 py-8 pb-16'}`}>
+        <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
           {activeTab === 'Today' && (
             <TodayTab
               state={state}
@@ -725,7 +711,7 @@ const App: React.FC = () => {
               activeSubjects={activeSubjects}
             />
           )}
-          {!isCurrentlyLockInActive && activeTab === 'Syllabus' && (
+          {activeTab === 'Syllabus' && (
             <SyllabusTab
               currentClass={state.currentClass}
               progress={state.progress}
@@ -734,8 +720,8 @@ const App: React.FC = () => {
               activeSubjects={activeSubjects}
             />
           )}
-          {!isCurrentlyLockInActive && activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} coreSubjects={coreQSubjects} activeSubjects={activeSubjects} />}
-          {!isCurrentlyLockInActive && activeTab === 'Questions' && (
+          {activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} coreSubjects={coreQSubjects} activeSubjects={activeSubjects} />}
+          {activeTab === 'Questions' && (
             <QuestionsTab
               questionTracking={state.questionTracking}
               onUpdateTracking={updateQuestionTracking}
@@ -744,7 +730,7 @@ const App: React.FC = () => {
               coreSubjects={coreQSubjects}
             />
           )}
-          {!isCurrentlyLockInActive && activeTab === 'Review' && (
+          {activeTab === 'Review' && (
             <ReviewTab
               logs={state.logs}
               score={lockInScore}
@@ -764,7 +750,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Kept out of the way of the tour's spotlight and of Lock-In. */}
-      {!isCurrentlyLockInActive && !showOnboarding && (
+      {!showOnboarding && (
         <VoiceControl theme={theme} onCommand={executeVoiceCommand} />
       )}
 

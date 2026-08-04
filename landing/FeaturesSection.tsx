@@ -19,8 +19,8 @@ const features = [
     desc: 'Mark chapters as in-progress, completed, or revision-pending. Know what is left before March decides it for you.',
   },
   {
-    title: 'Lock-in mode',
-    desc: 'Forces fullscreen. Detects tab switches. Logs distractions. Every breach is recorded. This is the one people are scared of.',
+    title: 'Pomodoro blocks',
+    desc: 'Twenty-five minutes of work, then a break you have to start yourself. Every finished block gets logged and rated. No block, no credit.',
   },
   {
     title: 'Cloud sync',
