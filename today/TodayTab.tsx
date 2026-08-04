@@ -85,6 +85,16 @@ const TodayTab: React.FC<Props> = ({
     }
   }, [timer.isLockInActive]);
 
+  /* Starting a session swaps in a much taller timer panel and removes the
+     goal card above it, so whatever the user was scrolled to is no longer
+     where they left it. Snap back to the top so the running timer is what
+     they actually see. */
+  useEffect(() => {
+    if (!timer.isRunning) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, [timer.isRunning]);
+
   useEffect(() => {
     let interval: number;
     if (wipeHoldStart !== null) {
@@ -240,7 +250,7 @@ const TodayTab: React.FC<Props> = ({
     <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {!timer.isRunning && (
         <section className={`p-6 md:p-10 rounded-xl border flex flex-col gap-8 md:gap-10 transition-all ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
-          <div className="flex flex-row gap-6 md:gap-10 items-center w-full">
+          <div className="flex flex-row gap-6 md:gap-10 items-center w-full" data-onboarding-target="daily-target">
             <div className="relative w-20 h-20 md:w-32 md:h-32 flex-shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className={theme === 'dark' ? 'text-zinc-900' : 'text-[#F2F0EC]'} />
@@ -274,7 +284,10 @@ const TodayTab: React.FC<Props> = ({
         </section>
       )}
 
-      <section className={`p-10 md:p-20 text-center rounded-xl border relative overflow-hidden transition-all ${theme === 'dark' ? 'bg-[#111114]' : 'bg-white'} ${timer.isRunning ? 'border-[#E10600]/30' : (theme === 'dark' ? 'border-white/[0.06]' : 'border-[#E3E0D9]')}`}>
+      <section
+        data-onboarding-target="session-timer"
+        className={`p-10 md:p-20 text-center rounded-xl border relative overflow-hidden transition-all ${theme === 'dark' ? 'bg-[#111114]' : 'bg-white'} ${timer.isRunning ? 'border-[#E10600]/30' : (theme === 'dark' ? 'border-white/[0.06]' : 'border-[#E3E0D9]')}`}
+      >
         {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
         <p className={`text-[10px] uppercase font-bold tracking-[0.06em] mb-10 font-ui relative z-10 ${theme === 'dark' ? 'text-zinc-500' : 'text-[#8A8577]'}`}>{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
         <p className="text-[14vw] md:text-8xl tabular-nums leading-none num-timer relative z-10">{formatTime(currentDisplayMs)}</p>

@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { ExamPreference } from './types';
 import { supabase } from './supabaseClient';
-import { PENDING_EXAM_PREF_KEY } from './state';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   theme: 'dark' | 'light';
-  onAuthSuccess: (examPref?: ExamPreference) => void;
+  onAuthSuccess: () => void;
 }
 
 const GoogleMark = () => (
@@ -28,7 +26,6 @@ const AuthModal: React.FC<Props> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [examPref, setExamPref] = useState<ExamPreference>('JEE');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +35,6 @@ const AuthModal: React.FC<Props> = ({
     setGoogleLoading(true);
     setError(null);
     try {
-      // Parked for after the redirect; only applied to brand-new accounts.
-      localStorage.setItem(PENDING_EXAM_PREF_KEY, examPref);
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin },
@@ -48,7 +42,6 @@ const AuthModal: React.FC<Props> = ({
       if (error) throw error;
       // On success the browser navigates to Google — nothing after this runs.
     } catch (err: any) {
-      localStorage.removeItem(PENDING_EXAM_PREF_KEY);
       setError(err.message || 'Could not reach Google. Try again.');
       setGoogleLoading(false);
     }
@@ -76,30 +69,6 @@ const AuthModal: React.FC<Props> = ({
 
         {error && <p className="text-[11px] font-bold text-red-500">{error}</p>}
         {successMsg && <p className="text-[11px] font-bold text-green-500">{successMsg}</p>}
-
-        {/* Exam target — shown in both modes because a Google sign-in can create
-            a new account from either one, and a NEET student must not silently
-            land on the JEE subject set. Ignored for accounts that already exist. */}
-        <div>
-          <div className={`w-full rounded-md px-3 py-2 border flex justify-between items-center ${theme === 'dark' ? 'bg-[#18181b] border-[#27272a]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}>
-            <span className={`text-[10px] font-black uppercase tracking-wide ${theme === 'dark' ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Exam Target</span>
-            <div className="flex gap-2">
-              {(['JEE', 'NEET'] as const).map(e => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setExamPref(e)}
-                  className={`px-3 py-1 text-[10px] font-bold rounded ${examPref === e ? 'bg-[#E10600] text-white' : (theme === 'dark' ? 'bg-[#27272a] text-zinc-400' : 'bg-[#E3E0D9] text-[#6B675C]')}`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className={`text-[9px] font-medium mt-1.5 px-1 ${theme === 'dark' ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}>
-            Only used when creating a new account. Switchable later.
-          </p>
-        </div>
 
         {/* Google */}
         <button
@@ -158,10 +127,10 @@ const AuthModal: React.FC<Props> = ({
                   onAuthSuccess();
                   onClose();
                 } else {
-                  const { error } = await supabase.auth.signUp({ email, password, options: { data: { examPreference: examPref } } });
+                  const { error } = await supabase.auth.signUp({ email, password });
                   if (error) throw error;
                   setSuccessMsg('Check your email to confirm your account.');
-                  onAuthSuccess(examPref);
+                  onAuthSuccess();
                   // Keep the modal open so the confirmation message above is actually seen —
                   // the user dismisses it manually via Close.
                 }

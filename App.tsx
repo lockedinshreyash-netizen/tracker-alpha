@@ -4,7 +4,7 @@ import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject,
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, PENDING_EXAM_PREF_KEY } from './state';
+import { DEFAULT_STATE } from './state';
 import QuestionsTab from './questions/QuestionsTab';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
@@ -14,6 +14,9 @@ import TodayTab from './today/TodayTab';
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
+import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
+
+const ONBOARDING_KEY = 'onboarding_complete';
 
 // --- Main App Component ---
 
@@ -63,6 +66,18 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
   const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(ONBOARDING_KEY) !== 'true';
+    } catch {
+      return false;
+    }
+  });
+  /* Onboarding pre-fills from live state, so for a signed-in user it must not
+     mount until the cloud pull has landed — otherwise it would show defaults
+     and could overwrite real saved settings. isInitialSyncDone is a ref (no
+     re-render), hence this companion state flag. */
+  const [syncSettled, setSyncSettled] = useState(false);
 
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
@@ -90,6 +105,8 @@ const App: React.FC = () => {
         setShowLanding(false);
       } else {
         setShowLanding(!hasVisited);
+        // Local-only session: there is no cloud pull to wait for.
+        setSyncSettled(true);
       }
     });
 
@@ -143,11 +160,11 @@ const App: React.FC = () => {
   }, [user]);
 
   const handleInitialSync = async (userId: string) => {
-    if (isInitialSyncDone.current) return;
+    if (isInitialSyncDone.current) {
+      setSyncSettled(true);
+      return;
+    }
     setSyncStatus('syncing');
-    // Exam target picked before an OAuth redirect, which the modal callback
-    // can't carry across a full page navigation.
-    const pendingPref = localStorage.getItem(PENDING_EXAM_PREF_KEY);
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -199,11 +216,6 @@ const App: React.FC = () => {
             theme: localState.theme,
           };
         });
-      } else if (pendingPref === 'JEE' || pendingPref === 'NEET') {
-        // No cloud profile yet — this account is brand new, so honour the exam
-        // target chosen before the OAuth redirect. Existing accounts skip this
-        // entirely, so a returning user's saved preference is never overwritten.
-        setState(prev => ({ ...prev, examPreference: pendingPref, lastUpdated: Date.now() }));
       }
       isInitialSyncDone.current = true;
       setSyncStatus('synced');
@@ -211,7 +223,8 @@ const App: React.FC = () => {
       console.error('Initial Sync Error:', err);
       setSyncStatus('error');
     } finally {
-      localStorage.removeItem(PENDING_EXAM_PREF_KEY);
+      // Settle either way — a failed pull must not leave onboarding stuck.
+      setSyncSettled(true);
       setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
     }
   };
@@ -263,7 +276,6 @@ const App: React.FC = () => {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         });
         localStorage.removeItem('locked_in_state_v2');
-        localStorage.removeItem(PENDING_EXAM_PREF_KEY);
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -284,6 +296,30 @@ const App: React.FC = () => {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
+  };
+
+  /* Written once, when the calibration act completes. Skipping writes nothing. */
+  const applyOnboardingSettings = (s: OnboardingSettings) => {
+    setState(prev => {
+      const next = {
+        ...prev,
+        examPreference: s.examPreference,
+        currentClass: s.currentClass,
+        dailyGoalHours: s.dailyGoalHours,
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  const completeOnboarding = () => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, 'true');
+    } catch {
+      // Hardened browser modes can refuse writes; the session flag below still applies.
+    }
+    setNeedsOnboarding(false);
   };
 
   const logStudy = (subject: Subject, hours: number, quality: number, distractions: number) => {
@@ -338,6 +374,33 @@ const App: React.FC = () => {
   const updateTimer = (timerUpdate: Partial<TimerState>) => {
     setState(prev => {
       const nextState = { ...prev, timer: { ...prev.timer!, ...timerUpdate } };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /* Throw away an in-progress session without logging it. Used by onboarding:
+     a running timer hides the goal card the tour needs to point at, and a
+     few seconds started mid-tour isn't real study data worth keeping. */
+  const discardActiveSession = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => { /* already exited */ });
+    }
+    setState(prev => {
+      if (!prev.timer.isRunning && !prev.timer.accumulatedMs && !prev.timer.isLockInActive) {
+        return prev;
+      }
+      const nextState = {
+        ...prev,
+        timer: {
+          ...prev.timer,
+          isRunning: false,
+          startTime: null,
+          accumulatedMs: 0,
+          isLockInActive: false,
+          distractions: 0,
+        },
+      };
       stateRef.current = nextState;
       return nextState;
     });
@@ -438,6 +501,12 @@ const App: React.FC = () => {
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
   const isCurrentlyLockInActive = state.timer.isLockInActive;
 
+  /* Onboarding waits on: the landing page being dismissed, the auth modal
+     being closed (so it can't cover a sign-up the user just started), and the
+     cloud pull having settled so pre-filled values are the user's real ones. */
+  const showOnboarding =
+    showLanding === false && needsOnboarding && syncSettled && !isAuthModalOpen;
+
   // While checking session, show nothing (prevents flash)
   if (showLanding === null) {
     return <div style={{ background: theme === 'dark' ? '#0B0B0D' : '#F2F0EC', width: '100vw', height: '100vh' }} />;
@@ -465,9 +534,9 @@ const App: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         theme={theme}
-        onAuthSuccess={(examPref?: ExamPreference) => {
-          if (examPref) setState(p => ({ ...p, examPreference: examPref }));
+        onAuthSuccess={() => {
           isInitialSyncDone.current = false;
+          setSyncSettled(false);
           setSyncStatus('syncing');
         }}
       />
@@ -544,6 +613,20 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {showOnboarding && (
+        <OnboardingFlow
+          initial={{
+            examPreference: state.examPreference || 'JEE',
+            currentClass: state.currentClass,
+            dailyGoalHours: state.dailyGoalHours,
+          }}
+          onApplySettings={applyOnboardingSettings}
+          onNavigateToToday={() => handleTabChange('Today')}
+          onDiscardSession={discardActiveSession}
+          onComplete={completeOnboarding}
+        />
+      )}
     </div>
   );
 };

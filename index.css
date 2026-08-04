@@ -157,6 +157,109 @@ button:active,
 }
 
 /* ══════════════════════════════════════════
+   ONBOARDING — cinematic sequence
+   Hand-rolled because the `animate-in` utilities used elsewhere come from
+   the tailwindcss-animate plugin, which the Tailwind CDN does not load.
+   ══════════════════════════════════════════ */
+
+@keyframes onb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes onb-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* The stage spotlight igniting: a hard flare, a small settle, then steady. */
+@keyframes onb-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  38% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  62% {
+    opacity: 0.92;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.onb-rise {
+  opacity: 0;
+  animation: onb-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.onb-fade {
+  opacity: 0;
+  animation: onb-fade 700ms ease forwards;
+}
+
+/* Light pool. Sized/positioned by the component via --onb-x / --onb-y /
+   --onb-size so the same treatment serves the Act 1 wordmark and the
+   Act 3 element highlights. */
+.onb-spotlight {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle var(--onb-size, 420px) at var(--onb-x, 50%) var(--onb-y, 50%),
+    rgba(255, 255, 255, 0.13) 0%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(0, 0, 0, 0) 72%
+  );
+}
+
+/* `both` (not `forwards`) so the 0% state applies before the animation
+   starts — otherwise the pool flashes at full brightness for one frame. */
+.onb-spotlight-ignite {
+  animation: onb-ignite 1150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: var(--onb-x, 50%) var(--onb-y, 50%);
+}
+
+/* Vignette that darkens everything outside the pool. */
+.onb-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle var(--onb-size, 420px) at var(--onb-x, 50%) var(--onb-y, 50%),
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.55) 58%,
+    rgba(0, 0, 0, 0.88) 100%
+  );
+}
+
+/* Respect reduced-motion: everything arrives at its final state instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .onb-rise,
+  .onb-fade {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .onb-spotlight-ignite {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ══════════════════════════════════════════
    SCROLLBAR — neutral, works on both themes
    ══════════════════════════════════════════ */
 
