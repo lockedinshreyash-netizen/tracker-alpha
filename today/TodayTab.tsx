@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppState, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
+import { REQUIRED_FOCUS_MS } from '../constants';
 import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
 
@@ -43,8 +44,6 @@ const TodayTab: React.FC<Props> = ({
 
   const timerRef = useRef(timer);
   useEffect(() => { timerRef.current = timer; }, [timer]);
-
-  const REQUIRED_FOCUS_MS = 15 * 60 * 1000;
 
   const [currentDisplayMs, setCurrentDisplayMs] = useState(0);
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings } from './types';
-import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE } from './constants';
+import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, REQUIRED_FOCUS_MS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
 import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS } from './state';
@@ -15,8 +15,15 @@ import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
 import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
+import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
+import { VoiceIntent, toQSubject } from './voice/commands';
+import { PHASE_LABEL, formatCountdown, phaseDurationMs } from './today/pomodoro';
 
 const ONBOARDING_KEY = 'onboarding_complete';
+
+/* Ending a session by voice can't stop to ask for a focus rating, so it logs
+   at the same neutral 4 the Pomodoro pending-block flush uses. */
+const VOICE_QUALITY = 4;
 
 // --- Main App Component ---
 
@@ -550,6 +557,90 @@ const App: React.FC = () => {
     }
   };
 
+  /* ── Voice commands ──
+     The parser is pure and exam-agnostic, so every check that depends on live
+     state — which subjects are active, what's already running, the focus floor
+     — happens here. Reads go through stateRef so a command fired moments after
+     another still sees the result of the first. */
+  const executeVoiceCommand = (intent: VoiceIntent): VoiceFeedback => {
+    const current = stateRef.current;
+    const exam = current.examPreference || 'JEE';
+
+    switch (intent.kind) {
+      case 'navigate':
+        handleTabChange(intent.tab);
+        return { ok: true, message: `OPENED ${intent.tab.toUpperCase()}.` };
+
+      case 'startSession': {
+        if (intent.subject && !activeSubjects.includes(intent.subject)) {
+          return { ok: false, message: `${intent.subject.toUpperCase()} ISN'T IN YOUR ${exam} TRACK.` };
+        }
+        handleTabChange('Today');
+
+        if (current.timerMode === 'pomodoro') {
+          if (current.pomodoro.isRunning) return { ok: false, message: 'A BLOCK IS ALREADY RUNNING.' };
+          const phase = current.pomodoro.phase;
+          updatePomodoro({
+            // The subject only means anything for a work block.
+            ...(phase === 'work' && intent.subject ? { subject: intent.subject } : {}),
+            isRunning: true,
+            phaseEndsAt: Date.now() + phaseDurationMs(phase, current.pomodoroSettings),
+          });
+          return { ok: true, message: `${PHASE_LABEL[phase].toUpperCase()} STARTED.` };
+        }
+
+        if (current.timer.isRunning) return { ok: false, message: 'SESSION ALREADY RUNNING.' };
+        const subject = intent.subject ?? current.timer.subject;
+        updateTimer({ isRunning: true, startTime: Date.now(), subject });
+        return { ok: true, message: `SESSION LIVE: ${subject.toUpperCase()}.` };
+      }
+
+      case 'endSession': {
+        if (current.timerMode === 'pomodoro') {
+          if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
+          updatePomodoro({ isRunning: false, phaseEndsAt: null });
+          return { ok: true, message: 'BLOCK ABANDONED. NOTHING LOGGED.' };
+        }
+
+        const t = current.timer;
+        if (!t.isRunning && !t.accumulatedMs) return { ok: false, message: 'NOTHING RUNNING.' };
+        const elapsedMs = (t.isRunning ? Date.now() - (t.startTime || Date.now()) : 0) + t.accumulatedMs;
+        // Voice gets no shortcut past the focus floor the button enforces.
+        if (elapsedMs < REQUIRED_FOCUS_MS) {
+          return { ok: false, message: `LOCK-OUT: ${formatCountdown(REQUIRED_FOCUS_MS - elapsedMs)} LEFT.` };
+        }
+        const hours = elapsedMs / (1000 * 60 * 60);
+        logStudy(t.subject, hours, VOICE_QUALITY, t.distractions || 0);
+        updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0, distractions: 0 });
+        return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
+      }
+
+      case 'addTask': {
+        const subject = activeSubjects.includes(intent.subject) ? intent.subject : 'General';
+        addTask(intent.text, subject);
+        return { ok: true, message: `TASK ADDED: ${intent.text.toUpperCase().slice(0, 32)}` };
+      }
+
+      case 'logQuestions': {
+        const qSubject = toQSubject(intent.subject);
+        if (!qSubject || !coreQSubjects.includes(qSubject)) {
+          return { ok: false, message: `${intent.subject.toUpperCase()} ISN'T TRACKED FOR QUESTIONS IN ${exam}.` };
+        }
+        logQuestions(qSubject, intent.count);
+        return { ok: true, message: `+${intent.count} ${intent.subject.toUpperCase()} QUESTIONS.` };
+      }
+
+      case 'setGoal': {
+        const hours = Math.min(24, Math.max(1, Math.round(intent.hours)));
+        updateDailyGoal(hours);
+        return { ok: true, message: `DAILY TARGET: ${hours}H.` };
+      }
+
+      default:
+        return { ok: false, message: 'UNKNOWN COMMAND.' };
+    }
+  };
+
   const targetExamDate = state.examPreference === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE;
   const daysRemaining = getDaysRemaining(targetExamDate);
   const streakCount = calculateStreak(state.logs);
@@ -671,6 +762,11 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Kept out of the way of the tour's spotlight and of Lock-In. */}
+      {!isCurrentlyLockInActive && !showOnboarding && (
+        <VoiceControl theme={theme} onCommand={executeVoiceCommand} />
+      )}
 
       {showOnboarding && (
         <OnboardingFlow
