@@ -4,7 +4,7 @@ import { JEE_2027_DATE, NEET_2027_DATE } from '../constants';
 import { getDaysRemaining } from '../utils';
 import { ACCENT, INK_DEEP, MICRO_LABEL, PAPER, TYPE } from '../landing/tokens';
 import Spotlight from './Spotlight';
-import * as sfx from './audio';
+import * as sfx from '../audio';
 
 /* Settings the flow can change. Applied in one write when calibration
    finishes — never per-screen, so abandoning midway changes nothing. */

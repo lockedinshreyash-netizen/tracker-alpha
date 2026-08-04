@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE } from './state';
+import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS } from './state';
 import QuestionsTab from './questions/QuestionsTab';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
@@ -53,7 +53,14 @@ const App: React.FC = () => {
            }
         }
 
-        return { ...DEFAULT_STATE, ...parsed };
+        /* Pomodoro arrived after these users already had saved state. The
+           top-level spread below covers a missing key, but not a partially
+           shaped one, so merge the nested objects field by field. */
+        const merged: AppState = { ...DEFAULT_STATE, ...parsed };
+        merged.pomodoroSettings = { ...DEFAULT_POMODORO_SETTINGS, ...(parsed.pomodoroSettings || {}) };
+        merged.pomodoro = { ...IDLE_POMODORO, ...(parsed.pomodoro || {}) };
+        merged.timerMode = parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch';
+        return merged;
       } catch (e) {
         return DEFAULT_STATE;
       }
@@ -379,6 +386,54 @@ const App: React.FC = () => {
     });
   };
 
+  const setTimerMode = (mode: TimerMode) => {
+    setState(prev => {
+      const nextState = { ...prev, timerMode: mode, lastUpdated: Date.now() };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const updatePomodoro = (update: Partial<PomodoroRuntime>) => {
+    setState(prev => {
+      const nextState = { ...prev, pomodoro: { ...prev.pomodoro, ...update } };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const updatePomodoroSettings = (update: Partial<PomodoroSettings>) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        pomodoroSettings: { ...prev.pomodoroSettings, ...update },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /* A completed Pomodoro block goes through the same logging path as a
+     stopwatch session, so hours, streaks, the heatmap and the Lock-In Score
+     all pick it up with no special-casing. */
+  const logPomodoroBlock = (subject: Subject, hours: number, quality: number) => {
+    logStudy(subject, hours, quality, 0);
+  };
+
+  /* If the tab was closed between finishing a block and rating it, that block
+     is still parked in pendingBlock. Flush it at a neutral quality on the next
+     load so completed study time is never silently lost. */
+  const pendingFlushDone = useRef(false);
+  useEffect(() => {
+    if (pendingFlushDone.current) return;
+    pendingFlushDone.current = true;
+    const pending = stateRef.current.pomodoro?.pendingBlock;
+    if (!pending) return;
+    logStudy(pending.subject, pending.hours, 4, 0);
+    updatePomodoro({ pendingBlock: null });
+  }, []);
+
   /* Throw away an in-progress session without logging it. Used by onboarding:
      a running timer hides the goal card the tour needs to point at, and a
      few seconds started mid-tour isn't real study data worth keeping. */
@@ -567,11 +622,14 @@ const App: React.FC = () => {
               onLog={logStudy}
               onDeleteLog={deleteLog}
               onTimerUpdate={updateTimer}
-              onToggleLockInMode={(val: boolean) => setState(p => ({ ...p, isLockInModeEnabled: val }))}
               onAddTask={addTask}
               onToggleTask={toggleTask}
               onDeleteTask={deleteTask}
               onUpdateDailyGoal={updateDailyGoal}
+              onSetTimerMode={setTimerMode}
+              onUpdatePomodoro={updatePomodoro}
+              onUpdatePomodoroSettings={updatePomodoroSettings}
+              onLogPomodoroBlock={logPomodoroBlock}
               theme={theme}
               activeSubjects={activeSubjects}
             />

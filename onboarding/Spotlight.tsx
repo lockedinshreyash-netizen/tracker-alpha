@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ACCENT, INK_DEEP, MICRO_LABEL, PAPER } from '../landing/tokens';
-import * as sfx from './audio';
+import * as sfx from '../audio';
 
 /* Act 3 — orientation over the real UI.
    The rect-measuring / tooltip-positioning approach here is salvaged from the

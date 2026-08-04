@@ -59,6 +59,31 @@ export interface TimerState {
   distractions: number;
 }
 
+export type TimerMode = 'stopwatch' | 'pomodoro';
+
+export type PomodoroPhase = 'work' | 'short_break' | 'long_break';
+
+export interface PomodoroSettings {
+  workMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  blocksBeforeLongBreak: number;
+  autoStartNext: boolean;
+}
+
+export interface PomodoroRuntime {
+  phase: PomodoroPhase;
+  /* Absolute epoch ms, never a decrementing counter — background tabs throttle
+     timers, so remaining time must always be derived from the clock. */
+  phaseEndsAt: number | null;
+  isRunning: boolean;
+  completedBlocks: number; // within the current set; resets after a long break
+  subject: Subject;
+  /* A finished work block awaiting its quality rating. Persisted so a reload
+     or a closed tab can't silently lose logged study time. */
+  pendingBlock: { subject: Subject; hours: number } | null;
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -67,10 +92,12 @@ export interface AppState {
   lastUsedTab: TabType;
   timer: TimerState;
   isLockInModeEnabled: boolean;
-  allowList: string[];
   tasks: Task[];
   theme?: 'dark' | 'light';
   dailyGoalHours: number;
   lastUpdated: number; // Timestamp for sync resolution
   questionTracking: QuestionTrackingState;
+  timerMode: TimerMode;
+  pomodoroSettings: PomodoroSettings;
+  pomodoro: PomodoroRuntime;
 }

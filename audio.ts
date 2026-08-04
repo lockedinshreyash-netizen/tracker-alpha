@@ -1,16 +1,21 @@
-/* ── Onboarding sound cues ──
-   One-shot HTMLAudioElement playbacks. No library: for four one-shots a
-   playback engine would be dead weight.
+/* ── Sound cues ──
+   One-shot HTMLAudioElement playbacks. No library: for a handful of one-shots
+   a playback engine would be dead weight.
 
    Hard rule: audio is decoration. A missing file, a blocked autoplay, or a
-   browser with no audio support must never interrupt the flow — every path
-   here fails silently. The sequence is designed to run fine with
-   public/sounds/ completely empty, which is how it ships until the files
-   are sourced. */
+   browser with no audio support must never interrupt anything — every path
+   here fails silently. The app is designed to run fine with public/sounds/
+   completely empty, which is how it ships until the files are sourced. */
 
 export const SOUND_PREF_KEY = 'lockin_sound_enabled';
 
-export type Cue = 'ignite' | 'riser' | 'select' | 'lock';
+export type Cue =
+  | 'ignite'
+  | 'riser'
+  | 'select'
+  | 'lock'
+  | 'phaseComplete'
+  | 'breakOver';
 
 /* Per-cue volume. A single shared level would make `select` — which fires on
    every tap — grating next to the ignition hit. */
@@ -19,9 +24,23 @@ const CUE_CONFIG: Record<Cue, { file: string; volume: number }> = {
   riser: { file: '/sounds/riser.mp3', volume: 0.40 },
   select: { file: '/sounds/select.mp3', volume: 0.22 },
   lock: { file: '/sounds/lock.mp3', volume: 0.50 },
+  phaseComplete: { file: '/sounds/phase-complete.mp3', volume: 0.60 },
+  breakOver: { file: '/sounds/break-over.mp3', volume: 0.55 },
 };
 
-let enabled = false;
+/** Read the stored preference. Defaults to off — never surprise anyone with sound. */
+export const getSoundPreference = (): boolean => {
+  try {
+    return window.localStorage.getItem(SOUND_PREF_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+/* Seeded at module load. Onboarding's sound gate is the only thing that *sets*
+   the preference, so without this every reload would silently mute Pomodoro. */
+let enabled = getSoundPreference();
+
 const cache = new Map<Cue, HTMLAudioElement>();
 
 const create = (cue: Cue): HTMLAudioElement | null => {
@@ -38,18 +57,10 @@ const create = (cue: Cue): HTMLAudioElement | null => {
   }
 };
 
-/** Read the stored preference. Defaults to off — never surprise anyone with sound. */
-export const getSoundPreference = (): boolean => {
-  try {
-    return window.localStorage.getItem(SOUND_PREF_KEY) === 'true';
-  } catch {
-    return false;
-  }
-};
-
 /**
- * Enable or disable cues. Must be called from a real user gesture (the Act 0
- * tap) for playback to be permitted at all — browsers block audio until then.
+ * Enable or disable cues. Playback additionally requires that the page has
+ * seen a real user gesture — the onboarding sound gate, or simply pressing
+ * Start on a timer, both satisfy that well before any cue needs to fire.
  * Enabling also warms the cache so the first cue isn't late.
  */
 export const setSoundEnabled = (next: boolean) => {
@@ -110,3 +121,5 @@ export const ignite = () => play('ignite');
 export const riser = () => play('riser');
 export const select = () => play('select');
 export const lock = () => play('lock');
+export const phaseComplete = () => play('phaseComplete');
+export const breakOver = () => play('breakOver');
