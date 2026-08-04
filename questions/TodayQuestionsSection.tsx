@@ -16,8 +16,8 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
   const [animatedTotal, setAnimatedTotal] = useState(0);
 
   const todayProgress = getTodayProgress(questionTracking.dailyQuestionsLog);
-  const targets = computeDailyTargets(questionTracking);
-  const goals = computeEffectiveGoals(questionTracking);
+  const targets = computeDailyTargets(questionTracking, coreSubjects);
+  const goals = computeEffectiveGoals(questionTracking, coreSubjects);
   const hasGoal = goals.activeSubjects.length > 0;
   const remaining = Math.max(0, targets.total - todayProgress.total);
 
@@ -68,10 +68,10 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-8 md:p-12 rounded-2xl border relative overflow-hidden transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-8 md:p-12 rounded-xl border relative overflow-hidden transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       {/* Toast */}
       {toast && (
-        <div className="absolute top-4 right-4 z-30 px-4 py-2 rounded-lg bg-[#E10600] text-white text-[10px] font-medium uppercase tracking-[0.06em] animate-slide-up">
+        <div className="absolute top-4 right-4 z-30 px-4 py-2 rounded-md bg-[#E10600] text-white text-[10px] font-medium uppercase tracking-[0.06em] animate-slide-up">
           {toast}
         </div>
       )}
@@ -88,7 +88,7 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
 
       {/* Target / Completed / Remaining row */}
       {hasGoal && targets.total > 0 && (
-        <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+        <div className={`grid grid-cols-3 gap-3 mb-8 p-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
           <div className="text-center">
             <p className="text-lg md:text-xl num-stat text-[#E10600]">{targets.total}</p>
             <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>🎯 Target</p>
@@ -110,7 +110,7 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           <button
             key={s.key}
             onClick={() => setSelectedSubject(s.key)}
-            className={`px-6 md:px-8 py-3 text-[10px] font-medium uppercase tracking-[0.08em] border rounded-lg transition-all ${selectedSubject === s.key
+            className={`px-6 md:px-8 py-3 text-[10px] font-medium uppercase tracking-[0.08em] border rounded-md transition-all ${selectedSubject === s.key
               ? 'bg-[#E10600] border-[#E10600] text-white'
               : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')
               }`}
@@ -126,7 +126,7 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           <button
             key={n}
             onClick={() => handleAdd(n)}
-            className={`px-8 md:px-10 py-3.5 text-[11px] font-bold border rounded-lg transition-all active:scale-95 tracking-[0.06em] ${dark
+            className={`px-8 md:px-10 py-3.5 text-[11px] font-bold border rounded-md transition-all active:scale-95 tracking-[0.06em] ${dark
               ? 'bg-[#0D0D10] border-white/[0.06] text-white hover:border-white/[0.12]'
               : 'bg-zinc-50 border-zinc-200 text-black hover:border-zinc-300'
               }`}
@@ -143,14 +143,14 @@ const TodayQuestionsSection: React.FC<Props> = ({ questionTracking, onLogQuestio
           value={manualInput}
           onChange={e => setManualInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
-          className={`flex-1 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-white/20 font-bold uppercase border rounded-lg transition-colors text-center ${dark
+          className={`flex-1 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-white/20 font-bold uppercase border rounded-md transition-colors text-center ${dark
             ? 'bg-[#0D0D10] border-white/[0.06] text-white placeholder-zinc-700'
             : 'bg-zinc-50 border-zinc-200 text-black placeholder-zinc-300'
             }`}
         />
         <button
           onClick={handleManualSubmit}
-          className="px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95"
+          className="px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-md hover:bg-red-700 transition-all active:scale-95"
         >
           Add
         </button>

@@ -1,5 +1,10 @@
 
 import { DailyLog, Subject } from './types';
+import { SYLLABUS_DATA } from './constants';
+
+export const generateId = (): string => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
 
 export const getISTDateString = (date: Date = new Date()): string => {
   return new Intl.DateTimeFormat('en-CA', {
@@ -126,8 +131,10 @@ export const calculateLockInScore = (
 
   // 3. Syllabus Progress (10%)
   const classProgress = progress.filter(p => p.classId === currentClass && activeSubjects.includes(p.subject) && p.status === 'completed').length;
-  const totalChapters = 45;
-  const progressScore = Math.min((classProgress / totalChapters) * 100, 100);
+  const totalChapters = activeSubjects
+    .filter((s): s is 'Physics' | 'Chemistry' | 'Maths' | 'Biology' => s !== 'General')
+    .reduce((sum, s) => sum + (SYLLABUS_DATA[currentClass][s]?.length || 0), 0);
+  const progressScore = totalChapters > 0 ? Math.min((classProgress / totalChapters) * 100, 100) : 0;
 
   // 4. Quality (30%)
   const avgQuality = logsLast30.length > 0

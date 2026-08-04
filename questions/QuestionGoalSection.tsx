@@ -22,7 +22,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
   const [subjectInputs, setSubjectInputs] = useState<Record<string, string>>(initialInputs);
 
   const dark = theme === 'dark';
-  const goals = computeEffectiveGoals(questionTracking);
+  const goals = computeEffectiveGoals(questionTracking, coreSubjects);
   const hasGoal = goals.activeSubjects.length > 0;
   const midWeek = isGoalMidWeek(goalStartDate);
 
@@ -78,7 +78,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
     setIsEditing(false);
   };
 
-  const inputClass = `w-full p-3 rounded-lg border text-sm font-bold uppercase focus:outline-none focus:ring-1 focus:ring-white/20 transition-colors ${dark
+  const inputClass = `w-full p-3 rounded-md border text-sm font-bold uppercase focus:outline-none focus:ring-1 focus:ring-white/20 transition-colors ${dark
     ? 'bg-[#0D0D10] border-white/[0.06] text-white placeholder-zinc-700'
     : 'bg-zinc-50 border-zinc-200 text-black placeholder-zinc-300'
     }`;
@@ -88,7 +88,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
   // --- DISPLAY MODE (goal is set, not editing) ---
   if (hasGoal && !isEditing) {
     return (
-      <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <div className="flex justify-between items-center mb-6">
           <h3 className={`text-[10px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             Weekly Goal
@@ -118,7 +118,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
         {/* Goal Summary */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {goals.totalGoal !== null && (
-            <div className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+            <div className={`p-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
               <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Total</p>
               <p className="text-xl num-stat">{goals.totalGoal}</p>
             </div>
@@ -127,7 +127,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
             const subjectGoal = (goals as any)[s];
             if (subjectGoal === null || subjectGoal === undefined) return null;
             return (
-              <div key={s} className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
+              <div key={s} className={`p-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}>
                 <p className={`text-[8px] font-medium uppercase tracking-[0.06em] mb-1 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{s.substring(0, 4)}</p>
                 <p className="text-xl num-stat">{subjectGoal}</p>
               </div>
@@ -147,7 +147,7 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
 
   // --- EDIT / CREATE MODE ---
   return (
-    <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-6 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         {hasGoal ? 'Edit Weekly Goal' : 'Set Weekly Goal'}
       </h3>
@@ -191,14 +191,14 @@ const QuestionGoalSection: React.FC<Props> = ({ questionTracking, onUpdateTracki
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleSave}
-            className="flex-1 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-lg hover:bg-red-700 transition-all active:scale-95"
+            className="flex-1 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-md hover:bg-red-700 transition-all active:scale-95"
           >
             {hasGoal ? 'Update Goal' : 'Set Goal'}
           </button>
           {isEditing && (
             <button
               onClick={() => setIsEditing(false)}
-              className={`px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] rounded-lg border transition-all ${dark ? 'border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'border-zinc-200 text-zinc-400'}`}
+              className={`px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] rounded-md border transition-all ${dark ? 'border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'border-zinc-200 text-zinc-400'}`}
             >
               Cancel
             </button>

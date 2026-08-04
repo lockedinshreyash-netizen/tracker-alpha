@@ -1,19 +1,20 @@
 import React from 'react';
-import { QuestionTrackingState } from '../types';
+import { QuestionTrackingState, QSubject } from '../types';
 import { computeWeeklyProgress, computeEffectiveGoals } from './utils';
 
 interface Props {
   questionTracking: QuestionTrackingState;
   theme: 'dark' | 'light';
+  coreSubjects: QSubject[];
 }
 
-const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => {
-  const goals = computeEffectiveGoals(questionTracking);
+const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme, coreSubjects }) => {
+  const goals = computeEffectiveGoals(questionTracking, coreSubjects);
   const progress = computeWeeklyProgress(questionTracking.dailyQuestionsLog);
 
   // Determine effective total goal
   const totalGoal = goals.totalGoal ||
-    ((goals.physics || 0) + (goals.chemistry || 0) + (goals.math || 0));
+    goals.activeSubjects.reduce((sum, s) => sum + (goals[s] || 0), 0);
 
   if (goals.activeSubjects.length === 0 || totalGoal <= 0) return null;
 
@@ -23,7 +24,7 @@ const WeeklyProgressSection: React.FC<Props> = ({ questionTracking, theme }) => 
   const dark = theme === 'dark';
 
   return (
-    <section className={`p-8 md:p-10 rounded-2xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <h3 className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         Weekly Progress
       </h3>
