@@ -43,6 +43,7 @@ export type VoiceIntent =
   | { kind: 'setChapterStatus'; chapter: string; status: SyllabusStatus }
   | { kind: 'query'; topic: QueryTopic }
   | { kind: 'stopListening' }
+  | { kind: 'setSpeech'; on: boolean }
   | { kind: 'help' };
 
 /* ── Fuzzy matching ────────────────────────────────────────────────────── */
@@ -261,6 +262,15 @@ export const parseCommand = (raw: string): VoiceIntent | null => {
     return { kind: 'stopListening' };
   }
 
+  /* ── Spoken replies ── separate from the mic: "mute" closes the microphone,
+     "be quiet" only stops the app talking back. */
+  if (/^(?:stop talking|be quiet|quiet|stop speaking|don t (?:talk|speak)|shut up)$/.test(text)) {
+    return { kind: 'setSpeech', on: false };
+  }
+  if (/^(?:start talking|speak to me|talk to me|speak up|say it out loud)$/.test(text)) {
+    return { kind: 'setSpeech', on: true };
+  }
+
   /* ── Questions the app can answer ──
      Anchored end to end like every other command. A loose "contains streak"
      test would fire on "my streak is gone because I skipped". Note that
@@ -429,5 +439,5 @@ export const COMMAND_HELP: { group: string; examples: string[] }[] = [
   { group: 'Tasks', examples: ['add task revise thermodynamics', 'complete task revise thermodynamics'] },
   { group: 'Syllabus', examples: ['mark rotational motion as done', 'mark integrals as revision'] },
   { group: 'Ask', examples: ["what's my streak", 'how many hours today', 'how many days left'] },
-  { group: 'Other', examples: ['pomodoro', 'dark mode', 'stop listening'] },
+  { group: 'Other', examples: ['pomodoro', 'dark mode', 'be quiet', 'stop listening'] },
 ];

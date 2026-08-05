@@ -8,6 +8,13 @@ import {
   isVoiceSupported,
   setVoicePreference,
 } from './speech';
+import {
+  cancelSpeech,
+  getSpeakPreference,
+  isSpeechOutSupported,
+  setSpeakPreference,
+  speak,
+} from './speechOut';
 
 export interface VoiceFeedback {
   ok: boolean;
@@ -50,10 +57,17 @@ const TASK_BODY_TIMEOUT_MS = 20000;
 const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   const [supported] = useState(isVoiceSupported);
   const [listening, setListening] = useState(false);
+  /* What the user asked for. Stays true while the mic is briefly closed so the
+     app can speak, which `listening` does not. */
+  const [micOn, setMicOn] = useState(false);
   const [interim, setInterim] = useState('');
   const [feedback, setFeedback] = useState<VoiceFeedback | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [awaitingTask, setAwaitingTask] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [speechOn, setSpeechOn] = useState(() => isSpeechOutSupported() && getSpeakPreference());
+  const speechOnRef = useRef(speechOn);
+  useEffect(() => { speechOnRef.current = speechOn; }, [speechOn]);
 
   const listenerRef = useRef<VoiceListener | null>(null);
   const feedbackTimer = useRef<number | null>(null);
@@ -82,10 +96,32 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     }
   };
 
+  /**
+   * Say a line out loud, with the microphone closed for the duration.
+   *
+   * Without the pause, recognition transcribes the app's own voice and feeds it
+   * straight back in as the next "command" — at best noise, at worst a loop.
+   */
+  const say = (message: string) => {
+    if (!speechOnRef.current) return;
+    const listener = listenerRef.current;
+    speak(message, {
+      onStart: () => {
+        setSpeaking(true);
+        listener?.suspend();
+      },
+      onDone: () => {
+        setSpeaking(false);
+        listener?.resume();
+      },
+    });
+  };
+
   const run = (intent: VoiceIntent) => {
     const result = onCommandRef.current(intent);
     if (result.ok) sfx.select();
     flash(result, intent.kind === 'query' ? ANSWER_MS : FEEDBACK_MS);
+    say(result.message);
   };
 
   /** Runs one complete utterance, once the speaker has paused. */
@@ -131,9 +167,21 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     }
 
     if (hit.intent.kind === 'stopListening') {
+      cancelSpeech();
       listenerRef.current?.stop();
       setVoicePreference(false);
       flash({ ok: true, message: 'MIC OFF.' });
+      return;
+    }
+
+    if (hit.intent.kind === 'setSpeech') {
+      const on = hit.intent.on;
+      setSpeechOn(on);
+      speechOnRef.current = on;
+      setSpeakPreference(on);
+      if (!on) cancelSpeech();
+      flash({ ok: true, message: on ? 'SPEAKING REPLIES.' : 'REPLIES MUTED.' });
+      if (on) say('speaking replies');
       return;
     }
 
@@ -142,6 +190,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
       setAwaitingTask(true);
       flash({ ok: true, message: "WHAT'S THE TASK?" }, TASK_BODY_TIMEOUT_MS);
       taskPromptTimer.current = window.setTimeout(cancelTaskPrompt, TASK_BODY_TIMEOUT_MS);
+      say("what's the task?");
       return;
     }
 
@@ -165,11 +214,15 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   useEffect(() => {
     if (!supported) return;
 
-    const listener = new VoiceListener({
+    const listener: VoiceListener = new VoiceListener({
       onTranscript: handleTranscript,
       onListeningChange: (active) => {
         setListening(active);
         if (!active) setInterim('');
+        /* The engine stops during a spoken reply, but the user hasn't turned
+           anything off — track intent separately so the button doesn't blink
+           to "off" every time the app answers. */
+        setMicOn(listener.isListening);
       },
       onError: (message) => flash({ ok: false, message }),
     });
@@ -186,6 +239,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
 
     return () => {
       cancelled = true;
+      cancelSpeech();
       listener.stop();
       if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
       if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
@@ -201,18 +255,29 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     const listener = listenerRef.current;
     if (!listener) return;
     if (listener.isListening) {
+      cancelSpeech();
       listener.stop();
       cancelTaskPrompt();
       segments.current = [];
       setInterim('');
+      setMicOn(false);
       setVoicePreference(false);
       flash({ ok: true, message: 'MIC OFF.' });
     } else {
       // The permission prompt (first time) rides on this click gesture.
       listener.start();
+      setMicOn(true);
       setVoicePreference(true);
       flash({ ok: true, message: 'LISTENING. SAY “HELP” FOR COMMANDS.' });
     }
+  };
+
+  const toggleSpeech = () => {
+    const next = !speechOn;
+    setSpeechOn(next);
+    speechOnRef.current = next;
+    setSpeakPreference(next);
+    if (!next) cancelSpeech();
   };
 
   const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-[#E3E0D9]';
@@ -236,28 +301,28 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
 
         {/* Stacked rather than sat beside the mic: on a phone this whole
             column floats over the timer, so it stays as narrow as possible. */}
-        {listening && (
+        {micOn && (
           <button
             onClick={() => setShowHelp(true)}
             className={`px-3 py-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-[0.08em] font-ui transition-all active:scale-95 pointer-events-auto ${panel} ${muted}`}
           >
-            Commands
+            {speaking ? 'Speaking…' : 'Commands'}
           </button>
         )}
 
         <button
           onClick={toggle}
-          aria-pressed={listening}
-          aria-label={listening ? 'Stop voice commands' : 'Start voice commands'}
-          className={`relative w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 shadow-lg pointer-events-auto ${listening
+          aria-pressed={micOn}
+          aria-label={micOn ? 'Stop voice commands' : 'Start voice commands'}
+          className={`relative w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 shadow-lg pointer-events-auto ${micOn
             ? 'bg-[#E10600] border-[#E10600] text-white'
             : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-[#6B675C] hover:text-[#17150F]'}`
             }`}
         >
-          {listening && (
-            <span className={`absolute inset-0 rounded-full bg-[#E10600] ${awaitingTask ? 'animate-pulse opacity-50' : 'animate-ping opacity-30'}`} />
+          {micOn && (
+            <span className={`absolute inset-0 rounded-full bg-[#E10600] ${speaking || awaitingTask ? 'animate-pulse opacity-50' : listening ? 'animate-ping opacity-30' : ''}`} />
           )}
-          <span className="relative"><MicIcon muted={!listening} /></span>
+          <span className="relative"><MicIcon muted={!micOn} /></span>
         </button>
       </div>
 
@@ -292,11 +357,27 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
               ))}
             </div>
 
-            <p className={`text-[9px] font-ui leading-relaxed mt-6 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'} ${muted}`}>
+            {isSpeechOutSupported() && (
+              <label className={`flex items-center gap-3 mt-6 pt-5 border-t cursor-pointer ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+                <input
+                  type="checkbox"
+                  checked={speechOn}
+                  onChange={toggleSpeech}
+                  className="accent-[#E10600] w-4 h-4 flex-shrink-0"
+                />
+                <span className={`text-[10px] uppercase font-bold tracking-[0.06em] font-ui ${muted}`}>
+                  Say the answer out loud
+                </span>
+              </label>
+            )}
+
+            <p className={`text-[9px] font-ui leading-relaxed mt-5 ${muted}`}>
               The mic stays on while this tab is open, and switches itself back on
-              next time you come back. Your browser does the transcribing — on
-              Chrome and Edge that means audio goes to their speech service, not
-              to this app. Say “stop listening” or tap the mic to switch it off.
+              next time you come back. It closes for a moment whenever the app
+              speaks, so it can't hear itself. Your browser does the transcribing
+              and the talking — on Chrome and Edge the audio goes to their speech
+              service, not to this app. Say “stop listening” to switch the mic
+              off, or “be quiet” to keep it listening silently.
             </p>
 
             <button

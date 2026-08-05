@@ -138,6 +138,9 @@ export class VoiceListener {
   /* Highest index in the current session's cumulative results list that has
      already been reported as final. See the note in `onresult`. */
   private finalizedUpTo = -1;
+  /* Paused mid-session — the user still wants to listen, but something else
+     (the app speaking) needs the mic closed for a moment. */
+  private suspended = false;
 
   constructor(private handlers: VoiceHandlers) { }
 
@@ -156,12 +159,44 @@ export class VoiceListener {
 
   stop() {
     this.wantsToListen = false;
+    this.suspended = false;
     if (this.restartTimer !== null) {
       window.clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
     this.teardown();
     this.handlers.onListeningChange(false);
+  }
+
+  /**
+   * Close the mic without forgetting that the user wants it open.
+   *
+   * Used while the app speaks: recognition is otherwise perfectly happy to
+   * transcribe our own voice and hand it back as a command. Releasing the mic
+   * outright beats filtering, because there is then nothing to filter.
+   */
+  suspend() {
+    if (!this.wantsToListen || this.suspended) return;
+    this.suspended = true;
+    if (this.restartTimer !== null) {
+      window.clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    // teardown() detaches handlers first, so the abort can't trigger a restart.
+    this.teardown();
+    this.handlers.onListeningChange(false);
+  }
+
+  resume() {
+    if (!this.wantsToListen || !this.suspended) return;
+    this.suspended = false;
+    this.restarts = 0;
+    const Ctor = getCtor();
+    if (Ctor) this.spinUp(Ctor);
+  }
+
+  get isSuspended() {
+    return this.suspended;
   }
 
   /* Detach before aborting: a discarded instance still fires `onend`
@@ -259,7 +294,7 @@ export class VoiceListener {
 
     rec.onend = () => {
       this.handlers.onListeningChange(false);
-      if (!this.wantsToListen) return;
+      if (!this.wantsToListen || this.suspended) return;
 
       // Immediate repeated ends mean something is wrong, not that the user
       // went quiet — back off, then give up rather than loop forever.
