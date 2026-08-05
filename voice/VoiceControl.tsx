@@ -10,8 +10,12 @@ import {
 } from './speech';
 import {
   cancelSpeech,
+  getPreferredVoiceName,
   getSpeakPreference,
   isSpeechOutSupported,
+  listVoices,
+  prefetchCommonClips,
+  setPreferredVoiceName,
   setSpeakPreference,
   speak,
 } from './speechOut';
@@ -68,6 +72,10 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   const [speechOn, setSpeechOn] = useState(() => isSpeechOutSupported() && getSpeakPreference());
   const speechOnRef = useRef(speechOn);
   useEffect(() => { speechOnRef.current = speechOn; }, [speechOn]);
+
+  /* Only used for the handful of replies with no pre-rendered clip. */
+  const [systemVoices, setSystemVoices] = useState<{ name: string; lang: string }[]>([]);
+  const [systemVoice, setSystemVoice] = useState(getPreferredVoiceName);
 
   const listenerRef = useRef<VoiceListener | null>(null);
   const feedbackTimer = useRef<number | null>(null);
@@ -247,6 +255,27 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     };
   }, [supported]);
 
+  /* The browser populates its voice list asynchronously, so the first lookup is
+     usually empty. Re-read when it lands and adopt the ranked best as the shown
+     selection when the user hasn't chosen one. */
+  useEffect(() => {
+    if (!isSpeechOutSupported()) return;
+    const sync = () => {
+      const ranked = listVoices().map(v => ({ name: v.name, lang: v.lang }));
+      setSystemVoices(ranked);
+      setSystemVoice(prev => prev || ranked[0]?.name || '');
+    };
+    sync();
+    window.speechSynthesis.addEventListener?.('voiceschanged', sync);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', sync);
+  }, []);
+
+  /* Pull the replies this session is almost certain to use into the HTTP cache,
+     so even the first one plays without a network round trip. */
+  useEffect(() => {
+    if (micOn && speechOn) prefetchCommonClips();
+  }, [micOn, speechOn]);
+
   if (!supported) return null;
 
   const dark = theme === 'dark';
@@ -279,6 +308,16 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     setSpeakPreference(next);
     if (!next) cancelSpeech();
   };
+
+  /** Play a sample so the voice can be judged before it's used for real. */
+  const preview = (line = 'SESSION LIVE: PHYSICS.') => {
+    const listener = listenerRef.current;
+    speak(line, {
+      onStart: () => { setSpeaking(true); listener?.suspend(); },
+      onDone: () => { setSpeaking(false); listener?.resume(); },
+    });
+  };
+
 
   const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-[#E3E0D9]';
   const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
@@ -358,17 +397,47 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             </div>
 
             {isSpeechOutSupported() && (
-              <label className={`flex items-center gap-3 mt-6 pt-5 border-t cursor-pointer ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
-                <input
-                  type="checkbox"
-                  checked={speechOn}
-                  onChange={toggleSpeech}
-                  className="accent-[#E10600] w-4 h-4 flex-shrink-0"
-                />
-                <span className={`text-[10px] uppercase font-bold tracking-[0.06em] font-ui ${muted}`}>
-                  Say the answer out loud
-                </span>
-              </label>
+              <div className={`mt-6 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={speechOn}
+                    onChange={toggleSpeech}
+                    className="accent-[#E10600] w-4 h-4 flex-shrink-0"
+                  />
+                  <span className={`text-[10px] uppercase font-bold tracking-[0.06em] font-ui ${muted}`}>
+                    Say the answer out loud
+                  </span>
+                </label>
+
+                {speechOn && (
+                  <div className="mt-4 space-y-2">
+                    <button
+                      onClick={() => preview('SESSION LIVE: PHYSICS.')}
+                      className={`w-full px-4 py-2 rounded-lg border text-[9px] font-bold uppercase tracking-[0.08em] font-ui transition-all active:scale-95 ${dark ? 'border-white/[0.06] text-zinc-300' : 'border-[#E3E0D9] text-[#3A362C]'}`}
+                    >
+                      Hear it
+                    </button>
+
+                    {/* Only reached for free-form text — task names and the like. */}
+                    <details>
+                      <summary className={`text-[9px] uppercase font-bold tracking-[0.06em] font-ui cursor-pointer ${muted}`}>
+                        Fallback voice
+                      </summary>
+                      <select
+                        value={systemVoice}
+                        onChange={(e) => { setSystemVoice(e.target.value); setPreferredVoiceName(e.target.value); }}
+                        className={`w-full mt-2 px-3 py-2 rounded-lg border text-[10px] font-ui ${dark ? 'bg-[#0D0D10] border-white/[0.06] text-zinc-300' : 'bg-white border-[#E3E0D9] text-[#3A362C]'}`}
+                      >
+                        {systemVoices.map(v => <option key={v.name} value={v.name}>{v.name} — {v.lang}</option>)}
+                      </select>
+                      <p className={`text-[9px] font-ui mt-2 ${muted}`}>
+                        Used only for things with no recorded reply, like task names.
+                      </p>
+                    </details>
+                  </div>
+                )}
+              </div>
             )}
 
             <p className={`text-[9px] font-ui leading-relaxed mt-5 ${muted}`}>

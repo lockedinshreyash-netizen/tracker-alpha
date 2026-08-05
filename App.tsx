@@ -480,16 +480,34 @@ const App: React.FC = () => {
 
   /* If the tab was closed between finishing a block and rating it, that block
      is still parked in pendingBlock. Flush it at a neutral quality on the next
-     load so completed study time is never silently lost. */
+     load so completed study time is never silently lost.
+
+     This has to wait for the cloud pull. Flushing on mount reads the local copy,
+     and the pull that lands moments later takes `pomodoro` wholesale from the
+     server — handing the block straight back. The clear is never pushed either,
+     because triggerSync is a no-op until the initial sync finishes. The block
+     therefore came back on every reload and logged itself again, every time. */
   const pendingFlushDone = useRef(false);
   useEffect(() => {
-    if (pendingFlushDone.current) return;
+    if (!syncSettled || pendingFlushDone.current) return;
     pendingFlushDone.current = true;
     const pending = stateRef.current.pomodoro?.pendingBlock;
     if (!pending) return;
+
     logStudy(pending.subject, pending.hours, 4, 0);
-    updatePomodoro({ pendingBlock: null });
-  }, []);
+    /* Cleared with a lastUpdated bump — unlike updatePomodoro, which leaves the
+       timestamp alone so ordinary phase ticks don't churn the sync. Without the
+       bump the server copy still looks current and wins the next merge. */
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        pomodoro: { ...prev.pomodoro, pendingBlock: null },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, [syncSettled]);
 
   /* Throw away an in-progress session without logging it. Used by onboarding:
      a running timer hides the goal card the tour needs to point at, and a
