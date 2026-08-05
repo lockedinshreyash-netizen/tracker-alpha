@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
-import { COMMAND_HELP, VoiceIntent, parseCommand } from './commands';
-import { VoiceListener, isVoiceSupported } from './speech';
+import { COMMAND_HELP, VoiceIntent, asTaskBody, parseBestOf, parseCommand } from './commands';
+import {
+  VoiceListener,
+  canResumeWithoutPrompt,
+  getVoicePreference,
+  isVoiceSupported,
+  setVoicePreference,
+} from './speech';
 
 export interface VoiceFeedback {
   ok: boolean;
@@ -24,11 +30,22 @@ const MicIcon: React.FC<{ muted: boolean }> = ({ muted }) => (
 );
 
 const FEEDBACK_MS = 4000;
+/** Answers to questions are read, not glanced at. */
+const ANSWER_MS = 7000;
+
+/* Recognition often splits one spoken sentence into several final segments
+   ("add task revise" then "thermodynamics"). Executing each as it lands both
+   truncates the command and fires it more than once, so segments are collected
+   and run as a single utterance once the speaker pauses. */
+const COALESCE_MS = 700;
+
+/** How long a bare "add task" waits for the user to say what the task is. */
+const TASK_BODY_TIMEOUT_MS = 20000;
 
 /**
- * Floating push-to-listen control. Renders nothing at all on browsers without
- * the Web Speech API (Firefox, most in-app webviews) — a dead mic button is
- * worse than no mic button.
+ * Floating voice control. Renders nothing at all on browsers without the Web
+ * Speech API (Firefox, most in-app webviews) — a dead mic button is worse than
+ * no mic button.
  */
 const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   const [supported] = useState(isVoiceSupported);
@@ -36,6 +53,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   const [interim, setInterim] = useState('');
   const [feedback, setFeedback] = useState<VoiceFeedback | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [awaitingTask, setAwaitingTask] = useState(false);
 
   const listenerRef = useRef<VoiceListener | null>(null);
   const feedbackTimer = useRef<number | null>(null);
@@ -44,36 +62,109 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   const onCommandRef = useRef(onCommand);
   useEffect(() => { onCommandRef.current = onCommand; }, [onCommand]);
 
-  const flash = (next: VoiceFeedback) => {
+  const segments = useRef<{ text: string; alternatives: string[] }[]>([]);
+  const flushTimer = useRef<number | null>(null);
+  const awaitingTaskRef = useRef(false);
+  const taskPromptTimer = useRef<number | null>(null);
+
+  const flash = (next: VoiceFeedback, ms: number = FEEDBACK_MS) => {
     setFeedback(next);
     if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
-    feedbackTimer.current = window.setTimeout(() => setFeedback(null), FEEDBACK_MS);
+    feedbackTimer.current = window.setTimeout(() => setFeedback(null), ms);
   };
 
-  const handleTranscript = (text: string, isFinal: boolean) => {
-    setInterim(isFinal ? '' : text.trim());
-    if (!isFinal) return;
+  const cancelTaskPrompt = () => {
+    awaitingTaskRef.current = false;
+    setAwaitingTask(false);
+    if (taskPromptTimer.current !== null) {
+      window.clearTimeout(taskPromptTimer.current);
+      taskPromptTimer.current = null;
+    }
+  };
 
-    const intent = parseCommand(text);
-    if (!intent) {
-      // Ambient conversation lands here constantly, so this stays quiet copy
-      // rather than an error — it's the expected case, not a failure.
-      flash({ ok: false, message: `NOT A COMMAND: “${text.trim().slice(0, 40)}”` });
+  const run = (intent: VoiceIntent) => {
+    const result = onCommandRef.current(intent);
+    if (result.ok) sfx.select();
+    flash(result, intent.kind === 'query' ? ANSWER_MS : FEEDBACK_MS);
+  };
+
+  /** Runs one complete utterance, once the speaker has paused. */
+  const execute = () => {
+    const collected = segments.current;
+    segments.current = [];
+    if (!collected.length) return;
+
+    const joined = collected.map(s => s.text).join(' ').trim();
+    if (!joined) return;
+
+    /* Alternatives only line up with a single-segment utterance; once segments
+       are joined, the primary transcript is the only coherent candidate. */
+    const candidates = collected.length === 1 && collected[0].alternatives.length
+      ? collected[0].alternatives
+      : [joined];
+
+    // A bare "add task" put us in capture mode: this utterance is the body.
+    if (awaitingTaskRef.current) {
+      cancelTaskPrompt();
+      const body = asTaskBody(joined);
+      if (!body || /^(?:cancel|never mind|nevermind|forget it|stop)$/.test(body)) {
+        flash({ ok: false, message: 'TASK CANCELLED.' });
+        return;
+      }
+      // Reuse the grammar so the body gets the same subject tagging.
+      const intent = parseCommand(`add task ${body}`);
+      if (intent) run(intent);
       return;
     }
 
-    if (intent.kind === 'help') {
+    const hit = parseBestOf(candidates);
+    if (!hit) {
+      // Ambient conversation lands here constantly, so this stays quiet copy
+      // rather than an error — it's the expected case, not a failure.
+      flash({ ok: false, message: `NOT A COMMAND: “${joined.slice(0, 40)}”` });
+      return;
+    }
+
+    if (hit.intent.kind === 'help') {
       setShowHelp(true);
       return;
     }
 
-    const result = onCommandRef.current(intent);
-    if (result.ok) sfx.select();
-    flash(result);
+    if (hit.intent.kind === 'stopListening') {
+      listenerRef.current?.stop();
+      setVoicePreference(false);
+      flash({ ok: true, message: 'MIC OFF.' });
+      return;
+    }
+
+    if (hit.intent.kind === 'askTaskBody') {
+      awaitingTaskRef.current = true;
+      setAwaitingTask(true);
+      flash({ ok: true, message: "WHAT'S THE TASK?" }, TASK_BODY_TIMEOUT_MS);
+      taskPromptTimer.current = window.setTimeout(cancelTaskPrompt, TASK_BODY_TIMEOUT_MS);
+      return;
+    }
+
+    run(hit.intent);
+  };
+
+  const handleTranscript = (text: string, isFinal: boolean, alternatives?: string[]) => {
+    if (!isFinal) {
+      setInterim(text.trim());
+      return;
+    }
+    setInterim('');
+    segments.current.push({ text: text.trim(), alternatives: alternatives ?? [text.trim()] });
+    if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
+    flushTimer.current = window.setTimeout(() => {
+      flushTimer.current = null;
+      execute();
+    }, COALESCE_MS);
   };
 
   useEffect(() => {
     if (!supported) return;
+
     const listener = new VoiceListener({
       onTranscript: handleTranscript,
       onListeningChange: (active) => {
@@ -83,9 +174,22 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
       onError: (message) => flash({ ok: false, message }),
     });
     listenerRef.current = listener;
+
+    /* Opted in previously → pick up where they left off. Gated on the mic
+       already being granted, so opening the app never raises a prompt. */
+    let cancelled = false;
+    if (getVoicePreference()) {
+      canResumeWithoutPrompt().then(ok => {
+        if (ok && !cancelled) listener.start();
+      });
+    }
+
     return () => {
+      cancelled = true;
       listener.stop();
       if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+      if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
+      if (taskPromptTimer.current !== null) window.clearTimeout(taskPromptTimer.current);
     };
   }, [supported]);
 
@@ -98,11 +202,15 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     if (!listener) return;
     if (listener.isListening) {
       listener.stop();
+      cancelTaskPrompt();
+      segments.current = [];
       setInterim('');
+      setVoicePreference(false);
       flash({ ok: true, message: 'MIC OFF.' });
     } else {
       // The permission prompt (first time) rides on this click gesture.
       listener.start();
+      setVoicePreference(true);
       flash({ ok: true, message: 'LISTENING. SAY “HELP” FOR COMMANDS.' });
     }
   };
@@ -146,7 +254,9 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-[#6B675C] hover:text-[#17150F]'}`
             }`}
         >
-          {listening && <span className="absolute inset-0 rounded-full bg-[#E10600] animate-ping opacity-30" />}
+          {listening && (
+            <span className={`absolute inset-0 rounded-full bg-[#E10600] ${awaitingTask ? 'animate-pulse opacity-50' : 'animate-ping opacity-30'}`} />
+          )}
           <span className="relative"><MicIcon muted={!listening} /></span>
         </button>
       </div>
@@ -158,7 +268,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md rounded-xl border p-6 md:p-8 animate-slide-up ${panel}`}
+            className={`w-full max-w-md max-h-[85vh] overflow-y-auto rounded-xl border p-6 md:p-8 animate-slide-up ${panel}`}
           >
             <p className={`text-xs font-black uppercase tracking-[0.1em] font-ui ${dark ? 'text-white' : 'text-[#17150F]'}`}>
               Say it, don't click it
@@ -183,9 +293,10 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             </div>
 
             <p className={`text-[9px] font-ui leading-relaxed mt-6 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'} ${muted}`}>
-              The mic stays on until you switch it off, including when this tab is in
-              the background. Your browser does the transcribing — on Chrome and Edge
-              that means audio goes to their speech service, not to this app.
+              The mic stays on while this tab is open, and switches itself back on
+              next time you come back. Your browser does the transcribing — on
+              Chrome and Edge that means audio goes to their speech service, not
+              to this app. Say “stop listening” or tap the mic to switch it off.
             </p>
 
             <button

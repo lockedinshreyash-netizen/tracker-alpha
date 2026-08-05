@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings } from './types';
-import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE } from './constants';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task } from './types';
+import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
 import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS } from './state';
@@ -24,6 +24,56 @@ const ONBOARDING_KEY = 'onboarding_complete';
 /* Ending a session by voice can't stop to ask for a focus rating, so it logs
    at the same neutral 4 the Pomodoro pending-block flush uses. */
 const VOICE_QUALITY = 4;
+
+type ChapterHit =
+  | { ok: true; subject: Subject; chapter: string }
+  | { ok: false; reason: 'none' | 'ambiguous' };
+
+/**
+ * Voice gives a rough chapter name ("rotational motion"), never the exact title
+ * ("System of Particles & Rotational Motion").
+ *
+ * Every spoken word must appear in the title, and exactly one chapter may
+ * qualify — "thermodynamics" is a real chapter in both Physics and Chemistry,
+ * and silently picking one would quietly corrupt syllabus progress.
+ */
+const findChapter = (spoken: string, classId: 11 | 12, subjects: Subject[]): ChapterHit => {
+  const words = spoken.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  if (!words.length) return { ok: false, reason: 'none' };
+
+  const matches: { subject: Subject; chapter: string }[] = [];
+  for (const subject of subjects) {
+    if (subject === 'General') continue;
+    const chapters = SYLLABUS_DATA[classId][subject as 'Physics' | 'Chemistry' | 'Maths' | 'Biology'] || [];
+    for (const chapter of chapters) {
+      const title = chapter.toLowerCase();
+      if (words.every(w => title.includes(w))) matches.push({ subject, chapter });
+    }
+  }
+
+  if (!matches.length) return { ok: false, reason: 'none' };
+  if (matches.length > 1) return { ok: false, reason: 'ambiguous' };
+  return { ok: true, ...matches[0] };
+};
+
+/** Loosest-to-tightest match of a spoken phrase against a task list. */
+const findTask = (spoken: string, tasks: Task[]): Task | null => {
+  const query = spoken.toLowerCase().trim();
+  if (!query) return null;
+
+  const exact = tasks.find(t => t.text.toLowerCase() === query);
+  if (exact) return exact;
+
+  const contains = tasks.find(t => {
+    const text = t.text.toLowerCase();
+    return text.includes(query) || query.includes(text);
+  });
+  if (contains) return contains;
+
+  const words = query.split(/\s+/).filter(w => w.length > 2);
+  if (!words.length) return null;
+  return tasks.find(t => words.every(w => t.text.toLowerCase().includes(w))) ?? null;
+};
 
 // --- Main App Component ---
 
@@ -552,11 +602,27 @@ const App: React.FC = () => {
     }
   };
 
+  /* Voice sets a chapter status outright. Deliberately separate from
+     toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
+  const setChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string, status: SyllabusStatus) => {
+    setState(prev => {
+      const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
+      const filtered = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
+      const nextState = {
+        ...prev,
+        progress: [...filtered, { classId, subject, chapter, status, notes: existing?.notes }],
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
   /* ── Voice commands ──
      The parser is pure and exam-agnostic, so every check that depends on live
-     state — which subjects are active, what's already running, the focus floor
-     — happens here. Reads go through stateRef so a command fired moments after
-     another still sees the result of the first. */
+     state — which subjects are active, what's already running — happens here.
+     Reads go through stateRef so a command fired moments after another still
+     sees the result of the first. */
   const executeVoiceCommand = (intent: VoiceIntent): VoiceFeedback => {
     const current = stateRef.current;
     const exam = current.examPreference || 'JEE';
@@ -625,6 +691,134 @@ const App: React.FC = () => {
         const hours = Math.min(24, Math.max(1, Math.round(intent.hours)));
         updateDailyGoal(hours);
         return { ok: true, message: `DAILY TARGET: ${hours}H.` };
+      }
+
+      case 'adjustGoal': {
+        const hours = Math.min(24, Math.max(1, current.dailyGoalHours + Math.round(intent.delta)));
+        if (hours === current.dailyGoalHours) return { ok: false, message: `TARGET STAYS AT ${hours}H.` };
+        updateDailyGoal(hours);
+        return { ok: true, message: `DAILY TARGET: ${hours}H.` };
+      }
+
+      case 'logHours': {
+        const subject = intent.subject ?? current.timer.subject;
+        if (!activeSubjects.includes(subject)) {
+          return { ok: false, message: `${subject.toUpperCase()} ISN'T IN YOUR ${exam} TRACK.` };
+        }
+        const hours = Math.round(intent.hours * 100) / 100;
+        if (hours <= 0) return { ok: false, message: 'HOW LONG? TRY “LOG 2 HOURS OF PHYSICS”.' };
+        logStudy(subject, hours, VOICE_QUALITY, 0);
+        return { ok: true, message: `LOGGED ${hours}H ${subject.toUpperCase()}.` };
+      }
+
+      case 'pauseTimer': {
+        if (current.timerMode !== 'pomodoro') {
+          return { ok: false, message: 'THE STOPWATCH DOESN’T PAUSE. SAY “END SESSION”.' };
+        }
+        if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
+        updatePomodoro({ isRunning: false, phaseEndsAt: null });
+        return { ok: true, message: 'BLOCK STOPPED. NOTHING LOGGED.' };
+      }
+
+      case 'resumeTimer': {
+        if (current.timerMode !== 'pomodoro') {
+          return { ok: false, message: 'SAY “START SESSION” TO BEGIN.' };
+        }
+        if (current.pomodoro.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
+        const phase = current.pomodoro.phase;
+        updatePomodoro({
+          isRunning: true,
+          phaseEndsAt: Date.now() + phaseDurationMs(phase, current.pomodoroSettings),
+        });
+        return { ok: true, message: `${PHASE_LABEL[phase].toUpperCase()} RUNNING.` };
+      }
+
+      case 'resetPomodoro': {
+        if (current.timerMode !== 'pomodoro') return { ok: false, message: 'NOT IN POMODORO MODE.' };
+        updatePomodoro({ phase: 'work', isRunning: false, phaseEndsAt: null, completedBlocks: 0 });
+        return { ok: true, message: 'SET RESET.' };
+      }
+
+      case 'setTimerMode': {
+        if (current.timerMode === intent.mode) return { ok: false, message: `ALREADY IN ${intent.mode.toUpperCase()}.` };
+        if (current.pomodoro.isRunning || current.timer.isRunning) {
+          return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
+        }
+        handleTabChange('Today');
+        setTimerMode(intent.mode);
+        return { ok: true, message: `${intent.mode.toUpperCase()} MODE.` };
+      }
+
+      case 'setTheme': {
+        if (current.theme === intent.theme) return { ok: false, message: `ALREADY ${intent.theme.toUpperCase()}.` };
+        setState(prev => ({ ...prev, theme: intent.theme }));
+        return { ok: true, message: `${intent.theme.toUpperCase()} MODE.` };
+      }
+
+      case 'completeTask': {
+        const open = current.tasks.filter(t => !t.completed);
+        const hit = findTask(intent.query, open);
+        if (!hit) return { ok: false, message: `NO OPEN TASK MATCHING “${intent.query.slice(0, 24)}”.` };
+        toggleTask(hit.id);
+        return { ok: true, message: `DONE: ${hit.text.toUpperCase().slice(0, 30)}` };
+      }
+
+      case 'deleteTask': {
+        const hit = findTask(intent.query, current.tasks);
+        if (!hit) return { ok: false, message: `NO TASK MATCHING “${intent.query.slice(0, 24)}”.` };
+        deleteTask(hit.id);
+        return { ok: true, message: `WIPED: ${hit.text.toUpperCase().slice(0, 30)}` };
+      }
+
+      case 'setChapterStatus': {
+        const hit: ChapterHit = findChapter(intent.chapter, current.currentClass, activeSubjects);
+        if (hit.ok === false) {
+          return hit.reason === 'ambiguous'
+            ? { ok: false, message: `“${intent.chapter.toUpperCase()}” MATCHES MORE THAN ONE CHAPTER. NAME THE SUBJECT.` }
+            : { ok: false, message: `NO CLASS ${current.currentClass} CHAPTER MATCHING “${intent.chapter.slice(0, 24)}”.` };
+        }
+        setChapterStatus(current.currentClass, hit.subject, hit.chapter, intent.status);
+        return { ok: true, message: `${hit.chapter.toUpperCase()} → ${STATUS_LABELS[intent.status].toUpperCase()}.` };
+      }
+
+      case 'query': {
+        const today = getISTDateString();
+        switch (intent.topic) {
+          case 'streak': {
+            const streak = calculateStreak(current.logs);
+            return { ok: true, message: streak > 0 ? `STREAK: ${streak} DAY${streak === 1 ? '' : 'S'}.` : 'NO STREAK. LOG TODAY.' };
+          }
+          case 'hoursToday': {
+            const hours = current.logs.filter(l => l.date === today).reduce((a, l) => a + l.hours, 0);
+            return { ok: true, message: `${hours.toFixed(1)}H TODAY, TARGET ${current.dailyGoalHours}H.` };
+          }
+          case 'goal': {
+            const hours = current.logs.filter(l => l.date === today).reduce((a, l) => a + l.hours, 0);
+            const left = current.dailyGoalHours - hours;
+            return {
+              ok: true,
+              message: left <= 0
+                ? `TARGET HIT. ${hours.toFixed(1)}H DONE.`
+                : `${left.toFixed(1)}H SHORT OF TODAY'S ${current.dailyGoalHours}H.`,
+            };
+          }
+          case 'questionsToday': {
+            const log = current.questionTracking.dailyQuestionsLog.find(l => l.date === today);
+            const counts = (log?.counts ?? {}) as Partial<Record<QSubject, number>>;
+            const total = (Object.keys(counts) as QSubject[]).reduce((a, k) => a + (counts[k] ?? 0), 0);
+            return { ok: true, message: `${total} QUESTION${total === 1 ? '' : 'S'} TODAY.` };
+          }
+          case 'score': {
+            const score = calculateLockInScore(current.logs, current.currentClass, current.progress, activeSubjects);
+            return { ok: true, message: `LOCK-IN SCORE: ${score}/100.` };
+          }
+          case 'daysLeft': {
+            const days = getDaysRemaining(exam === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE);
+            return { ok: true, message: `${days} DAYS TO ${exam} 2027.` };
+          }
+          default:
+            return { ok: false, message: 'UNKNOWN QUESTION.' };
+        }
       }
 
       default:

@@ -65,12 +65,52 @@ const getCtor = (): RecognitionCtor | null => {
 export const isVoiceSupported = (): boolean => getCtor() !== null;
 
 export interface VoiceHandlers {
-  /** Fires for interim words too, so the UI can show speech as it lands. */
-  onTranscript: (text: string, isFinal: boolean) => void;
+  /**
+   * Fires for interim words too, so the UI can show speech as it lands.
+   * `alternatives` holds the engine's ranked guesses for a final result, best
+   * first — accented speech often puts the right words in a lower-ranked one.
+   */
+  onTranscript: (text: string, isFinal: boolean, alternatives?: string[]) => void;
   onListeningChange: (listening: boolean) => void;
   /** Only for failures worth showing; transient ones are swallowed. */
   onError: (message: string) => void;
 }
+
+export const VOICE_PREF_KEY = 'lockin_voice_enabled';
+
+/** Whether the user has opted in to voice control. Defaults to off. */
+export const getVoicePreference = (): boolean => {
+  try {
+    return window.localStorage.getItem(VOICE_PREF_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setVoicePreference = (next: boolean) => {
+  try {
+    window.localStorage.setItem(VOICE_PREF_KEY, String(next));
+  } catch {
+    // Private/hardened modes can refuse writes; the session still works.
+  }
+};
+
+/**
+ * Whether listening can resume on load without prompting.
+ *
+ * Only true when the mic was *already* granted for this origin — reopening the
+ * app must never raise a permission prompt on its own, and a prompt shown
+ * without a click would be dismissed by the browser anyway.
+ */
+export const canResumeWithoutPrompt = async (): Promise<boolean> => {
+  try {
+    const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+    return status.state === 'granted';
+  } catch {
+    // Safari has no permissions query for the mic. Don't guess — wait for a tap.
+    return false;
+  }
+};
 
 const ERROR_COPY: Record<string, string> = {
   'not-allowed': 'MIC BLOCKED. ALLOW MICROPHONE ACCESS FOR THIS SITE.',
@@ -95,6 +135,9 @@ export class VoiceListener {
   private wantsToListen = false;
   private restarts = 0;
   private restartTimer: number | null = null;
+  /* Highest index in the current session's cumulative results list that has
+     already been reported as final. See the note in `onresult`. */
+  private finalizedUpTo = -1;
 
   constructor(private handlers: VoiceHandlers) { }
 
@@ -161,20 +204,46 @@ export class VoiceListener {
     rec.lang = 'en-IN';
     rec.continuous = true;
     rec.interimResults = true;
-    rec.maxAlternatives = 1;
+    // Extra guesses cost nothing and are the single biggest accuracy win for
+    // accented speech — the parser tries each one.
+    rec.maxAlternatives = 5;
 
     rec.onstart = () => {
       this.restarts = 0;
+      // A restart begins a fresh results list, so the dedupe cursor resets too.
+      this.finalizedUpTo = -1;
       this.handlers.onListeningChange(true);
     };
 
     rec.onresult = (event) => {
-      // Only the results added since the last event are new.
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      /* `event.results` is cumulative for the whole session, and Chrome fires
+         this handler with `resultIndex` pinned at 0 while an utterance grows.
+         Trusting resultIndex therefore re-delivers results that were already
+         final — which duplicated every non-idempotent command ("add task X"
+         landed once per event). Track what has actually been reported instead. */
+      let latestInterim = '';
+
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        if (text.trim()) this.handlers.onTranscript(text, result.isFinal);
+        const text = (result[0]?.transcript ?? '').trim();
+        if (!text) continue;
+
+        if (!result.isFinal) {
+          latestInterim = text;
+          continue;
+        }
+        if (i <= this.finalizedUpTo) continue;
+        this.finalizedUpTo = i;
+
+        const alternatives: string[] = [];
+        for (let a = 0; a < result.length; a++) {
+          const alt = (result[a]?.transcript ?? '').trim();
+          if (alt && !alternatives.includes(alt)) alternatives.push(alt);
+        }
+        this.handlers.onTranscript(text, true, alternatives);
       }
+
+      if (latestInterim) this.handlers.onTranscript(latestInterim, false);
     };
 
     rec.onerror = (event) => {
