@@ -5,6 +5,7 @@ import { AppState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings } from '.
 export const DEFAULT_LEADERBOARD: LeaderboardPrefs = {
   enabled: false,
   displayName: '',
+  notifications: false,
 };
 
 export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = {

@@ -260,6 +260,50 @@ button:active,
 }
 
 /* ══════════════════════════════════════════
+   RACE CONTROL — the leaderboard as a live event
+   Hand-rolled for the same reason as the onboarding keyframes above: the
+   `animate-in` utilities come from a plugin the Tailwind CDN doesn't load.
+   ══════════════════════════════════════════ */
+
+/* A session running somewhere on the board. Slow on purpose — a fast blink
+   reads as an error state, and this is meant to read as a heartbeat. */
+@keyframes race-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.82); }
+}
+
+.race-live-dot {
+  animation: race-pulse 1.8s ease-in-out infinite;
+}
+
+/* The status card when first place is genuinely under threat: a red bloom
+   behind the copy rather than a louder border. */
+.race-alert {
+  background-image: radial-gradient(120% 140% at 0% 0%, rgba(225, 6, 0, 0.16) 0%, rgba(225, 6, 0, 0) 62%);
+}
+
+.race-crown {
+  background-image: radial-gradient(120% 140% at 100% 0%, rgba(225, 6, 0, 0.10) 0%, rgba(225, 6, 0, 0) 58%);
+}
+
+@keyframes race-toast-in {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.race-toast {
+  animation: race-toast-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .race-live-dot,
+  .race-toast {
+    animation: none;
+  }
+}
+
+/* ══════════════════════════════════════════
    SCROLLBAR — neutral, works on both themes
    ══════════════════════════════════════════ */
 

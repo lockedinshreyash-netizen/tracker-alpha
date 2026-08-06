@@ -16,7 +16,9 @@ import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
 import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
 import RanksTab from './leaderboard/RanksTab';
-import { leaveBoard, publishEntry } from './leaderboard/api';
+import { leaveBoard } from './leaderboard/api';
+import { useRace } from './leaderboard/useRace';
+import { RaceStrip, RaceToast } from './leaderboard/RaceControl';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, phaseDurationMs } from './today/pomodoro';
@@ -653,18 +655,19 @@ const App: React.FC = () => {
 
   /* ── Leaderboard ──
      Strictly opt-in: nothing is written to the shared table until the user
-     joins, and leaving deletes their row rather than hiding it. */
+     joins, and leaving deletes their row rather than hiding it. Publishing is
+     owned by useRace, which flips to an immediate write the moment `enabled`
+     turns on — one place decides what this device tells the board. */
   const joinLeaderboard = (displayName: string) => {
     setState(prev => {
       const nextState = {
         ...prev,
-        leaderboard: { enabled: true, displayName },
+        leaderboard: { ...prev.leaderboard, enabled: true, displayName },
         lastUpdated: Date.now(),
       };
       stateRef.current = nextState;
       return nextState;
     });
-    if (user) void publishEntry(user.id, displayName, stateRef.current.logs);
   };
 
   const exitLeaderboard = () => {
@@ -681,18 +684,30 @@ const App: React.FC = () => {
     });
   };
 
-  /* Push the day's total whenever it changes. Debounced because logging a
-     session updates state several times in a row, and the board only needs the
-     settled figure. */
-  const boardEnabled = state.leaderboard?.enabled ?? false;
-  const boardName = state.leaderboard?.displayName ?? '';
-  useEffect(() => {
-    if (!user || !boardEnabled || !boardName) return;
-    const id = window.setTimeout(() => {
-      void publishEntry(user.id, boardName, stateRef.current.logs);
-    }, 1500);
-    return () => window.clearTimeout(id);
-  }, [user, boardEnabled, boardName, state.logs]);
+  const setRaceNotifications = (enabled: boolean) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        leaderboard: { ...prev.leaderboard, notifications: enabled },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /* ── Race Control ──
+     Mounted here rather than inside the Ranks tab: places change hands while
+     the user is on Today, and the alert about it has to fire from wherever
+     they are. Owns polling, publishing this device's row, and the day's
+     event log. */
+  const race = useRace({
+    user,
+    state,
+    watching: activeTab === 'Ranks',
+    onNotificationsChange: setRaceNotifications,
+  });
+  const inTheRace = Boolean(user && state.leaderboard?.enabled);
 
   /* Voice sets a chapter status outright. Deliberately separate from
      toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
@@ -982,6 +997,12 @@ const App: React.FC = () => {
         />
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
+          {/* One line of the race, where the sessions actually get started. */}
+          {activeTab === 'Today' && inTheRace && (
+            <div className="mb-8">
+              <RaceStrip status={race.status} onOpen={() => handleTabChange('Ranks')} theme={theme} />
+            </div>
+          )}
           {activeTab === 'Today' && (
             <TodayTab
               state={state}
@@ -1024,6 +1045,7 @@ const App: React.FC = () => {
               user={user}
               logs={state.logs}
               prefs={state.leaderboard ?? DEFAULT_LEADERBOARD}
+              race={race}
               onJoin={joinLeaderboard}
               onLeave={exitLeaderboard}
               onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -1052,6 +1074,12 @@ const App: React.FC = () => {
       {/* Kept out of the way of the tour's spotlight and of Lock-In. */}
       {!showOnboarding && (
         <VoiceControl theme={theme} onCommand={executeVoiceCommand} />
+      )}
+
+      {/* A place changing hands, wherever the user happens to be. Suppressed
+          during the tour, which owns the screen. */}
+      {!showOnboarding && (
+        <RaceToast event={race.toast} onDismiss={race.dismissToast} theme={theme} />
       )}
 
       {showOnboarding && (

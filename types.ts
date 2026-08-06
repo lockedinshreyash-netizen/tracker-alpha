@@ -66,6 +66,11 @@ export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 
 export interface LeaderboardPrefs {
   enabled: boolean;
   displayName: string;
+  /* Race notifications — losing a place, a lead being eaten into. Separate
+     from `enabled`: being on the board and wanting to be interrupted about it
+     are two different decisions. Only ever true alongside browser permission,
+     which can be revoked without the app being told. */
+  notifications?: boolean;
 }
 
 export interface TimerState {

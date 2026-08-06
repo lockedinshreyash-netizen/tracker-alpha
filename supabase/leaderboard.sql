@@ -24,6 +24,26 @@ create table if not exists public.leaderboard_entries (
   constraint hours_sane check (hours >= 0 and hours <= 24)
 );
 
+-- ── Race signals ──
+-- Added after the first version of the table shipped, so they go on as
+-- alterations rather than columns above. Re-running the whole file is safe.
+--
+-- These exist so the board can describe a race rather than just rank a list:
+-- who is on the clock right now, and who has actually moved today. All three
+-- are self-reported by the client and none of them affect `hours`, so the worst
+-- a hostile client can do is lie about its own activity light.
+alter table public.leaderboard_entries
+  -- True while a stopwatch or Pomodoro block is running. Only trustworthy
+  -- alongside updated_at: a closed tab stops refreshing and the flag goes stale,
+  -- so the app ignores it once the row is older than a few minutes.
+  add column if not exists is_studying  boolean     not null default false,
+  -- When the current session started, for "45 min and counting" on the board.
+  add column if not exists active_since timestamptz,
+  -- When `hours` last went up — distinct from updated_at, which also moves on
+  -- every activity heartbeat. This is what "nobody above you has studied in
+  -- hours" is measured against.
+  add column if not exists last_gain_at timestamptz;
+
 -- The only query the app makes: today's rows, highest first.
 create index if not exists leaderboard_entries_daily
   on public.leaderboard_entries (date, hours desc);
