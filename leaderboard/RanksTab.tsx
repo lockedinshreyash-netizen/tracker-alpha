@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, LeaderboardPrefs } from '../types';
-import { BoardResult, LeaderboardRow, MAX_NAME, fetchBoard, hoursToday, validateName } from './api';
+import { BoardResult, LeaderboardRow, MAX_NAME, fetchBoard, hoursToday, isRanked, validateName } from './api';
+import { getISTDateString } from '../utils';
 
 interface Props {
   user: User | null;
@@ -67,7 +68,9 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, onJoin, onLeave, onOpenA
             Put your name on the board
           </h2>
           <p className={`text-[11px] font-ui mt-3 leading-relaxed ${muted}`}>
-            Ranked on hours logged today. Resets every midnight, IST.
+            Ranked on hours the app timed today — stopwatch sessions and Pomodoro blocks.
+            Hours you type in yourself still count for your own totals, but not here.
+            Resets every midnight, IST.
           </p>
 
           <label className={`block text-[9px] font-black uppercase tracking-[0.14em] mt-8 mb-2 font-ui ${muted}`}>
@@ -105,6 +108,14 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, onJoin, onLeave, onOpenA
   const mine = board.rows.findIndex(r => r.user_id === user.id);
   const myHours = hoursToday(logs);
 
+  /* Anything logged today that the app didn't time. Surfaced explicitly,
+     because "I logged 6 hours and the board says 0" is otherwise indis-
+     tinguishable from a bug. */
+  const today = getISTDateString();
+  const untimed = logs
+    .filter(l => l.date === today && !isRanked(l))
+    .reduce((sum, l) => sum + l.hours, 0);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section className={`p-6 md:p-8 rounded-xl border ${card}`}>
@@ -120,9 +131,16 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, onJoin, onLeave, onOpenA
           </div>
           <div className="text-right">
             <p className={`text-2xl md:text-3xl num-stat ${heading}`}>{myHours.toFixed(1)}h</p>
-            <p className={`text-[9px] font-bold uppercase font-ui ${muted}`}>You today</p>
+            <p className={`text-[9px] font-bold uppercase font-ui ${muted}`}>Timed today</p>
           </div>
         </div>
+
+        {untimed > 0 && (
+          <p className={`text-[10px] font-ui mt-5 pt-4 border-t leading-relaxed ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'} ${muted}`}>
+            {untimed.toFixed(1)}h you entered by hand today isn't ranked. Only the stopwatch and
+            Pomodoro count here.
+          </p>
+        )}
       </section>
 
       {board.error && (

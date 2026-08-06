@@ -28,10 +28,26 @@ export const validateName = (raw: string): string | null => {
   return name.slice(0, MAX_NAME);
 };
 
-/** Today's total across every subject, which is what the board ranks. */
+/* Only time the app measured itself. Hours typed in after the fact still count
+   towards the user's own totals, streak and score — they just can't be ranked
+   against other people, because there is nothing behind them but typing. */
+const RANKED_SOURCES: ReadonlySet<string> = new Set(['timer', 'pomodoro']);
+
+/** True if this log was measured by the stopwatch or a Pomodoro block. */
+export const isRanked = (log: DailyLog): boolean => RANKED_SOURCES.has(log.source ?? '');
+
+/**
+ * Today's leaderboard total.
+ *
+ * Deliberately not the same as the number on the Today tab: that one is the
+ * user's own record of their day and includes everything. Logs written before
+ * `source` existed have no origin to verify, so they don't count either.
+ */
 export const hoursToday = (logs: DailyLog[]): number => {
   const today = getISTDateString();
-  const total = logs.filter(l => l.date === today).reduce((sum, l) => sum + l.hours, 0);
+  const total = logs
+    .filter(l => l.date === today && isRanked(l))
+    .reduce((sum, l) => sum + l.hours, 0);
   // Clamped to match the DB constraint; a corrupted local state can't post 900h.
   return Math.min(24, Math.max(0, Math.round(total * 100) / 100));
 };

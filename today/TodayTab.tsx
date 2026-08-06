@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
+import { AppState, LogSource, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
 
 interface Props {
   state: AppState;
-  onLog: (subject: Subject, hours: number, quality: number, distractions: number) => void;
+  onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource) => void;
   onDeleteLog: (id: string) => void;
   onTimerUpdate: (timerUpdate: Partial<TimerState>) => void;
   onAddTask: (text: string, subject: Subject) => void;
@@ -76,7 +76,8 @@ const TodayTab: React.FC<Props> = ({
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
     const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0);
+    // Measured by the stopwatch, so it counts towards the leaderboard.
+    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer');
     onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0 });
   };
 

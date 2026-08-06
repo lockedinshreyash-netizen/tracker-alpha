@@ -9,6 +9,15 @@ export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
 export type QSubject = 'physics' | 'chemistry' | 'math' | 'biology';
 
+/**
+ * Where a log came from.
+ *
+ * `timer` and `pomodoro` were measured by the app as the time passed;
+ * `manual` was typed in after the fact. The leaderboard counts only the first
+ * two, so the distinction has to survive on the log itself.
+ */
+export type LogSource = 'timer' | 'pomodoro' | 'manual';
+
 export interface DailyLog {
   id: string;
   date: string; // YYYY-MM-DD (IST)
@@ -16,6 +25,9 @@ export interface DailyLog {
   hours: number;
   quality: number; // 1-5
   distractions: number; // Count of tab switches/blur events
+  /* Absent on logs written before this existed. Treated as `manual`, because
+     an unverifiable origin must never count towards a public ranking. */
+  source?: LogSource;
 }
 
 export interface DailyQuestionsLog {

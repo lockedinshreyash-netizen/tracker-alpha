@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
@@ -406,7 +406,16 @@ const App: React.FC = () => {
     setNeedsOnboarding(false);
   };
 
-  const logStudy = (subject: Subject, hours: number, quality: number, distractions: number) => {
+  /* `source` defaults to 'manual' on purpose: only the paths that actually
+     measured the time say so explicitly, so a caller that forgets can never
+     accidentally donate leaderboard hours. */
+  const logStudy = (
+    subject: Subject,
+    hours: number,
+    quality: number,
+    distractions: number,
+    source: LogSource = 'manual'
+  ) => {
     if (hours <= 0) return;
     const today = getISTDateString();
     setState(prev => {
@@ -416,7 +425,8 @@ const App: React.FC = () => {
         subject,
         hours: parseFloat(hours.toFixed(2)),
         quality: quality,
-        distractions: distractions
+        distractions: distractions,
+        source
       };
       const nextState = { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
       stateRef.current = nextState;
@@ -495,7 +505,7 @@ const App: React.FC = () => {
      stopwatch session, so hours, streaks, the heatmap and the Lock-In Score
      all pick it up with no special-casing. */
   const logPomodoroBlock = (subject: Subject, hours: number, quality: number) => {
-    logStudy(subject, hours, quality, 0);
+    logStudy(subject, hours, quality, 0, 'pomodoro');
   };
 
   /* If the tab was closed between finishing a block and rating it, that block
@@ -514,7 +524,8 @@ const App: React.FC = () => {
     const pending = stateRef.current.pomodoro?.pendingBlock;
     if (!pending) return;
 
-    logStudy(pending.subject, pending.hours, 4, 0);
+    // Still a real Pomodoro block — it was measured, just never rated.
+    logStudy(pending.subject, pending.hours, 4, 0, 'pomodoro');
     /* Cleared with a lastUpdated bump — unlike updatePomodoro, which leaves the
        timestamp alone so ordinary phase ticks don't churn the sync. Without the
        bump the server copy still looks current and wins the next merge. */
@@ -748,7 +759,8 @@ const App: React.FC = () => {
         if (!t.isRunning && !t.accumulatedMs) return { ok: false, message: 'NOTHING RUNNING.' };
         const elapsedMs = (t.isRunning ? Date.now() - (t.startTime || Date.now()) : 0) + t.accumulatedMs;
         const hours = elapsedMs / (1000 * 60 * 60);
-        logStudy(t.subject, hours, VOICE_QUALITY, 0);
+        // Ending by voice still ends a stopwatch the app timed itself.
+        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer');
         updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0 });
         return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
       }
@@ -788,7 +800,9 @@ const App: React.FC = () => {
         }
         const hours = Math.round(intent.hours * 100) / 100;
         if (hours <= 0) return { ok: false, message: 'HOW LONG? TRY “LOG 2 HOURS OF PHYSICS”.' };
-        logStudy(subject, hours, VOICE_QUALITY, 0);
+        /* Backfilled by voice, not measured — 'manual', so it counts towards the
+           user's own totals but never towards the leaderboard. */
+        logStudy(subject, hours, VOICE_QUALITY, 0, 'manual');
         return { ok: true, message: `LOGGED ${hours}H ${subject.toUpperCase()}.` };
       }
 
