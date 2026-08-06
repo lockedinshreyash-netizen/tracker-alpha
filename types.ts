@@ -48,7 +48,13 @@ export interface ChapterProgress {
   notes?: string;
 }
 
-export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Review';
+export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review';
+
+/** Opt-in, per account. Nothing is published until `enabled` is true. */
+export interface LeaderboardPrefs {
+  enabled: boolean;
+  displayName: string;
+}
 
 export interface TimerState {
   isRunning: boolean;
@@ -97,4 +103,5 @@ export interface AppState {
   timerMode: TimerMode;
   pomodoroSettings: PomodoroSettings;
   pomodoro: PomodoroRuntime;
+  leaderboard: LeaderboardPrefs;
 }

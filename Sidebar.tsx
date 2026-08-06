@@ -41,6 +41,16 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </svg>
       );
+    case 'Ranks':
+      return (
+        <svg {...props}>
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+          <path d="M6 4h12v5a6 6 0 0 1-12 0V4z" />
+          <line x1="12" y1="15" x2="12" y2="18" />
+          <path d="M8.5 21h7l-.5-3h-6l-.5 3z" />
+        </svg>
+      );
     case 'Review':
       return (
         <svg {...props}>
@@ -56,7 +66,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Review'];
+  const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review'];
   const dark = theme === 'dark';
 
   const handleTabClick = (tab: TabType) => {

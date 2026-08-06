@@ -4,7 +4,7 @@ import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject,
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS } from './state';
+import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD } from './state';
 import QuestionsTab from './questions/QuestionsTab';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
@@ -15,6 +15,8 @@ import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
 import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
+import RanksTab from './leaderboard/RanksTab';
+import { leaveBoard, publishEntry } from './leaderboard/api';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, phaseDurationMs } from './today/pomodoro';
@@ -117,6 +119,7 @@ const App: React.FC = () => {
         merged.pomodoroSettings = { ...DEFAULT_POMODORO_SETTINGS, ...(parsed.pomodoroSettings || {}) };
         merged.pomodoro = { ...IDLE_POMODORO, ...(parsed.pomodoro || {}) };
         merged.timerMode = parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch';
+        merged.leaderboard = { ...DEFAULT_LEADERBOARD, ...(parsed.leaderboard || {}) };
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -637,6 +640,49 @@ const App: React.FC = () => {
     }
   };
 
+  /* ── Leaderboard ──
+     Strictly opt-in: nothing is written to the shared table until the user
+     joins, and leaving deletes their row rather than hiding it. */
+  const joinLeaderboard = (displayName: string) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        leaderboard: { enabled: true, displayName },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+    if (user) void publishEntry(user.id, displayName, stateRef.current.logs);
+  };
+
+  const exitLeaderboard = () => {
+    if (user) void leaveBoard(user.id);
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        // The name is kept so re-joining doesn't mean typing it again.
+        leaderboard: { ...prev.leaderboard, enabled: false },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /* Push the day's total whenever it changes. Debounced because logging a
+     session updates state several times in a row, and the board only needs the
+     settled figure. */
+  const boardEnabled = state.leaderboard?.enabled ?? false;
+  const boardName = state.leaderboard?.displayName ?? '';
+  useEffect(() => {
+    if (!user || !boardEnabled || !boardName) return;
+    const id = window.setTimeout(() => {
+      void publishEntry(user.id, boardName, stateRef.current.logs);
+    }, 1500);
+    return () => window.clearTimeout(id);
+  }, [user, boardEnabled, boardName, state.logs]);
+
   /* Voice sets a chapter status outright. Deliberately separate from
      toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
   const setChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string, status: SyllabusStatus) => {
@@ -957,6 +1003,17 @@ const App: React.FC = () => {
               onLogQuestions={logQuestions}
               theme={theme}
               coreSubjects={coreQSubjects}
+            />
+          )}
+          {activeTab === 'Ranks' && (
+            <RanksTab
+              user={user}
+              logs={state.logs}
+              prefs={state.leaderboard ?? DEFAULT_LEADERBOARD}
+              onJoin={joinLeaderboard}
+              onLeave={exitLeaderboard}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              theme={theme}
             />
           )}
           {activeTab === 'Review' && (

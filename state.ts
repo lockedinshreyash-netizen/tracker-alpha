@@ -1,4 +1,11 @@
-import { AppState, PomodoroRuntime, PomodoroSettings } from './types';
+import { AppState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings } from './types';
+
+/* Off until the user explicitly joins — nothing about their study is visible to
+   anyone else before that. */
+export const DEFAULT_LEADERBOARD: LeaderboardPrefs = {
+  enabled: false,
+  displayName: '',
+};
 
 export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = {
   workMinutes: 25,
@@ -39,4 +46,5 @@ export const DEFAULT_STATE: AppState = {
   timerMode: 'stopwatch',
   pomodoroSettings: DEFAULT_POMODORO_SETTINGS,
   pomodoro: IDLE_POMODORO,
+  leaderboard: DEFAULT_LEADERBOARD,
 };
