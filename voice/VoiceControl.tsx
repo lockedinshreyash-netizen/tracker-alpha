@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
-import { COMMAND_HELP, VoiceIntent, asTaskBody, parseBestOf, parseCommand } from './commands';
+import { COMMAND_HELP, VoiceIntent, asTaskBody, joinSegments, parseBestOf, parseCommand } from './commands';
 import {
   VoiceListener,
   canResumeWithoutPrompt,
@@ -138,7 +138,9 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
     segments.current = [];
     if (!collected.length) return;
 
-    const joined = collected.map(s => s.text).join(' ').trim();
+    // Splices overlapping fragments rather than concatenating them — see
+    // joinSegments for why Android makes that necessary.
+    const joined = joinSegments(collected.map(s => s.text));
     if (!joined) return;
 
     /* Alternatives only line up with a single-segment utterance; once segments

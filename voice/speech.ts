@@ -64,6 +64,10 @@ const getCtor = (): RecognitionCtor | null => {
 /** False on Firefox and most in-app browsers — callers should hide the UI. */
 export const isVoiceSupported = (): boolean => getCtor() !== null;
 
+const isMobile = (): boolean =>
+  typeof navigator !== 'undefined' &&
+  /Android|webOS|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+
 export interface VoiceHandlers {
   /**
    * Fires for interim words too, so the UI can show speech as it lands.
@@ -237,7 +241,13 @@ export class VoiceListener {
     // Indian English — the vocabulary here is subject names spoken by JEE/NEET
     // aspirants, and en-US mangles them noticeably more.
     rec.lang = 'en-IN';
-    rec.continuous = true;
+    /* Android's speech service does not hold a continuous session the way
+       desktop Chrome does — it segments internally and re-delivers overlapping
+       hypotheses of the same phrase, which arrive as several finals that each
+       repeat the beginning ("start", "start maths", "start maths session").
+       One utterance per session is the only reliable shape there, and `onend`
+       already restarts us, so listening still feels continuous. */
+    rec.continuous = !isMobile();
     rec.interimResults = true;
     // Extra guesses cost nothing and are the single biggest accuracy win for
     // accented speech — the parser tries each one.

@@ -131,6 +131,48 @@ const FILLER = new Set([
 const normalize = (raw: string): string =>
   raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
+/**
+ * Join recognition fragments into one utterance, dropping repeated overlap.
+ *
+ * Android's speech service re-delivers growing hypotheses of the same phrase as
+ * separate final results — "start", then "start maths", then "start maths
+ * session". Concatenating those blindly produced "start start maths start
+ * session", which matches nothing. A fragment already covered by what we have
+ * is dropped; one that overlaps the tail is spliced rather than appended.
+ */
+export const joinSegments = (segments: string[]): string => {
+  const words: string[] = [];
+
+  for (const segment of segments) {
+    const next = normalize(segment).split(' ').filter(Boolean);
+    if (!next.length) continue;
+    if (!words.length) {
+      words.push(...next);
+      continue;
+    }
+
+    const accumulated = words.join(' ');
+    const fragment = next.join(' ');
+    // Already said — the whole phrase again, or just its tail.
+    if (accumulated === fragment || accumulated.endsWith(` ${fragment}`)) continue;
+    // A longer retelling of everything so far replaces it outright.
+    if (fragment.startsWith(`${accumulated} `)) {
+      words.length = 0;
+      words.push(...next);
+      continue;
+    }
+
+    // Otherwise splice at the largest overlap between our tail and its head.
+    let overlap = Math.min(words.length, next.length);
+    while (overlap > 0 && words.slice(-overlap).join(' ') !== next.slice(0, overlap).join(' ')) {
+      overlap--;
+    }
+    words.push(...next.slice(overlap));
+  }
+
+  return words.join(' ');
+};
+
 export const toQSubject = (subject: Subject): QSubject | null => {
   switch (subject) {
     case 'Physics': return 'physics';

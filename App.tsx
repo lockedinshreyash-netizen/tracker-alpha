@@ -210,7 +210,11 @@ const App: React.FC = () => {
               ...remoteState,
               // Keep UI only state local
               lastUsedTab: prev.lastUsedTab,
-              theme: prev.theme
+              theme: prev.theme,
+              // A push from another device must not reach in and restart or
+              // rewind a timer running here.
+              timer: prev.timer,
+              pomodoro: prev.pomodoro,
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -255,6 +259,9 @@ const App: React.FC = () => {
               // Preserve UI‑only preferences from the current device.
               lastUsedTab: localState.lastUsedTab,
               theme: localState.theme,
+              // …and anything mid-flight on this device. See the note below.
+              timer: localState.timer,
+              pomodoro: localState.pomodoro,
             };
           }
 
@@ -278,6 +285,16 @@ const App: React.FC = () => {
             // Preserve UI‑only preferences from the current device.
             lastUsedTab: localState.lastUsedTab,
             theme: localState.theme,
+            /* Running timers belong to the device running them, never to the
+               account. Taking these from the server resurrected an already
+               flushed Pomodoro block on every reload — it was logged locally,
+               but the clear could not be pushed back inside the 200ms
+               preventSyncOnUpdate window, so the stale server copy won the next
+               merge and the same block was logged again, and again. The same
+               hazard applies to `timer`: a stale record could restart a
+               stopwatch the user had stopped. */
+            timer: localState.timer,
+            pomodoro: localState.pomodoro,
           };
         });
       }
