@@ -129,6 +129,11 @@ export interface CoachState {
   dismissed: string[];
   dismissedOn: string | null; // YYYY-MM-DD (IST)
   served: Record<string, string>; // task id -> YYYY-MM-DD last served
+  /* Muted for good, for people who already know what they're doing. Lives in
+     synced state rather than localStorage so it holds across devices — being
+     told what to study on your phone after muting it on your laptop would be
+     the whole point missed. Never auto-unmutes. */
+  muted?: boolean;
 }
 
 export interface AppState {

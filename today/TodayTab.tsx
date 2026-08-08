@@ -24,6 +24,7 @@ interface Props {
   examPreference: ExamPreference;
   onEngageRecommendation: (rec: Recommendation) => void;
   onDismissRecommendation: (rec: Recommendation) => void;
+  onSetCoachMuted: (muted: boolean) => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -43,7 +44,8 @@ const TodayTab: React.FC<Props> = ({
   activeSubjects,
   examPreference,
   onEngageRecommendation,
-  onDismissRecommendation
+  onDismissRecommendation,
+  onSetCoachMuted
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
@@ -120,6 +122,7 @@ const TodayTab: React.FC<Props> = ({
           theme={theme}
           onEngage={onEngageRecommendation}
           onDismiss={onDismissRecommendation}
+          onSetMuted={onSetCoachMuted}
         />
       )}
       {!timer.isRunning && (

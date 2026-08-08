@@ -518,6 +518,18 @@ const App: React.FC = () => {
     });
   };
 
+  const setCoachMuted = (muted: boolean) => {
+    setState(prev => {
+      const nextState: AppState = {
+        ...prev,
+        coach: { ...(prev.coach || DEFAULT_COACH), muted },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
   const updateTimer = (timerUpdate: Partial<TimerState>) => {
     setState(prev => {
       const nextState = { ...prev, timer: { ...prev.timer!, ...timerUpdate } };
@@ -1073,6 +1085,7 @@ const App: React.FC = () => {
               examPreference={state.examPreference || 'JEE'}
               onEngageRecommendation={engageRecommendation}
               onDismissRecommendation={dismissRecommendation}
+              onSetCoachMuted={setCoachMuted}
             />
           )}
           {activeTab === 'Syllabus' && (
