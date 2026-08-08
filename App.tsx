@@ -4,7 +4,8 @@ import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject,
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD } from './state';
+import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH } from './state';
+import { Recommendation } from './today/recommend';
 import QuestionsTab from './questions/QuestionsTab';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
@@ -457,10 +458,60 @@ const App: React.FC = () => {
       const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
       const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
       const filteredProgress = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
+      const today = getISTDateString();
+      /* Stamp the transitions the coach's spaced-repetition schedule needs.
+         Entering `completed` starts the clock; entering `revision_pending` is
+         the user telling us they have just been back over it. Existing stamps
+         are carried forward so cycling past a state does not erase history. */
       const nextState = {
         ...prev,
-        progress: [...filteredProgress, { classId, subject, chapter, status: nextStatus, notes: existing?.notes }],
+        progress: [...filteredProgress, {
+          classId, subject, chapter, status: nextStatus, notes: existing?.notes,
+          completedAt: nextStatus === 'completed' ? today : existing?.completedAt,
+          lastRevisedAt: nextStatus === 'revision_pending' ? today : existing?.lastRevisedAt,
+        }],
         lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /**
+   * Accept a coach recommendation: point the timer at that subject, start it,
+   * and remember the topic was served so tomorrow offers a different one.
+   */
+  const engageRecommendation = (rec: Recommendation) => {
+    setState(prev => {
+      const today = getISTDateString();
+      const nextState: AppState = {
+        ...prev,
+        timer: { isRunning: true, startTime: Date.now(), accumulatedMs: 0, subject: rec.subject },
+        coach: {
+          ...(prev.coach || DEFAULT_COACH),
+          served: { ...(prev.coach?.served || {}), [rec.id.split(':').slice(1).join(':')]: today },
+        },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  /** "Not now" — suppress for the rest of today only, so it resurfaces
+      tomorrow rather than being lost. */
+  const dismissRecommendation = (rec: Recommendation) => {
+    setState(prev => {
+      const today = getISTDateString();
+      const sameDay = prev.coach?.dismissedOn === today;
+      const nextState: AppState = {
+        ...prev,
+        coach: {
+          served: prev.coach?.served || {},
+          dismissedOn: today,
+          dismissed: sameDay ? [...(prev.coach?.dismissed || []), rec.id] : [rec.id],
+        },
+        lastUpdated: Date.now(),
       };
       stateRef.current = nextState;
       return nextState;
@@ -1019,6 +1070,9 @@ const App: React.FC = () => {
               onLogPomodoroBlock={logPomodoroBlock}
               theme={theme}
               activeSubjects={activeSubjects}
+              examPreference={state.examPreference || 'JEE'}
+              onEngageRecommendation={engageRecommendation}
+              onDismissRecommendation={dismissRecommendation}
             />
           )}
           {activeTab === 'Syllabus' && (

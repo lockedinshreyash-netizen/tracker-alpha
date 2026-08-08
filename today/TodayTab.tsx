@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, LogSource, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
+import CoachCard from './CoachCard';
+import { Recommendation } from './recommend';
 
 interface Props {
   state: AppState;
@@ -19,6 +21,9 @@ interface Props {
   onLogPomodoroBlock: (subject: Subject, hours: number, quality: number) => void;
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
+  examPreference: ExamPreference;
+  onEngageRecommendation: (rec: Recommendation) => void;
+  onDismissRecommendation: (rec: Recommendation) => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -35,7 +40,10 @@ const TodayTab: React.FC<Props> = ({
   onUpdatePomodoroSettings,
   onLogPomodoroBlock,
   theme,
-  activeSubjects
+  activeSubjects,
+  examPreference,
+  onEngageRecommendation,
+  onDismissRecommendation
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
@@ -102,6 +110,18 @@ const TodayTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Only while idle — mid-session the last thing anyone needs is a second
+          opinion about what they should be doing. */}
+      {!timer.isRunning && !pomodoro.isRunning && (
+        <CoachCard
+          state={state}
+          exam={examPreference}
+          activeSubjects={activeSubjects}
+          theme={theme}
+          onEngage={onEngageRecommendation}
+          onDismiss={onDismissRecommendation}
+        />
+      )}
       {!timer.isRunning && (
         <section className={`p-6 md:p-10 rounded-xl border flex flex-col gap-8 md:gap-10 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full" data-onboarding-target="daily-target">

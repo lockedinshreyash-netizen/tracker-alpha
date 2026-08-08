@@ -1,4 +1,10 @@
-import { AppState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings } from './types';
+import { AppState, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings } from './types';
+
+export const DEFAULT_COACH: CoachState = {
+  dismissed: [],
+  dismissedOn: null,
+  served: {},
+};
 
 /* Off until the user explicitly joins — nothing about their study is visible to
    anyone else before that. */
@@ -48,4 +54,5 @@ export const DEFAULT_STATE: AppState = {
   pomodoroSettings: DEFAULT_POMODORO_SETTINGS,
   pomodoro: IDLE_POMODORO,
   leaderboard: DEFAULT_LEADERBOARD,
+  coach: DEFAULT_COACH,
 };

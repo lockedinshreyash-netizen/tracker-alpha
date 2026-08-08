@@ -28,6 +28,11 @@ export interface DailyLog {
   /* Absent on logs written before this existed. Treated as `manual`, because
      an unverifiable origin must never count towards a public ranking. */
   source?: LogSource;
+  /* What was actually studied. Optional because the timer can be started
+     without picking one, and every log predating this field has none. Turns
+     "4h of Physics" into "4h on Thermodynamics", which is the only way the
+     coach can notice a chapter you are stuck on. */
+  chapter?: string;
 }
 
 export interface DailyQuestionsLog {
@@ -58,6 +63,12 @@ export interface ChapterProgress {
   chapter: string;
   status: SyllabusStatus;
   notes?: string;
+  /* Absent on entries written before these existed, and deliberately not
+     backfilled — a chapter completed at an unknown time must not be treated as
+     freshly revised. The coach reads `undefined` as "age unknown" and leans on
+     weightage instead of decay for those. */
+  completedAt?: string;   // YYYY-MM-DD (IST)
+  lastRevisedAt?: string; // YYYY-MM-DD (IST)
 }
 
 export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review';
@@ -105,6 +116,21 @@ export interface PomodoroRuntime {
   pendingBlock: { subject: Subject; hours: number } | null;
 }
 
+/**
+ * Just enough memory for the coach to stop repeating itself.
+ *
+ * Deliberately not a history: `served` keeps one date per task id so the coach
+ * rotates through a chapter's topics instead of serving the same one daily, and
+ * `dismissed` is cleared whenever `dismissedOn` is not today. Both are bounded
+ * by the number of authored topics, so this cannot grow without limit inside
+ * the synced state blob.
+ */
+export interface CoachState {
+  dismissed: string[];
+  dismissedOn: string | null; // YYYY-MM-DD (IST)
+  served: Record<string, string>; // task id -> YYYY-MM-DD last served
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -121,4 +147,5 @@ export interface AppState {
   pomodoroSettings: PomodoroSettings;
   pomodoro: PomodoroRuntime;
   leaderboard: LeaderboardPrefs;
+  coach?: CoachState;
 }
