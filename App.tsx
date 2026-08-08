@@ -1028,6 +1028,7 @@ const App: React.FC = () => {
               onToggle={toggleChapterStatus}
               theme={theme}
               activeSubjects={activeSubjects}
+              examPreference={state.examPreference || 'JEE'}
             />
           )}
           {activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} coreSubjects={coreQSubjects} activeSubjects={activeSubjects} />}

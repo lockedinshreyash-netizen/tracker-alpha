@@ -22,6 +22,46 @@ export const getCoreQSubjects = (preference: ExamPreference = 'JEE'): ('physics'
     : ['physics', 'chemistry', 'math'];
 };
 
+/**
+ * Chapters that exist for one exam and not the other.
+ *
+ * SYLLABUS_DATA is the shared base list, which tracks JEE. The two syllabi
+ * genuinely diverge in Inorganic Chemistry: JEE keeps only p-Block from the
+ * s/p/Hydrogen group, while NEET retains s-Block, p-Block and Hydrogen (one
+ * source notes p-Block was cut from NCERT but explicitly kept in the NEET 2026
+ * syllabus). Before this existed, NEET students were shown the JEE list and
+ * never saw p-Block at all — the single largest Chemistry block in their exam.
+ *
+ * Additive only. Nothing is ever removed from the base list here, because
+ * ChapterProgress is keyed by chapter name and dropping a name would orphan
+ * a student's existing progress.
+ *
+ * Article-sourced, not read off the official NTA/NMC PDFs — see
+ * content/SOURCES.md before treating this as authoritative.
+ */
+export const EXAM_EXTRA_CHAPTERS: Record<ExamPreference, Partial<Record<11 | 12, Partial<Record<Subject, string[]>>>>> = {
+  JEE: {
+    11: { Chemistry: ['Purification & Characterisation of Organic Compounds'] },
+    12: { Chemistry: ['The p-Block Elements (Groups 15-18)'] },
+  },
+  NEET: {
+    11: { Chemistry: ['The p-Block Elements (Groups 13 & 14)', 's-Block Elements', 'Hydrogen'] },
+    12: { Chemistry: ['The p-Block Elements (Groups 15-18)'] },
+  },
+};
+
+/** The chapter list actually shown for an exam: shared base plus that exam's
+    extras. Use this everywhere instead of indexing SYLLABUS_DATA directly. */
+export const getChaptersFor = (
+  exam: ExamPreference,
+  classId: 11 | 12,
+  subject: Subject,
+): string[] => {
+  const base = (SYLLABUS_DATA[classId] as Record<string, string[] | undefined>)[subject] || [];
+  const extra = EXAM_EXTRA_CHAPTERS[exam]?.[classId]?.[subject] || [];
+  return [...base, ...extra];
+};
+
 export const LOCK_IN_QUOTES = [
   "THE COMPETITION IS STUDYING. ARE YOU?",
   "ONE CHAPTER TODAY. ONE RANK TOMORROW.",
