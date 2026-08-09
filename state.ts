@@ -1,4 +1,4 @@
-import { AppState, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings } from './types';
+import { AppState, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, RewardsState } from './types';
 
 export const DEFAULT_COACH: CoachState = {
   dismissed: [],
@@ -32,6 +32,18 @@ export const IDLE_POMODORO: PomodoroRuntime = {
   pendingBlock: null,
 };
 
+/* Nothing earned yet. Note `wallpaper: null` rather than a default design —
+   the plain background is what an unearned account looks like. */
+export const DEFAULT_REWARDS: RewardsState = {
+  unlocked: {},
+  acknowledged: [],
+  wallpaper: null,
+  bestStreak: 0,
+  bestVerifiedStreak: 0,
+  bookChapter: 0,
+  hamperClaimedOn: null,
+};
+
 export const DEFAULT_STATE: AppState = {
   currentClass: 11,
   examPreference: 'JEE',
@@ -55,4 +67,5 @@ export const DEFAULT_STATE: AppState = {
   pomodoro: IDLE_POMODORO,
   leaderboard: DEFAULT_LEADERBOARD,
   coach: DEFAULT_COACH,
+  rewards: DEFAULT_REWARDS,
 };

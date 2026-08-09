@@ -329,3 +329,86 @@ button:active,
   background: var(--accent);
   color: white;
 }
+
+/* ══════════════════════════════════════════
+   AURORA WALLPAPER — drifting light curtains
+   Geometry and colour live on the elements
+   (rewards/WallpaperLayer.tsx); this owns the
+   motion only.
+   ══════════════════════════════════════════ */
+
+.aurora-curtain {
+  position: absolute;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  will-change: transform, opacity, background-position;
+  /* Rays dissolve upward into the sky and stop dead below the bright hem —
+     the shape every photograph of this has. Without the mask the striations
+     run to the element's edges and read as wallpaper stripes. */
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent 0%, rgba(0, 0, 0, 0.14) 14%, rgba(0, 0, 0, 0.6) 42%,
+    #000 62%, rgba(0, 0, 0, 0.62) 80%, rgba(0, 0, 0, 0.24) 91%, transparent 100%);
+  mask-image: linear-gradient(to bottom,
+    transparent 0%, rgba(0, 0, 0, 0.14) 14%, rgba(0, 0, 0, 0.6) 42%,
+    #000 62%, rgba(0, 0, 0, 0.62) 80%, rgba(0, 0, 0, 0.24) 91%, transparent 100%);
+  /* Three cycles of unrelated lengths, so a ribbon is rarely in the same place
+     at the same brightness with the same ripple twice — the thing that stops
+     it reading as a loop. */
+  animation:
+    aurora-drift 26s ease-in-out infinite alternate,
+    aurora-glow 11s ease-in-out infinite alternate,
+    aurora-shimmer 17s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift {
+  from { transform: translate3d(-9%, 0, 0) skewX(var(--au-skew, -10deg)) scaleY(0.9); }
+  to   { transform: translate3d(11%, 0, 0) skewX(calc(var(--au-skew, -10deg) * 0.55)) scaleY(1.12); }
+}
+
+/* Both ends matter. The ceiling sits behind the header, and at full strength
+   the countdown text stopped being readable against it; too low a floor and
+   the aurora simply vanishes for part of every cycle. */
+@keyframes aurora-glow {
+  from { opacity: 0.58; }
+  to   { opacity: 0.95; }
+}
+
+/* The rays slide within the ribbon while the ribbon itself drifts, which is
+   what makes the curtain look like it is rippling rather than sliding. The hem
+   (first layer) stays put; only the two ray layers move, in opposite
+   directions. */
+@keyframes aurora-shimmer {
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to   { background-position: 0 0, 84px 0, -52px 0, 0 0; }
+}
+
+/* The unmasked ambient spill. Slow and formless on purpose — it is the light
+   in the room, not a shape anyone should be able to point at. */
+.aurora-spill {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: aurora-breathe 43s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-breathe {
+  from { transform: translate3d(-5%, 0, 0) scale(1); opacity: 0.5; }
+  to   { transform: translate3d(6%, 2%, 0) scale(1.18); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-spill {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
+/* A background that never stops moving is exhausting for anyone who asked the
+   OS to calm things down. Keep the picture, drop the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-curtain {
+    animation: none;
+    opacity: 0.7;
+    transform: skewX(var(--au-skew, -10deg));
+  }
+}

@@ -136,6 +136,34 @@ export interface CoachState {
   muted?: boolean;
 }
 
+/**
+ * Everything the user has earned by showing up.
+ *
+ * Unlocks are permanent and monotone. A reward is a receipt for days already
+ * survived, so breaking a streak never takes one back — and that one-way
+ * property is what lets two devices merge their rewards by union rather than
+ * by whichever wrote last.
+ *
+ * The high-water marks are stored rather than recomputed because logs can be
+ * deleted. A user who clears old logs has still done the days; the receipt
+ * stands.
+ */
+export interface RewardsState {
+  /** reward id -> YYYY-MM-DD (IST) it was unlocked. Presence means unlocked. */
+  unlocked: Record<string, string>;
+  /** Unlocks whose interstitial has been shown, so it fires exactly once. */
+  acknowledged: string[];
+  /** Selected wallpaper id, or null for the plain app background. */
+  wallpaper: string | null;
+  bestStreak: number;
+  /** Best streak counting only days with a timer/pomodoro log. See LogSource. */
+  bestVerifiedStreak: number;
+  /** Chapter index the in-app book is open at. */
+  bookChapter?: number;
+  /** YYYY-MM-DD the user asked to claim the year-one hamper. */
+  hamperClaimedOn?: string | null;
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -153,4 +181,5 @@ export interface AppState {
   pomodoro: PomodoroRuntime;
   leaderboard: LeaderboardPrefs;
   coach?: CoachState;
+  rewards?: RewardsState;
 }

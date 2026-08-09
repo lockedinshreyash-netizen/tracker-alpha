@@ -1,31 +1,45 @@
 import React from 'react';
-import { DailyLog, DailyQuestionsLog, QSubject, Subject } from '../types';
+import { DailyLog, DailyQuestionsLog, QSubject, RewardsState, Subject } from '../types';
 import { getLast7DaysStats } from '../utils';
 import QuestionsBarChart from '../review/QuestionsBarChart';
 import QuestionsHeatmap from '../review/QuestionsHeatmap';
 import MonthlyHeatmap from './MonthlyHeatmap';
+import RewardsVault from '../rewards/RewardsVault';
+import { nextReward } from '../rewards/engine';
 
 interface Props {
   streak: number;
+  /** Streak counting only app-timed days — what the paid rewards run on. */
+  verifiedStreak: number;
   logs: DailyLog[];
   dailyGoalHours: number;
   theme: 'dark' | 'light';
   dailyQuestionsLog?: DailyQuestionsLog[];
   coreSubjects: QSubject[];
   activeSubjects: Subject[];
+  rewards: RewardsState;
+  onSelectWallpaper: (id: string | null) => void;
+  onOpenBook: () => void;
+  onClaimHamper: () => void;
 }
 
 const StreakTab: React.FC<Props> = ({
   streak,
+  verifiedStreak,
   logs,
   dailyGoalHours,
   theme,
   dailyQuestionsLog,
   coreSubjects,
   activeSubjects,
+  rewards,
+  onSelectWallpaper,
+  onOpenBook,
+  onClaimHamper,
 }) => {
   const days = getLast7DaysStats(logs, activeSubjects);
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
+  const next = nextReward(rewards);
 
   return (
     <div className="space-y-14 animate-in fade-in duration-500">
@@ -41,7 +55,34 @@ const StreakTab: React.FC<Props> = ({
         <p className="text-sm font-medium tracking-wide text-zinc-600 mt-2 font-ui">
           days of undivided focus
         </p>
+
+        {/* What the next day of this is actually worth. */}
+        {next && (
+          <div className="mt-10 max-w-xs mx-auto px-6">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 font-ui">
+                Next: {next.def.title}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#E10600] tabular-nums font-ui">
+                {next.daysLeft} to go
+              </span>
+            </div>
+            <div className={`h-1 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-white/[0.06]' : 'bg-zinc-200'}`}>
+              <div className="h-full bg-[#E10600] transition-all duration-700" style={{ width: `${next.percent}%` }} />
+            </div>
+          </div>
+        )}
       </div>
+
+      <RewardsVault
+        rewards={rewards}
+        streak={streak}
+        verifiedStreak={verifiedStreak}
+        theme={theme}
+        onSelectWallpaper={onSelectWallpaper}
+        onOpenBook={onOpenBook}
+        onClaimHamper={onClaimHamper}
+      />
 
       {/* 7‑day focus hours graph */}
       <div

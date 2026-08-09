@@ -35,11 +35,8 @@ export const getDaysRemaining = (target: Date): number => {
   return diffDays > 0 ? diffDays : 0;
 };
 
-export const calculateStreak = (logs: DailyLog[]): number => {
-  if (logs.length === 0) return 0;
-
-  const loggedDates = new Set(logs.map(l => l.date));
-  const sortedDates = Array.from(loggedDates).sort((a, b) => b.localeCompare(a));
+const streakFromDates = (loggedDates: Set<string>): number => {
+  if (loggedDates.size === 0) return 0;
 
   const today = getISTDateString();
   const yesterday = getISTDateString(new Date(Date.now() - 86400000));
@@ -63,6 +60,24 @@ export const calculateStreak = (logs: DailyLog[]): number => {
 
   return streak;
 };
+
+export const calculateStreak = (logs: DailyLog[]): number =>
+  streakFromDates(new Set(logs.map(l => l.date)));
+
+/** A log the app measured itself, rather than one typed in after the fact. */
+export const isVerifiedLog = (log: DailyLog): boolean =>
+  log.source === 'timer' || log.source === 'pomodoro';
+
+/**
+ * The streak counting only days the app actually watched happen.
+ *
+ * Same rule as `calculateStreak`, over a smaller set of days. Manual logs keep
+ * the visible streak alive but cannot buy a reward that costs real money —
+ * a backfill loop would otherwise mint a year of study in a minute. This is
+ * the same stance the leaderboard already takes on `LogSource`.
+ */
+export const calculateVerifiedStreak = (logs: DailyLog[]): number =>
+  streakFromDates(new Set(logs.filter(isVerifiedLog).map(l => l.date)));
 
 export const getLast7DaysStats = (
   logs: DailyLog[],

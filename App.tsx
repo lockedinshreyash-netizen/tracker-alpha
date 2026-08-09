@@ -2,9 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
-import { getISTDateString, getDaysRemaining, calculateStreak, calculateLockInScore, generateId } from './utils';
+import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH } from './state';
+import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REWARDS } from './state';
+import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
+import { wallpaperById } from './rewards/wallpapers';
+import WallpaperLayer from './rewards/WallpaperLayer';
+import UnlockModal from './rewards/UnlockModal';
+import BookReader from './rewards/BookReader';
 import { Recommendation } from './today/recommend';
 import QuestionsTab from './questions/QuestionsTab';
 import Sidebar from './Sidebar';
@@ -123,6 +128,10 @@ const App: React.FC = () => {
         merged.pomodoro = { ...IDLE_POMODORO, ...(parsed.pomodoro || {}) };
         merged.timerMode = parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch';
         merged.leaderboard = { ...DEFAULT_LEADERBOARD, ...(parsed.leaderboard || {}) };
+        /* Rewards arrived late too, and an account with a long history should
+           find its earned tiers already in the vault on first load — `evaluate`
+           backfills them from the logs. */
+        merged.rewards = normalizeRewards(parsed.rewards);
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -221,6 +230,8 @@ const App: React.FC = () => {
               // rewind a timer running here.
               timer: prev.timer,
               pomodoro: prev.pomodoro,
+              // …nor take back a reward already earned here.
+              rewards: mergeRewards(normalizeRewards(prev.rewards), normalizeRewards(remoteState.rewards)),
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -268,6 +279,12 @@ const App: React.FC = () => {
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
               pomodoro: localState.pomodoro,
+              /* Never last-write-wins: an unlock is a receipt, and a stale
+                 push from another device must not be able to revoke one. */
+              rewards: mergeRewards(
+                normalizeRewards(localState.rewards),
+                normalizeRewards(remoteState.rewards),
+              ),
             };
           }
 
@@ -301,6 +318,10 @@ const App: React.FC = () => {
                stopwatch the user had stopped. */
             timer: localState.timer,
             pomodoro: localState.pomodoro,
+            rewards: mergeRewards(
+              normalizeRewards(localState.rewards),
+              normalizeRewards(remoteState.rewards),
+            ),
           };
         });
       }
@@ -383,6 +404,74 @@ const App: React.FC = () => {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
+  };
+
+  /* ── Rewards ──────────────────────────────────────────────────────────── */
+
+  const [isBookOpen, setIsBookOpen] = useState(false);
+
+  /**
+   * Re-derive unlocks whenever the logs move.
+   *
+   * `evaluateRewards` returns the same object when nothing was earned, so this
+   * settles in one pass and never loops — the `setState` below is skipped
+   * entirely on the overwhelmingly common no-change path. It also runs once on
+   * mount, which is what backfills the vault for users who already had a long
+   * streak before rewards existed.
+   */
+  useEffect(() => {
+    setState(prev => {
+      const current = normalizeRewards(prev.rewards);
+      const next = evaluateRewards(prev.logs, current);
+      if (next === current && prev.rewards) return prev;
+      return { ...prev, rewards: next };
+    });
+  }, [state.logs]);
+
+  const selectWallpaper = (id: string | null) => {
+    setState(prev => {
+      const next = { ...prev, rewards: { ...normalizeRewards(prev.rewards), wallpaper: id }, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  const setBookChapter = (index: number) => {
+    setState(prev => {
+      const next = { ...prev, rewards: { ...normalizeRewards(prev.rewards), bookChapter: index }, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  /* Records that the user opened the claim. The actual conversation happens
+     over email — the app never collects a postal address. */
+  const claimHamper = () => {
+    setState(prev => {
+      const rewards = normalizeRewards(prev.rewards);
+      if (rewards.hamperClaimedOn) return prev;
+      const next = {
+        ...prev,
+        rewards: { ...rewards, hamperClaimedOn: getISTDateString() },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  const acknowledgeReward = (id: string) => {
+    setState(prev => {
+      const rewards = normalizeRewards(prev.rewards);
+      if (rewards.acknowledged.includes(id)) return prev;
+      const next = {
+        ...prev,
+        rewards: { ...rewards, acknowledged: [...rewards.acknowledged, id] },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = next;
+      return next;
+    });
   };
 
   /* Written once, when the calibration act completes. Skipping writes nothing. */
@@ -1002,7 +1091,14 @@ const App: React.FC = () => {
   const targetExamDate = state.examPreference === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE;
   const daysRemaining = getDaysRemaining(targetExamDate);
   const streakCount = calculateStreak(state.logs);
+  const verifiedStreakCount = calculateVerifiedStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
+
+  const rewards = state.rewards ?? DEFAULT_REWARDS;
+  /* Oldest un-shown tier first, so someone returning after a long absence is
+     walked up their unlocks one at a time instead of seeing only the last. */
+  const celebration = pendingCelebrations(rewards)[0];
+  const wallpaper = wallpaperById(rewards.wallpaper);
 
   /* Onboarding waits on: the landing page being dismissed, the auth modal
      being closed (so it can't cover a sign-up the user just started), and the
@@ -1029,6 +1125,15 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen relative selection:bg-[#E10600] selection:text-white transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0B0B0D] text-white' : 'bg-[#F2F0EC] text-[#17150F]'}`}>
+      {/* An earned wallpaper, behind everything and reacting to nothing. */}
+      {wallpaper && (
+        <WallpaperLayer
+          wallpaper={wallpaper}
+          dark={theme === 'dark'}
+          className="fixed inset-0 z-0 pointer-events-none"
+        />
+      )}
+
       <Sidebar activeTab={activeTab} onTabChange={handleTabChange} theme={theme} />
 
       <AuthModal
@@ -1098,7 +1203,22 @@ const App: React.FC = () => {
               examPreference={state.examPreference || 'JEE'}
             />
           )}
-          {activeTab === 'Streak' && <StreakTab streak={streakCount} logs={state.logs} dailyGoalHours={state.dailyGoalHours} theme={theme} dailyQuestionsLog={state.questionTracking.dailyQuestionsLog} coreSubjects={coreQSubjects} activeSubjects={activeSubjects} />}
+          {activeTab === 'Streak' && (
+            <StreakTab
+              streak={streakCount}
+              verifiedStreak={verifiedStreakCount}
+              logs={state.logs}
+              dailyGoalHours={state.dailyGoalHours}
+              theme={theme}
+              dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
+              coreSubjects={coreQSubjects}
+              activeSubjects={activeSubjects}
+              rewards={rewards}
+              onSelectWallpaper={selectWallpaper}
+              onOpenBook={() => setIsBookOpen(true)}
+              onClaimHamper={claimHamper}
+            />
+          )}
           {activeTab === 'Questions' && (
             <QuestionsTab
               questionTracking={state.questionTracking}
@@ -1148,6 +1268,30 @@ const App: React.FC = () => {
           during the tour, which owns the screen. */}
       {!showOnboarding && (
         <RaceToast event={race.toast} onDismiss={race.dismissToast} theme={theme} />
+      )}
+
+      {/* The payoff. Held back until the tour is done and the book is closed,
+          so it never lands on top of another full-screen moment. */}
+      {!showOnboarding && !isBookOpen && celebration && (
+        <UnlockModal
+          def={celebration}
+          theme={theme}
+          onDismiss={() => acknowledgeReward(celebration.id)}
+          onOpen={() => {
+            acknowledgeReward(celebration.id);
+            if (celebration.kind === 'book') setIsBookOpen(true);
+            else handleTabChange('Streak');
+          }}
+        />
+      )}
+
+      {isBookOpen && (
+        <BookReader
+          theme={theme}
+          chapter={rewards.bookChapter ?? 0}
+          onChapterChange={setBookChapter}
+          onClose={() => setIsBookOpen(false)}
+        />
       )}
 
       {showOnboarding && (
