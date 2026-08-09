@@ -110,5 +110,51 @@ for (const exam of EXAMS) {
   console.log(`  foundational but low/medium tier (never show as skippable): ${trap.length}`);
 }
 
-console.log(failures ? `\nFAIL — ${failures} coverage problem(s)` : '\nOK — coverage complete for both exams');
+/* Topic ids are generated from a slug that truncates the NAME to 40 chars, so a
+   hand-written topicId is easy to get subtly wrong — and a wrong one fails
+   silently: hasCompleteTest returns false and the test simply never appears.
+   This check exists because that happened. */
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+const topicsSrc = readFileSync('content/topics.ts', 'utf8');
+const topicIds = [];
+const chapterOf = {};
+{
+  const re = /chapterTopics\(\s*'(\w+)',\s*(11|12),\s*'([^']+)',\s*\[([\s\S]*?)\]\s*\)/g;
+  let m;
+  while ((m = re.exec(topicsSrc))) {
+    const [, subject, cl, chapter, body] = m;
+    for (const r of body.matchAll(/\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*(\d+)\s*,/g)) {
+      const id = `${subject[0].toLowerCase()}${cl}-${slug(chapter)}-${slug(r[1].replace(/\\'/g, "'"))}`;
+      topicIds.push(id);
+      chapterOf[id] = `${cl}|${subject}|${chapter}`;
+    }
+  }
+}
+
+const qIds = [...readFileSync('content/questions.ts', 'utf8').matchAll(/topicId: '([^']+)'/g)].map((m) => m[1]);
+console.log(`\n=== Mastery tests ===`);
+
+const orphanQ = qIds.filter((q) => !topicIds.includes(q));
+for (const o of orphanQ) console.log(`  DANGLING topicId (test will silently never appear): ${o}`);
+failures += orphanQ.length;
+
+const dupQ = qIds.filter((q, i) => qIds.indexOf(q) !== i);
+for (const d of new Set(dupQ)) console.log(`  DUPLICATE question for topic: ${d}`);
+failures += new Set(dupQ).size;
+
+// Report which chapters are fully covered, i.e. actually testable.
+const byChapter = {};
+for (const id of topicIds) {
+  const key = chapterOf[id];
+  byChapter[key] = byChapter[key] || { total: 0, withQ: 0 };
+  byChapter[key].total++;
+  if (qIds.includes(id)) byChapter[key].withQ++;
+}
+const complete = Object.entries(byChapter).filter(([, v]) => v.withQ === v.total);
+const partial = Object.entries(byChapter).filter(([, v]) => v.withQ > 0 && v.withQ < v.total);
+console.log(`  testable chapters (every topic covered): ${complete.length}`);
+for (const [k, v] of complete) console.log(`    ${k.replace(/\|/g, ' ')} — ${v.total} questions`);
+for (const [k, v] of partial) console.log(`    PARTIAL (test hidden): ${k.replace(/\|/g, ' ')} — ${v.withQ}/${v.total}`);
+
+console.log(failures ? `\nFAIL — ${failures} problem(s)` : '\nOK — coverage complete for both exams');
 process.exit(failures ? 1 : 0);

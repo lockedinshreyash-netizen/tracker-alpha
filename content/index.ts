@@ -11,8 +11,6 @@ import { NEET_WEIGHTAGE } from './weightageNEET';
 export * from './types';
 export { JEE_WEIGHTAGE } from './weightageJEE';
 export { NEET_WEIGHTAGE } from './weightageNEET';
-export { REVISION_NOTES, revisionNoteFor } from './revisionNotes';
-export type { RevisionNote } from './revisionNotes';
 
 export const getWeight = (
   exam: ExamPreference,

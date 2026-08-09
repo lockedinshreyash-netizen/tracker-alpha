@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Subject, ChapterProgress, SyllabusStatus, ExamPreference } from '../types';
+import { Subject, ChapterProgress, SyllabusStatus, ExamPreference, TopicMastery } from '../types';
 import { STATUS_COLORS, STATUS_LABELS, getChaptersFor } from '../constants';
-import { getWeight, revisionNoteFor, TIER_LABELS, TIER_STYLES, TIER_ORDER, canShowPercent } from '../content';
-import RevisionSheet from './RevisionSheet';
+import { getWeight, TIER_LABELS, TIER_STYLES, TIER_ORDER, canShowPercent } from '../content';
+import ChapterTest from './ChapterTest';
+import { hasCompleteTest } from '../content/questions';
 
 interface Props {
   currentClass: 11 | 12;
@@ -11,15 +12,16 @@ interface Props {
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
   examPreference: ExamPreference;
+  onTestFinished: (classId: 11 | 12, subject: Subject, chapter: string, results: Record<string, TopicMastery>, allSolid: boolean) => void;
 }
 
 type SortMode = 'damage' | 'syllabus';
 
-const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference }) => {
+const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference, onTestFinished }) => {
   const [activeSubject, setActiveSubject] = useState<Subject>('Physics');
   const [sortMode, setSortMode] = useState<SortMode>('damage');
   const [hideCompleted, setHideCompleted] = useState(false);
-  const [sheetFor, setSheetFor] = useState<string | null>(null);
+  const [testFor, setTestFor] = useState<string | null>(null);
 
   const dark = theme === 'dark';
   const chapters = useMemo(
@@ -37,7 +39,7 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
       chapter,
       weight: getWeight(examPreference, currentClass, activeSubject, chapter),
       status: statusOf(chapter),
-      hasSheet: !!revisionNoteFor(currentClass, activeSubject, chapter),
+      hasTest: hasCompleteTest(currentClass, activeSubject, chapter),
     }));
 
     if (sortMode === 'damage') {
@@ -86,8 +88,6 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
     });
     return open[0];
   }, [chapters, examPreference, currentClass, activeSubject, progress]);
-
-  const sheetChapter = sheetFor;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -164,7 +164,7 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {rows.map(({ chapter, weight, status, hasSheet }) => {
+        {rows.map(({ chapter, weight, status, hasTest }) => {
           const colors = STATUS_COLORS[status];
           // Only genuinely low-yield chapters get de-emphasised. A foundational
           // chapter is never dimmed however light its weightage — dropping it
@@ -204,12 +204,18 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
               </div>
 
               <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 gap-2">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSheetFor(chapter); }}
-                  className={`text-[8px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border transition-colors ${hasSheet ? (dark ? 'border-white/15 text-zinc-300 hover:border-white/35 hover:text-white' : 'border-zinc-300 text-zinc-600 hover:border-zinc-500') : 'border-transparent text-zinc-600 hover:text-zinc-400'}`}
-                >
-                  {hasSheet ? 'Revision sheet' : 'Sheet pending'}
-                </button>
+                {hasTest ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setTestFor(chapter); }}
+                    className="text-[8px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border border-[#E10600]/50 text-[#E10600] hover:bg-[#E10600]/10 transition-colors"
+                  >
+                    Test me
+                  </button>
+                ) : (
+                  <span className="text-[8px] font-bold uppercase tracking-[0.06em] text-zinc-600">
+                    Test pending
+                  </span>
+                )}
                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
               </div>
             </div>
@@ -223,15 +229,14 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
         </p>
       )}
 
-      {sheetChapter && (
-        <RevisionSheet
-          chapter={sheetChapter}
+      {testFor && (
+        <ChapterTest
+          chapter={testFor}
           classId={currentClass}
           subject={activeSubject}
-          weight={getWeight(examPreference, currentClass, activeSubject, sheetChapter)}
-          note={revisionNoteFor(currentClass, activeSubject, sheetChapter)}
           theme={theme}
-          onClose={() => setSheetFor(null)}
+          onClose={() => setTestFor(null)}
+          onFinish={(results, allSolid) => onTestFinished(currentClass, activeSubject, testFor, results, allSolid)}
         />
       )}
     </div>

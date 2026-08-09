@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
@@ -607,6 +607,45 @@ const App: React.FC = () => {
     });
   };
 
+  /**
+   * Record a mastery test. Clearing every topic confidently is the one thing
+   * that marks a chapter complete outright — the tap-to-cycle path still works,
+   * but this is the path with evidence behind it.
+   */
+  const recordTestResult = (
+    classId: 11 | 12,
+    subject: Subject,
+    chapter: string,
+    results: Record<string, TopicMastery>,
+    allSolid: boolean,
+  ) => {
+    setState(prev => {
+      const today = getISTDateString();
+      const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
+      const progress = allSolid
+        ? [
+            ...prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter)),
+            {
+              classId, subject, chapter,
+              status: 'completed' as SyllabusStatus,
+              notes: existing?.notes,
+              completedAt: today,
+              lastRevisedAt: today,
+            },
+          ]
+        : prev.progress;
+
+      const nextState: AppState = {
+        ...prev,
+        progress,
+        topicMastery: { ...(prev.topicMastery || {}), ...results },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
   const setCoachMuted = (muted: boolean) => {
     setState(prev => {
       const nextState: AppState = {
@@ -1201,6 +1240,7 @@ const App: React.FC = () => {
               theme={theme}
               activeSubjects={activeSubjects}
               examPreference={state.examPreference || 'JEE'}
+              onTestFinished={recordTestResult}
             />
           )}
           {activeTab === 'Streak' && (

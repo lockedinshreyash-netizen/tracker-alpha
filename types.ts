@@ -164,6 +164,21 @@ export interface RewardsState {
   hamperClaimedOn?: string | null;
 }
 
+/**
+ * Result of a topic's question in a chapter mastery test.
+ *
+ * `shaky` exists because the rule is "confidently get all of these right".
+ * A right answer the student flagged as a guess is not mastery — it is a gap
+ * that happened to land, and treating it as solid would certify a chapter on
+ * luck. Only `solid` counts towards completing a chapter.
+ */
+export type TopicResult = 'solid' | 'shaky' | 'gap';
+
+export interface TopicMastery {
+  result: TopicResult;
+  date: string; // YYYY-MM-DD (IST)
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -182,4 +197,7 @@ export interface AppState {
   leaderboard: LeaderboardPrefs;
   coach?: CoachState;
   rewards?: RewardsState;
+  /* Keyed by Topic.id. Bounded by the number of authored topics, so it stays
+     small inside the synced state blob. */
+  topicMastery?: Record<string, TopicMastery>;
 }

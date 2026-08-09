@@ -193,7 +193,27 @@ export const buildRecommendations = ({ state, exam, activeSubjects, now = new Da
           : `Heaviest chapter you haven’t opened${stale > 5 && stale !== Infinity ? ` · ${subject} untouched ${stale} days` : ''}`;
       }
 
-      const topic = pickTopic(topics, served, today);
+      /* A topic the mastery test just caught outranks everything else in this
+         chapter — it is the one place the app has direct evidence of a gap
+         rather than an inference from dates and weightage. A `shaky` result
+         counts too: the answer landed but the student said they guessed. */
+      const failed = topics.filter((t) => {
+        const r = state.topicMastery?.[t.id]?.result;
+        return r === 'gap' || r === 'shaky';
+      });
+      const topic = failed.length
+        ? pickTopic(failed, served, today)
+        : pickTopic(topics, served, today);
+
+      if (topic && failed.some((f) => f.id === topic.id)) {
+        const r = state.topicMastery?.[topic.id]?.result;
+        score += r === 'gap' ? 60 : 35;
+        action = 'revise';
+        reason = r === 'gap'
+          ? `You got this wrong in the chapter test`
+          : `You got this right but flagged it a guess`;
+      }
+
       // Slot fit: a topic that does not fit the remaining time is a bad call
       // right now even if it is the most valuable thing overall.
       const minutes = topic ? (action === 'start' ? Math.round(topic.minutes * 1.4) : topic.minutes) : Math.min(45, budget);
