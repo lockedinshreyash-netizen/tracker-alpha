@@ -419,17 +419,47 @@ export const withinOneBlock = (minutes: number): boolean => minutes <= POMODORO_
    two devices arguing about who saw what. */
 
 const DAY_KEY = 'race_day_v1';
+/* The last COMPLETED day, kept so the recap has something to report. Only one
+   day is retained — a recap is about yesterday, and an archive of every race
+   the user has ever run is a different feature with a different cost. */
+const PREV_KEY = 'race_day_prev_v1';
 
 export const loadRaceDay = (date: string = getISTDateString()): RaceDay => {
   try {
     const raw = localStorage.getItem(DAY_KEY);
     if (!raw) return emptyRaceDay(date);
     const parsed = JSON.parse(raw) as RaceDay;
-    // A record from yesterday is not a record of today's race.
-    if (parsed.date !== date) return emptyRaceDay(date);
+    // A record from yesterday is not a record of today's race — but it is
+    // exactly what the recap wants, so retire it rather than dropping it.
+    if (parsed.date !== date) {
+      if (parsed.seeded) {
+        try { localStorage.setItem(PREV_KEY, raw); } catch { /* not worth failing over */ }
+      }
+      return emptyRaceDay(date);
+    }
     return { ...emptyRaceDay(date), ...parsed };
   } catch {
     return emptyRaceDay(date);
+  }
+};
+
+/**
+ * The last completed race day, or null if there isn't one worth showing.
+ *
+ * Returns null for today's own record (the race is still running) and for any
+ * day the user never actually appeared on the board — a recap of a race you
+ * did not enter is noise.
+ */
+export const loadPreviousRaceDay = (today: string = getISTDateString()): RaceDay | null => {
+  try {
+    const raw = localStorage.getItem(PREV_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RaceDay;
+    if (!parsed.date || parsed.date === today) return null;
+    if (!parsed.seeded || parsed.startPosition === null) return null;
+    return { ...emptyRaceDay(parsed.date), ...parsed };
+  } catch {
+    return null;
   }
 };
 

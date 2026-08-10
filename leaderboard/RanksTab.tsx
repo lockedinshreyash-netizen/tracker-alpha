@@ -5,6 +5,7 @@ import { MAX_NAME, validateName } from './api';
 import { Racer, formatGap } from './engine';
 import { RaceView, untimedHoursToday } from './useRace';
 import RaceStatusCard from './RaceStatusCard';
+import RaceRecap from './RaceRecap';
 import RaceControlFeed from './RaceControl';
 import RaceTimeline from './RaceTimeline';
 
@@ -127,6 +128,8 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, o
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <RaceRecap theme={theme} />
+
       <RaceStatusCard status={race.status} race={race.race} day={race.day} theme={theme} />
 
       <RaceControlFeed events={race.feed} theme={theme} />

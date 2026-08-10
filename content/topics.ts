@@ -274,6 +274,114 @@ export const TOPICS: Topic[] = [
     ['Counting isomers: geometrical, optical and linkage', 40, 'numerical'],
     ['VBT hybridisation and predicting geometry', 35, 'concept'],
   ]),
+  // ------------------------------------------------------------- Chemistry 11
+  ...chapterTopics('Chemistry', 11, 'Some Basic Concepts of Chemistry', [
+    ['The mole concept and Avogadro’s number', 30, 'concept'],
+    ['Empirical and molecular formulae', 30, 'concept'],
+    ['Stoichiometry and the limiting reagent', 35, 'concept'],
+    ['Concentration terms and their temperature dependence', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Structure of Atom', [
+    ['The Bohr model and where it breaks down', 30, 'concept'],
+    ['Quantum numbers and the shapes of orbitals', 35, 'concept'],
+    ['Aufbau principle, Pauli exclusion and Hund’s rule', 30, 'concept'],
+    ['Dual nature, de Broglie and Heisenberg uncertainty', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Classification of Elements & Periodicity', [
+    ['Modern periodic law and the s, p, d, f blocks', 25, 'concept'],
+    ['Atomic and ionic radii trends', 30, 'concept'],
+    ['Ionisation enthalpy: trends and the exceptions', 35, 'concept'],
+    ['Electron gain enthalpy and electronegativity', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Thermodynamics', [
+    ['System, surroundings and state functions', 25, 'concept'],
+    ['First law, enthalpy and heat capacity', 35, 'concept'],
+    ['Hess’s law and enthalpies of reaction', 30, 'concept'],
+    ['Entropy, spontaneity and Gibbs free energy', 35, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Redox Reactions', [
+    ['Rules for assigning oxidation numbers', 30, 'concept'],
+    ['Identifying oxidising and reducing agents', 25, 'concept'],
+    ['Balancing redox equations', 35, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Organic Chemistry: Basic Principles & Techniques', [
+    ['IUPAC nomenclature of organic compounds', 35, 'concept'],
+    ['Structural isomerism and stereoisomerism', 35, 'concept'],
+    ['Inductive, resonance and hyperconjugative effects', 35, 'concept'],
+    ['Carbocations, carbanions and free radicals', 30, 'concept'],
+    ['Types of organic reactions, and electrophiles vs nucleophiles', 25, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Hydrocarbons', [
+    ['Alkanes and free radical substitution', 30, 'concept'],
+    ['Alkenes: electrophilic addition and Markovnikov’s rule', 35, 'concept'],
+    ['Alkynes: acidity and addition reactions', 30, 'concept'],
+    ['Aromaticity and electrophilic aromatic substitution', 35, 'concept'],
+    ['Directive influence of substituents on the benzene ring', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Purification & Characterisation of Organic Compounds', [
+    ['Purification: distillation, crystallisation and chromatography', 30, 'concept'],
+    ['Detection of elements and quantitative estimation', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'The p-Block Elements (Groups 13 & 14)', [
+    ['Group 13: trends and important compounds', 30, 'concept'],
+    ['Group 14: allotropes, trends and important compounds', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 's-Block Elements', [
+    ['Alkali and alkaline earth metals: periodic trends', 30, 'concept'],
+    ['Anomalous behaviour and the diagonal relationship', 25, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 11, 'Hydrogen', [
+    ['Position of hydrogen, its isotopes and preparation', 25, 'concept'],
+    ['Hydrides, and the hardness of water', 25, 'concept'],
+  ]),
+
+  // ------------------------------------------------------------- Chemistry 12
+  ...chapterTopics('Chemistry', 12, 'Electrochemistry', [
+    ['Electrochemical cells and standard electrode potential', 30, 'concept'],
+    ['The Nernst equation and cell EMF', 35, 'concept'],
+    ['Conductance and Kohlrausch’s law', 30, 'concept'],
+    ['Electrolysis and Faraday’s laws', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'Chemical Kinetics', [
+    ['Rate of reaction and the rate law', 30, 'concept'],
+    ['Order versus molecularity', 30, 'concept'],
+    ['Integrated rate equations and half-life', 35, 'concept'],
+    ['Arrhenius equation, activation energy and catalysts', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'd- & f-Block Elements', [
+    ['General characteristics of the transition metals', 30, 'concept'],
+    ['Variable oxidation states and the origin of colour', 30, 'concept'],
+    ['Magnetic properties and catalytic behaviour', 25, 'concept'],
+    ['Lanthanoids, actinoids and lanthanoid contraction', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'Haloalkanes & Haloarenes', [
+    ['Nomenclature and methods of preparation', 25, 'concept'],
+    ['SN1 and SN2 mechanisms', 40, 'concept'],
+    ['Elimination reactions and Saytzeff’s rule', 30, 'concept'],
+    ['Why haloarenes resist nucleophilic substitution', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'Alcohols, Phenols & Ethers', [
+    ['Preparation and physical properties', 30, 'concept'],
+    ['Acidity of alcohols and phenols', 30, 'concept'],
+    ['Reactions of alcohols: dehydration and oxidation', 30, 'concept'],
+    ['Reactions of phenols and their distinguishing tests', 30, 'concept'],
+    ['Ethers: preparation and cleavage', 25, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'Amines', [
+    ['Classification, preparation and basicity', 35, 'concept'],
+    ['Reactions of amines and the Hinsberg test', 30, 'concept'],
+    ['Diazonium salts and their conversions', 30, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'Biomolecules', [
+    ['Carbohydrates: classification and structure', 30, 'concept'],
+    ['Amino acids, the peptide bond and protein structure', 30, 'concept'],
+    ['Nucleic acids, enzymes and vitamins', 25, 'concept'],
+  ]),
+  ...chapterTopics('Chemistry', 12, 'The p-Block Elements (Groups 15-18)', [
+    ['Group 15: trends, ammonia and nitric acid', 30, 'concept'],
+    ['Group 16: trends, oxygen and sulphuric acid', 30, 'concept'],
+    ['Group 17 halogens and Group 18 noble gases', 30, 'concept'],
+  ]),
   ...chapterTopics('Chemistry', 12, 'Solutions', [
     ['Concentration terms and interconverting them', 30, 'numerical'],
     ['Henry’s law and the solubility of gases', 25, 'concept'],
@@ -309,6 +417,75 @@ export const TOPICS: Topic[] = [
     ['Shortest distance between skew lines', 40, 'numerical'],
     ['Foot of perpendicular and image of a point in a plane', 40, 'numerical'],
   ]),
+  ...chapterTopics('Maths', 11, 'Complex Numbers & Quadratic Equations', [
+    ['Algebra of complex numbers, modulus and conjugate', 30, 'concept'],
+    ['Argand plane, polar form and argument', 30, 'concept'],
+    ['De Moivre’s theorem and roots of unity', 30, 'concept'],
+    ['Nature of roots and the discriminant', 30, 'concept'],
+    ['Relation between roots and coefficients', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Sequences & Series', [
+    ['Arithmetic progression: nth term and sum', 30, 'concept'],
+    ['Geometric progression and the infinite GP', 30, 'concept'],
+    ['Arithmetic, geometric and harmonic means', 25, 'concept'],
+    ['Special series and summation techniques', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Binomial Theorem', [
+    ['Binomial expansion and the general term', 30, 'concept'],
+    ['Middle term and the term independent of x', 30, 'concept'],
+    ['Properties of binomial coefficients', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Limits & Derivatives', [
+    ['The idea of a limit and one-sided limits', 30, 'concept'],
+    ['Standard limits and indeterminate forms', 35, 'concept'],
+    ['Derivative from first principles', 30, 'concept'],
+    ['Rules of differentiation', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Permutations & Combinations', [
+    ['The fundamental principle of counting', 25, 'concept'],
+    ['Permutations, with repetition and with restrictions', 35, 'concept'],
+    ['Combinations, and when order does not matter', 35, 'concept'],
+    ['Circular arrangements and identical objects', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Probability', [
+    ['Random experiments, sample space and events', 25, 'concept'],
+    ['Axiomatic probability and the addition rule', 30, 'concept'],
+    ['Mutually exclusive and exhaustive events', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Statistics', [
+    ['Measures of central tendency', 25, 'concept'],
+    ['Mean deviation, variance and standard deviation', 35, 'concept'],
+    ['Comparing dispersion with the coefficient of variation', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Straight Lines', [
+    ['Slope and the forms of the equation of a line', 30, 'concept'],
+    ['Angle between lines; parallel and perpendicular conditions', 30, 'concept'],
+    ['Distance of a point from a line', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Trigonometric Functions', [
+    ['Trigonometric ratios, signs and periodicity', 30, 'concept'],
+    ['Identities and transformation formulae', 35, 'concept'],
+    ['General solutions of trigonometric equations', 35, 'concept'],
+    ['Sine rule and cosine rule', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Relations & Functions', [
+    ['Cartesian product and relations', 25, 'concept'],
+    ['Domain, codomain and range', 30, 'concept'],
+    ['Standard functions and their graphs', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Sets', [
+    ['Set operations and Venn diagrams', 25, 'concept'],
+    ['Subsets, power set and cardinality', 25, 'concept'],
+    ['Complement and De Morgan’s laws', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Introduction to 3D Geometry', [
+    ['Coordinates in space and the octants', 20, 'concept'],
+    ['Distance and section formulae in three dimensions', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 11, 'Linear Inequalities', [
+    ['Solving linear inequalities in one variable', 25, 'concept'],
+    ['Graphical solution in two variables', 25, 'concept'],
+  ]),
   ...chapterTopics('Maths', 11, 'Conic Sections', [
     ['Circle: equation, tangent and chord of contact', 35, 'numerical'],
     ['Parabola: standard form, focus, directrix, latus rectum', 30, 'concept'],
@@ -316,6 +493,64 @@ export const TOPICS: Topic[] = [
     ['Hyperbola: eccentricity, asymptotes, conjugate hyperbola', 35, 'concept'],
     ['Tangent and normal conditions across all conics', 40, 'numerical'],
     ['Reducing a general second-degree equation by completing the square', 35, 'numerical'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Applications of Derivatives', [
+    ['Rate of change and related rates', 30, 'concept'],
+    ['Increasing and decreasing functions', 30, 'concept'],
+    ['Tangents and normals', 30, 'concept'],
+    ['Maxima and minima: first and second derivative tests', 40, 'concept'],
+    ['Absolute extrema on a closed interval', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Vector Algebra', [
+    ['Types of vectors and when two vectors are equal', 25, 'concept'],
+    ['Scalar (dot) product and its uses', 30, 'concept'],
+    ['Vector (cross) product and its uses', 30, 'concept'],
+    ['Scalar triple product and coplanarity', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Differential Equations', [
+    ['Order, degree and formation of a differential equation', 25, 'concept'],
+    ['Variable separable equations', 30, 'concept'],
+    ['Homogeneous differential equations', 30, 'concept'],
+    ['Linear equations and the integrating factor', 35, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Determinants', [
+    ['Properties of determinants', 35, 'concept'],
+    ['Minors, cofactors and the adjoint', 30, 'concept'],
+    ['Inverse of a matrix using the adjoint', 30, 'concept'],
+    ['Consistency of a system of linear equations', 35, 'concept'],
+    ['Area of a triangle and the collinearity condition', 20, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Matrices', [
+    ['Types of matrices and the conditions for operations', 25, 'concept'],
+    ['Matrix multiplication and why it is not commutative', 30, 'concept'],
+    ['Transpose, symmetric and skew-symmetric matrices', 30, 'concept'],
+    ['Invertibility and elementary operations', 35, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Probability', [
+    ['Conditional probability', 30, 'concept'],
+    ['Independent events versus mutually exclusive events', 30, 'concept'],
+    ['Total probability and Bayes’ theorem', 35, 'concept'],
+    ['Random variables and probability distributions', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Applications of Integrals', [
+    ['Area under a curve', 30, 'concept'],
+    ['Area between two curves', 35, 'concept'],
+    ['Handling regions below the axis', 25, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Inverse Trigonometric Functions', [
+    ['Principal value branches', 30, 'concept'],
+    ['Domains and ranges of the inverse functions', 25, 'recall'],
+    ['Properties and identities', 35, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Relations & Functions', [
+    ['Types of relations and equivalence relations', 30, 'concept'],
+    ['One-one, onto and bijective functions', 30, 'concept'],
+    ['Composition of functions', 25, 'concept'],
+    ['Invertible functions', 30, 'concept'],
+  ]),
+  ...chapterTopics('Maths', 12, 'Linear Programming', [
+    ['Formulating an LPP: objective function and constraints', 25, 'concept'],
+    ['Feasible region and the corner point theorem', 25, 'concept'],
   ]),
   ...chapterTopics('Maths', 12, 'Continuity & Differentiability', [
     ['Continuity at a point, and classifying discontinuities', 30, 'concept'],

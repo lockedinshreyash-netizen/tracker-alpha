@@ -1465,6 +1465,906 @@ export const QUESTIONS: TopicQuestion[] = [
     explain: 'K₂SO₄ → 2K⁺ + SO₄²⁻ gives three particles, so i = 3. Count every ion. Association works the other way: benzoic acid dimerises in benzene, giving i = 0.5.',
   },
 
+  // =============================================================== CLASS 11 CHEMISTRY
+  // ------------------------------- Chemistry 11 · Some Basic Concepts of Chemistry
+  {
+    topicId: 'c11-some-basic-concepts-of-chemistry-the-mole-concept-and-avogadro-s-number',
+    question: 'One mole of any substance contains',
+    options: ['1 gram of it', '6.022 × 10²³ particles', '22.4 grams of it', '1 litre of it'],
+    answer: 1,
+    explain: 'A mole is a fixed count, not a fixed mass or volume. The 22.4 litre figure applies to a GAS at STP only, and never to solids or liquids.',
+  },
+  {
+    topicId: 'c11-some-basic-concepts-of-chemistry-empirical-and-molecular-formulae',
+    question: 'The empirical formula of a compound gives',
+    options: [
+      'the actual number of atoms in one molecule',
+      'the simplest whole-number ratio of the atoms present',
+      'the molar mass of the compound',
+      'the arrangement of atoms in space',
+    ],
+    answer: 1,
+    explain: 'The molecular formula is a whole-number multiple of it, and you need the molar mass to find that multiple. Benzene is C₆H₆ molecularly but CH empirically.',
+  },
+  {
+    topicId: 'c11-some-basic-concepts-of-chemistry-stoichiometry-and-the-limiting-reagent',
+    question: 'The limiting reagent in a reaction is the reactant that',
+    options: [
+      'is present in the largest amount',
+      'is consumed completely first and therefore fixes how much product forms',
+      'acts as a catalyst',
+      'remains unreacted at the end',
+    ],
+    answer: 1,
+    explain: 'It is decided by the mole ratio required by the equation, not by mass. Comparing raw masses rather than moles-per-coefficient is the standard mistake.',
+  },
+  {
+    topicId: 'c11-some-basic-concepts-of-chemistry-concentration-terms-and-their-temperatur',
+    question: 'Which concentration term changes when the temperature changes?',
+    options: ['Molality', 'Mole fraction', 'Molarity', 'Mass percentage'],
+    answer: 2,
+    explain: 'Molarity is defined per litre of solution, and volume expands on heating. The other three are all defined by mass or by mole ratios, so they are temperature independent.',
+  },
+
+  // ------------------------- Chemistry 11 · Chemical Bonding & Molecular Structure
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-ionic-vs-covalent-character-fajans-rules',
+    question: 'By Fajans’ rules, covalent character in an ionic compound is greatest when the cation is',
+    options: [
+      'large with a low charge',
+      'small with a high charge',
+      'the same size as the anion',
+      'uncharged',
+    ],
+    answer: 1,
+    explain: 'A small, highly charged cation polarises the anion strongly, distorting its electron cloud towards the shared region. A large, easily polarised anion has the same effect — which is why LiI is far more covalent than LiF.',
+  },
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-vsepr-predicting-shape-and-bond-angles',
+    question: 'The shape of the ammonia molecule is',
+    options: ['trigonal planar', 'trigonal pyramidal', 'tetrahedral', 'linear'],
+    answer: 1,
+    explain: 'Four electron pairs give tetrahedral GEOMETRY, but one is a lone pair, so the observed SHAPE is trigonal pyramidal. Lone pair repulsion also squeezes the bond angle to 107° rather than 109.5°.',
+  },
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-hybridisation-and-its-relation-to-geomet',
+    question: 'sp² hybridisation gives rise to a geometry that is',
+    options: ['linear', 'trigonal planar', 'tetrahedral', 'octahedral'],
+    answer: 1,
+    explain: 'Three hybrid orbitals arrange at 120° in a plane, leaving one unhybridised p orbital perpendicular to it — which is what forms the π bond in ethene. sp is linear, sp³ tetrahedral, sp³d² octahedral.',
+  },
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-molecular-orbital-theory-for-diatomics-b',
+    question: 'The paramagnetism of the O₂ molecule is explained by',
+    options: [
+      'valence bond theory',
+      'molecular orbital theory, which places two unpaired electrons in π* orbitals',
+      'VSEPR theory',
+      'Fajans’ rules',
+    ],
+    answer: 1,
+    explain: 'VBT predicts a doubly bonded O=O with every electron paired, and therefore the wrong magnetic behaviour. MOT gives bond order 2 AND two unpaired electrons in degenerate antibonding orbitals — its most celebrated success.',
+  },
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-hydrogen-bonding-and-its-physical-conseq',
+    question: 'Water boils at a far higher temperature than H₂S because',
+    options: [
+      'water has a greater molar mass',
+      'water molecules form intermolecular hydrogen bonds',
+      'water is more covalent in character',
+      'H₂S is an ionic compound',
+    ],
+    answer: 1,
+    explain: 'Water is actually the LIGHTER molecule, so mass cannot be the reason. Hydrogen bonding needs H attached to N, O or F, and sulphur is not electronegative enough to qualify.',
+  },
+  {
+    topicId: 'c11-chemical-bonding-molecular-structure-dipole-moment-and-molecular-polarity',
+    question: 'CO₂ has a zero dipole moment because',
+    options: [
+      'its C=O bonds are non-polar',
+      'it is linear, so the two equal bond dipoles cancel',
+      'it contains no lone pairs on carbon',
+      'it is a gas at room temperature',
+    ],
+    answer: 1,
+    explain: 'The individual bonds are strongly polar; it is the symmetry that cancels them. Water has similarly polar bonds but is bent, so its dipoles add to a substantial net moment — shape decides polarity.',
+  },
+
+  // ------------------------------------------------------ Chemistry 11 · Equilibrium
+  {
+    topicId: 'c11-equilibrium-kp-kc-and-the-relation-between-them',
+    question: 'Kp and Kc are numerically equal when',
+    options: ['Δn = 0', 'Δn > 0', 'Δn < 0', 'always, for every reaction'],
+    answer: 0,
+    explain: 'Kp = Kc(RT)^Δn, where Δn counts moles of gaseous products minus reactants. With Δn = 0 the factor becomes 1. Only GASEOUS species are counted in Δn.',
+  },
+  {
+    topicId: 'c11-equilibrium-le-chatelier-s-principle-applied-to-real',
+    question: 'Raising the temperature of an exothermic reaction at equilibrium',
+    options: [
+      'shifts it towards the products',
+      'shifts it towards the reactants',
+      'has no effect on the position of equilibrium',
+      'stops the reaction entirely',
+    ],
+    answer: 1,
+    explain: 'Heat is effectively a product, so adding it drives the system backwards and lowers K. Temperature is the only factor that changes the value of the equilibrium constant — a catalyst never does.',
+  },
+  {
+    topicId: 'c11-equilibrium-ionic-equilibrium-ph-poh-and-strong-weak',
+    question: 'A solution of pH 3 is more acidic than one of pH 6 by a factor of',
+    options: ['3', '30', '100', '1000'],
+    answer: 3,
+    explain: 'pH is logarithmic, so each unit is a tenfold change in [H⁺]. Three units means 10³ = 1000 times. A tenfold dilution of a strong acid therefore moves pH by exactly one unit.',
+  },
+  {
+    topicId: 'c11-equilibrium-buffers-and-the-henderson-hasselbalch-eq',
+    question: 'A buffer solution resists changes in pH because it contains',
+    options: [
+      'a strong acid together with a strong base',
+      'a weak acid together with its conjugate base, or the base equivalent',
+      'only pure water',
+      'a neutral salt of a strong acid and strong base',
+    ],
+    answer: 1,
+    explain: 'One component mops up added acid and the other added base. Buffering is most effective when the two are present in comparable amounts, which is where pH equals pKa.',
+  },
+  {
+    topicId: 'c11-equilibrium-solubility-product-and-the-common-ion-ef',
+    question: 'Adding sodium chloride to a saturated solution of silver chloride causes the solubility of AgCl to',
+    options: ['increase', 'decrease', 'remain unchanged', 'fall to exactly zero'],
+    answer: 1,
+    explain: 'The extra chloride ions push the equilibrium back towards undissolved solid, so less AgCl dissolves. Ksp itself is untouched — only the position of the equilibrium moves. This is the common ion effect.',
+  },
+  {
+    topicId: 'c11-equilibrium-salt-hydrolysis-and-predicting-the-resul',
+    question: 'An aqueous solution of sodium acetate is',
+    options: ['acidic', 'basic', 'exactly neutral', 'amphoteric'],
+    answer: 1,
+    explain: 'It is the salt of a weak acid and a strong base, so the acetate ion hydrolyses to give OH⁻. Reverse the pairing, as in ammonium chloride, and the solution is acidic instead.',
+  },
+
+  // ------------------------------------------------- Chemistry 11 · Structure of Atom
+  {
+    topicId: 'c11-structure-of-atom-the-bohr-model-and-where-it-breaks-down',
+    question: 'Bohr’s model failed to account for',
+    options: [
+      'the line spectrum of hydrogen',
+      'the spectra of multi-electron atoms and the splitting of spectral lines',
+      'the existence of the atomic number',
+      'the mass of the nucleus',
+    ],
+    answer: 1,
+    explain: 'It works only for one-electron systems. It also cannot accommodate the uncertainty principle, since it assumes an electron has a definite orbit with a definite radius and speed.',
+  },
+  {
+    topicId: 'c11-structure-of-atom-quantum-numbers-and-the-shapes-of-orbita',
+    question: 'The azimuthal quantum number l determines the',
+    options: ['size of the orbital', 'shape of the orbital', 'orientation of the orbital', 'spin of the electron'],
+    answer: 1,
+    explain: 'n fixes size and energy, l the shape (s, p, d, f), m the orientation in space, and s the spin. Mixing up l and m is the usual slip.',
+  },
+  {
+    topicId: 'c11-structure-of-atom-aufbau-principle-pauli-exclusion-and-hun',
+    question: 'Hund’s rule states that',
+    options: [
+      'electrons pair in an orbital before occupying separate ones',
+      'orbitals of equal energy are each singly filled before any pairing occurs',
+      'no two electrons in an atom share all four quantum numbers',
+      'lower energy orbitals are filled first',
+    ],
+    answer: 1,
+    explain: 'Singly occupying degenerate orbitals with parallel spins minimises repulsion. The third option is the Pauli exclusion principle and the fourth is the Aufbau principle — three different rules that are easy to blur together.',
+  },
+  {
+    topicId: 'c11-structure-of-atom-dual-nature-de-broglie-and-heisenberg-un',
+    question: 'The Heisenberg uncertainty principle says it is impossible to determine simultaneously and exactly',
+    options: [
+      'the mass and charge of an electron',
+      'the position and the momentum of an electron',
+      'the energy and the charge of an electron',
+      'the spin and the mass of an electron',
+    ],
+    answer: 1,
+    explain: 'Δx·Δp ≥ h/4π. The limit is fundamental rather than a shortcoming of our instruments, and it is why orbitals are probability regions rather than paths.',
+  },
+
+  // ------------------------------ Chemistry 11 · Classification of Elements & Periodicity
+  {
+    topicId: 'c11-classification-of-elements-periodicity-modern-periodic-law-and-the-s-p-d-f-bloc',
+    question: 'An element whose configuration ends in 3d⁵4s¹ belongs to the',
+    options: ['s-block', 'p-block', 'd-block', 'f-block'],
+    answer: 2,
+    explain: 'The block is named for the subshell being filled, here 3d. This is chromium, whose half-filled d⁵ arrangement is extra stable and is why it borrows an electron from 4s.',
+  },
+  {
+    topicId: 'c11-classification-of-elements-periodicity-atomic-and-ionic-radii-trends',
+    question: 'Moving left to right across a period, the atomic radius',
+    options: ['increases', 'decreases', 'stays constant', 'increases then decreases'],
+    answer: 1,
+    explain: 'Nuclear charge grows while electrons enter the same shell, so the pull on them tightens. Down a group the radius increases instead, because a new shell is added each time.',
+  },
+  {
+    topicId: 'c11-classification-of-elements-periodicity-ionisation-enthalpy-trends-and-the-excep',
+    question: 'The first ionisation enthalpy of boron is LOWER than that of beryllium because',
+    options: [
+      'boron has a larger atomic radius',
+      'beryllium has a completely filled 2s subshell, which is extra stable',
+      'boron has fewer protons',
+      'boron is a metal and beryllium is not',
+    ],
+    answer: 1,
+    explain: 'Removing boron’s lone 2p electron is easier than breaking into beryllium’s filled 2s. The same stability argument explains the dip from nitrogen (half-filled 2p³) to oxygen.',
+  },
+  {
+    topicId: 'c11-classification-of-elements-periodicity-electron-gain-enthalpy-and-electronegati',
+    question: 'The most electronegative element in the periodic table is',
+    options: ['chlorine', 'fluorine', 'oxygen', 'nitrogen'],
+    answer: 1,
+    explain: 'Fluorine tops the electronegativity scale. Note that CHLORINE has the more negative electron gain enthalpy — the two properties measure different things and this is the case where they disagree.',
+  },
+
+  // -------------------------------------------------- Chemistry 11 · Thermodynamics
+  {
+    topicId: 'c11-thermodynamics-system-surroundings-and-state-functions',
+    question: 'Which of the following is NOT a state function?',
+    options: ['Enthalpy', 'Entropy', 'Work', 'Internal energy'],
+    answer: 2,
+    explain: 'Work and heat depend on the path taken, not just the endpoints, so they are path functions. This is exactly why an isothermal and an adiabatic route between the same two states involve different amounts of work.',
+  },
+  {
+    topicId: 'c11-thermodynamics-first-law-enthalpy-and-heat-capacity',
+    question: 'At constant pressure, the heat exchanged by a system equals',
+    options: ['ΔU', 'ΔH', 'ΔS', 'ΔG'],
+    answer: 1,
+    explain: 'q_p = ΔH, which is why enthalpy is the convenient quantity for reactions in open vessels. At constant VOLUME the heat equals ΔU instead, since no expansion work is done.',
+  },
+  {
+    topicId: 'c11-thermodynamics-hess-s-law-and-enthalpies-of-reaction',
+    question: 'Hess’s law is a direct consequence of the fact that',
+    options: [
+      'enthalpy is a state function',
+      'entropy always increases',
+      'energy cannot be created',
+      'equilibria shift to oppose change',
+    ],
+    answer: 0,
+    explain: 'Because ΔH depends only on initial and final states, the total is the same whether the reaction runs in one step or several. That is what lets you add thermochemical equations like algebra.',
+  },
+  {
+    topicId: 'c11-thermodynamics-entropy-spontaneity-and-gibbs-free-energ',
+    question: 'A process is spontaneous at constant temperature and pressure when',
+    options: ['ΔH < 0 in every case', 'ΔG < 0', 'ΔS of the system < 0', 'ΔG > 0'],
+    answer: 1,
+    explain: 'ΔG = ΔH − TΔS decides it, not ΔH alone. Endothermic processes can be spontaneous if the entropy gain is large enough — melting ice above 0 °C is the everyday example.',
+  },
+
+  // ------------------------------------------------- Chemistry 11 · Redox Reactions
+  {
+    topicId: 'c11-redox-reactions-rules-for-assigning-oxidation-numbers',
+    question: 'The oxidation number of sulphur in H₂SO₄ is',
+    options: ['+2', '+4', '+6', '−2'],
+    answer: 2,
+    explain: 'Hydrogen contributes +1 each and oxygen −2 each, so 2(+1) + x + 4(−2) = 0 gives x = +6. Oxidation number is a bookkeeping device and may well be fractional, as in Fe₃O₄.',
+  },
+  {
+    topicId: 'c11-redox-reactions-identifying-oxidising-and-reducing-agent',
+    question: 'In a redox reaction, the oxidising agent',
+    options: [
+      'loses electrons and is itself oxidised',
+      'gains electrons and is itself reduced',
+      'neither gains nor loses electrons',
+      'merely acts as a catalyst',
+    ],
+    answer: 1,
+    explain: 'The oxidising agent oxidises something else by taking its electrons, so it is reduced in the process. The naming refers to what it does to the OTHER species, which is why it reads backwards at first.',
+  },
+  {
+    topicId: 'c11-redox-reactions-balancing-redox-equations',
+    question: 'When balancing a redox half-equation in acidic medium, oxygen is balanced by',
+    options: [
+      'adding O₂ molecules',
+      'adding H₂O to the oxygen-deficient side and H⁺ to the other side',
+      'adding OH⁻ ions',
+      'adding electrons',
+    ],
+    answer: 1,
+    explain: 'Water supplies the oxygen and H⁺ then balances the hydrogen. In BASIC medium you use OH⁻ instead — applying the acidic recipe to a basic medium is the standard error.',
+  },
+
+  // ---------------------- Chemistry 11 · Organic Chemistry: Basic Principles & Techniques
+  {
+    topicId: 'c11-organic-chemistry-basic-principles-techn-iupac-nomenclature-of-organic-compounds',
+    question: 'In IUPAC nomenclature the principal chain is chosen as',
+    options: [
+      'the longest carbon chain, regardless of anything else',
+      'the longest chain that contains the principal functional group',
+      'the shortest chain available',
+      'any chain, since the choice does not affect the name',
+    ],
+    answer: 1,
+    explain: 'The functional group outranks chain length, and numbering then gives that group the lowest possible locant. Picking the longest chain while ignoring the functional group is the classic error.',
+  },
+  {
+    topicId: 'c11-organic-chemistry-basic-principles-techn-structural-isomerism-and-stereoisomerism',
+    question: 'Compounds sharing a molecular formula but differing in the order in which the atoms are joined are',
+    options: ['stereoisomers', 'structural isomers', 'conformers', 'identical compounds'],
+    answer: 1,
+    explain: 'Structural isomers differ in connectivity — chain, position, functional group, metamerism, tautomerism. Stereoisomers keep the same connectivity and differ only in spatial arrangement.',
+  },
+  {
+    topicId: 'c11-organic-chemistry-basic-principles-techn-inductive-resonance-and-hyperconjugative',
+    question: 'Hyperconjugation stabilises a carbocation by',
+    options: [
+      'donating a lone pair from an adjacent atom',
+      'delocalising σ C–H bonding electrons into the empty p orbital',
+      'withdrawing electron density inductively',
+      'shifting π electrons of an adjacent double bond',
+    ],
+    answer: 1,
+    explain: 'More α-hydrogens mean more such interactions, which is why stability rises 1° < 2° < 3°. Resonance involves π or lone pair electrons; hyperconjugation uniquely involves a σ bond.',
+  },
+  {
+    topicId: 'c11-organic-chemistry-basic-principles-techn-carbocations-carbanions-and-free-radical',
+    question: 'The stability order of carbocations is',
+    options: ['1° > 2° > 3°', '3° > 2° > 1°', 'all are equally stable', '2° > 3° > 1°'],
+    answer: 1,
+    explain: 'Alkyl groups release electron density and provide hyperconjugation, both stabilising the positive centre. Carbanions run the opposite way, 1° > 2° > 3°, since they need electron density removed rather than supplied.',
+  },
+  {
+    topicId: 'c11-organic-chemistry-basic-principles-techn-types-of-organic-reactions-and-electroph',
+    question: 'An electrophile is a species that',
+    options: [
+      'donates a pair of electrons',
+      'accepts a pair of electrons',
+      'is always negatively charged',
+      'always carries an unpaired electron',
+    ],
+    answer: 1,
+    explain: 'Electrophiles are electron-poor and may be positive or neutral, as AlCl₃ and BF₃ are. Nucleophiles donate electron pairs and may likewise be neutral, such as H₂O or NH₃ — charge is not the deciding factor.',
+  },
+
+  // -------------------------------------------------------- Chemistry 11 · Hydrocarbons
+  {
+    topicId: 'c11-hydrocarbons-alkanes-and-free-radical-substitution',
+    question: 'The chlorination of methane in sunlight proceeds by',
+    options: [
+      'electrophilic addition',
+      'a free radical chain mechanism',
+      'nucleophilic substitution',
+      'elimination',
+    ],
+    answer: 1,
+    explain: 'Light homolytically splits Cl₂ to start the chain, which then propagates and eventually terminates. Because it is a chain, the reaction is hard to stop cleanly at monochlorination.',
+  },
+  {
+    topicId: 'c11-hydrocarbons-alkenes-electrophilic-addition-and-marko',
+    question: 'Adding HBr to propene in the ABSENCE of peroxide gives mainly',
+    options: ['1-bromopropane', '2-bromopropane', 'equal amounts of both', 'no reaction'],
+    answer: 1,
+    explain: 'Markovnikov addition puts the hydrogen on the carbon that already has more hydrogens, forming the more stable secondary carbocation. Peroxides flip this to anti-Markovnikov via free radicals — and that effect works with HBr only, not HCl or HI.',
+  },
+  {
+    topicId: 'c11-hydrocarbons-alkynes-acidity-and-addition-reactions',
+    question: 'Terminal alkynes are acidic enough to react with sodium metal because',
+    options: [
+      'the sp-hybridised carbon holds the C–H electrons more tightly, stabilising the resulting anion',
+      'they contain two π bonds',
+      'they are unsaturated hydrocarbons',
+      'they are non-polar molecules',
+    ],
+    answer: 0,
+    explain: 'An sp carbon has 50% s character, so its electrons sit closer to the nucleus and the carbanion is better stabilised. Acidity therefore runs alkyne > alkene > alkane, and only TERMINAL alkynes have such a hydrogen.',
+  },
+  {
+    topicId: 'c11-hydrocarbons-aromaticity-and-electrophilic-aromatic-s',
+    question: 'For a compound to be aromatic it must be',
+    options: [
+      'cyclic, planar, fully conjugated and hold (4n + 2) π electrons',
+      'cyclic, and nothing more',
+      'saturated and cyclic',
+      'cyclic with 4n π electrons',
+    ],
+    answer: 0,
+    explain: 'All four conditions of Hückel’s rule must hold together. A cyclic conjugated system with 4n π electrons is ANTI-aromatic and notably unstable, as cyclobutadiene is.',
+  },
+  {
+    topicId: 'c11-hydrocarbons-directive-influence-of-substituents-on-t',
+    question: 'A nitro group already attached to a benzene ring is',
+    options: [
+      'activating and ortho/para directing',
+      'deactivating and meta directing',
+      'activating and meta directing',
+      'deactivating and ortho/para directing',
+    ],
+    answer: 1,
+    explain: 'Electron-withdrawing groups deactivate the ring and direct incoming electrophiles to the meta position. Halogens are the famous exception — deactivating through induction yet ortho/para directing through resonance.',
+  },
+
+  // --------------- Chemistry 11 · Purification & Characterisation of Organic Compounds
+  {
+    topicId: 'c11-purification-characterisation-of-organic-purification-distillation-crystallisatio',
+    question: 'Chromatography separates the components of a mixture on the basis of',
+    options: [
+      'their boiling points',
+      'their differing affinity for a stationary and a mobile phase',
+      'their molar masses alone',
+      'their colours',
+    ],
+    answer: 1,
+    explain: 'Components that cling harder to the stationary phase travel more slowly. Distillation is the technique that separates by boiling point, and fractional distillation handles liquids whose boiling points lie close together.',
+  },
+  {
+    topicId: 'c11-purification-characterisation-of-organic-detection-of-elements-and-quantitative-e',
+    question: 'Halogens in an organic compound are estimated quantitatively by',
+    options: ['Kjeldahl’s method', 'the Carius method', 'Dumas method', 'Liebig’s method'],
+    answer: 1,
+    explain: 'Carius estimates halogens and also sulphur. Kjeldahl and Dumas both estimate nitrogen, and Liebig’s combustion method gives carbon and hydrogen.',
+  },
+
+  // -------------------------------- Chemistry 11 · The p-Block Elements (Groups 13 & 14)
+  {
+    topicId: 'c11-the-p-block-elements-groups-13-14-group-13-trends-and-important-compounds',
+    question: 'The inert pair effect explains why',
+    options: [
+      'boron shows an oxidation state of +1',
+      'heavier members favour an oxidation state two below the group value, as in Tl⁺ and Pb²⁺',
+      'all group members show only the group oxidation state',
+      'these elements are chemically inert',
+    ],
+    answer: 1,
+    explain: 'The ns² pair becomes increasingly reluctant to take part in bonding down the group, thanks to poor shielding by intervening d and f electrons. So Tl⁺ beats Tl³⁺ in stability, and Pb²⁺ beats Pb⁴⁺.',
+  },
+  {
+    topicId: 'c11-the-p-block-elements-groups-13-14-group-14-allotropes-trends-and-important',
+    question: 'Within group 14, the tendency to catenate is greatest for',
+    options: ['carbon', 'silicon', 'germanium', 'lead'],
+    answer: 0,
+    explain: 'The C–C bond is by far the strongest self-linkage in the group, which is the whole reason organic chemistry exists. Bond strength falls sharply down the group as the atoms grow.',
+  },
+
+  // ------------------------------------------------- Chemistry 11 · s-Block Elements
+  {
+    topicId: 'c11-s-block-elements-alkali-and-alkaline-earth-metals-periodi',
+    question: 'Descending group 1, the first ionisation enthalpy',
+    options: ['increases', 'decreases', 'stays constant', 'first rises then falls'],
+    answer: 1,
+    explain: 'The outer electron sits further out and is better shielded, so it is easier to remove. This is why reactivity increases down the group — the opposite of the halogens.',
+  },
+  {
+    topicId: 'c11-s-block-elements-anomalous-behaviour-and-the-diagonal-rel',
+    question: 'Lithium behaves anomalously compared with the other alkali metals mainly because of its',
+    options: [
+      'very small size and consequently high polarising power',
+      'unusually large atomic radius',
+      'very low electronegativity',
+      'high density',
+    ],
+    answer: 0,
+    explain: 'A small, highly polarising Li⁺ gives its compounds more covalent character. The same property produces the diagonal relationship with magnesium, which it resembles more than it does sodium.',
+  },
+  {
+    topicId: 'c11-hydrogen-position-of-hydrogen-its-isotopes-and-pr',
+    question: 'The radioactive isotope of hydrogen is',
+    options: ['protium', 'deuterium', 'tritium', 'none of them'],
+    answer: 2,
+    explain: 'Tritium has two neutrons and is a beta emitter with a half-life near 12.3 years. Protium and deuterium are both stable, and hydrogen sits awkwardly in the table because it resembles both group 1 and group 17.',
+  },
+  {
+    topicId: 'c11-hydrogen-hydrides-and-the-hardness-of-water',
+    question: 'Temporary hardness of water is caused by',
+    options: [
+      'chlorides and sulphates of calcium and magnesium',
+      'bicarbonates of calcium and magnesium',
+      'dissolved sodium salts',
+      'dissolved gases',
+    ],
+    answer: 1,
+    explain: 'Bicarbonates decompose on boiling and precipitate out, so temporary hardness is removed simply by heating or by Clark’s method. Chlorides and sulphates cause PERMANENT hardness, which needs washing soda or an ion exchanger.',
+  },
+
+  // ------------------------- Chemistry 12 · Aldehydes, Ketones & Carboxylic Acids
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-nucleophilic-addition-and-the-reactivity',
+    question: 'The order of reactivity towards nucleophilic addition is',
+    options: [
+      'acetone > acetaldehyde > formaldehyde',
+      'formaldehyde > acetaldehyde > acetone',
+      'acetaldehyde > formaldehyde > acetone',
+      'all three react equally',
+    ],
+    answer: 1,
+    explain: 'Alkyl groups both crowd the carbonyl carbon and push electron density onto it, so each one added slows the attack. Aldehydes therefore beat ketones, and formaldehyde beats everything.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-aldol-and-cross-aldol-condensation',
+    question: 'Which compound will NOT undergo the aldol condensation?',
+    options: ['Acetaldehyde', 'Acetone', 'Benzaldehyde', 'Propanal'],
+    answer: 2,
+    explain: 'Aldol needs an α-hydrogen to form the enolate. Benzaldehyde has none, which is exactly why it undergoes Cannizzaro instead.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-cannizzaro-reaction-and-the-no-hydrogen-',
+    question: 'The Cannizzaro reaction is given by aldehydes that have',
+    options: ['at least one α-hydrogen', 'no α-hydrogen', 'an aromatic ring only', 'a carboxyl group'],
+    answer: 1,
+    explain: 'With no α-hydrogen the enolate route is closed, so one molecule is oxidised and another reduced instead. HCHO and benzaldehyde are the standard examples — note it is the exact complement of the aldol condition.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-clemmensen-vs-wolff-kishner-choosing-by-',
+    question: 'To reduce a ketone to an alkane under ACIDIC conditions, the correct reagent is',
+    options: [
+      'NH₂NH₂ / KOH (Wolff–Kishner)',
+      'Zn-Hg / HCl (Clemmensen)',
+      'LiAlH₄',
+      'NaBH₄',
+    ],
+    answer: 1,
+    explain: 'Clemmensen is acidic, Wolff–Kishner is basic — you pick by which medium the rest of the molecule survives. LiAlH₄ and NaBH₄ stop at the alcohol rather than going all the way to the alkane.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-distinguishing-tests-tollens-fehling-iod',
+    question: 'Which of these gives a NEGATIVE Fehling’s test?',
+    options: ['Formaldehyde', 'Acetaldehyde', 'Benzaldehyde', 'Propanal'],
+    answer: 2,
+    explain: 'Aromatic aldehydes do not respond to Fehling’s, though they do reduce Tollens’ reagent. Knowing which test fails for which compound is the whole point of the pair.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-acidity-of-carboxylic-acids-and-substitu',
+    question: 'Which is the strongest acid?',
+    options: ['Acetic acid', 'Chloroacetic acid', 'Dichloroacetic acid', 'Trichloroacetic acid'],
+    answer: 3,
+    explain: 'Each electron-withdrawing chlorine pulls charge away from the carboxylate and stabilises it, so acidity climbs with the number of halogens. The effect also weakens sharply as the halogen moves further from the –COOH group.',
+  },
+  {
+    topicId: 'c12-aldehydes-ketones-carboxylic-acids-conversion-sequences-and-naming-the-reag',
+    question: 'The Rosenmund reduction converts an acyl chloride into',
+    options: ['an alcohol', 'an aldehyde', 'an alkane', 'a carboxylic acid'],
+    answer: 1,
+    explain: 'H₂ over Pd poisoned with BaSO₄ stops the reduction at the aldehyde. Without the poison it would run on to the alcohol — the poison is the whole trick.',
+  },
+
+  // -------------------------------------------------- Chemistry 12 · Electrochemistry
+  {
+    topicId: 'c12-electrochemistry-electrochemical-cells-and-standard-elect',
+    question: 'In a galvanic cell, oxidation takes place at the',
+    options: ['cathode', 'anode', 'salt bridge', 'both electrodes'],
+    answer: 1,
+    explain: 'Oxidation is always at the anode and reduction at the cathode, in both cell types. What flips is the SIGN: the anode is negative in a galvanic cell but positive in an electrolytic one.',
+  },
+  {
+    topicId: 'c12-electrochemistry-the-nernst-equation-and-cell-emf',
+    question: 'The Nernst equation relates the cell potential to',
+    options: [
+      'the temperature alone',
+      'the concentrations of the species taking part',
+      'the current drawn from the cell',
+      'the physical size of the electrodes',
+    ],
+    answer: 1,
+    explain: 'It corrects E° for non-standard concentrations. Electrode SIZE never affects potential, since potential is an intensive property — only concentration, temperature and the reaction itself matter.',
+  },
+  {
+    topicId: 'c12-electrochemistry-conductance-and-kohlrausch-s-law',
+    question: 'On dilution, the MOLAR conductivity of an electrolyte',
+    options: ['decreases', 'increases', 'stays constant', 'falls to zero'],
+    answer: 1,
+    explain: 'Molar conductivity rises because interionic attraction falls and weak electrolytes dissociate further. SPECIFIC conductivity moves the opposite way, since there are fewer ions per unit volume — confusing the two is the classic error.',
+  },
+  {
+    topicId: 'c12-electrochemistry-electrolysis-and-faraday-s-laws',
+    question: 'The quantity of electricity required to deposit one gram equivalent of a substance is',
+    options: ['1 coulomb', '96500 coulombs', '6.022 × 10²³ coulombs', '1 ampere'],
+    answer: 1,
+    explain: 'One faraday, the charge on a mole of electrons. Note the ampere is a rate, not a quantity — charge is current multiplied by time.',
+  },
+
+  // ------------------------------------------------- Chemistry 12 · Chemical Kinetics
+  {
+    topicId: 'c12-chemical-kinetics-rate-of-reaction-and-the-rate-law',
+    question: 'The rate law of a reaction',
+    options: [
+      'can be written directly from the balanced equation',
+      'must be determined experimentally',
+      'is always first order',
+      'always matches the molecularity',
+    ],
+    answer: 1,
+    explain: 'Stoichiometric coefficients give the rate law only for an elementary step. For everything else the exponents come from experiment, because they reflect the slowest step, not the overall equation.',
+  },
+  {
+    topicId: 'c12-chemical-kinetics-order-versus-molecularity',
+    question: 'The order of a reaction',
+    options: [
+      'is always a whole number',
+      'may be zero or fractional, and is found experimentally',
+      'always equals the molecularity',
+      'can never be zero',
+    ],
+    answer: 1,
+    explain: 'Order is experimental and may be zero, fractional or even negative. Molecularity counts the species colliding in an elementary step, so it must be a positive whole number.',
+  },
+  {
+    topicId: 'c12-chemical-kinetics-integrated-rate-equations-and-half-life',
+    question: 'For a first-order reaction, the half-life',
+    options: [
+      'depends on the initial concentration',
+      'is independent of the initial concentration',
+      'doubles with each successive half-life',
+      'is always zero',
+    ],
+    answer: 1,
+    explain: 't₁/₂ = 0.693/k, with no concentration term. This is why radioactive decay, which is first order, has a fixed half-life however much material you start with.',
+  },
+  {
+    topicId: 'c12-chemical-kinetics-arrhenius-equation-activation-energy-and',
+    question: 'A catalyst increases the rate of a reaction by',
+    options: [
+      'raising the activation energy',
+      'providing an alternative path of lower activation energy',
+      'changing the enthalpy of the reaction',
+      'shifting the position of equilibrium',
+    ],
+    answer: 1,
+    explain: 'It lowers the barrier for both forward and reverse reactions equally, so ΔH and the equilibrium constant are untouched. Equilibrium arrives sooner, not at a different place.',
+  },
+
+  // --------------------------------------------- Chemistry 12 · d- & f-Block Elements
+  {
+    topicId: 'c12-d-f-block-elements-general-characteristics-of-the-transitio',
+    question: 'A transition element is one that has',
+    options: [
+      'completely filled d orbitals',
+      'partially filled d orbitals in its atom or in a stable ion',
+      'only s electrons in its valence shell',
+      'partially filled f orbitals',
+    ],
+    answer: 1,
+    explain: 'By this definition Zn, Cd and Hg are not typical transition metals — they are d¹⁰ in both the atom and the common ion, which is why they are colourless and form few complexes.',
+  },
+  {
+    topicId: 'c12-d-f-block-elements-variable-oxidation-states-and-the-origin',
+    question: 'Most transition metal ions are coloured because of',
+    options: [
+      'd–d electronic transitions',
+      'their high density',
+      'metallic bonding',
+      'their large ionic size',
+    ],
+    answer: 0,
+    explain: 'A partially filled d subshell allows an electron to absorb visible light and jump between split d levels. Sc³⁺ (d⁰) and Zn²⁺ (d¹⁰) have no such transition available, so both are colourless.',
+  },
+  {
+    topicId: 'c12-d-f-block-elements-magnetic-properties-and-catalytic-behavi',
+    question: 'Transition metals make good catalysts largely because they',
+    options: [
+      'are dense and hard',
+      'show variable oxidation states and offer surfaces for adsorption',
+      'are brightly coloured',
+      'have high melting points',
+    ],
+    answer: 1,
+    explain: 'Switching oxidation state lets them shuttle electrons through a reaction, and their surfaces adsorb reactants and weaken bonds. Iron in the Haber process and vanadium pentoxide in the Contact process both work this way.',
+  },
+  {
+    topicId: 'c12-d-f-block-elements-lanthanoids-actinoids-and-lanthanoid-con',
+    question: 'A direct consequence of the lanthanoid contraction is that',
+    options: [
+      'zirconium and hafnium have very different radii',
+      'zirconium and hafnium have almost identical radii and are hard to separate',
+      'all lanthanoids are radioactive',
+      'the actinoids show only the +3 state',
+    ],
+    answer: 1,
+    explain: 'Poor shielding by f electrons shrinks the lanthanoids steadily, cancelling the size increase expected further down. Second and third row transition metals therefore end up nearly the same size.',
+  },
+
+  // ------------------------------------------- Chemistry 12 · Haloalkanes & Haloarenes
+  {
+    topicId: 'c12-haloalkanes-haloarenes-nomenclature-and-methods-of-preparation',
+    question: 'The best reagent for converting an alcohol to a chloroalkane in high purity is',
+    options: ['concentrated HCl', 'thionyl chloride, SOCl₂', 'chlorine gas', 'sodium chloride'],
+    answer: 1,
+    explain: 'The by-products SO₂ and HCl are both gases and simply escape, leaving a pure product. Hydrogen halides can also trigger carbocation rearrangements, which SOCl₂ largely avoids.',
+  },
+  {
+    topicId: 'c12-haloalkanes-haloarenes-sn1-and-sn2-mechanisms',
+    question: 'A tertiary alkyl halide undergoes nucleophilic substitution predominantly by',
+    options: [
+      'SN2, because the carbon is easy to approach',
+      'SN1, through a relatively stable carbocation',
+      'neither mechanism',
+      'both at equal rates',
+    ],
+    answer: 1,
+    explain: 'Bulky groups block the backside attack SN2 requires, while the same groups stabilise the carbocation SN1 needs. Primary halides behave oppositely, and SN2 inverts configuration while SN1 tends to racemise.',
+  },
+  {
+    topicId: 'c12-haloalkanes-haloarenes-elimination-reactions-and-saytzeff-s-rul',
+    question: 'Saytzeff’s rule predicts that elimination will give mainly',
+    options: [
+      'the least substituted alkene',
+      'the more substituted and more stable alkene',
+      'an alkyne',
+      'an alcohol',
+    ],
+    answer: 1,
+    explain: 'More alkyl substituents on the double bond mean greater stability through hyperconjugation. A bulky base can override this and give the less substituted product instead — the Hofmann outcome.',
+  },
+  {
+    topicId: 'c12-haloalkanes-haloarenes-why-haloarenes-resist-nucleophilic-subst',
+    question: 'Chlorobenzene is far less reactive than chloroethane towards nucleophilic substitution because',
+    options: [
+      'the C–Cl bond gains partial double bond character through resonance, and the carbon is sp²',
+      'chlorine is more electronegative in chlorobenzene',
+      'benzene is a saturated molecule',
+      'chlorobenzene is a liquid',
+    ],
+    answer: 0,
+    explain: 'Delocalisation of a chlorine lone pair into the ring shortens and strengthens the C–Cl bond, and the sp² carbon holds it more tightly. The ring’s electron density also repels incoming nucleophiles.',
+  },
+
+  // ------------------------------------------ Chemistry 12 · Alcohols, Phenols & Ethers
+  {
+    topicId: 'c12-alcohols-phenols-ethers-preparation-and-physical-properties',
+    question: 'Alcohols boil at much higher temperatures than ethers of similar molar mass because',
+    options: [
+      'alcohols are heavier molecules',
+      'alcohols form intermolecular hydrogen bonds',
+      'ethers are ionic compounds',
+      'alcohols are more branched',
+    ],
+    answer: 1,
+    explain: 'The –OH hydrogen bonds to a neighbouring molecule, and breaking that network costs energy. An ether has no O–H, so it cannot donate a hydrogen bond, only accept one.',
+  },
+  {
+    topicId: 'c12-alcohols-phenols-ethers-acidity-of-alcohols-and-phenols',
+    question: 'Phenol is considerably more acidic than ethanol because',
+    options: [
+      'phenol contains more carbon atoms',
+      'the phenoxide ion is stabilised by resonance with the ring',
+      'phenol is aromatic and aromatic compounds are always acidic',
+      'ethanol is a gas at room temperature',
+    ],
+    answer: 1,
+    explain: 'The negative charge on phenoxide spreads into the ring, whereas ethoxide must carry it entirely on oxygen. Electron-withdrawing groups such as –NO₂ push phenol’s acidity higher still.',
+  },
+  {
+    topicId: 'c12-alcohols-phenols-ethers-reactions-of-alcohols-dehydration-and-ox',
+    question: 'The ease of acid-catalysed dehydration of alcohols to alkenes follows the order',
+    options: [
+      'primary > secondary > tertiary',
+      'tertiary > secondary > primary',
+      'all react equally readily',
+      'secondary > tertiary > primary',
+    ],
+    answer: 1,
+    explain: 'Dehydration goes through a carbocation, and tertiary carbocations are the most stable. The same ordering explains why tertiary alcohols also favour SN1 substitution.',
+  },
+  {
+    topicId: 'c12-alcohols-phenols-ethers-reactions-of-phenols-and-their-distingui',
+    question: 'Phenol gives a characteristic violet colouration with',
+    options: ['Fehling’s solution', 'neutral FeCl₃', 'Tollens’ reagent', 'sodium bicarbonate'],
+    answer: 1,
+    explain: 'Neutral ferric chloride is the standard phenol test. Note phenol does NOT liberate CO₂ from sodium bicarbonate, which is precisely how you separate a phenol from a carboxylic acid.',
+  },
+  {
+    topicId: 'c12-alcohols-phenols-ethers-ethers-preparation-and-cleavage',
+    question: 'Cleavage of methyl tert-butyl ether by HI gives',
+    options: [
+      'methyl iodide and tert-butyl alcohol',
+      'tert-butyl iodide and methanol',
+      'both iodides in equal amounts',
+      'no reaction',
+    ],
+    answer: 1,
+    explain: 'A tertiary group leaves as a stable carbocation, so the reaction goes SN1 and the iodide ends up on the tertiary carbon. For ethers with only primary or secondary groups the mechanism is SN2 and the iodide attacks the less hindered side instead.',
+  },
+
+  // ------------------------------------------------------------ Chemistry 12 · Amines
+  {
+    topicId: 'c12-amines-classification-preparation-and-basicity',
+    question: 'In aqueous solution, the basicity order of the methylamines is',
+    options: [
+      '(CH₃)₃N > (CH₃)₂NH > CH₃NH₂',
+      '(CH₃)₂NH > CH₃NH₂ > (CH₃)₃N',
+      'CH₃NH₂ > (CH₃)₂NH > (CH₃)₃N',
+      'all three are equally basic',
+    ],
+    answer: 1,
+    explain: 'Two competing effects: alkyl groups push electron density onto nitrogen, but they also block solvation of the protonated ion and crowd the lone pair. The secondary amine is the best compromise. In the gas phase, with no solvent, the order becomes simply 3° > 2° > 1°.',
+  },
+  {
+    topicId: 'c12-amines-reactions-of-amines-and-the-hinsberg-tes',
+    question: 'The Hinsberg test is used to distinguish between',
+    options: [
+      'aldehydes and ketones',
+      'primary, secondary and tertiary amines',
+      'alcohols and phenols',
+      'acids and esters',
+    ],
+    answer: 1,
+    explain: 'Benzenesulphonyl chloride gives a product soluble in alkali with a primary amine, insoluble with a secondary amine, and no reaction at all with a tertiary amine — three distinct outcomes from one reagent.',
+  },
+  {
+    topicId: 'c12-amines-diazonium-salts-and-their-conversions',
+    question: 'Benzenediazonium chloride is prepared from aniline using',
+    options: ['concentrated HNO₃', 'NaNO₂ with HCl at 0–5 °C', 'ammonia', 'bromine water'],
+    answer: 1,
+    explain: 'Nitrous acid is generated in situ, and the low temperature is essential because diazonium salts decompose above about 5 °C. They are enormously useful because the –N₂⁺ group can be swapped for OH, CN, halogen or H.',
+  },
+
+  // ------------------------------------------------------- Chemistry 12 · Biomolecules
+  {
+    topicId: 'c12-biomolecules-carbohydrates-classification-and-structu',
+    question: 'Sucrose is a non-reducing sugar because',
+    options: [
+      'it contains no hydroxyl groups',
+      'both anomeric carbons are locked in the glycosidic linkage',
+      'it is a monosaccharide',
+      'it is insoluble in water',
+    ],
+    answer: 1,
+    explain: 'With no free anomeric carbon there is no open-chain aldehyde or ketone to be oxidised, so Tollens’ and Fehling’s stay negative. Maltose and lactose keep one free anomeric carbon and therefore do reduce.',
+  },
+  {
+    topicId: 'c12-biomolecules-amino-acids-the-peptide-bond-and-protein',
+    question: 'The peptide bond in a protein is',
+    options: [
+      'an ester linkage',
+      'an amide linkage between a –COOH and an –NH₂ group',
+      'a glycosidic linkage',
+      'a disulphide bridge',
+    ],
+    answer: 1,
+    explain: 'It forms with loss of water between the carboxyl of one amino acid and the amino group of the next. Secondary structure — the α-helix and β-pleated sheet — is then held together by hydrogen bonds, not peptide bonds.',
+  },
+  {
+    topicId: 'c12-biomolecules-nucleic-acids-enzymes-and-vitamins',
+    question: 'Vitamin C must be supplied in the diet regularly because it is',
+    options: [
+      'fat soluble and stored in the liver',
+      'water soluble, so it is excreted and not stored',
+      'synthesised by the human body',
+      'a protein that degrades quickly',
+    ],
+    answer: 1,
+    explain: 'Vitamins B and C are water soluble and are lost in urine, so they need constant replenishment. A, D, E and K are fat soluble and stored, which is why those can build up to toxic levels.',
+  },
+
+  // ------------------------------------- Chemistry 12 · The p-Block Elements (15-18)
+  {
+    topicId: 'c12-the-p-block-elements-groups-15-18-group-15-trends-ammonia-and-nitric-acid',
+    question: 'The basicity of the group 15 hydrides follows the order',
+    options: [
+      'NH₃ > PH₃ > AsH₃ > SbH₃',
+      'SbH₃ > AsH₃ > PH₃ > NH₃',
+      'PH₃ > NH₃ > AsH₃ > SbH₃',
+      'all are equally basic',
+    ],
+    answer: 0,
+    explain: 'Going down the group the central atom grows, so the lone pair is spread over a larger volume and is less available for donation. The same size trend makes the hydrides progressively less thermally stable.',
+  },
+  {
+    topicId: 'c12-the-p-block-elements-groups-15-18-group-16-trends-oxygen-and-sulphuric-aci',
+    question: 'Among H₂O, H₂S, H₂Se and H₂Te, the strongest reducing agent is',
+    options: ['H₂O', 'H₂S', 'H₂Se', 'H₂Te'],
+    answer: 3,
+    explain: 'The H–E bond weakens down the group, so H₂Te gives up hydrogen most readily. Water is the odd one out on boiling point too, because of hydrogen bonding.',
+  },
+  {
+    topicId: 'c12-the-p-block-elements-groups-15-18-group-17-halogens-and-group-18-noble-gas',
+    question: 'Fluorine has a LESS negative electron gain enthalpy than chlorine because',
+    options: [
+      'fluorine is less electronegative than chlorine',
+      'strong electron–electron repulsion in its small compact 2p subshell',
+      'fluorine exists as a gas',
+      'chlorine has a larger nuclear charge',
+    ],
+    answer: 1,
+    explain: 'The incoming electron is crowded into a very small orbital already dense with electrons. Fluorine remains the most electronegative element — electronegativity and electron gain enthalpy are different properties, and this is the classic case where they disagree.',
+  },
+
   // --------------------------------------- Chemistry 12 · Coordination Compounds
   {
     topicId: 'c12-coordination-compounds-iupac-nomenclature-of-complexes',
@@ -1524,6 +2424,912 @@ export const QUESTIONS: TopicQuestion[] = [
     ],
     answer: 1,
     explain: 'Strong-field CN⁻ pairs the d⁸ electrons, freeing a 3d orbital for dsp² — square planar and diamagnetic. Contrast [NiCl₄]²⁻, which is tetrahedral and paramagnetic.',
+  },
+
+  // ================================================================== CLASS 11 MATHS
+  // ------------------------------- Maths 11 · Complex Numbers & Quadratic Equations
+  {
+    topicId: 'm11-complex-numbers-quadratic-equations-algebra-of-complex-numbers-modulus-and-c',
+    question: 'For a complex number z, the product z·z̄ equals',
+    options: ['|z|', '|z|²', 'z²', '2 Re(z)'],
+    answer: 1,
+    explain: 'z·z̄ = a² + b² = |z|², always real and non-negative. This is exactly what lets you rationalise a denominator by multiplying by the conjugate.',
+  },
+  {
+    topicId: 'm11-complex-numbers-quadratic-equations-argand-plane-polar-form-and-argument',
+    question: 'In the Argand plane, |z − z₁| = r represents',
+    options: [
+      'a straight line through z₁',
+      'a circle of radius r centred at z₁',
+      'an ellipse with focus z₁',
+      'a single point',
+    ],
+    answer: 1,
+    explain: 'A modulus is a distance, so the locus of points a fixed distance r from z₁ is a circle. By contrast |z − z₁| = |z − z₂| gives the perpendicular bisector of the segment joining them.',
+  },
+  {
+    topicId: 'm11-complex-numbers-quadratic-equations-de-moivre-s-theorem-and-roots-of-unity',
+    question: 'The n distinct nth roots of unity, plotted in the Argand plane, lie',
+    options: [
+      'on a straight line',
+      'at the vertices of a regular n-sided polygon on the unit circle',
+      'all at one point',
+      'on a circle of radius n',
+    ],
+    answer: 1,
+    explain: 'Each has modulus 1, with arguments spaced 2π/n apart. Their sum is therefore zero for every n > 1.',
+  },
+  {
+    topicId: 'm11-complex-numbers-quadratic-equations-nature-of-roots-and-the-discriminant',
+    question: 'A quadratic with real coefficients and discriminant D < 0 has',
+    options: [
+      'two distinct real roots',
+      'a pair of complex conjugate roots',
+      'one repeated real root',
+      'no roots at all',
+    ],
+    answer: 1,
+    explain: 'Complex roots of a real-coefficient polynomial always come in conjugate pairs — you can never have just one. D = 0 gives equal real roots, D > 0 two distinct real ones.',
+  },
+  {
+    topicId: 'm11-complex-numbers-quadratic-equations-relation-between-roots-and-coefficients',
+    question: 'For ax² + bx + c = 0, the sum and the product of the roots are respectively',
+    options: ['−b/a and c/a', 'b/a and −c/a', '−c/a and b/a', 'b/a and c/a'],
+    answer: 0,
+    explain: 'Sum = −b/a, product = c/a. The minus sign is the usual casualty. These let you construct a new quadratic from transformed roots without ever solving the original.',
+  },
+
+  // --------------------------------------------------- Maths 11 · Sequences & Series
+  {
+    topicId: 'm11-sequences-series-arithmetic-progression-nth-term-and-sum',
+    question: 'What characterises an arithmetic progression is that consecutive terms differ by',
+    options: ['a constant amount', 'an increasing amount', 'a constant ratio', 'a positive amount'],
+    answer: 0,
+    explain: 'A constant common difference d defines an AP, and d may be negative or zero. A constant RATIO would make it a geometric progression instead.',
+  },
+  {
+    topicId: 'm11-sequences-series-geometric-progression-and-the-infinite-g',
+    question: 'An infinite geometric series has a finite sum precisely when',
+    options: ['|r| > 1', '|r| < 1', 'r = 1', 'r is an integer'],
+    answer: 1,
+    explain: 'Only then do the terms shrink fast enough, giving S∞ = a/(1 − r). For |r| ≥ 1 the series diverges.',
+  },
+  {
+    topicId: 'm11-sequences-series-arithmetic-geometric-and-harmonic-means',
+    question: 'For two distinct positive numbers, the arithmetic, geometric and harmonic means satisfy',
+    options: ['AM < GM < HM', 'AM > GM > HM', 'AM = GM = HM', 'GM > AM > HM'],
+    answer: 1,
+    explain: 'AM ≥ GM ≥ HM always, with equality only when the numbers are equal. It is also true that GM² = AM × HM.',
+  },
+  {
+    topicId: 'm11-sequences-series-special-series-and-summation-techniques',
+    question: 'The sum of the first n natural numbers is',
+    options: ['n(n + 1)/2', 'n(n + 1)(2n + 1)/6', '[n(n + 1)/2]²', 'n²'],
+    answer: 0,
+    explain: 'Σn = n(n+1)/2. The second option is Σn² and the third is Σn³, which happens to be the square of Σn.',
+  },
+
+  // ----------------------------------------------------- Maths 11 · Binomial Theorem
+  {
+    topicId: 'm11-binomial-theorem-binomial-expansion-and-the-general-term',
+    question: 'The expansion of (a + b)ⁿ for a positive integer n contains',
+    options: ['n terms', 'n + 1 terms', '2n terms', 'infinitely many terms'],
+    answer: 1,
+    explain: 'The exponent of b runs from 0 to n. The general term is T_{r+1} = ⁿC_r a^{n−r} b^r — note the index shift, which is where most errors begin.',
+  },
+  {
+    topicId: 'm11-binomial-theorem-middle-term-and-the-term-independent-of-',
+    question: 'In the expansion of (a + b)ⁿ with n even, the number of middle terms is',
+    options: ['one', 'two', 'n/2', 'none'],
+    answer: 0,
+    explain: 'An even n gives an odd number of terms, so there is exactly one middle term, the (n/2 + 1)th. An ODD n gives two middle terms.',
+  },
+  {
+    topicId: 'm11-binomial-theorem-properties-of-binomial-coefficients',
+    question: 'The sum of all binomial coefficients in the expansion of (1 + x)ⁿ is',
+    options: ['2ⁿ', 'n²', '2ⁿ⁻¹', 'n!'],
+    answer: 0,
+    explain: 'Putting x = 1 gives Σ ⁿC_r = 2ⁿ. Putting x = −1 shows the alternating sum is zero, so the odd and even coefficients each total 2ⁿ⁻¹.',
+  },
+
+  // --------------------------------------------------- Maths 11 · Limits & Derivatives
+  {
+    topicId: 'm11-limits-derivatives-the-idea-of-a-limit-and-one-sided-limits',
+    question: 'The limit of f(x) as x → a exists if and only if',
+    options: [
+      'f(a) is defined',
+      'the left-hand and right-hand limits both exist and are equal',
+      'f is continuous at a',
+      'f is differentiable at a',
+    ],
+    answer: 1,
+    explain: 'A limit describes the approach to a, not the value at a — f need not even be defined there. Continuity additionally demands that the limit equal f(a).',
+  },
+  {
+    topicId: 'm11-limits-derivatives-standard-limits-and-indeterminate-forms',
+    question: 'When a limit produces the form 0/0, this means the limit is',
+    options: [
+      'equal to zero',
+      'indeterminate, so more work is needed to evaluate it',
+      'equal to 1',
+      'guaranteed not to exist',
+    ],
+    answer: 1,
+    explain: 'Indeterminate means the form alone settles nothing — the limit may take any value or fail to exist. Factorising, rationalising, or a standard limit such as (sin x)/x → 1 resolves it.',
+  },
+  {
+    topicId: 'm11-limits-derivatives-derivative-from-first-principles',
+    question: 'From first principles, the derivative of f at x is the limit of',
+    options: [
+      '[f(x + h) − f(x)]/h as h → 0',
+      '[f(x + h) − f(x)]/h as x → 0',
+      '[f(x) − f(0)]/x as x → 0',
+      'f(x + h) − f(x) as h → 0',
+    ],
+    answer: 0,
+    explain: 'It is the limiting slope of a chord as h shrinks to zero. Omitting the division by h leaves only zero — the standard slip.',
+  },
+  {
+    topicId: 'm11-limits-derivatives-rules-of-differentiation',
+    question: 'The product rule gives d(uv)/dx as',
+    options: ['u′v′', 'u′v + uv′', 'u′v − uv′', '(u′v − uv′)/v²'],
+    answer: 1,
+    explain: 'Multiplying the two derivatives is never correct. The last option is the quotient rule, which subtracts and divides by v².',
+  },
+
+  // ------------------------------------------- Maths 11 · Permutations & Combinations
+  {
+    topicId: 'm11-permutations-combinations-the-fundamental-principle-of-counting',
+    question: 'If one task can be done in m ways and then, independently, a second in n ways, the number of ways to do both is',
+    options: ['m + n', 'm × n', 'm − n', 'mⁿ'],
+    answer: 1,
+    explain: 'Tasks done together multiply; mutually exclusive alternatives add. Deciding whether a problem is an AND or an OR is most of the battle in counting.',
+  },
+  {
+    topicId: 'm11-permutations-combinations-permutations-with-repetition-and-with-re',
+    question: 'A permutation differs from a combination in that a permutation',
+    options: [
+      'ignores the order of selection',
+      'takes the order of arrangement into account',
+      'always allows repetition',
+      'applies only to identical objects',
+    ],
+    answer: 1,
+    explain: 'Order matters for permutations and not for combinations, which is why ⁿP_r = ⁿC_r × r!. Words and seating are permutations; teams and handshakes are combinations.',
+  },
+  {
+    topicId: 'm11-permutations-combinations-combinations-and-when-order-does-not-mat',
+    question: 'The value of ⁿC_r is equal to',
+    options: ['ⁿC_{n−r}', 'ⁿP_r', 'ⁿC_{r−1}', 'n!/r!'],
+    answer: 0,
+    explain: 'Choosing r to include is the same as choosing n − r to leave out. This symmetry turns a heavy computation such as ¹⁰⁰C₉₈ into a trivial one.',
+  },
+  {
+    topicId: 'm11-permutations-combinations-circular-arrangements-and-identical-obje',
+    question: 'The number of ways to seat n distinct people around a circular table is',
+    options: ['n!', '(n − 1)!', 'n!/2', '(n − 1)!/2'],
+    answer: 1,
+    explain: 'Only relative position matters, so fix one person and arrange the rest. If the arrangement can also be flipped over, as with a necklace, divide by 2 again.',
+  },
+
+  // --------------------------------------------------------- Maths 11 · Probability
+  {
+    topicId: 'm11-probability-random-experiments-sample-space-and-even',
+    question: 'The sample space of a random experiment is',
+    options: [
+      'the set of favourable outcomes only',
+      'the set of all possible outcomes',
+      'a single outcome',
+      'always a finite set',
+    ],
+    answer: 1,
+    explain: 'It contains every possible outcome, and an event is any subset of it. Sample spaces may be infinite — for instance tossing until the first head appears.',
+  },
+  {
+    topicId: 'm11-probability-axiomatic-probability-and-the-addition-r',
+    question: 'For any two events A and B, P(A ∪ B) equals',
+    options: ['P(A) + P(B)', 'P(A) + P(B) − P(A ∩ B)', 'P(A)·P(B)', 'P(A) − P(B)'],
+    answer: 1,
+    explain: 'The overlap would otherwise be counted twice. The plain sum is correct only when the events are mutually exclusive.',
+  },
+  {
+    topicId: 'm11-probability-mutually-exclusive-and-exhaustive-events',
+    question: 'Two events are mutually exclusive when',
+    options: [
+      'they cannot occur together, so P(A ∩ B) = 0',
+      'they are independent of each other',
+      'they have equal probabilities',
+      'their union has probability 1',
+    ],
+    answer: 0,
+    explain: 'Mutually exclusive means disjoint. Exhaustive is a different idea — the events together cover the whole sample space. And mutually exclusive is not the same as independent.',
+  },
+
+  // ---------------------------------------------------------- Maths 11 · Statistics
+  {
+    topicId: 'm11-statistics-measures-of-central-tendency',
+    question: 'The measure of central tendency least disturbed by a few extreme values is the',
+    options: ['mean', 'median', 'range', 'standard deviation'],
+    answer: 1,
+    explain: 'The median depends only on position, so outliers barely move it. The mean gets dragged towards extremes — which is why median income is reported rather than mean income.',
+  },
+  {
+    topicId: 'm11-statistics-mean-deviation-variance-and-standard-dev',
+    question: 'Variance squares the deviations from the mean rather than using them directly because',
+    options: [
+      'squares are easier to compute',
+      'the plain deviations from the mean always sum to zero',
+      'squaring makes the value smaller',
+      'it keeps the original units',
+    ],
+    answer: 1,
+    explain: 'Σ(x − x̄) is identically zero, so it measures nothing at all. Squaring removes the cancellation; taking the square root afterwards restores the original units, which is why standard deviation is the quoted figure.',
+  },
+  {
+    topicId: 'm11-statistics-comparing-dispersion-with-the-coefficien',
+    question: 'To compare the variability of two data sets measured in different units, use the',
+    options: ['variance', 'standard deviation', 'coefficient of variation', 'mean deviation'],
+    answer: 2,
+    explain: 'CV = (σ/x̄) × 100 is a pure ratio, so it carries no units and allows fair comparison. A larger CV means greater relative variability, hence less consistency.',
+  },
+
+  // ------------------------------------------------------- Maths 11 · Straight Lines
+  {
+    topicId: 'm11-straight-lines-slope-and-the-forms-of-the-equation-of-a',
+    question: 'The slope of a line parallel to the y-axis is',
+    options: ['0', '1', 'undefined', '−1'],
+    answer: 2,
+    explain: 'A vertical line rises infinitely for zero run, so tan 90° is undefined and its equation takes the form x = k. A horizontal line has slope 0 instead.',
+  },
+  {
+    topicId: 'm11-straight-lines-angle-between-lines-parallel-and-perpend',
+    question: 'Two lines of slopes m₁ and m₂ are perpendicular when',
+    options: ['m₁ = m₂', 'm₁·m₂ = −1', 'm₁ + m₂ = 0', 'm₁·m₂ = 1'],
+    answer: 1,
+    explain: 'Equal slopes mean parallel; a product of −1 means perpendicular. The test breaks down when one line is vertical, since its slope is undefined — handle that case separately.',
+  },
+  {
+    topicId: 'm11-straight-lines-distance-of-a-point-from-a-line',
+    question: 'The distance from a point to a line is measured along',
+    options: [
+      'the horizontal direction',
+      'the perpendicular dropped from the point to the line',
+      'any convenient direction',
+      'the line joining the point to the origin',
+    ],
+    answer: 1,
+    explain: 'Distance always means the shortest path, which is the perpendicular. Hence |ax₁ + by₁ + c|/√(a² + b²), with a modulus because distance is never negative.',
+  },
+
+  // -------------------------------------------- Maths 11 · Trigonometric Functions
+  {
+    topicId: 'm11-trigonometric-functions-trigonometric-ratios-signs-and-periodici',
+    question: 'In the second quadrant, which trigonometric ratios are positive?',
+    options: ['all of them', 'sine and cosecant only', 'tangent and cotangent only', 'cosine and secant only'],
+    answer: 1,
+    explain: 'The ASTC rule: All positive in the first quadrant, Sine in the second, Tangent in the third, Cosine in the fourth — each together with its reciprocal.',
+  },
+  {
+    topicId: 'm11-trigonometric-functions-identities-and-transformation-formulae',
+    question: 'The identity sin²θ + cos²θ = 1 holds',
+    options: [
+      'only for acute angles',
+      'for every real value of θ',
+      'only in the first quadrant',
+      'only when θ is measured in degrees',
+    ],
+    answer: 1,
+    explain: 'It follows directly from the unit circle, so it is valid for all real θ. The companions 1 + tan²θ = sec²θ and 1 + cot²θ = cosec²θ hold wherever those functions are defined.',
+  },
+  {
+    topicId: 'm11-trigonometric-functions-general-solutions-of-trigonometric-equat',
+    question: 'The general solution of sin θ = 0 is',
+    options: ['θ = nπ', 'θ = (2n + 1)π/2', 'θ = 2nπ', 'θ = nπ/2'],
+    answer: 0,
+    explain: 'Sine vanishes at every integer multiple of π, while cos θ = 0 gives the odd multiples of π/2. Because these functions are periodic, a general solution must capture every value, not just the principal one.',
+  },
+  {
+    topicId: 'm11-trigonometric-functions-sine-rule-and-cosine-rule',
+    question: 'The cosine rule is the right tool when you are given',
+    options: [
+      'two angles and one side',
+      'two sides and the angle between them',
+      'three angles',
+      'one side and one angle only',
+    ],
+    answer: 1,
+    explain: 'The cosine rule handles two sides with the included angle, or all three sides. The sine rule suits two angles with a side. Three angles alone never fix a triangle’s size.',
+  },
+
+  // ----------------------------------------------- Maths 11 · Relations & Functions
+  {
+    topicId: 'm11-relations-functions-cartesian-product-and-relations',
+    question: 'If set A has m elements and set B has n elements, the number of relations from A to B is',
+    options: ['mn', '2^{mn}', 'm^n', 'm + n'],
+    answer: 1,
+    explain: 'A × B contains mn ordered pairs, and a relation is any subset of it, giving 2^{mn}. Functions form a much smaller family, numbering n^m.',
+  },
+  {
+    topicId: 'm11-relations-functions-domain-codomain-and-range',
+    question: 'The range of a function is',
+    options: [
+      'identical to its codomain',
+      'the set of values actually attained, which is a subset of the codomain',
+      'the set of all inputs',
+      'always the whole real line',
+    ],
+    answer: 1,
+    explain: 'The codomain is declared in advance; the range is what the function genuinely produces. The two coincide exactly when the function is onto.',
+  },
+  {
+    topicId: 'm11-relations-functions-standard-functions-and-their-graphs',
+    question: 'A curve in the plane represents y as a function of x if',
+    options: [
+      'it passes through the origin',
+      'no vertical line meets it more than once',
+      'no horizontal line meets it more than once',
+      'it is continuous everywhere',
+    ],
+    answer: 1,
+    explain: 'This is the vertical line test: each input must yield exactly one output. The HORIZONTAL line test is a different check — it tells you whether the function is one-one.',
+  },
+
+  // -------------------------------------------------------------- Maths 11 · Sets
+  {
+    topicId: 'm11-sets-set-operations-and-venn-diagrams',
+    question: 'For any two finite sets, n(A ∪ B) equals',
+    options: ['n(A) + n(B)', 'n(A) + n(B) − n(A ∩ B)', 'n(A) × n(B)', 'n(A) − n(B)'],
+    answer: 1,
+    explain: 'Elements lying in both sets would otherwise be counted twice. The simple sum is right only for disjoint sets, where the intersection is empty.',
+  },
+  {
+    topicId: 'm11-sets-subsets-power-set-and-cardinality',
+    question: 'A set with n elements has how many subsets?',
+    options: ['n', '2ⁿ', 'n²', 'n!'],
+    answer: 1,
+    explain: 'Each element is independently either in or out, giving 2ⁿ — counting both the empty set and the set itself. The number of PROPER subsets is 2ⁿ − 1.',
+  },
+  {
+    topicId: 'm11-sets-complement-and-de-morgan-s-laws',
+    question: 'De Morgan’s law says that (A ∪ B)′ equals',
+    options: ['A′ ∪ B′', 'A′ ∩ B′', 'A ∩ B', '(A ∩ B)′'],
+    answer: 1,
+    explain: 'Complementing a union gives the intersection of the complements — the operation flips. Being in neither set means being outside both.',
+  },
+
+  // --------------------------------------- Maths 11 · Introduction to 3D Geometry
+  {
+    topicId: 'm11-introduction-to-3d-geometry-coordinates-in-space-and-the-octants',
+    question: 'The three coordinate planes divide space into how many octants?',
+    options: ['4', '6', '8', '12'],
+    answer: 2,
+    explain: 'Each coordinate may independently be positive or negative, giving 2³ = 8 regions. The same reasoning in two dimensions produces 4 quadrants.',
+  },
+  {
+    topicId: 'm11-introduction-to-3d-geometry-distance-and-section-formulae-in-three-d',
+    question: 'A point lying on the x-axis in three dimensions has coordinates of the form',
+    options: ['(x, y, 0)', '(x, 0, 0)', '(0, y, z)', '(x, x, x)'],
+    answer: 1,
+    explain: 'On an axis the other two coordinates vanish. Points of the form (x, y, 0) lie in the xy-PLANE, which is a weaker condition — this is the usual confusion.',
+  },
+
+  // -------------------------------------------------- Maths 11 · Linear Inequalities
+  {
+    topicId: 'm11-linear-inequalities-solving-linear-inequalities-in-one-varia',
+    question: 'When both sides of an inequality are multiplied by a negative number, the inequality sign',
+    options: ['stays the same', 'reverses', 'becomes an equality', 'becomes undefined'],
+    answer: 1,
+    explain: 'Multiplying or dividing by a negative reverses the direction. Forgetting this is the commonest error in the chapter, and it silently yields exactly the complement of the right answer.',
+  },
+  {
+    topicId: 'm11-linear-inequalities-graphical-solution-in-two-variables',
+    question: 'The solution set of a linear inequality in two variables is',
+    options: [
+      'a single point',
+      'a half-plane on one side of the boundary line',
+      'the boundary line only',
+      'the entire plane',
+    ],
+    answer: 1,
+    explain: 'The line splits the plane in two; testing a convenient point such as the origin identifies the correct half. A strict inequality excludes the line itself, drawn dashed.',
+  },
+
+  // ------------------------------------------------------ Maths 11 · Conic Sections
+  {
+    topicId: 'm11-conic-sections-circle-equation-tangent-and-chord-of-con',
+    question: 'The general equation x² + y² + 2gx + 2fy + c = 0 represents a real circle only when',
+    options: ['g² + f² − c > 0', 'g² + f² − c < 0', 'c > 0', 'g = f'],
+    answer: 0,
+    explain: 'The radius is √(g² + f² − c), so the expression must be positive. Zero gives a point circle and a negative value gives an imaginary one.',
+  },
+  {
+    topicId: 'm11-conic-sections-parabola-standard-form-focus-directrix-l',
+    question: 'For the parabola y² = 4ax, the length of the latus rectum is',
+    options: ['a', '2a', '4a', 'a/4'],
+    answer: 2,
+    explain: 'The latus rectum is 4a, with focus at (a, 0) and directrix x = −a. A parabola has eccentricity exactly 1, so every point is equidistant from focus and directrix.',
+  },
+  {
+    topicId: 'm11-conic-sections-ellipse-eccentricity-foci-and-the-b-a-ca',
+    question: 'For the ellipse x²/a² + y²/b² = 1 with a > b, the eccentricity satisfies',
+    options: ['e² = 1 − b²/a²', 'e² = 1 + b²/a²', 'e² = b²/a² − 1', 'e = 1'],
+    answer: 0,
+    explain: 'An ellipse has e < 1, so the term subtracts. If b > a instead, the major axis runs along y and the foci move to (0, ±be) — always compare a and b before writing anything down.',
+  },
+  {
+    topicId: 'm11-conic-sections-hyperbola-eccentricity-asymptotes-conjug',
+    question: 'For the hyperbola x²/a² − y²/b² = 1, the eccentricity satisfies',
+    options: ['e² = 1 − b²/a²', 'e² = 1 + b²/a²', 'e < 1', 'e = 1'],
+    answer: 1,
+    explain: 'A hyperbola has e > 1, so the term adds — the sign flip from the ellipse is the classic slip. Its asymptotes are y = ±(b/a)x.',
+  },
+  {
+    topicId: 'm11-conic-sections-tangent-and-normal-conditions-across-all',
+    question: 'The line y = mx + c is a tangent to the parabola y² = 4ax when',
+    options: ['c = a/m', 'c = am', 'c = a + m', 'c = 4am'],
+    answer: 0,
+    explain: 'Substituting and forcing the discriminant to zero gives c = a/m. The corresponding tangency condition for the ellipse is c² = a²m² + b².',
+  },
+  {
+    topicId: 'm11-conic-sections-reducing-a-general-second-degree-equatio',
+    question: 'Before identifying the centre and axes of a shifted conic, the necessary first step is to',
+    options: [
+      'differentiate the equation',
+      'complete the square in x and in y',
+      'set the equation equal to zero',
+      'substitute x = 0',
+    ],
+    answer: 1,
+    explain: 'Completing the square converts the general form to the standard one and reveals the shift. Reading a and b straight off the raw equation is the standard way to get every subsequent step wrong.',
+  },
+
+  // ------------------------------------- Maths 12 · Continuity & Differentiability
+  {
+    topicId: 'm12-continuity-differentiability-continuity-at-a-point-and-classifying-di',
+    question: 'A function f is continuous at x = a precisely when',
+    options: [
+      'f(a) is defined',
+      'the limit of f as x → a exists',
+      'f(a) is defined, the limit exists, and the two are equal',
+      'f is differentiable at a',
+    ],
+    answer: 2,
+    explain: 'All three conditions must hold together. A removable discontinuity satisfies the first two but fails the third — the limit exists yet does not match the value.',
+  },
+  {
+    topicId: 'm12-continuity-differentiability-differentiability-and-why-it-implies-con',
+    question: 'At x = 0, the function f(x) = |x| is',
+    options: [
+      'continuous and differentiable',
+      'continuous but not differentiable',
+      'differentiable but not continuous',
+      'neither continuous nor differentiable',
+    ],
+    answer: 1,
+    explain: 'The left and right derivatives are −1 and +1, so no unique tangent exists at the corner. This is the standard counterexample: differentiability implies continuity, never the reverse.',
+  },
+  {
+    topicId: 'm12-continuity-differentiability-chain-rule-on-nested-and-composite-funct',
+    question: 'The chain rule is the tool for differentiating',
+    options: ['a sum of functions', 'a composite function', 'a product of functions', 'a constant'],
+    answer: 1,
+    explain: 'For f(g(x)) the derivative is f′(g(x))·g′(x). Products need the product rule and quotients the quotient rule — reaching for the wrong one is the usual slip.',
+  },
+  {
+    topicId: 'm12-continuity-differentiability-implicit-and-parametric-differentiation',
+    question: 'For a curve given parametrically by x = f(t) and y = g(t), dy/dx equals',
+    options: ['g′(t)/f′(t)', 'f′(t)/g′(t)', 'g′(t)·f′(t)', 'g″(t)/f″(t)'],
+    answer: 0,
+    explain: 'dy/dx = (dy/dt)/(dx/dt). Inverting this fraction is the common error. Note that d²y/dx² is NOT g″/f″ — it requires differentiating dy/dx again with respect to t and dividing by dx/dt.',
+  },
+  {
+    topicId: 'm12-continuity-differentiability-logarithmic-differentiation',
+    question: 'Logarithmic differentiation is the natural method when the function has the form',
+    options: ['a polynomial', '[f(x)]^{g(x)}', 'a constant', 'a sum of two terms'],
+    answer: 1,
+    explain: 'With a variable in both base and exponent, neither the power rule nor the exponential rule applies. Taking logs first turns the exponent into a product.',
+  },
+  {
+    topicId: 'm12-continuity-differentiability-rolle-s-and-lagrange-s-mean-value-theore',
+    question: 'Beyond continuity on [a, b] and differentiability on (a, b), Rolle’s theorem additionally requires that',
+    options: ['f(a) = f(b)', 'f(a) = 0', 'f is increasing', 'f is a polynomial'],
+    answer: 0,
+    explain: 'Equal endpoint values guarantee some c with f′(c) = 0. Lagrange’s mean value theorem drops that requirement and concludes f′(c) = (f(b) − f(a))/(b − a) instead.',
+  },
+
+  // ---------------------------------------------------------- Maths 12 · Integrals
+  {
+    topicId: 'm12-integrals-standard-integrals-worth-knowing-cold',
+    question: '∫ (1/x) dx equals',
+    options: ['x⁻² + C', 'ln|x| + C', '1/x² + C', '−1/x² + C'],
+    answer: 1,
+    explain: 'The modulus matters — the antiderivative is valid on both sides of zero. The power rule x^{n+1}/(n+1) breaks down at n = −1, which is exactly why this case is separate.',
+  },
+  {
+    topicId: 'm12-integrals-integration-by-substitution',
+    question: 'When substitution is used on a DEFINITE integral, you must also',
+    options: [
+      'change the limits to match the new variable',
+      'multiply the result by the substitution',
+      'differentiate the final answer',
+      'add an arbitrary constant',
+    ],
+    answer: 0,
+    explain: 'Either convert the limits along with the variable, or convert back to the original variable before substituting the old limits. Applying old limits to a new variable is the classic error, and no constant is needed for a definite integral.',
+  },
+  {
+    topicId: 'm12-integrals-integration-by-parts-and-the-ilate-order',
+    question: 'In ∫ x·eˣ dx, the ILATE rule says the function to take as the first (u) is',
+    options: ['eˣ', 'x', 'either, it makes no difference', 'neither'],
+    answer: 1,
+    explain: 'ILATE orders Inverse, Logarithmic, Algebraic, Trigonometric, Exponential. Algebraic precedes Exponential, so u = x — which is what makes the resulting integral simpler rather than worse.',
+  },
+  {
+    topicId: 'm12-integrals-partial-fractions',
+    question: 'Partial fractions apply when the integrand is',
+    options: [
+      'a product of two unrelated functions',
+      'a rational function, that is a ratio of polynomials',
+      'a trigonometric function',
+      'an exponential function',
+    ],
+    answer: 1,
+    explain: 'The method splits a rational function into simpler fractions. If the numerator’s degree is not lower than the denominator’s, divide first — skipping that step is the usual mistake.',
+  },
+  {
+    topicId: 'm12-integrals-definite-integral-properties-especially-',
+    question: 'For an odd function f, the value of ∫ from −a to a of f(x) dx is',
+    options: ['2∫₀ᵃ f(x) dx', '0', '∫₀ᵃ f(x) dx', 'undefined'],
+    answer: 1,
+    explain: 'The contributions on either side of the origin cancel exactly. For an EVEN function the same integral doubles to 2∫₀ᵃ — checking parity first often removes all the work.',
+  },
+  {
+    topicId: 'm12-integrals-definite-integral-as-the-limit-of-a-sum',
+    question: 'The "limit of a sum" definition interprets ∫ₐᵇ f(x) dx as',
+    options: [
+      'the antiderivative evaluated at b minus at a',
+      'the limit of a Riemann sum of rectangle areas as the widths tend to zero',
+      'the slope of the tangent at b',
+      'the average value of f on [a, b]',
+    ],
+    answer: 1,
+    explain: 'This is the definition of the integral. The antiderivative statement is the Fundamental Theorem of Calculus — a powerful theorem connecting the two ideas, not the definition itself.',
+  },
+
+  // ------------------------------------------ Maths 12 · Applications of Derivatives
+  {
+    topicId: 'm12-applications-of-derivatives-rate-of-change-and-related-rates',
+    question: 'The derivative dy/dx represents',
+    options: [
+      'the area under the curve',
+      'the instantaneous rate of change of y with respect to x',
+      'the average rate of change over an interval',
+      'the slope of the normal',
+    ],
+    answer: 1,
+    explain: 'It is the limiting value of Δy/Δx, so it is instantaneous rather than average. Related-rate problems chain these together through a shared variable, usually time.',
+  },
+  {
+    topicId: 'm12-applications-of-derivatives-increasing-and-decreasing-functions',
+    question: 'A differentiable function f is strictly increasing on an interval when, throughout it,',
+    options: ['f′(x) < 0', 'f′(x) > 0', 'f″(x) > 0', 'f′(x) = 0'],
+    answer: 1,
+    explain: 'A positive derivative means rising values. f″ > 0 describes concavity, which is a different property — a function can be concave up while decreasing.',
+  },
+  {
+    topicId: 'm12-applications-of-derivatives-tangents-and-normals',
+    question: 'If the tangent to a curve at a point has slope m (m ≠ 0), the normal there has slope',
+    options: ['m', '−1/m', '1/m', '−m'],
+    answer: 1,
+    explain: 'The normal is perpendicular to the tangent, and perpendicular slopes multiply to −1. Where the tangent is horizontal the normal is vertical, with undefined slope.',
+  },
+  {
+    topicId: 'm12-applications-of-derivatives-maxima-and-minima-first-and-second-deriv',
+    question: 'At a point of local maximum of a twice-differentiable function,',
+    options: ['f′ = 0 and f″ > 0', 'f′ = 0 and f″ < 0', 'f′ > 0', 'f″ = 0 only'],
+    answer: 1,
+    explain: 'A stationary point that curves downward is a maximum. If f″ = 0 the test is inconclusive and you fall back on the sign change of f′ — as with y = x⁴ at the origin.',
+  },
+  {
+    topicId: 'm12-applications-of-derivatives-absolute-extrema-on-a-closed-interval',
+    question: 'The absolute maximum of a continuous function on a closed interval [a, b] must occur',
+    options: [
+      'only at a critical point',
+      'at a critical point or at an endpoint',
+      'only at an endpoint',
+      'always at the midpoint',
+    ],
+    answer: 1,
+    explain: 'Endpoints are genuine candidates even though f′ need not vanish there. Forgetting to evaluate f(a) and f(b) is the single most common way to lose the answer.',
+  },
+
+  // ------------------------------------------------------ Maths 12 · Vector Algebra
+  {
+    topicId: 'm12-vector-algebra-types-of-vectors-and-when-two-vectors-ar',
+    question: 'Two vectors are equal when they have',
+    options: [
+      'the same magnitude',
+      'the same magnitude and direction, wherever they are placed',
+      'the same initial point',
+      'the same direction only',
+    ],
+    answer: 1,
+    explain: 'Free vectors carry no fixed location, so position is irrelevant. Both magnitude and direction must agree — equal magnitudes alone are not enough.',
+  },
+  {
+    topicId: 'm12-vector-algebra-scalar-dot-product-and-its-uses',
+    question: 'For two non-zero vectors, a·b = 0 means the vectors are',
+    options: ['parallel', 'perpendicular', 'equal', 'antiparallel'],
+    answer: 1,
+    explain: 'a·b = |a||b|cos θ, which vanishes at θ = 90°. The cross product behaves oppositely: a × b = 0 signals parallel vectors.',
+  },
+  {
+    topicId: 'm12-vector-algebra-vector-cross-product-and-its-uses',
+    question: '|a × b| gives',
+    options: [
+      'the area of the triangle with a and b as two sides',
+      'the area of the parallelogram with a and b as adjacent sides',
+      'the volume of a parallelepiped',
+      'the projection of a on b',
+    ],
+    answer: 1,
+    explain: 'The magnitude is the parallelogram’s area; the triangle is half of it. Dropping or adding that factor of ½ is the usual mistake.',
+  },
+  {
+    topicId: 'm12-vector-algebra-scalar-triple-product-and-coplanarity',
+    question: 'Three non-zero vectors are coplanar when their scalar triple product is',
+    options: ['1', '0', 'positive', 'negative'],
+    answer: 1,
+    explain: '[a b c] measures the volume of the parallelepiped they span. Zero volume means they lie in one plane. The sign otherwise only records orientation.',
+  },
+
+  // ------------------------------------------------ Maths 12 · Differential Equations
+  {
+    topicId: 'm12-differential-equations-order-degree-and-formation-of-a-differen',
+    question: 'The DEGREE of a differential equation is',
+    options: [
+      'the order of the highest derivative present',
+      'the power of the highest order derivative, once the equation is polynomial in its derivatives',
+      'always 1',
+      'the number of terms in the equation',
+    ],
+    answer: 1,
+    explain: 'Order counts derivatives; degree is the exponent on the highest one. Degree is undefined when the equation cannot be made polynomial in the derivatives — for instance if a derivative sits inside a sine or a logarithm.',
+  },
+  {
+    topicId: 'm12-differential-equations-variable-separable-equations',
+    question: 'A first-order equation is separable when it can be written as',
+    options: ['dy/dx = f(x)·g(y)', 'dy/dx + Py = Q', 'dy/dx = F(y/x)', 'as a second-order equation'],
+    answer: 0,
+    explain: 'The variables then split onto opposite sides and each is integrated separately. The second option is the linear form and the third the homogeneous form, each with its own method.',
+  },
+  {
+    topicId: 'm12-differential-equations-homogeneous-differential-equations',
+    question: 'A homogeneous equation of the form dy/dx = F(y/x) is solved by substituting',
+    options: ['y = vx', 'v = xy', 'y = v + x', 'x = v + y'],
+    answer: 0,
+    explain: 'Putting y = vx makes dy/dx = v + x·dv/dx and reduces the equation to a separable one in v and x. If the equation is homogeneous in the other sense, x = vy works instead.',
+  },
+  {
+    topicId: 'm12-differential-equations-linear-equations-and-the-integrating-fac',
+    question: 'For dy/dx + Py = Q, where P and Q are functions of x, the integrating factor is',
+    options: ['e^{∫P dx}', 'e^{∫Q dx}', '∫P dx', 'e^{−∫P dx}'],
+    answer: 0,
+    explain: 'Multiplying through by e^{∫P dx} makes the left side an exact derivative. Note P is the coefficient of y, so the equation must first be arranged with the coefficient of dy/dx equal to 1.',
+  },
+
+  // -------------------------------------------------------- Maths 12 · Determinants
+  {
+    topicId: 'm12-determinants-properties-of-determinants',
+    question: 'If two rows of a determinant are identical, its value is',
+    options: ['1', '0', 'undefined', 'the product of the diagonal entries'],
+    answer: 1,
+    explain: 'Swapping the two identical rows must flip the sign yet leave the determinant unchanged, so it has to be zero. Interchanging any two rows changes the sign; multiplying one row by k multiplies the determinant by k.',
+  },
+  {
+    topicId: 'm12-determinants-minors-cofactors-and-the-adjoint',
+    question: 'The sum of the products of the elements of one row with the cofactors of a DIFFERENT row equals',
+    options: ['|A|', '0', '1', '−|A|'],
+    answer: 1,
+    explain: 'Matching a row with its own cofactors gives |A|; pairing it with another row’s cofactors always gives zero. This is exactly what makes A·adj(A) = |A|·I.',
+  },
+  {
+    topicId: 'm12-determinants-inverse-of-a-matrix-using-the-adjoint',
+    question: 'The formula A⁻¹ = adj(A)/|A| can be used only when',
+    options: ['A is symmetric', '|A| ≠ 0', 'A is of order 2', 'A is diagonal'],
+    answer: 1,
+    explain: 'A zero determinant makes the matrix singular and non-invertible. Only square matrices have an inverse at all.',
+  },
+  {
+    topicId: 'm12-determinants-consistency-of-a-system-of-linear-equati',
+    question: 'For a system AX = B with |A| = 0 and (adj A)·B ≠ O, the system has',
+    options: ['a unique solution', 'infinitely many solutions', 'no solution', 'exactly two solutions'],
+    answer: 2,
+    explain: 'It is inconsistent. If instead |A| = 0 and (adj A)·B = O the system either has infinitely many solutions or none. A unique solution requires |A| ≠ 0.',
+  },
+  {
+    topicId: 'm12-determinants-area-of-a-triangle-and-the-collinearity-',
+    question: 'For three collinear points, the determinant used to compute the area of the triangle they form is',
+    options: ['1', '0', 'infinite', 'equal to the perimeter'],
+    answer: 1,
+    explain: 'Collinear points enclose no area. This gives the standard collinearity test. Since area cannot be negative, the formula carries a modulus.',
+  },
+
+  // ------------------------------------------------------------ Maths 12 · Matrices
+  {
+    topicId: 'm12-matrices-types-of-matrices-and-the-conditions-for',
+    question: 'Two matrices can be added only if they',
+    options: ['are both square', 'have the same order', 'are both invertible', 'have equal determinants'],
+    answer: 1,
+    explain: 'Addition works entry by entry, so the dimensions must match exactly. Multiplication has a different requirement — the columns of the first must equal the rows of the second.',
+  },
+  {
+    topicId: 'm12-matrices-matrix-multiplication-and-why-it-is-not-',
+    question: 'For matrices A and B where both products are defined, AB = BA holds',
+    options: ['always', 'never', 'only in special cases', 'whenever both are square'],
+    answer: 2,
+    explain: 'Matrix multiplication is associative and distributive but not commutative in general. Being square is not sufficient — order matters, which is why AB = O does not imply that A or B is O.',
+  },
+  {
+    topicId: 'm12-matrices-transpose-symmetric-and-skew-symmetric-m',
+    question: 'For any square matrix A, the matrix A + A′ is always',
+    options: ['skew-symmetric', 'symmetric', 'singular', 'the identity'],
+    answer: 1,
+    explain: '(A + A′)′ = A′ + A, so it is symmetric, while A − A′ is skew-symmetric. Every square matrix splits into the sum of these two. A skew-symmetric matrix always has zeros along its diagonal.',
+  },
+  {
+    topicId: 'm12-matrices-invertibility-and-elementary-operations',
+    question: 'A square matrix A is invertible if and only if',
+    options: ['A is symmetric', '|A| ≠ 0', 'A is of even order', 'A is diagonal'],
+    answer: 1,
+    explain: 'A non-zero determinant is exactly the condition. The inverse, when it exists, is unique, and (AB)⁻¹ = B⁻¹A⁻¹ — note the reversed order.',
+  },
+
+  // --------------------------------------------------------- Maths 12 · Probability
+  {
+    topicId: 'm12-probability-conditional-probability',
+    question: 'The conditional probability P(A | B) is defined as',
+    options: ['P(A ∩ B)/P(B), for P(B) ≠ 0', 'P(A ∩ B)/P(A)', 'P(A) + P(B)', 'P(A)·P(B)'],
+    answer: 0,
+    explain: 'Conditioning on B restricts the sample space to B, so you divide by P(B). Dividing by the wrong one reverses the conditioning and gives P(B | A) instead.',
+  },
+  {
+    topicId: 'm12-probability-independent-events-versus-mutually-exclu',
+    question: 'Two events A and B are independent when',
+    options: ['P(A ∩ B) = 0', 'P(A ∩ B) = P(A)·P(B)', 'they are mutually exclusive', 'P(A ∪ B) = 1'],
+    answer: 1,
+    explain: 'Independence and mutual exclusivity are opposites in practice — two events of non-zero probability that are mutually exclusive cannot be independent, because one occurring makes the other impossible.',
+  },
+  {
+    topicId: 'm12-probability-total-probability-and-bayes-theorem',
+    question: 'Bayes’ theorem is the tool for finding',
+    options: [
+      'the probability of a cause, given that an effect has been observed',
+      'the mean of a distribution',
+      'whether two events are mutually exclusive',
+      'the variance of a random variable',
+    ],
+    answer: 0,
+    explain: 'It reverses the conditioning: from P(effect | cause) to P(cause | effect). The denominator is supplied by the theorem of total probability over a partition of the sample space.',
+  },
+  {
+    topicId: 'm12-probability-random-variables-and-probability-distrib',
+    question: 'For any probability distribution of a random variable, the sum of all the probabilities must be',
+    options: ['0', '1', 'equal to the number of outcomes', 'between 0 and the number of outcomes'],
+    answer: 1,
+    explain: 'The outcomes are exhaustive, so the probabilities total 1 and each lies in [0, 1]. Checking this is the quickest way to catch an arithmetic slip before computing a mean or variance.',
+  },
+
+  // ------------------------------------------- Maths 12 · Applications of Integrals
+  {
+    topicId: 'm12-applications-of-integrals-area-under-a-curve',
+    question: 'For f(x) ≥ 0 on [a, b], the area bounded by y = f(x), the x-axis and the lines x = a, x = b is',
+    options: ['∫ₐᵇ f(x) dx', '∫ₐᵇ f(x)² dx', 'f(b) − f(a)', '∫ₐᵇ (1/f(x)) dx'],
+    answer: 0,
+    explain: 'The definite integral sums infinitesimal strips of height f(x) and width dx. For a region bounded with respect to the y-axis you integrate x as a function of y instead.',
+  },
+  {
+    topicId: 'm12-applications-of-integrals-area-between-two-curves',
+    question: 'The area between y = f(x) and y = g(x) from a to b, where f(x) ≥ g(x) throughout, is',
+    options: ['∫ₐᵇ (f + g) dx', '∫ₐᵇ (f − g) dx', '∫ₐᵇ f dx − g(b)', '∫ₐᵇ |f| dx'],
+    answer: 1,
+    explain: 'Upper curve minus lower curve, integrated across the interval. If the curves cross inside [a, b] you must split at the intersection, because the roles of upper and lower swap.',
+  },
+  {
+    topicId: 'm12-applications-of-integrals-handling-regions-below-the-axis',
+    question: 'When part of the curve lies below the x-axis, computing the enclosed AREA requires that you',
+    options: [
+      'ignore that part of the region',
+      'split the integral at the crossing point and take the modulus of the negative portion',
+      'square the integrand',
+      'double the result',
+    ],
+    answer: 1,
+    explain: 'A definite integral counts area below the axis as negative, so the two portions would cancel. Area is a positive quantity, so the pieces must be handled separately and their magnitudes added.',
+  },
+
+  // -------------------------------------- Maths 12 · Inverse Trigonometric Functions
+  {
+    topicId: 'm12-inverse-trigonometric-functions-principal-value-branches',
+    question: 'The principal value branch of sin⁻¹x is',
+    options: ['[0, π]', '[−π/2, π/2]', '(−π/2, π/2)', '[0, π/2]'],
+    answer: 1,
+    explain: 'Sine is restricted to [−π/2, π/2] so that it becomes one-one and invertible there. The endpoints are included, since sin⁻¹(±1) = ±π/2.',
+  },
+  {
+    topicId: 'm12-inverse-trigonometric-functions-domains-and-ranges-of-the-inverse-functi',
+    question: 'The range of cos⁻¹x is',
+    options: ['[−π/2, π/2]', '[0, π]', '(0, π)', '[−π, π]'],
+    answer: 1,
+    explain: 'Cosine is one-one on [0, π], so that is the principal branch. Note that sin⁻¹ and tan⁻¹ take negative values while cos⁻¹ never does — a frequent source of sign errors.',
+  },
+  {
+    topicId: 'm12-inverse-trigonometric-functions-properties-and-identities',
+    question: 'The value of sin⁻¹(sin(3π/4)) is',
+    options: ['3π/4', 'π/4', '−π/4', 'π'],
+    answer: 1,
+    explain: '3π/4 lies outside the principal range, so the identity sin⁻¹(sin θ) = θ does not apply. Since sin(3π/4) = sin(π/4) and π/4 is in range, the answer is π/4. Always check whether the angle sits in the principal branch first.',
+  },
+
+  // ------------------------------------------------- Maths 12 · Relations & Functions
+  {
+    topicId: 'm12-relations-functions-types-of-relations-and-equivalence-relat',
+    question: 'On the set of all lines in a plane, the relation "is perpendicular to" is',
+    options: [
+      'reflexive only',
+      'symmetric but neither reflexive nor transitive',
+      'transitive but not symmetric',
+      'an equivalence relation',
+    ],
+    answer: 1,
+    explain: 'No line is perpendicular to itself, so it fails reflexivity. If a ⊥ b then b ⊥ a, so it is symmetric. But a ⊥ b and b ⊥ c makes a parallel to c, not perpendicular, so transitivity fails.',
+  },
+  {
+    topicId: 'm12-relations-functions-one-one-onto-and-bijective-functions',
+    question: 'The function f: R → R defined by f(x) = x² is',
+    options: [
+      'one-one and onto',
+      'neither one-one nor onto',
+      'one-one but not onto',
+      'onto but not one-one',
+    ],
+    answer: 1,
+    explain: 'f(−2) = f(2) breaks injectivity, and no negative number is ever an output, so it is not surjective either. Restricting the domain and codomain to [0, ∞) would make it bijective — the domain is part of the function.',
+  },
+  {
+    topicId: 'm12-relations-functions-composition-of-functions',
+    question: 'If f and g are both one-one, then the composition g∘f is',
+    options: ['not necessarily one-one', 'always one-one', 'always onto', 'never one-one'],
+    answer: 1,
+    explain: 'Injectivity survives composition. Surjectivity does too, so a composition of bijections is a bijection. Note that g∘f and f∘g are generally different functions.',
+  },
+  {
+    topicId: 'm12-relations-functions-invertible-functions',
+    question: 'A function is invertible if and only if it is',
+    options: ['one-one', 'onto', 'bijective', 'continuous'],
+    answer: 2,
+    explain: 'It must be both injective and surjective — injective so each output has one source, surjective so every element of the codomain is reached. Continuity is irrelevant to invertibility.',
+  },
+
+  // -------------------------------------------------- Maths 12 · Linear Programming
+  {
+    topicId: 'm12-linear-programming-formulating-an-lpp-objective-function-an',
+    question: 'In a linear programming problem, the quantity to be maximised or minimised is called the',
+    options: ['constraint', 'objective function', 'feasible region', 'decision variable'],
+    answer: 1,
+    explain: 'The constraints are the inequalities restricting the variables, and the region they carve out is the feasible region. The objective function is what you optimise over it.',
+  },
+  {
+    topicId: 'm12-linear-programming-feasible-region-and-the-corner-point-the',
+    question: 'If an optimal solution to an LPP exists, it occurs',
+    options: [
+      'at the centre of the feasible region',
+      'at a corner point (vertex) of the feasible region',
+      'anywhere in the interior',
+      'outside the feasible region',
+    ],
+    answer: 1,
+    explain: 'This is the corner point theorem, so only the vertices need testing. If the feasible region is unbounded, an optimum may not exist at all and the corner value must be checked against the open direction.',
   },
 
   // ------------------------------------------ Maths 12 · Three Dimensional Geometry
