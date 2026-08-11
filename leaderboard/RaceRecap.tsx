@@ -2,10 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { getISTDateString } from '../utils';
 import { loadPreviousRaceDay } from './raceDay';
 import { summariseRaceDay, RecapTone } from './recap';
+import { clockLabel, describeEvent } from './messages';
 
 interface Props {
   theme: 'dark' | 'light';
 }
+
+/** Enough to tell the story without burying the standings below it. */
+const COLLAPSED = 6;
 
 const TONE: Record<RecapTone, string> = {
   good: 'text-green-500',
@@ -25,10 +29,9 @@ const TONE: Record<RecapTone, string> = {
  */
 const RaceRecap: React.FC<Props> = ({ theme }) => {
   const today = getISTDateString();
-  const recap = useMemo(() => {
-    const prev = loadPreviousRaceDay(today);
-    return prev ? summariseRaceDay(prev, today) : null;
-  }, [today]);
+  const prev = useMemo(() => loadPreviousRaceDay(today), [today]);
+  const recap = useMemo(() => (prev ? summariseRaceDay(prev, today) : null), [prev, today]);
+  const [showAll, setShowAll] = useState(false);
 
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem('race_recap_seen') === recap?.date; } catch { return false; }
@@ -37,6 +40,9 @@ const RaceRecap: React.FC<Props> = ({ theme }) => {
   if (!recap || dismissed) return null;
 
   const dark = theme === 'dark';
+
+  const allEvents = prev?.timeline ?? [];
+  const events = showAll ? allEvents : allEvents.slice(-COLLAPSED);
 
   const dismiss = () => {
     try { localStorage.setItem('race_recap_seen', recap.date); } catch { /* ignore */ }
@@ -83,6 +89,52 @@ const RaceRecap: React.FC<Props> = ({ theme }) => {
           </div>
         ))}
       </div>
+
+      {/* What actually happened, oldest first — the part the totals throw away. */}
+      {events.length > 0 && (
+        <div className={`px-6 py-5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
+          <div className="flex items-baseline justify-between gap-4 mb-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 font-ui">
+              How it happened
+            </p>
+            {allEvents.length > COLLAPSED && (
+              <button
+                onClick={() => setShowAll((v) => !v)}
+                className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-500 hover:text-[#E10600] transition-colors font-ui"
+              >
+                {showAll ? 'Show less' : `All ${allEvents.length}`}
+              </button>
+            )}
+          </div>
+
+          <ol>
+            {events.map((event, i) => {
+              const copy = describeEvent(event);
+              const last = i === events.length - 1;
+              return (
+                <li key={event.id} className="flex gap-3.5">
+                  <div className="flex flex-col items-center flex-shrink-0 pt-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${copy.good ? 'bg-green-500' : 'bg-[#E10600]'}`} />
+                    {!last && <span className={`w-px flex-1 ${dark ? 'bg-white/[0.08]' : 'bg-zinc-200'}`} />}
+                  </div>
+                  <div className={`min-w-0 flex-1 ${last ? '' : 'pb-4'}`}>
+                    <span className="text-[10px] tabular-nums text-zinc-600 font-ui">
+                      {clockLabel(event.at)}
+                    </span>
+                    <p className={`text-[12px] font-bold font-ui leading-snug mt-0.5 ${dark ? 'text-white' : 'text-black'}`}>
+                      <span className="mr-1.5" aria-hidden="true">{copy.icon}</span>
+                      {copy.headline}
+                    </p>
+                    {copy.line && (
+                      <p className="text-[11px] font-ui mt-0.5 text-zinc-500">{copy.line}</p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
     </section>
   );
 };

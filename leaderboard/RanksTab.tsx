@@ -36,7 +36,7 @@ const Movement: React.FC<{ delta: number; dark: boolean }> = ({ delta, dark }) =
   );
 };
 
-const RanksTab: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, theme }) => {
+const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, theme }) => {
   const dark = theme === 'dark';
   const [name, setName] = useState(prefs.displayName);
 
@@ -128,8 +128,6 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, o
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <RaceRecap theme={theme} />
-
       <RaceStatusCard status={race.status} race={race.race} day={race.day} theme={theme} />
 
       <RaceControlFeed events={race.feed} theme={theme} />
@@ -265,5 +263,20 @@ const RanksTab: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, o
     </div>
   );
 };
+
+/**
+ * The recap is deliberately OUTSIDE the auth branches.
+ *
+ * It reads only this device's own archived race day, and returns null when
+ * there is none — so it can appear solely for someone who actually raced.
+ * Hiding your own history behind a sign-in wall you are already past once,
+ * having signed out, serves nobody.
+ */
+const RanksTab: React.FC<Props> = (props) => (
+  <div className="space-y-6">
+    <RaceRecap theme={props.theme} />
+    <RanksBody {...props} />
+  </div>
+);
 
 export default RanksTab;
