@@ -104,12 +104,20 @@ export const calculateVerifiedStreak = (logs: DailyLog[]): number =>
 
 /* Study-day strings are plain calendar dates, so stepping between them is
    exact UTC arithmetic — no timezone, no DST, no clock in it at all. */
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-const dateValue = (date: string): number => {
+export const dateValue = (date: string): number => {
   const [y, m, d] = date.split('-').map(Number);
   return Date.UTC(y, m - 1, d);
 };
+
+/** A study-day string stepped by whole days. Exact, for the same reason. */
+export const addDays = (date: string, days: number): string =>
+  new Date(dateValue(date) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** 0=Sun … 6=Sat for a study-day string, with no timezone in the answer. */
+export const weekdayOf = (date: string): number =>
+  new Date(dateValue(date)).getUTCDay();
 
 /**
  * The longest unbroken run of logged days anywhere in the history.

@@ -34,7 +34,7 @@ export interface ClipRule {
 }
 
 const SUBJECTS = ['PHYSICS', 'CHEMISTRY', 'MATHS', 'BIOLOGY', 'GENERAL'];
-const TABS = ['TODAY', 'SYLLABUS', 'STREAK', 'QUESTIONS', 'RANKS', 'REVIEW'];
+const TABS = ['TODAY', 'PLAN', 'SYLLABUS', 'STREAK', 'QUESTIONS', 'RANKS', 'REVIEW'];
 const PHASES = ['FOCUS', 'SHORT BREAK', 'LONG BREAK'];
 const EXAMS = ['JEE', 'NEET'];
 const MODES = ['STOPWATCH', 'POMODORO'];

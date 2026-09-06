@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
-import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId } from './utils';
+import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, normalizePomodoro } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, normalizePomodoro, normalizeSchedule } from './state';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
+import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
+import PlanTab from './schedule/PlanTab';
 import { wallpaperById } from './rewards/wallpapers';
 import WallpaperLayer from './rewards/WallpaperLayer';
 import UnlockModal from './rewards/UnlockModal';
@@ -133,6 +135,7 @@ const App: React.FC = () => {
            find its earned tiers already in the vault on first load — `evaluate`
            backfills them from the logs. */
         merged.rewards = normalizeRewards(parsed.rewards);
+        merged.schedule = normalizeSchedule(parsed.schedule);
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -236,6 +239,12 @@ const App: React.FC = () => {
               pomodoro: prev.pomodoro,
               // …nor take back a reward already earned here.
               rewards: mergeRewards(normalizeRewards(prev.rewards), normalizeRewards(remoteState.rewards)),
+              /* `schedule` deliberately rides the wholesale spread, exactly like
+                 `tasks` and `progress`. A union here would look kinder and be
+                 wrong: deleting a block on the phone has to reach the laptop,
+                 and a device that unions can never be told something is gone.
+                 The only place it is safe to merge is the local-newer branch
+                 below, where the deletions in play are this device's own. */
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -325,6 +334,14 @@ const App: React.FC = () => {
             rewards: mergeRewards(
               normalizeRewards(localState.rewards),
               normalizeRewards(remoteState.rewards),
+            ),
+            /* Same treatment as logs and tasks directly above, and for the
+               same reason: a block created on this device while the server
+               moved on must not be dropped, but a deletion this device made
+               must not be undone either. Union only in this branch. */
+            schedule: mergeSchedule(
+              normalizeSchedule(localState.schedule),
+              normalizeSchedule(remoteState.schedule),
             ),
           };
         });
@@ -510,7 +527,12 @@ const App: React.FC = () => {
     hours: number,
     quality: number,
     distractions: number,
-    source: LogSource = 'manual'
+    source: LogSource = 'manual',
+    /* What was actually studied, and which planned block it was owed to.
+       Both optional and both trailing, so every existing call site is
+       unchanged — only the paths that genuinely know pass them. */
+    chapter?: string,
+    blockId?: string,
   ) => {
     if (hours <= 0) return;
     const today = getISTDateString();
@@ -522,7 +544,9 @@ const App: React.FC = () => {
         hours: parseFloat(hours.toFixed(2)),
         quality: quality,
         distractions: distractions,
-        source
+        source,
+        chapter,
+        blockId,
       };
       const nextState = { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
       stateRef.current = nextState;
@@ -579,7 +603,11 @@ const App: React.FC = () => {
       const today = getISTDateString();
       const nextState: AppState = {
         ...prev,
-        timer: { isRunning: true, startTime: Date.now(), accumulatedMs: 0, subject: rec.subject },
+        /* `rec.chapter` was already in hand here and was being dropped, which
+           left `hoursOnChapter` in recommend.ts reading a field nothing ever
+           wrote. Carrying it is what makes the coach able to see a chapter you
+           keep bouncing off. */
+        timer: { isRunning: true, startTime: Date.now(), accumulatedMs: 0, subject: rec.subject, chapter: rec.chapter, blockId: undefined },
         coach: {
           ...(prev.coach || DEFAULT_COACH),
           served: { ...(prev.coach?.served || {}), [rec.id.split(':').slice(1).join(':')]: today },
@@ -796,6 +824,171 @@ const App: React.FC = () => {
       stateRef.current = nextState;
       return nextState;
     });
+  };
+
+  /* ── Plan ─────────────────────────────────────────────────────────
+     One helper so the optional slice is dealt with in a single place: every
+     mutator below is handed a schedule that definitely exists. */
+  const withSchedule = (fn: (s: ScheduleState) => ScheduleState) => {
+    setState(prev => {
+      const nextState: AppState = {
+        ...prev,
+        schedule: fn(normalizeSchedule(prev.schedule)),
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  const addBlock = (input: Omit<ScheduleBlock, 'id'>) => {
+    withSchedule(s => ({ ...s, blocks: [...s.blocks, { ...input, id: generateId() }] }));
+  };
+
+  /**
+   * Edit one block on the grid.
+   *
+   * A rule instance has no row of its own — moving one writes an override for
+   * that date instead of touching the rule, so dragging Wednesday's slot
+   * cannot silently move every Wednesday.
+   */
+  const updateBlock = (id: string, patch: Partial<Omit<ScheduleBlock, 'id' | 'date'>>) => {
+    withSchedule(s => {
+      if (!isInstanceId(id)) {
+        return { ...s, blocks: s.blocks.map(b => (b.id === id ? { ...b, ...patch } : b)) };
+      }
+      const parsed = parseInstanceId(id);
+      if (!parsed) return s;
+      const existing = s.overrides.find(o => o.id === id);
+      const next = {
+        ...(existing || { id, ruleId: parsed.ruleId, date: parsed.date }),
+        ...patch,
+        skipped: undefined,
+      };
+      return {
+        ...s,
+        overrides: [...s.overrides.filter(o => o.id !== id), next],
+      };
+    });
+  };
+
+  /* A one-off is removed; a rule instance is tombstoned for that date only. */
+  const deleteBlock = (id: string) => {
+    withSchedule(s => {
+      if (!isInstanceId(id)) return { ...s, blocks: s.blocks.filter(b => b.id !== id) };
+      const parsed = parseInstanceId(id);
+      if (!parsed) return s;
+      return {
+        ...s,
+        overrides: [
+          ...s.overrides.filter(o => o.id !== id),
+          { id, ruleId: parsed.ruleId, date: parsed.date, skipped: true },
+        ],
+      };
+    });
+  };
+
+  /** Put a moved or skipped instance back to whatever the template says. */
+  const resetInstance = (ruleId: string, date: string) => {
+    withSchedule(s => ({
+      ...s,
+      overrides: s.overrides.filter(o => o.id !== instanceId(ruleId, date)),
+    }));
+  };
+
+  const addRule = (input: Omit<TemplateRule, 'id' | 'from'>) => {
+    withSchedule(s => ({
+      ...s,
+      rules: [...s.rules, { ...input, id: generateId(), from: getISTDateString(), until: null }],
+    }));
+  };
+
+  /**
+   * Change a weekly slot from today onward.
+   *
+   * The old rule is closed at yesterday rather than edited, and a new one
+   * opened from today. Editing in place would move the slot on days already
+   * spent, so last Monday's adherence would silently be re-measured against a
+   * plan that did not exist when it was lived.
+   */
+  const updateRule = (id: string, patch: Partial<Omit<TemplateRule, 'id' | 'from' | 'until'>>) => {
+    withSchedule(s => {
+      const rule = s.rules.find(r => r.id === id);
+      if (!rule) return s;
+      const today = getISTDateString();
+      /* Edited the same day it was created: nothing has been lived against it
+         yet, so amend it rather than leaving a zero-length husk behind. */
+      if (rule.from === today) {
+        return { ...s, rules: s.rules.map(r => (r.id === id ? { ...r, ...patch } : r)) };
+      }
+      const closed = { ...rule, until: addDays(today, -1) };
+      const opened: TemplateRule = {
+        ...rule,
+        ...patch,
+        id: generateId(),
+        from: today,
+        until: null,
+      };
+      return { ...s, rules: [...s.rules.map(r => (r.id === id ? closed : r)), opened] };
+    });
+  };
+
+  /* Closed, not deleted — the days it already governed still have to
+     materialize the way they were actually planned. A rule created today has
+     no such history, so that one really does go. */
+  const deleteRule = (id: string) => {
+    withSchedule(s => {
+      const rule = s.rules.find(r => r.id === id);
+      if (!rule) return s;
+      const today = getISTDateString();
+      if (rule.from >= today) {
+        return {
+          ...s,
+          rules: s.rules.filter(r => r.id !== id),
+          overrides: s.overrides.filter(o => o.ruleId !== id),
+        };
+      }
+      return {
+        ...s,
+        rules: s.rules.map(r => (r.id === id ? { ...r, until: addDays(today, -1) } : r)),
+        overrides: s.overrides.filter(o => !(o.ruleId === id && o.date >= today)),
+      };
+    });
+  };
+
+  /**
+   * Start a session against a planned block.
+   *
+   * Deliberately the same shape as `engageRecommendation` above rather than a
+   * second copy of the timer rules — the only thing this adds is `blockId`,
+   * which is what lets adherence say a block was honoured instead of guessing
+   * it from subject and hours.
+   */
+  const startBlock = (block: ScheduleBlock) => {
+    const current = stateRef.current;
+    if (current.timer.isRunning || !pomodoroIsIdle(current.pomodoro)) {
+      window.alert('A SESSION IS ALREADY RUNNING. FINISH IT.');
+      return;
+    }
+    setState(prev => {
+      const nextState: AppState = {
+        ...prev,
+        timer: {
+          isRunning: true,
+          startTime: Date.now(),
+          accumulatedMs: 0,
+          subject: block.subject,
+          chapter: block.chapter,
+          blockId: block.id,
+        },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+    /* Engaging and staying on the grid is a dead end — the running clock is
+       on Today. */
+    handleTabChange('Today');
   };
 
   const updateDailyGoal = (val: number) => {
@@ -1151,6 +1344,10 @@ const App: React.FC = () => {
      device that predates a field) must never reach the vault with a missing
      high-water mark and render NaN progress. */
   const rewards = normalizeRewards(state.rewards);
+  /* Normalized on read as well as on load: the realtime path spreads a whole
+     remote blob, and a blob written by a build that predates this feature has
+     no schedule in it at all. */
+  const schedule = normalizeSchedule(state.schedule);
   /* Oldest un-shown tier first, so someone returning after a long absence is
      walked up their unlocks one at a time instead of seeing only the last. */
   const celebration = pendingCelebrations(rewards)[0];
@@ -1254,6 +1451,27 @@ const App: React.FC = () => {
               onEngageRecommendation={engageRecommendation}
               onDismissRecommendation={dismissRecommendation}
               onSetCoachMuted={setCoachMuted}
+              onStartBlock={startBlock}
+              onOpenPlan={() => handleTabChange('Plan')}
+            />
+          )}
+          {activeTab === 'Plan' && (
+            <PlanTab
+              schedule={schedule}
+              logs={state.logs}
+              timer={state.timer}
+              theme={theme}
+              activeSubjects={activeSubjects}
+              currentClass={state.currentClass}
+              examPreference={state.examPreference || 'JEE'}
+              onAddBlock={addBlock}
+              onUpdateBlock={updateBlock}
+              onDeleteBlock={deleteBlock}
+              onResetInstance={resetInstance}
+              onAddRule={addRule}
+              onUpdateRule={updateRule}
+              onDeleteRule={deleteRule}
+              onStartBlock={startBlock}
             />
           )}
           {activeTab === 'Syllabus' && (

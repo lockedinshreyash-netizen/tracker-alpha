@@ -33,6 +33,11 @@ export interface DailyLog {
      "4h of Physics" into "4h on Thermodynamics", which is the only way the
      coach can notice a chapter you are stuck on. */
   chapter?: string;
+  /* The planned block this session was started from, if it was started from
+     one. The only way adherence can know a block was honoured rather than
+     guess it — a log carries no start time, so without this the best the
+     Plan tab can do is match on subject and hours. */
+  blockId?: string;
 }
 
 export interface DailyQuestionsLog {
@@ -71,7 +76,7 @@ export interface ChapterProgress {
   lastRevisedAt?: string; // YYYY-MM-DD (IST)
 }
 
-export type TabType = 'Today' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -89,6 +94,13 @@ export interface TimerState {
   startTime: number | null;
   accumulatedMs: number;
   subject: Subject;
+  /* Set when the session was launched from a block on the Plan tab, and
+     stamped onto the log when it stops. Device-local like the rest of the
+     timer — a block engaged on the laptop is not running on the phone. */
+  blockId?: string;
+  /* Carried alongside blockId so the log can say what was actually studied,
+     not just which subject. */
+  chapter?: string;
 }
 
 export type TimerMode = 'stopwatch' | 'pomodoro';
@@ -218,6 +230,91 @@ export interface TopicMastery {
   date: string; // YYYY-MM-DD (IST)
 }
 
+/* ────────────────────────────────────────────────────────────────
+   SCHEDULING — the Plan tab
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Minutes since the start of the study day, which is 04:00 IST — not
+ * midnight. See DAY_START_HOUR in utils.ts.
+ *
+ * So minute 0 is 04:00, minute 1199 is 23:59, and minute 1200 is 00:00 the
+ * following calendar morning while still belonging to the same study day.
+ * Range 0 … 1439.
+ */
+export type DayMinute = number;
+
+export type BlockKind = 'study' | 'revision' | 'test' | 'break' | 'fixed';
+
+/**
+ * A planned block that exists on one date only.
+ *
+ * Instances of a weekly rule are NOT stored here — they are derived from
+ * `TemplateRule` at render time. See `materializeDay`.
+ */
+export interface ScheduleBlock {
+  id: string;
+  date: string; // YYYY-MM-DD (IST study day)
+  subject: Subject;
+  chapter?: string;
+  start: DayMinute;
+  durationMins: number;
+  kind: BlockKind;
+  label?: string;
+}
+
+/**
+ * One repeating slot in the weekly template.
+ *
+ * `from`/`until` are what keep history honest. Editing a rule closes the old
+ * one at yesterday and opens a new one from today, rather than mutating it in
+ * place — otherwise moving your Monday slot would retroactively change what
+ * last Monday's adherence was measured against.
+ */
+export interface TemplateRule {
+  id: string;
+  days: number[]; // 0=Sun … 6=Sat, in study-day terms
+  subject: Subject;
+  chapter?: string;
+  start: DayMinute;
+  durationMins: number;
+  kind: BlockKind;
+  label?: string;
+  from: string;          // inclusive YYYY-MM-DD; nothing materializes before this
+  until?: string | null; // inclusive last day, or null while the rule is live
+}
+
+/**
+ * One instance of a rule, moved or dropped for a single date.
+ *
+ * The id is `${ruleId}@${date}` so re-editing the same instance replaces its
+ * override instead of stacking a second one.
+ */
+export interface BlockOverride {
+  id: string;
+  ruleId: string;
+  date: string;
+  skipped?: boolean;
+  start?: DayMinute;
+  durationMins?: number;
+  subject?: Subject;
+  chapter?: string;
+}
+
+/**
+ * The plan.
+ *
+ * Rules plus overrides rather than materialized rows: seven rows a week
+ * written forever would grow the synced blob without bound, and every edit to
+ * the template would rewrite days already spent. Overrides accrue only where
+ * the user actually deviated, so this stays small.
+ */
+export interface ScheduleState {
+  blocks: ScheduleBlock[];
+  rules: TemplateRule[];
+  overrides: BlockOverride[];
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -239,4 +336,7 @@ export interface AppState {
   /* Keyed by Topic.id. Bounded by the number of authored topics, so it stays
      small inside the synced state blob. */
   topicMastery?: Record<string, TopicMastery>;
+  /* Optional because it arrived after these users already had saved state.
+     `normalizeSchedule` fills it on load. */
+  schedule?: ScheduleState;
 }

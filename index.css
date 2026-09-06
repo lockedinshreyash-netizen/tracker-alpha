@@ -304,6 +304,29 @@ button:active,
 }
 
 /* ══════════════════════════════════════════
+   PLAN — the day grid
+   Hand-rolled for the same reason as the blocks above: the `animate-in`
+   utilities come from a plugin the Tailwind CDN doesn't load.
+   ══════════════════════════════════════════ */
+
+/* The now-line's marker. Slow, like the race dot — a fast blink on a line
+   that sits across the whole day reads as an error, not as a clock. */
+@keyframes plan-now-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.plan-now-dot {
+  animation: plan-now-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-now-dot {
+    animation: none;
+  }
+}
+
+/* ══════════════════════════════════════════
    SCROLLBAR — neutral, works on both themes
    ══════════════════════════════════════════ */
 

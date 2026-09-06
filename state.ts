@@ -1,4 +1,4 @@
-import { AppState, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, RewardsState, Subject } from './types';
+import { AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, RewardsState, ScheduleBlock, ScheduleState, Subject, TemplateRule } from './types';
 
 export const DEFAULT_COACH: CoachState = {
   dismissed: [],
@@ -97,6 +97,97 @@ export const DEFAULT_REWARDS: RewardsState = {
   hamperClaimedOn: null,
 };
 
+/* An empty plan, not a suggested one. A timetable somebody else wrote is the
+   thing students abandon in week two. */
+export const DEFAULT_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [] };
+
+const BLOCK_KINDS: BlockKind[] = ['study', 'revision', 'test', 'break', 'fixed'];
+const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
+const asMinute = (v: unknown, fallback: number): number =>
+  Number.isFinite(v as number) ? Math.min(1439, Math.max(0, Math.floor(v as number))) : fallback;
+
+const asDuration = (v: unknown): number =>
+  Number.isFinite(v as number) ? Math.min(1440, Math.max(10, Math.floor(v as number))) : 60;
+
+const asSubject = (v: unknown): Subject =>
+  SUBJECTS.includes(v as Subject) ? (v as Subject) : 'General';
+
+const asKind = (v: unknown): BlockKind =>
+  BLOCK_KINDS.includes(v as BlockKind) ? (v as BlockKind) : 'study';
+
+const asDate = (v: unknown): string | null =>
+  typeof v === 'string' && DATE_SHAPE.test(v) ? v : null;
+
+const asText = (v: unknown): string | undefined =>
+  typeof v === 'string' && v.trim() ? v.slice(0, 120) : undefined;
+
+/**
+ * Whatever was persisted, made safe to render a day from.
+ *
+ * Same stance as normalizePomodoro: validate every field rather than trusting
+ * the shape, and drop the row outright when its identity is unusable. A block
+ * with no date or no id cannot be drawn, moved or deleted — keeping it would
+ * only put something on the grid the user has no way to get rid of.
+ */
+export const normalizeSchedule = (raw: unknown): ScheduleState => {
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<ScheduleState>;
+
+  const blocks: ScheduleBlock[] = (Array.isArray(src.blocks) ? src.blocks : [])
+    .filter(b => b && typeof b.id === 'string' && asDate(b.date))
+    .map(b => ({
+      id: b.id,
+      date: asDate(b.date)!,
+      subject: asSubject(b.subject),
+      chapter: asText(b.chapter),
+      start: asMinute(b.start, 0),
+      durationMins: asDuration(b.durationMins),
+      kind: asKind(b.kind),
+      label: asText(b.label),
+    }));
+
+  const rules: TemplateRule[] = (Array.isArray(src.rules) ? src.rules : [])
+    .filter(r => r && typeof r.id === 'string' && asDate(r.from))
+    .map(r => ({
+      id: r.id,
+      days: (Array.isArray(r.days) ? r.days : [])
+        .filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+        .filter((d, i, a) => a.indexOf(d) === i)
+        .sort((a, b) => a - b),
+      subject: asSubject(r.subject),
+      chapter: asText(r.chapter),
+      start: asMinute(r.start, 0),
+      durationMins: asDuration(r.durationMins),
+      kind: asKind(r.kind),
+      label: asText(r.label),
+      from: asDate(r.from)!,
+      until: asDate(r.until),
+    }))
+    /* A rule with no days can never materialize and can never be seen to be
+       deleted — it would just sit in the blob forever. */
+    .filter(r => r.days.length > 0);
+
+  const ruleIds = new Set(rules.map(r => r.id));
+
+  const overrides: BlockOverride[] = (Array.isArray(src.overrides) ? src.overrides : [])
+    .filter(o => o && typeof o.id === 'string' && typeof o.ruleId === 'string' && asDate(o.date))
+    /* An override whose rule is gone describes an instance that no longer
+       exists. Dropping it is the only way this array stays bounded. */
+    .filter(o => ruleIds.has(o.ruleId))
+    .map(o => ({
+      id: o.id,
+      ruleId: o.ruleId,
+      date: asDate(o.date)!,
+      skipped: o.skipped === true ? true : undefined,
+      start: o.start === undefined ? undefined : asMinute(o.start, 0),
+      durationMins: o.durationMins === undefined ? undefined : asDuration(o.durationMins),
+      subject: o.subject === undefined ? undefined : asSubject(o.subject),
+      chapter: asText(o.chapter),
+    }));
+
+  return { blocks, rules, overrides };
+};
+
 export const DEFAULT_STATE: AppState = {
   currentClass: 11,
   examPreference: 'JEE',
@@ -121,4 +212,5 @@ export const DEFAULT_STATE: AppState = {
   leaderboard: DEFAULT_LEADERBOARD,
   coach: DEFAULT_COACH,
   rewards: DEFAULT_REWARDS,
+  schedule: DEFAULT_SCHEDULE,
 };

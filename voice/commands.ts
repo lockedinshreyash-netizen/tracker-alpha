@@ -94,6 +94,7 @@ const SUBJECT_ALIASES: [Subject, string[]][] = [
 
 const TAB_ALIASES: [TabType, string[]][] = [
   ['Today', ['today', 'home', 'timer', 'dashboard']],
+  ['Plan', ['plan', 'planner', 'schedule', 'timetable', 'calendar']],
   ['Syllabus', ['syllabus', 'silabus', 'syllabi', 'chapters', 'chapter']],
   // "strike" is what en-IN most often hears for "streak".
   ['Streak', ['streak', 'streaks', 'strike', 'strick']],

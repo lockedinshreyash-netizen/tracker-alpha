@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, ExamPreference, LogSource, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import { isIdle as pomodoroIsIdle } from './pomodoro';
 import { PomodoroApi } from './usePomodoro';
@@ -7,10 +7,11 @@ import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
 import CoachCard from './CoachCard';
 import { Recommendation } from './recommend';
+import NextUpStrip from '../schedule/NextUpStrip';
 
 interface Props {
   state: AppState;
-  onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource) => void;
+  onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource, chapter?: string, blockId?: string) => void;
   onDeleteLog: (id: string) => void;
   onTimerUpdate: (timerUpdate: Partial<TimerState>) => void;
   onAddTask: (text: string, subject: Subject) => void;
@@ -26,6 +27,8 @@ interface Props {
   onEngageRecommendation: (rec: Recommendation) => void;
   onDismissRecommendation: (rec: Recommendation) => void;
   onSetCoachMuted: (muted: boolean) => void;
+  onStartBlock: (block: ScheduleBlock) => void;
+  onOpenPlan: () => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -45,7 +48,9 @@ const TodayTab: React.FC<Props> = ({
   examPreference,
   onEngageRecommendation,
   onDismissRecommendation,
-  onSetCoachMuted
+  onSetCoachMuted,
+  onStartBlock,
+  onOpenPlan
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
@@ -80,16 +85,21 @@ const TodayTab: React.FC<Props> = ({
   }, [timer.isRunning]);
 
   const handleStartTimer = () => {
-    onTimerUpdate({ isRunning: true, startTime: Date.now(), subject: manualSubject });
+    /* Started by hand, so it belongs to no planned block — clear any stamp a
+       previous engaged session left behind. */
+    onTimerUpdate({ isRunning: true, startTime: Date.now(), subject: manualSubject, chapter: undefined, blockId: undefined });
   };
 
   const handleStopTimer = () => {
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
     const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
-    // Measured by the stopwatch, so it counts towards the leaderboard.
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer');
-    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0 });
+    /* Measured by the stopwatch, so it counts towards the leaderboard. The
+       chapter and block ride along when the session was started from a plan —
+       that stamp is the only thing that lets adherence say a block was
+       honoured rather than infer it from subject and hours. */
+    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer', currentTimer.chapter, currentTimer.blockId);
+    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, chapter: undefined, blockId: undefined });
   };
 
   const formatTime = (ms: number) => {
@@ -115,6 +125,15 @@ const TodayTab: React.FC<Props> = ({
     <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Only while idle — mid-session the last thing anyone needs is a second
           opinion about what they should be doing. */}
+      {!timer.isRunning && !pomodoroBusy && state.schedule && (
+        <NextUpStrip
+          schedule={state.schedule}
+          timer={timer}
+          theme={theme}
+          onStartBlock={onStartBlock}
+          onOpenPlan={onOpenPlan}
+        />
+      )}
       {!timer.isRunning && !pomodoroBusy && (
         <CoachCard
           state={state}

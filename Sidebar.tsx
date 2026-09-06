@@ -24,6 +24,17 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <polyline points="12 6 12 12 16 14" />
         </svg>
       );
+    case 'Plan':
+      return (
+        <svg {...props}>
+          <rect x="3" y="4" width="18" height="17" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="13" x2="14" y2="13" />
+          <line x1="8" y1="17" x2="12" y2="17" />
+        </svg>
+      );
     case 'Syllabus':
       return (
         <svg {...props}>
@@ -70,7 +81,7 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
 const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review'];
+  const tabs: TabType[] = ['Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review'];
   const dark = theme === 'dark';
 
   const handleTabClick = (tab: TabType) => {
@@ -146,7 +157,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
               <button
                 key={tab}
                 onClick={() => handleTabClick(tab)}
-                data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : undefined}
+                data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : tab === 'Plan' ? 'plan-nav' : undefined}
                 className={`flex items-center gap-3 rounded-lg transition-all duration-200 group relative
                   ${collapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'}
                   ${isActive
