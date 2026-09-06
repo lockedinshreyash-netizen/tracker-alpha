@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   BlockKind, DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, TemplateRule, TimerState,
 } from '../types';
-import { getISTDateString } from '../utils';
+import { addDays, getISTDateString } from '../utils';
 import AdherenceSection from './AdherenceSection';
 import BlockEditor, { EditorDraft } from './BlockEditor';
 import DateStrip from './DateStrip';
@@ -10,7 +10,8 @@ import DayTimeline from './DayTimeline';
 import TemplateSection from './TemplateSection';
 import { ACTIVITIES, countsAsStudy } from './colors';
 import {
-  firstFreeSlot, isInstanceId, isOverridden, materializeDay, nowMinute, parseInstanceId,
+  RepeatMode, daysForRepeat, firstFreeSlot, isInstanceId, isOverridden,
+  materializeDay, nowMinute, parseInstanceId, repeatOf,
 } from './schedule';
 
 interface Props {
@@ -65,6 +66,15 @@ const PlanTab: React.FC<Props> = ({
     .filter(b => countsAsStudy(b.kind))
     .reduce((a, b) => a + b.durationMins, 0);
 
+  /** The rule an on-screen block came from, if it came from one. */
+  const ruleFor = (blockId: string): TemplateRule | undefined => {
+    const parsed = isInstanceId(blockId) ? parseInstanceId(blockId) : null;
+    return parsed ? schedule.rules.find(r => r.id === parsed.ruleId) : undefined;
+  };
+
+  const weekdayName = new Intl.DateTimeFormat('en-US', { weekday: 'long' })
+    .format(new Date(date + 'T12:00:00'));
+
   const closeEditor = () => setDraft(null);
 
   const openNew = (kind: BlockKind, start?: number) => {
@@ -74,25 +84,65 @@ const PlanTab: React.FC<Props> = ({
       subject: def.isStudy ? activeSubjects[0] : undefined,
       start: start ?? firstFreeSlot(blocks, def.defaultStart, def.defaultMins),
       durationMins: def.defaultMins,
+      repeat: 'none',
     });
   };
 
+  /**
+   * One Save button, six outcomes.
+   *
+   * Repeat is applied here rather than by its own hidden action, because
+   * "make this repeat" and "change its time" are the same edit as far as the
+   * user is concerned, and splitting them is how the old buried link ended up
+   * silently creating a rule for one weekday and nothing else.
+   */
   const saveDraft = (d: EditorDraft) => {
     const patch = {
       kind: d.kind, subject: d.subject, chapter: d.chapter,
       start: d.start, durationMins: d.durationMins, label: d.label,
     };
-    if (d.id) onUpdateBlock(d.id, patch);
-    else onAddBlock({ date, ...patch });
+    const rule = d.id ? ruleFor(d.id) : undefined;
+    const wasRepeating = !!rule;
+    const wantsRepeat = d.repeat !== 'none';
+
+    if (wantsRepeat) {
+      const days = daysForRepeat(d.repeat, date);
+      if (wasRepeating) {
+        onUpdateRule(rule!.id, { ...patch, days });
+      } else {
+        /* A one-off becoming a repeat: the rule takes over from today, and the
+           single block it grew from goes, or the day would show it twice. */
+        onAddRule({ ...patch, days, until: null });
+        if (d.id) onDeleteBlock(d.id);
+      }
+    } else if (wasRepeating) {
+      /* Dropping the repeat must not also drop today — the user asked for one
+         block, not for none. */
+      onDeleteRule(rule!.id);
+      onAddBlock({ date, ...patch });
+    } else if (d.id) {
+      onUpdateBlock(d.id, patch);
+    } else {
+      onAddBlock({ date, ...patch });
+    }
     closeEditor();
   };
 
+  /** Just this day. A repeating block keeps coming back tomorrow. */
   const deleteDraft = () => {
     if (!draft?.id) return;
     const msg = isInstanceId(draft.id)
-      ? 'Skip this one today? The weekly slot stays.'
-      : 'Delete this block? This cannot be undone.';
+      ? 'Remove it from today only? It still comes back tomorrow.'
+      : 'Delete this block?';
     if (window.confirm(msg)) onDeleteBlock(draft.id);
+    closeEditor();
+  };
+
+  /** The whole repeat. Days already spent keep it — see deleteRule in App. */
+  const deleteSeries = () => {
+    const rule = draft?.id ? ruleFor(draft.id) : undefined;
+    if (!rule) return;
+    if (window.confirm('Delete this from every day it repeats on?')) onDeleteRule(rule.id);
     closeEditor();
   };
 
@@ -100,19 +150,6 @@ const PlanTab: React.FC<Props> = ({
     if (!draft?.id) return;
     const parsed = parseInstanceId(draft.id);
     if (parsed) onResetInstance(parsed.ruleId, parsed.date);
-    closeEditor();
-  };
-
-  /* Promote a one-off into the timetable, on the weekday it already sits on. */
-  const makeWeekly = () => {
-    if (!draft?.id) return;
-    onAddRule({
-      days: [new Date(date + 'T12:00:00').getDay()],
-      kind: draft.kind, subject: draft.subject, chapter: draft.chapter,
-      start: draft.start, durationMins: draft.durationMins, label: draft.label,
-      until: null,
-    });
-    onDeleteBlock(draft.id);
     closeEditor();
   };
 
@@ -126,30 +163,87 @@ const PlanTab: React.FC<Props> = ({
     dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
   }`;
 
+  /* Built once and placed twice — the fullscreen shell and the page need the
+     same controls, and two copies would drift. */
+  const quickAdd = !readOnly && (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className={`text-[10px] font-bold uppercase tracking-[0.06em] mr-1.5 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+        Add
+      </span>
+      {QUICK_ADD.map(k => (
+        <button
+          key={k}
+          onClick={() => openNew(k)}
+          className={`px-3.5 py-2 text-[10px] font-medium uppercase tracking-[0.06em] border rounded-md transition-all active:scale-95 font-ui ${
+            dark ? 'border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/20'
+                 : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300'
+          }`}
+        >
+          {ACTIVITIES[k].label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const timeline = (
+    <DayTimeline
+      blocks={blocks}
+      theme={theme}
+      minute={minute}
+      readOnly={readOnly}
+      runningBlockId={timer.isRunning ? timer.blockId : undefined}
+      onCommit={(id, patch) => onUpdateBlock(id, patch)}
+      onOpen={b => {
+        const rule = ruleFor(b.id);
+        setDraft({
+          id: b.id, kind: b.kind, subject: b.subject, chapter: b.chapter,
+          start: b.start, durationMins: b.durationMins, label: b.label,
+          repeat: rule ? repeatOf(rule) : 'none',
+        });
+      }}
+      onCreateAt={start => openNew('study', start)}
+      onDelete={b => { if (window.confirm('Delete this block?')) onDeleteBlock(b.id); }}
+      isRecurring={isInstanceId}
+      isMoved={id => isOverridden(schedule, id)}
+    />
+  );
+
+  const editor = draft && (
+    <BlockEditor
+      draft={draft}
+      dayBlocks={blocks}
+      recurring={!!draft.id && isInstanceId(draft.id)}
+      moved={!!draft.id && isOverridden(schedule, draft.id)}
+      /* Engaging a block on a day you are not living is meaningless, and
+         a second timer while one runs is refused upstream anyway. */
+      canEngage={date === today && !timer.isRunning}
+      theme={theme}
+      activeSubjects={activeSubjects}
+      currentClass={currentClass}
+      examPreference={examPreference}
+      weekdayName={weekdayName}
+      onSave={saveDraft}
+      onDelete={deleteDraft}
+      onDeleteSeries={deleteSeries}
+      onReset={resetDraft}
+      onEngage={engageDraft}
+      onClose={closeEditor}
+    />
+  );
+
   return (
     <div className="space-y-12 md:space-y-14 pb-16">
-      <DateStrip date={date} today={today} studyMins={studyMins} theme={theme} onChange={setDate} />
+      <DateStrip
+        date={date}
+        today={today}
+        studyMins={studyMins}
+        theme={theme}
+        onChange={setDate}
+        onStep={delta => setDate(d => addDays(d, delta))}
+      />
 
       <section className={card}>
-        {!readOnly && (
-          <div className="flex flex-wrap items-center gap-1.5 mb-6">
-            <span className={`text-[10px] font-bold uppercase tracking-[0.06em] mr-1.5 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-              Add
-            </span>
-            {QUICK_ADD.map(k => (
-              <button
-                key={k}
-                onClick={() => openNew(k)}
-                className={`px-3.5 py-2 text-[10px] font-medium uppercase tracking-[0.06em] border rounded-md transition-all active:scale-95 font-ui ${
-                  dark ? 'border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/20'
-                       : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300'
-                }`}
-              >
-                {ACTIVITIES[k].label}
-              </button>
-            ))}
-          </div>
-        )}
+        {quickAdd && <div className="mb-6">{quickAdd}</div>}
 
         {blocks.length === 0 && (
           <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-5 font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
@@ -157,22 +251,7 @@ const PlanTab: React.FC<Props> = ({
           </p>
         )}
 
-        <DayTimeline
-          blocks={blocks}
-          theme={theme}
-          minute={minute}
-          readOnly={readOnly}
-          runningBlockId={timer.isRunning ? timer.blockId : undefined}
-          onCommit={(id, patch) => onUpdateBlock(id, patch)}
-          onOpen={b => setDraft({
-            id: b.id, kind: b.kind, subject: b.subject, chapter: b.chapter,
-            start: b.start, durationMins: b.durationMins, label: b.label,
-          })}
-          onCreateAt={start => openNew('study', start)}
-          onDelete={b => { if (window.confirm('Delete this block?')) onDeleteBlock(b.id); }}
-          isRecurring={isInstanceId}
-          isMoved={id => isOverridden(schedule, id)}
-        />
+        {timeline}
       </section>
 
       <AdherenceSection blocks={blocks} logs={logs} date={date} minute={minute} theme={theme} />
@@ -188,27 +267,7 @@ const PlanTab: React.FC<Props> = ({
         onDeleteRule={onDeleteRule}
       />
 
-      {draft && (
-        <BlockEditor
-          draft={draft}
-          dayBlocks={blocks}
-          recurring={!!draft.id && isInstanceId(draft.id)}
-          moved={!!draft.id && isOverridden(schedule, draft.id)}
-          /* Engaging a block on a day you are not living is meaningless, and
-             a second timer while one runs is refused upstream anyway. */
-          canEngage={date === today && !timer.isRunning}
-          theme={theme}
-          activeSubjects={activeSubjects}
-          currentClass={currentClass}
-          examPreference={examPreference}
-          onSave={saveDraft}
-          onDelete={deleteDraft}
-          onReset={resetDraft}
-          onEngage={engageDraft}
-          onMakeWeekly={makeWeekly}
-          onClose={closeEditor}
-        />
-      )}
+      {editor}
     </div>
   );
 };

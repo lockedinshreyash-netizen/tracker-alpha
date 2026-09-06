@@ -9,6 +9,10 @@ interface Props {
   studyMins: number;
   theme: 'dark' | 'light';
   onChange: (date: string) => void;
+  /** Step by whole days. Separate from onChange so two quick taps on the
+      arrows advance two days — computing the next date from the rendered one
+      makes both taps in a frame resolve to the same day. */
+  onStep: (delta: number) => void;
 }
 
 /* Noon anchor when turning a date string into a Date for labelling — the same
@@ -16,7 +20,7 @@ interface Props {
 const label = (date: string, opts: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat('en-US', opts).format(new Date(date + 'T12:00:00'));
 
-const DateStrip: React.FC<Props> = ({ date, today, studyMins, theme, onChange }) => {
+const DateStrip: React.FC<Props> = ({ date, today, studyMins, theme, onChange, onStep }) => {
   const dark = theme === 'dark';
   const days = Array.from({ length: 7 }, (_, i) => addDays(date, i - 3));
 
@@ -49,7 +53,7 @@ const DateStrip: React.FC<Props> = ({ date, today, studyMins, theme, onChange })
 
       <div className="flex items-stretch gap-1.5">
         <button
-          onClick={() => onChange(addDays(date, -1))}
+          onClick={() => onStep(-1)}
           aria-label="Previous day"
           className={`px-3 rounded-md border text-sm transition-all ${
             dark ? 'border-white/[0.06] text-zinc-500 hover:text-white' : 'border-zinc-200 text-zinc-400 hover:text-zinc-900'
@@ -82,7 +86,7 @@ const DateStrip: React.FC<Props> = ({ date, today, studyMins, theme, onChange })
         </div>
 
         <button
-          onClick={() => onChange(addDays(date, 1))}
+          onClick={() => onStep(1)}
           aria-label="Next day"
           className={`px-3 rounded-md border text-sm transition-all ${
             dark ? 'border-white/[0.06] text-zinc-500 hover:text-white' : 'border-zinc-200 text-zinc-400 hover:text-zinc-900'

@@ -127,6 +127,24 @@ export const parseInstanceId = (id: string): { ruleId: string; date: string } | 
   return { ruleId: id.slice(0, at), date: id.slice(at + 1) };
 };
 
+/**
+ * How often a block comes back.
+ *
+ * `weekly` is every seven days on one weekday; `daily` is all seven. Both are
+ * the same `TemplateRule` underneath — a full `days` array is what "every day"
+ * means — so nothing in the model has to special-case it.
+ */
+export type RepeatMode = 'none' | 'daily' | 'weekly';
+
+export const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+
+export const repeatOf = (rule: TemplateRule): RepeatMode =>
+  rule.days.length >= 7 ? 'daily' : 'weekly';
+
+/** The weekday numbers a repeat mode covers on a given date. */
+export const daysForRepeat = (mode: RepeatMode, date: string): number[] =>
+  mode === 'daily' ? [...ALL_WEEKDAYS] : [weekdayOf(date)];
+
 export const ruleAppliesOn = (rule: TemplateRule, date: string): boolean => {
   if (date < rule.from) return false;
   if (rule.until && date > rule.until) return false;

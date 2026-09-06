@@ -95,25 +95,25 @@ const TemplateSection: React.FC<Props> = ({
     <section className={`p-8 md:p-10 rounded-xl border transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex items-start justify-between gap-4 mb-2">
         <h3 className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-          Every week
+          Repeating blocks
         </h3>
         {!draft && (
           <button
             onClick={() => setDraft({ days: [1, 2, 3, 4, 5], kind: 'class', start: 300, durationMins: 360 })}
             className="shrink-0 px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-md hover:bg-red-700 transition-all active:scale-95 font-ui"
           >
-            Add a slot
+            Add
           </button>
         )}
       </div>
 
       <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-8 font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-        School, coaching, sleep, the gym — set once, shows up every week. A day here runs 4 AM to 4 AM.
+Things that happen every week — school, coaching, sleep, the gym. Set it once and it shows up on its own.
       </p>
 
       {live.length === 0 && !draft && (
         <p className={`text-xs font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-          No timetable yet. Every day starts from nothing, and most of them stay there.
+Nothing repeats yet. Every day starts from nothing, and most of them stay there.
         </p>
       )}
 
@@ -140,9 +140,9 @@ const TemplateSection: React.FC<Props> = ({
                   className={`text-[10px] font-medium uppercase tracking-[0.06em] shrink-0 font-ui transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'}`}
                 >Edit</button>
                 <button
-                  onClick={() => { if (window.confirm('Drop this slot from the timetable? Days already spent keep it.')) onDeleteRule(r.id); }}
+                  onClick={() => { if (window.confirm('Delete this from every day it repeats on?')) onDeleteRule(r.id); }}
                   className="text-[10px] font-medium uppercase tracking-[0.06em] text-[#E10600]/70 hover:text-[#E10600] shrink-0 font-ui transition-colors"
-                >Drop</button>
+                >Delete</button>
               </div>
             );
           })}
@@ -153,6 +153,12 @@ const TemplateSection: React.FC<Props> = ({
         <div className={`mt-6 p-5 md:p-6 rounded-lg border space-y-6 ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100'}`}>
           <div>
             <label className={label}>Days</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              <button
+                onClick={() => setDraft(d => d && ({ ...d, days: d.days.length >= 7 ? [] : [0, 1, 2, 3, 4, 5, 6] }))}
+                className={chip(draft.days.length >= 7)}
+              >Every day</button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {DAY_LABELS.map((lbl, i) => (
                 <button
@@ -210,7 +216,7 @@ const TemplateSection: React.FC<Props> = ({
           )}
 
           <div>
-            <label className={label}>Starts — {formatRange(draft.start, draft.durationMins)}</label>
+            <label className={label}>Start time — {formatRange(draft.start, draft.durationMins)}</label>
             <div className="flex items-center gap-2 max-w-[220px]">
               <button onClick={() => setDraft(d => d && ({ ...d, ...clampBlock(d.start - 15, d.durationMins) }))} className={step} aria-label="15 minutes earlier">−</button>
               <span className={`flex-1 text-center text-sm num-stat tabular-nums ${dark ? 'text-white' : 'text-zinc-900'}`}>
@@ -221,7 +227,7 @@ const TemplateSection: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className={label}>Runs for — {formatSpan(draft.durationMins)}</label>
+            <label className={label}>How long — {formatSpan(draft.durationMins)}</label>
             <div className="flex flex-wrap gap-1.5">
               {DURATIONS.map(m => (
                 <button key={m} onClick={() => setDraft(d => d && ({ ...d, ...clampBlock(d.start, m) }))} className={chip(draft.durationMins === m)}>
@@ -234,7 +240,7 @@ const TemplateSection: React.FC<Props> = ({
 
           {draft.id && (
             <p className={`text-[10px] font-medium uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-              This applies from today on. Days already spent keep the old slot.
+Changes apply from today on. Days you already finished keep the old version.
             </p>
           )}
 

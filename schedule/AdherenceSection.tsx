@@ -99,7 +99,7 @@ const AdherenceSection: React.FC<Props> = ({ blocks, logs, date, minute, theme }
 
       {a.offPlanMins > 0 && (
         <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mt-6 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-          {formatSpan(a.offPlanMins)} off-plan — studied, but not against anything you scheduled.
+          {formatSpan(a.offPlanMins)} off-plan — you studied, but not what you planned.
         </p>
       )}
 
@@ -108,8 +108,8 @@ const AdherenceSection: React.FC<Props> = ({ blocks, logs, date, minute, theme }
           against it; everything else here is an allocation. */}
       <p className={`text-[10px] mt-5 leading-relaxed font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
         {a.hasInferred
-          ? 'A ✓ means the clock was started on that block. The rest is matched by subject and hours, earliest block first — a log carries no start time. Hit Engage and it stops being a guess.'
-          : 'Every block here was measured — the clock was started on it.'}
+          ? 'A ✓ means you started the clock on that block, so those minutes are certain. The rest is a best guess, matched by subject and hours. Start the clock from a block and it stops being a guess.'
+          : 'Every block here was measured — you started the clock on it.'}
       </p>
     </section>
   );

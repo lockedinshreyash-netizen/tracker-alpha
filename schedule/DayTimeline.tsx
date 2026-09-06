@@ -290,7 +290,7 @@ const DayTimeline: React.FC<Props> = ({
                   : dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'
               }`}
             >
-              {['Day', 'Fit', 'Zoom'][i]}
+              {['All day', 'Normal', 'Zoom'][i]}
             </button>
           ))}
         </div>

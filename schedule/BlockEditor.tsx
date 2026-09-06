@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BlockKind, ExamPreference, ScheduleBlock, Subject } from '../types';
 import { getChaptersFor } from '../constants';
 import { ACTIVITIES, BLOCK_KINDS, countsAsStudy } from './colors';
-import { DAY_MINUTES, clampBlock, clashesWith, formatClock, formatRange, formatSpan } from './schedule';
+import { DAY_MINUTES, RepeatMode, clampBlock, clashesWith, formatClock, formatRange, formatSpan } from './schedule';
 
 export interface EditorDraft {
   /** Absent for a block being created. */
@@ -13,24 +13,31 @@ export interface EditorDraft {
   start: number;
   durationMins: number;
   label?: string;
+  /** How often it comes back. Applied on save, like every other field. */
+  repeat: RepeatMode;
 }
 
 interface Props {
   draft: EditorDraft;
   /** Everything else on the day, for the clash warning. */
   dayBlocks: ScheduleBlock[];
+  /** Already part of a repeat, so deleting has two meanings. */
   recurring: boolean;
   moved: boolean;
   canEngage: boolean;
+  /** "Sunday" — for labelling the weekly option on this date. */
+  weekdayName: string;
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
   currentClass: 11 | 12;
   examPreference: ExamPreference;
   onSave: (draft: EditorDraft) => void;
+  /** Just this one day. */
   onDelete: () => void;
+  /** Every day it repeats on. */
+  onDeleteSeries: () => void;
   onReset: () => void;
   onEngage: () => void;
-  onMakeWeekly: () => void;
   onClose: () => void;
 }
 
@@ -49,8 +56,8 @@ const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
  * drag-only.
  */
 const BlockEditor: React.FC<Props> = ({
-  draft, dayBlocks, recurring, moved, canEngage, theme, activeSubjects,
-  currentClass, examPreference, onSave, onDelete, onReset, onEngage, onMakeWeekly, onClose,
+  draft, dayBlocks, recurring, moved, canEngage, weekdayName, theme, activeSubjects,
+  currentClass, examPreference, onSave, onDelete, onDeleteSeries, onReset, onEngage, onClose,
 }) => {
   const dark = theme === 'dark';
   const [d, setD] = useState<EditorDraft>(draft);
@@ -168,7 +175,7 @@ const BlockEditor: React.FC<Props> = ({
 
           {/* 3 ── When. */}
           <div>
-            <label className={label}>Starts</label>
+            <label className={label}>Start time</label>
             <div className="flex items-center gap-2">
               <button onClick={() => set(clampBlock(d.start - 15, d.durationMins))} className={step} aria-label="15 minutes earlier">−</button>
               <span className={`flex-1 text-center text-base num-stat tabular-nums ${dark ? 'text-white' : 'text-zinc-900'}`}>
@@ -179,7 +186,7 @@ const BlockEditor: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className={label}>Runs for — {formatSpan(geom.durationMins)}</label>
+            <label className={label}>How long — {formatSpan(geom.durationMins)}</label>
             <div className="flex flex-wrap gap-1.5">
               {DURATIONS.map(m => (
                 <button key={m} onClick={() => set(clampBlock(d.start, m))} className={chip(geom.durationMins === m)}>
@@ -190,15 +197,32 @@ const BlockEditor: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* 4 ── How often. Out in the open, because "does this come back
+              tomorrow" is a decision, not a setting. */}
+          <div>
+            <label className={label}>Repeat</label>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ['none', 'Just today'],
+                ['daily', 'Every day'],
+                ['weekly', `Every ${weekdayName}`],
+              ] as [RepeatMode, string][]).map(([mode, text]) => (
+                <button key={mode} onClick={() => set({ repeat: mode })} className={chip(d.repeat === mode)}>
+                  {text}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {runsToEndOfDay && (
             <p className={`text-[10px] font-medium uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-              Runs to the end of the day at 4 AM. Add a second block tomorrow for the rest.
+This runs to 4 AM, where the day ends. Add another block tomorrow for the rest.
             </p>
           )}
 
           {clashes.length > 0 && (
             <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] font-ui">
-              Clashes with {clashes.length} other block{clashes.length > 1 ? 's' : ''}. You cannot be in two places.
+Overlaps {clashes.length} other block{clashes.length > 1 ? 's' : ''}. You cannot be in two places at once.
             </p>
           )}
         </div>
@@ -208,7 +232,7 @@ const BlockEditor: React.FC<Props> = ({
             onClick={() => onSave({ ...d, ...geom })}
             className="w-full py-3.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-md hover:bg-red-700 transition-all active:scale-95 font-ui"
           >
-            {d.id ? 'Save' : 'Add to the day'}
+            {d.id ? 'Save' : 'Add'}
           </button>
 
           {d.id && canEngage && isStudy && (
@@ -218,24 +242,26 @@ const BlockEditor: React.FC<Props> = ({
                 dark ? 'border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800' : 'border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
               }`}
             >
-              Engage — start the clock
+              Start now
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-5 pt-2">
-            {d.id && !recurring && (
-              <button onClick={onMakeWeekly} className={`text-[10px] font-medium uppercase tracking-[0.06em] font-ui transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'}`}>
-                Repeat weekly
-              </button>
-            )}
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-2">
             {moved && (
               <button onClick={onReset} className={`text-[10px] font-medium uppercase tracking-[0.06em] font-ui transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'}`}>
-                Reset to template
+                Undo my change
               </button>
             )}
             {d.id && (
               <button onClick={onDelete} className="text-[10px] font-medium uppercase tracking-[0.06em] text-[#E10600]/70 hover:text-[#E10600] transition-colors font-ui">
-                {recurring ? 'Skip today' : 'Delete'}
+                {recurring ? 'Delete from today' : 'Delete'}
+              </button>
+            )}
+            {/* A repeating block needs both meanings spelled out. "Delete"
+                alone always removes the wrong one for half the people. */}
+            {d.id && recurring && (
+              <button onClick={onDeleteSeries} className="text-[10px] font-medium uppercase tracking-[0.06em] text-[#E10600]/70 hover:text-[#E10600] transition-colors font-ui">
+                Delete from every day
               </button>
             )}
           </div>
