@@ -4,7 +4,7 @@ import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject,
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, IDLE_POMODORO, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REWARDS } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, normalizePomodoro } from './state';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
 import { wallpaperById } from './rewards/wallpapers';
 import WallpaperLayer from './rewards/WallpaperLayer';
@@ -27,7 +27,8 @@ import { useRace } from './leaderboard/useRace';
 import { RaceStrip, RaceToast } from './leaderboard/RaceControl';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
-import { PHASE_LABEL, phaseDurationMs } from './today/pomodoro';
+import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused } from './today/pomodoro';
+import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -125,7 +126,7 @@ const App: React.FC = () => {
            shaped one, so merge the nested objects field by field. */
         const merged: AppState = { ...DEFAULT_STATE, ...parsed };
         merged.pomodoroSettings = { ...DEFAULT_POMODORO_SETTINGS, ...(parsed.pomodoroSettings || {}) };
-        merged.pomodoro = { ...IDLE_POMODORO, ...(parsed.pomodoro || {}) };
+        merged.pomodoro = normalizePomodoro(parsed.pomodoro);
         merged.timerMode = parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch';
         merged.leaderboard = { ...DEFAULT_LEADERBOARD, ...(parsed.leaderboard || {}) };
         /* Rewards arrived late too, and an account with a long history should
@@ -145,6 +146,9 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
   const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
+  /* View-only, and deliberately not in AppState: which width a rail is at on
+     this screen is not something to sync to another device. */
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
     try {
       return localStorage.getItem(ONBOARDING_KEY) !== 'true';
@@ -667,6 +671,12 @@ const App: React.FC = () => {
   };
 
   const setTimerMode = (mode: TimerMode) => {
+    /* Leaving Pomodoro with a block part-served banks it on the way out.
+       Switching modes is a UI choice; it should never be a way to lose the
+       twenty minutes you just sat through. */
+    if (mode !== 'pomodoro' && !pomodoroIsIdle(stateRef.current.pomodoro)) {
+      pomodoro.end();
+    }
     setState(prev => {
       const nextState = { ...prev, timerMode: mode, lastUpdated: Date.now() };
       stateRef.current = nextState;
@@ -674,9 +684,33 @@ const App: React.FC = () => {
     });
   };
 
-  const updatePomodoro = (update: Partial<PomodoroRuntime>) => {
+  /**
+   * One atomic write for everything a Pomodoro transition touches.
+   *
+   * The runtime change and the log a block earned must land together. Two
+   * separate setStates would leave a window where a block had been counted but
+   * not recorded — and it is exactly that window the old flow lived in.
+   *
+   * `lastUpdated` moves only when something worth syncing changed. Ordinary
+   * phase churn is device-local (every merge path keeps the local runtime), so
+   * bumping it on every tick would just fight the cloud for no reason.
+   */
+  const commitPomodoro = (update: Partial<PomodoroRuntime>, extra?: PomodoroCommit) => {
     setState(prev => {
-      const nextState = { ...prev, pomodoro: { ...prev.pomodoro, ...update } };
+      const runtime = { ...prev.pomodoro, ...update };
+      let logs = prev.logs;
+      if (extra?.log) logs = [...logs, extra.log];
+      if (extra?.rate) {
+        const { logId, quality } = extra.rate;
+        logs = logs.map(l => (l.id === logId ? { ...l, quality } : l));
+      }
+      const touched = Boolean(extra?.log || extra?.rate);
+      const nextState: AppState = {
+        ...prev,
+        pomodoro: runtime,
+        logs,
+        ...(touched ? { lastUpdated: Date.now() } : {}),
+      };
       stateRef.current = nextState;
       return nextState;
     });
@@ -694,44 +728,17 @@ const App: React.FC = () => {
     });
   };
 
-  /* A completed Pomodoro block goes through the same logging path as a
-     stopwatch session, so hours, streaks, the heatmap and the Lock-In Score
-     all pick it up with no special-casing. */
-  const logPomodoroBlock = (subject: Subject, hours: number, quality: number) => {
-    logStudy(subject, hours, quality, 0, 'pomodoro');
-  };
-
-  /* If the tab was closed between finishing a block and rating it, that block
-     is still parked in pendingBlock. Flush it at a neutral quality on the next
-     load so completed study time is never silently lost.
-
-     This has to wait for the cloud pull. Flushing on mount reads the local copy,
-     and the pull that lands moments later takes `pomodoro` wholesale from the
-     server — handing the block straight back. The clear is never pushed either,
-     because triggerSync is a no-op until the initial sync finishes. The block
-     therefore came back on every reload and logged itself again, every time. */
-  const pendingFlushDone = useRef(false);
-  useEffect(() => {
-    if (!syncSettled || pendingFlushDone.current) return;
-    pendingFlushDone.current = true;
-    const pending = stateRef.current.pomodoro?.pendingBlock;
-    if (!pending) return;
-
-    // Still a real Pomodoro block — it was measured, just never rated.
-    logStudy(pending.subject, pending.hours, 4, 0, 'pomodoro');
-    /* Cleared with a lastUpdated bump — unlike updatePomodoro, which leaves the
-       timestamp alone so ordinary phase ticks don't churn the sync. Without the
-       bump the server copy still looks current and wins the next merge. */
-    setState(prev => {
-      const nextState = {
-        ...prev,
-        pomodoro: { ...prev.pomodoro, pendingBlock: null },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, [syncSettled]);
+  /* The engine lives here rather than in the timer component so a block keeps
+     running — and keeps being logged — while the user is off looking at their
+     streak, their syllabus, or nothing at all. */
+  const pomodoro = usePomodoro({
+    runtime: state.pomodoro,
+    settings: state.pomodoroSettings,
+    read: () => ({ pomodoro: stateRef.current.pomodoro, settings: stateRef.current.pomodoroSettings }),
+    commit: commitPomodoro,
+    active: state.timerMode === 'pomodoro',
+    ready: syncSettled,
+  });
 
   /* Throw away an in-progress session without logging it. Used by onboarding:
      a running timer hides the goal card the tour needs to point at, and a
@@ -939,13 +946,13 @@ const App: React.FC = () => {
         if (current.timerMode === 'pomodoro') {
           if (current.pomodoro.isRunning) return { ok: false, message: 'A BLOCK IS ALREADY RUNNING.' };
           const phase = current.pomodoro.phase;
-          updatePomodoro({
-            // The subject only means anything for a work block.
-            ...(phase === 'work' && intent.subject ? { subject: intent.subject } : {}),
-            isRunning: true,
-            phaseEndsAt: Date.now() + phaseDurationMs(phase, current.pomodoroSettings),
-          });
-          return { ok: true, message: `${PHASE_LABEL[phase].toUpperCase()} STARTED.` };
+          const resuming = pomodoroIsPaused(current.pomodoro);
+          // The subject only means anything for a work block.
+          pomodoro.start(phase === 'work' ? intent.subject : undefined);
+          return {
+            ok: true,
+            message: `${PHASE_LABEL[phase].toUpperCase()} ${resuming ? 'RESUMED' : 'STARTED'}.`,
+          };
         }
 
         if (current.timer.isRunning) return { ok: false, message: 'SESSION ALREADY RUNNING.' };
@@ -956,9 +963,14 @@ const App: React.FC = () => {
 
       case 'endSession': {
         if (current.timerMode === 'pomodoro') {
-          if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
-          updatePomodoro({ isRunning: false, phaseEndsAt: null });
-          return { ok: true, message: 'BLOCK ABANDONED. NOTHING LOGGED.' };
+          if (pomodoroIsIdle(current.pomodoro)) return { ok: false, message: 'NOTHING RUNNING.' };
+          const wasWork = current.pomodoro.phase === 'work';
+          // Ending early still banks every minute that was served.
+          const { hours } = pomodoro.end();
+          if (!wasWork) return { ok: true, message: 'BREAK ENDED.' };
+          return hours > 0
+            ? { ok: true, message: `BLOCK ENDED. LOGGED ${hours.toFixed(2)}H ${current.pomodoro.subject.toUpperCase()}.` }
+            : { ok: true, message: 'BLOCK ENDED. TOO SHORT TO LOG.' };
         }
 
         const t = current.timer;
@@ -1017,8 +1029,9 @@ const App: React.FC = () => {
           return { ok: false, message: 'THE STOPWATCH DOESN’T PAUSE. SAY “END SESSION”.' };
         }
         if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
-        updatePomodoro({ isRunning: false, phaseEndsAt: null });
-        return { ok: true, message: 'BLOCK STOPPED. NOTHING LOGGED.' };
+        pomodoro.pause();
+        // Paused, not abandoned — the time served is still on the clock.
+        return { ok: true, message: 'PAUSED. THE CLOCK IS HELD.' };
       }
 
       case 'resumeTimer': {
@@ -1027,17 +1040,18 @@ const App: React.FC = () => {
         }
         if (current.pomodoro.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
         const phase = current.pomodoro.phase;
-        updatePomodoro({
-          isRunning: true,
-          phaseEndsAt: Date.now() + phaseDurationMs(phase, current.pomodoroSettings),
-        });
+        pomodoro.start();
         return { ok: true, message: `${PHASE_LABEL[phase].toUpperCase()} RUNNING.` };
       }
 
       case 'resetPomodoro': {
         if (current.timerMode !== 'pomodoro') return { ok: false, message: 'NOT IN POMODORO MODE.' };
-        updatePomodoro({ phase: 'work', isRunning: false, phaseEndsAt: null, completedBlocks: 0 });
-        return { ok: true, message: 'SET RESET.' };
+        // Resets the set, not the day: focus already served is logged first.
+        const { hours } = pomodoro.reset();
+        return {
+          ok: true,
+          message: hours > 0 ? `SET RESET. LOGGED ${hours.toFixed(2)}H FIRST.` : 'SET RESET.',
+        };
       }
 
       case 'setTimerMode': {
@@ -1133,7 +1147,10 @@ const App: React.FC = () => {
   const verifiedStreakCount = calculateVerifiedStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
 
-  const rewards = state.rewards ?? DEFAULT_REWARDS;
+  /* Normalized on the way out too: a blob written by an older build (or by a
+     device that predates a field) must never reach the vault with a missing
+     high-water mark and render NaN progress. */
+  const rewards = normalizeRewards(state.rewards);
   /* Oldest un-shown tier first, so someone returning after a long absence is
      walked up their unlocks one at a time instead of seeing only the last. */
   const celebration = pendingCelebrations(rewards)[0];
@@ -1173,7 +1190,13 @@ const App: React.FC = () => {
         />
       )}
 
-      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} theme={theme} />
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        theme={theme}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+      />
 
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -1186,7 +1209,9 @@ const App: React.FC = () => {
         }}
       />
 
-      <div className="transition-all duration-300 md:ml-[200px] pt-14 md:pt-0">
+      {/* Margin tracks the rail's width, so collapsing it gives the page the
+          space back instead of leaving the app parked to the right of a gap. */}
+      <div className={`transition-all duration-300 pt-14 md:pt-0 ${sidebarCollapsed ? 'md:ml-[60px]' : 'md:ml-[200px]'}`}>
         <Header
           currentClass={state.currentClass}
           onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
@@ -1221,9 +1246,8 @@ const App: React.FC = () => {
               onDeleteTask={deleteTask}
               onUpdateDailyGoal={updateDailyGoal}
               onSetTimerMode={setTimerMode}
-              onUpdatePomodoro={updatePomodoro}
+              pomodoro={pomodoro}
               onUpdatePomodoroSettings={updatePomodoroSettings}
-              onLogPomodoroBlock={logPomodoroBlock}
               theme={theme}
               activeSubjects={activeSubjects}
               examPreference={state.examPreference || 'JEE'}

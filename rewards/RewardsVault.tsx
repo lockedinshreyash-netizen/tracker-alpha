@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { RewardsState } from '../types';
 import { RewardDef } from './catalog';
-import { rewardProgress, nextReward } from './engine';
+import { rewardProgress } from './engine';
 import { WALLPAPERS, wallpaperById } from './wallpapers';
 import WallpaperLayer from './WallpaperLayer';
 import { BOOK } from '../content/book';
 
 interface Props {
   rewards: RewardsState;
-  /** Live streaks, for the "keep going" line — not for unlocking. */
+  /** Live streaks: what the progress bars measure. Unlocking is decided in
+      `evaluate`, off the whole history, and never taken back. */
   streak: number;
   verifiedStreak: number;
   theme: 'dark' | 'light';
@@ -37,8 +38,8 @@ const RewardsVault: React.FC<Props> = ({
 }) => {
   const dark = theme === 'dark';
   const [expanded, setExpanded] = useState<string | null>(null);
-  const progress = rewardProgress(rewards);
-  const next = nextReward(rewards);
+  const progress = rewardProgress(rewards, streak, verifiedStreak);
+  const next = progress.find(p => !p.unlocked);
 
   const card = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm';
   const heading = dark ? 'text-white' : 'text-black';
@@ -100,6 +101,11 @@ const RewardsVault: React.FC<Props> = ({
                 ) : (
                   <span className="shrink-0 text-[10px] font-bold tabular-nums text-zinc-600 font-ui">
                     {p.current}/{def.day}
+                    {p.best !== undefined && (
+                      <span className="block text-[9px] font-medium text-zinc-600/70 mt-0.5">
+                        best {p.best}
+                      </span>
+                    )}
                   </span>
                 )}
               </div>

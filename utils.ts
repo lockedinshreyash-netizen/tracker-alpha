@@ -6,20 +6,43 @@ export const generateId = (): string => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
+/**
+ * The hour (IST) at which one study day becomes the next.
+ *
+ * Not midnight. Someone still working at 01:30 is finishing the day they
+ * started, not beginning a new one, and rolling over mid-session would split
+ * their hours across two days and break a streak they were actively earning.
+ *
+ * Everything that decides "which day is this moment part of" must go through
+ * here — logs, streaks, the leaderboard date, race days, question goals.
+ * Anything that formats a wall-clock time for display must NOT.
+ */
+export const DAY_START_HOUR = 4;
+
+/**
+ * The instant re-based so that the study day lines up with the calendar day.
+ *
+ * Shifting back by DAY_START_HOUR means 03:59 IST still reads as the previous
+ * date and 04:00 begins the new one. Callers can then use ordinary date maths
+ * on the result and get study-day answers.
+ */
+export const toStudyDayInstant = (date: Date = new Date()): Date =>
+  new Date(date.getTime() - DAY_START_HOUR * 3_600_000);
+
 export const getISTDateString = (date: Date = new Date()): string => {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
+  }).format(toStudyDayInstant(date));
 };
 
 export const getDaysRemaining = (target: Date): number => {
   const now = new Date();
 
   // Create IST date objects for both target and current time
-  const istNowStr = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const istNowStr = toStudyDayInstant(now).toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
   const istTargetStr = target.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
 
   const start = new Date(istNowStr);
@@ -78,6 +101,49 @@ export const isVerifiedLog = (log: DailyLog): boolean =>
  */
 export const calculateVerifiedStreak = (logs: DailyLog[]): number =>
   streakFromDates(new Set(logs.filter(isVerifiedLog).map(l => l.date)));
+
+/* Study-day strings are plain calendar dates, so stepping between them is
+   exact UTC arithmetic — no timezone, no DST, no clock in it at all. */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const dateValue = (date: string): number => {
+  const [y, m, d] = date.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+
+/**
+ * The longest unbroken run of logged days anywhere in the history.
+ *
+ * `calculateStreak` only ever sees the run that reaches today, which makes it
+ * the wrong thing to earn a reward with: a month-long run that ended in March
+ * is a month the student actually did. Rewards are receipts for days survived,
+ * so they are derived from the whole history, not from whichever moment the
+ * app happened to be open.
+ *
+ * Dates in the future are ignored — a device with a wrong clock must not be
+ * able to write itself a streak.
+ */
+const longestRunFromDates = (loggedDates: Set<string>, today: string = getISTDateString()): number => {
+  const days = [...loggedDates]
+    .filter(d => DATE_RE.test(d) && d <= today)
+    .sort();
+  if (days.length === 0) return 0;
+
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = dateValue(days[i]) - dateValue(days[i - 1]) === 86_400_000 ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  return best;
+};
+
+export const longestStreak = (logs: DailyLog[], today?: string): number =>
+  longestRunFromDates(new Set(logs.map(l => l.date)), today);
+
+/** Same, over days the app timed itself. See `calculateVerifiedStreak`. */
+export const longestVerifiedStreak = (logs: DailyLog[], today?: string): number =>
+  longestRunFromDates(new Set(logs.filter(isVerifiedLog).map(l => l.date)), today);
 
 export const getLast7DaysStats = (
   logs: DailyLog[],

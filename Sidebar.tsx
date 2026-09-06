@@ -5,6 +5,11 @@ interface Props {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   theme: 'dark' | 'light';
+  /* Collapsing is owned by App: the rail is fixed, so the page beside it has
+     to move its own margin in step or the app sits stranded to the right of a
+     gap the size of the old sidebar. */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -62,8 +67,7 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme }) => {
-  const [collapsed, setCollapsed] = useState(false);
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const tabs: TabType[] = ['Today', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review'];
@@ -121,7 +125,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme }) => {
             </span>
           )}
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={onToggleCollapsed}
             className={`hidden md:flex p-1.5 rounded-md transition-all ${collapsed ? 'mx-auto' : ''} ${dark ? 'text-zinc-500 hover:text-white hover:bg-zinc-800' : 'text-[#8A8577] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

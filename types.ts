@@ -101,19 +101,58 @@ export interface PomodoroSettings {
   longBreakMinutes: number;
   blocksBeforeLongBreak: number;
   autoStartNext: boolean;
+  /* A bell only helps if you can hear it in another tab. Opt-in, and only ever
+     true alongside browser permission — which can be revoked without the app
+     being told, so every send is still guarded. */
+  notify?: boolean;
+  /* Hold the screen awake while a block runs. Phones dim mid-block otherwise,
+     and a timer you have to keep waking is a timer you stop trusting. */
+  keepAwake?: boolean;
+}
+
+/**
+ * A Pomodoro block that has already been written to `logs` and is only waiting
+ * for its focus rating.
+ *
+ * The log is written the moment the block ends, at a neutral quality; rating
+ * amends it. Study time is never held hostage by a rating the user may never
+ * give — the old shape parked an unlogged block here, and anything that
+ * cleared it (a second block finishing, a wipe, a closed tab) took real hours
+ * with it.
+ */
+export interface PendingRating {
+  /** id of the DailyLog already recorded for this block. */
+  logId: string;
+  subject: Subject;
+  hours: number;
+  /** Ended by hand before the bell, rather than run to full length. */
+  partial: boolean;
 }
 
 export interface PomodoroRuntime {
   phase: PomodoroPhase;
   /* Absolute epoch ms, never a decrementing counter — background tabs throttle
-     timers, so remaining time must always be derived from the clock. */
+     timers, so remaining time must always be derived from the clock. Null
+     whenever the phase is not actively running. */
   phaseEndsAt: number | null;
   isRunning: boolean;
+  /* Full length of the phase currently armed, captured when it started. Null
+     means nothing is armed (idle). Stored rather than recomputed from settings
+     so editing the block length mid-phase cannot retroactively change how long
+     the running block was, or how much time it earns. */
+  phaseTotalMs: number | null;
+  /* Time already served in the armed phase, banked at the last pause. While
+     running it is stale by design — the live figure comes off the clock. */
+  servedMs: number;
   completedBlocks: number; // within the current set; resets after a long break
   subject: Subject;
-  /* A finished work block awaiting its quality rating. Persisted so a reload
-     or a closed tab can't silently lose logged study time. */
-  pendingBlock: { subject: Subject; hours: number } | null;
+  /* Finished blocks awaiting a rating. A queue, because a second block can
+     finish before the first is rated. */
+  pendingRating: PendingRating[];
+  /* @deprecated Pre-queue shape: a finished block that was measured but never
+     logged. Never written any more — flushed to `logs` once on load, then
+     dropped. Kept only so state saved by an older build loses nothing. */
+  pendingBlock?: { subject: Subject; hours: number } | null;
 }
 
 /**

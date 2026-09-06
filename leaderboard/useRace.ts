@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AppState } from '../types';
 import { getISTDateString } from '../utils';
-import { phaseDurationMs } from '../today/pomodoro';
+import { servedMs } from '../today/pomodoro';
 import { ActivitySignal, LeaderboardRow, fetchBoard, hoursToday, isRanked, publishEntry } from './api';
 import { RaceState, buildRaceState, minutesOf } from './engine';
 import { RaceDay, RaceEvent, advanceRaceDay, loadRaceDay, priorityOf, saveRaceDay } from './raceDay';
@@ -83,21 +83,22 @@ interface Options {
 
 /** What this device is doing right now, from the two timers. */
 const readActivity = (state: AppState, now: number) => {
-  const { timer, pomodoro, pomodoroSettings } = state;
+  const { timer, pomodoro } = state;
 
   const stopwatchMs = timer.isRunning
     ? now - (timer.startTime ?? now) + timer.accumulatedMs
     : timer.accumulatedMs;
 
   const workRunning = pomodoro.isRunning && pomodoro.phase === 'work';
-  const phaseStarted = pomodoro.phaseEndsAt
-    ? pomodoro.phaseEndsAt - phaseDurationMs(pomodoro.phase, pomodoroSettings)
-    : null;
-  const blockMs = workRunning && phaseStarted ? Math.max(0, now - phaseStarted) : 0;
+  /* Time served in the block so far — which is not "now minus a start time"
+     once a block can be paused and resumed. Rendered back into an instant for
+     `activeSince`, which is what the board's "on the clock since" reads. */
+  const blockMs = workRunning ? servedMs(pomodoro, now) : 0;
+  const phaseStarted = workRunning ? now - blockMs : null;
 
-  /* A finished block waiting on its focus rating is time the app has already
-     measured — it belongs in "not on the board yet", not in limbo. */
-  const pendingBlockMs = (pomodoro.pendingBlock?.hours ?? 0) * 3600_000;
+  /* Nothing is pending on a rating any more: a finished block is written to
+     the logs the moment it ends, so it reaches the board by the ordinary
+     path. Only the block still running is unpublished. */
 
   return {
     /* Published to the board. Work only: a break is not a session, and a rival
@@ -107,7 +108,7 @@ const readActivity = (state: AppState, now: number) => {
        still part of the block the user is in the middle of. */
     busy: timer.isRunning || pomodoro.isRunning,
     activeSince: timer.isRunning ? timer.startTime : workRunning ? phaseStarted : null,
-    pendingMinutes: Math.floor((stopwatchMs + blockMs + pendingBlockMs) / 60_000),
+    pendingMinutes: Math.floor((stopwatchMs + blockMs) / 60_000),
   };
 };
 

@@ -1,11 +1,11 @@
 import { DailyQuestionsLog, QuestionTrackingState, QSubject } from '../types';
-import { getISTDateString } from '../utils';
+import { getISTDateString, toStudyDayInstant } from '../utils';
 
 // --- IST Week Boundaries (Monday = start, Sunday = end) ---
 
 export const getISTWeekBounds = (): { start: string; end: string } => {
   const now = new Date();
-  const istStr = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const istStr = toStudyDayInstant(now).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
   const istNow = new Date(istStr);
 
   const day = istNow.getDay(); // 0=Sun, 1=Mon...
@@ -55,7 +55,7 @@ export const computeWeeklyProgress = (logs: DailyQuestionsLog[]): Record<string,
 
 export const getDaysLeftInWeek = (): number => {
   const now = new Date();
-  const istStr = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const istStr = toStudyDayInstant(now).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
   const istNow = new Date(istStr);
   const day = istNow.getDay(); // 0=Sun
   // Sun=1, Mon=7, Tue=6, Wed=5, Thu=4, Fri=3, Sat=2
@@ -304,7 +304,7 @@ export const getWeeklyQuestionTotals = (
 ): { label: string; total: number }[] => {
   const result: { label: string; total: number }[] = [];
   const now = new Date();
-  const istStr = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const istStr = toStudyDayInstant(now).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
   const istNow = new Date(istStr);
 
   for (let w = weeksBack - 1; w >= 0; w--) {

@@ -39,7 +39,7 @@ const StreakTab: React.FC<Props> = ({
 }) => {
   const days = getLast7DaysStats(logs, activeSubjects);
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
-  const next = nextReward(rewards);
+  const next = nextReward(rewards, streak, verifiedStreak);
 
   return (
     <div className="space-y-14 animate-in fade-in duration-500">

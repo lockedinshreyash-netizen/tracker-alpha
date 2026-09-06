@@ -12,6 +12,7 @@
    behind" means nothing to anyone. */
 
 import { LeaderboardRow } from './api';
+import { toStudyDayInstant } from '../utils';
 
 /** The unit the whole app measures a gap in: one focus block. */
 export const POMODORO_MIN = 25;
@@ -263,14 +264,15 @@ export const buildRaceState = (rows: LeaderboardRow[], opts: BuildOptions): Race
 export const pomodorosToClose = (minutes: number): number =>
   Math.max(1, Math.ceil(minutes / POMODORO_MIN));
 
-/** True while the day is close enough to over that the gaps stop being theoretical. */
+/** True while the day is close enough to over that the gaps stop being theoretical.
+ *  Measured against the study day, so this is 03:00–03:59 IST, not 23:00. */
 export const isFinalHour = (now: number = Date.now()): boolean => {
   const hour = Number(
     new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata',
       hour: '2-digit',
       hour12: false,
-    }).format(new Date(now))
+    }).format(toStudyDayInstant(new Date(now)))
   );
   return hour === 23;
 };

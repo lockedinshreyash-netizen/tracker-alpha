@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, ExamPreference, LogSource, PomodoroRuntime, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroSettings, Subject, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
+import { isIdle as pomodoroIsIdle } from './pomodoro';
+import { PomodoroApi } from './usePomodoro';
 import TaskSection from './TaskSection';
 import PomodoroTimer from './PomodoroTimer';
 import CoachCard from './CoachCard';
@@ -16,9 +18,8 @@ interface Props {
   onDeleteTask: (id: string) => void;
   onUpdateDailyGoal: (val: number) => void;
   onSetTimerMode: (mode: TimerMode) => void;
-  onUpdatePomodoro: (next: Partial<PomodoroRuntime>) => void;
+  pomodoro: PomodoroApi;
   onUpdatePomodoroSettings: (next: Partial<PomodoroSettings>) => void;
-  onLogPomodoroBlock: (subject: Subject, hours: number, quality: number) => void;
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
   examPreference: ExamPreference;
@@ -37,9 +38,8 @@ const TodayTab: React.FC<Props> = ({
   onDeleteTask,
   onUpdateDailyGoal,
   onSetTimerMode,
-  onUpdatePomodoro,
+  pomodoro: pomodoroApi,
   onUpdatePomodoroSettings,
-  onLogPomodoroBlock,
   theme,
   activeSubjects,
   examPreference,
@@ -48,6 +48,7 @@ const TodayTab: React.FC<Props> = ({
   onSetCoachMuted
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
+  const pomodoroBusy = !pomodoroIsIdle(pomodoro);
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
 
@@ -114,7 +115,7 @@ const TodayTab: React.FC<Props> = ({
     <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Only while idle — mid-session the last thing anyone needs is a second
           opinion about what they should be doing. */}
-      {!timer.isRunning && !pomodoro.isRunning && (
+      {!timer.isRunning && !pomodoroBusy && (
         <CoachCard
           state={state}
           exam={examPreference}
@@ -161,7 +162,9 @@ const TodayTab: React.FC<Props> = ({
         </section>
       )}
 
-      {/* Mode switch — hidden mid-stopwatch so a running session can't be orphaned */}
+      {/* Mode switch — hidden mid-stopwatch so a running session can't be orphaned.
+          A part-served Pomodoro block isn't orphaned by it: switching away banks
+          the time first (see setTimerMode). */}
       {!timer.isRunning && (
         <div className="flex justify-center">
           <div className={`inline-flex p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-[#E3E0D9] bg-white'}`}>
@@ -184,13 +187,12 @@ const TodayTab: React.FC<Props> = ({
 
       {isPomodoro ? (
         <PomodoroTimer
-          pomodoro={pomodoro}
+          runtime={pomodoro}
           settings={pomodoroSettings}
+          api={pomodoroApi}
           activeSubjects={activeSubjects}
           theme={theme}
-          onUpdate={onUpdatePomodoro}
           onUpdateSettings={onUpdatePomodoroSettings}
-          onLogBlock={onLogPomodoroBlock}
         />
       ) : (
         <section
