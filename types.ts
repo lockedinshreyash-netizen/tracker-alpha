@@ -244,7 +244,17 @@ export interface TopicMastery {
  */
 export type DayMinute = number;
 
-export type BlockKind = 'study' | 'revision' | 'test' | 'break' | 'fixed';
+/**
+ * What a block actually is.
+ *
+ * A day is not only study. Sleep, meals, school and the gym are what decide
+ * when studying can happen at all, so they belong on the same grid — but only
+ * the first three count as planned study, and only those are measured against
+ * `logs`. See `countsAsStudy`.
+ */
+export type BlockKind =
+  | 'study' | 'revision' | 'test'
+  | 'class' | 'sleep' | 'meal' | 'gym' | 'break' | 'travel' | 'other';
 
 /**
  * A planned block that exists on one date only.
@@ -255,7 +265,9 @@ export type BlockKind = 'study' | 'revision' | 'test' | 'break' | 'fixed';
 export interface ScheduleBlock {
   id: string;
   date: string; // YYYY-MM-DD (IST study day)
-  subject: Subject;
+  /* Only study kinds carry one. Sleep has no subject, and pretending it does
+     would put it in the adherence maths. */
+  subject?: Subject;
   chapter?: string;
   start: DayMinute;
   durationMins: number;
@@ -274,7 +286,7 @@ export interface ScheduleBlock {
 export interface TemplateRule {
   id: string;
   days: number[]; // 0=Sun … 6=Sat, in study-day terms
-  subject: Subject;
+  subject?: Subject;
   chapter?: string;
   start: DayMinute;
   durationMins: number;

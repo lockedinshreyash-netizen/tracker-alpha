@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScheduleBlock } from '../types';
-import { BLOCK_KIND_LABELS, subjectStyle } from './colors';
-import { formatClock, formatSpan } from './schedule';
+import { ACTIVITIES, blockStyle, blockTitle, countsAsStudy } from './colors';
+import { formatRange } from './schedule';
 
 interface Props {
   block: ScheduleBlock;
@@ -39,28 +39,31 @@ const BlockCard: React.FC<Props> = ({
   recurring, moved, readOnly, running, onPointerDown, onKeyDown, onOpen,
 }) => {
   const dark = theme === 'dark';
-  const c = subjectStyle(block.subject);
+  const c = blockStyle(block);
 
   const start = preview ? preview.start : block.start;
   const duration = preview ? preview.durationMins : block.durationMins;
 
   const top = (start / 60) * pxPerHour;
-  /* A floor in pixels as well as in minutes: a 10-minute block at 48px/hr is
+  /* A floor in pixels as well as in minutes: a 10-minute block at 46px/hr is
      8px tall, which is not a target anyone can hit or read. */
   const height = Math.max(24, (duration / 60) * pxPerHour);
   const laneWidth = 100 / lanes;
 
-  /* Two 12px handles inside a 44px block leave 20px of body to grab. Below
-     that the whole card is the move target and the top edge is given up. */
+  /* Two 10px handles inside a 44px block leave 24px of body to grab. Below
+     that the whole card is the move target and the edges are given up. */
   const showHandles = !readOnly && height >= 44;
 
-  const label = block.chapter || block.label || BLOCK_KIND_LABELS[block.kind];
+  const title = blockTitle(block);
+  const isStudy = countsAsStudy(block.kind);
+  /* The subtitle is whatever the title didn't already say. */
+  const sub = isStudy ? block.chapter : (block.label ? ACTIVITIES[block.kind].label : null);
 
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${block.subject}${block.chapter ? `, ${block.chapter}` : ''}, ${formatClock(start)} to ${formatClock(start + duration)}${readOnly ? ', past day, locked' : ''}`}
+      aria-label={`${title}${sub ? `, ${sub}` : ''}, ${formatRange(start, duration)}${readOnly ? ', past day, locked' : ''}`}
       onKeyDown={onKeyDown}
       onPointerDown={e => !readOnly && onPointerDown(e, 'move')}
       onClick={onOpen}
@@ -78,7 +81,7 @@ const BlockCard: React.FC<Props> = ({
            under the finger reads as lag, not polish. */
         transition: dragging ? undefined : 'top 120ms ease, height 120ms ease',
       }}
-      className={`group rounded-md border px-2 py-1 overflow-hidden select-none text-left
+      className={`group rounded-md border px-2.5 py-1.5 overflow-hidden select-none text-left transition-colors
         ${dark ? `${c.bg} ${c.border}` : `${c.bgLight} ${c.borderLight}`}
         ${dragging ? 'shadow-2xl ring-1 ring-white/20' : ''}
         ${clashing ? 'ring-1 ring-[#E10600]' : ''}
@@ -94,26 +97,22 @@ const BlockCard: React.FC<Props> = ({
         </div>
       )}
 
-      <div className="flex items-baseline gap-1.5 pointer-events-none">
-        <span className={`font-ui text-[11px] font-bold uppercase tracking-wide truncate ${dark ? c.text : c.textLight}`}>
-          {block.subject}
+      <div className="flex items-center gap-1.5 pointer-events-none">
+        <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate ${dark ? c.text : c.textLight}`}>
+          {title}
         </span>
-        {recurring && (
-          <span className={`text-[9px] ${dark ? 'text-white/40' : 'text-black/35'}`} title="From the weekly template">↻</span>
-        )}
-        {moved && (
-          <span className={`text-[8px] font-bold tracking-wider ${dark ? 'text-white/35' : 'text-black/35'}`}>MOVED</span>
-        )}
+        {recurring && <span className={`text-[9px] shrink-0 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`} title="Repeats weekly">↻</span>}
+        {moved && <span className={`text-[8px] font-bold uppercase tracking-[0.06em] shrink-0 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>Moved</span>}
       </div>
 
-      {height >= 34 && (
-        <div className={`font-ui text-[10px] truncate pointer-events-none ${dark ? 'text-white/45' : 'text-black/45'}`}>
-          {formatClock(start)}–{formatClock(start + duration)} · {formatSpan(duration)}
+      {height >= 36 && (
+        <div className={`text-[10px] tabular-nums truncate pointer-events-none font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          {formatRange(start, duration)}
         </div>
       )}
-      {height >= 56 && label && (
-        <div className={`font-ui text-[10px] mt-0.5 truncate pointer-events-none ${dark ? 'text-white/35' : 'text-black/40'}`}>
-          {label}
+      {height >= 58 && sub && (
+        <div className={`text-[10px] truncate pointer-events-none font-ui mt-0.5 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          {sub}
         </div>
       )}
 

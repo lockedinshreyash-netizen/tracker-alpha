@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, TemplateRule, TimerState,
+  BlockKind, DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, TemplateRule, TimerState,
 } from '../types';
 import { getISTDateString } from '../utils';
 import AdherenceSection from './AdherenceSection';
@@ -8,9 +8,9 @@ import BlockEditor, { EditorDraft } from './BlockEditor';
 import DateStrip from './DateStrip';
 import DayTimeline from './DayTimeline';
 import TemplateSection from './TemplateSection';
-import { isCommitment } from './colors';
+import { ACTIVITIES, countsAsStudy } from './colors';
 import {
-  isInstanceId, isOverridden, materializeDay, nowMinute, parseInstanceId,
+  firstFreeSlot, isInstanceId, isOverridden, materializeDay, nowMinute, parseInstanceId,
 } from './schedule';
 
 interface Props {
@@ -30,6 +30,10 @@ interface Props {
   onDeleteRule: (id: string) => void;
   onStartBlock: (block: ScheduleBlock) => void;
 }
+
+/* The day as most people actually build it: the work, then the things that
+   decide when the work can happen. Anything else is one tap further in. */
+const QUICK_ADD: BlockKind[] = ['study', 'class', 'meal', 'gym', 'sleep'];
 
 /**
  * The Plan tab.
@@ -57,31 +61,37 @@ const PlanTab: React.FC<Props> = ({
      rewrite what its adherence was measured against. */
   const readOnly = date < today;
 
-  const plannedMins = blocks.filter(b => !isCommitment(b.kind)).reduce((a, b) => a + b.durationMins, 0);
+  const studyMins = blocks
+    .filter(b => countsAsStudy(b.kind))
+    .reduce((a, b) => a + b.durationMins, 0);
 
   const closeEditor = () => setDraft(null);
 
+  const openNew = (kind: BlockKind, start?: number) => {
+    const def = ACTIVITIES[kind];
+    setDraft({
+      kind,
+      subject: def.isStudy ? activeSubjects[0] : undefined,
+      start: start ?? firstFreeSlot(blocks, def.defaultStart, def.defaultMins),
+      durationMins: def.defaultMins,
+    });
+  };
+
   const saveDraft = (d: EditorDraft) => {
-    if (d.id) {
-      onUpdateBlock(d.id, {
-        subject: d.subject, chapter: d.chapter, start: d.start,
-        durationMins: d.durationMins, kind: d.kind, label: d.label,
-      });
-    } else {
-      onAddBlock({
-        date, subject: d.subject, chapter: d.chapter, start: d.start,
-        durationMins: d.durationMins, kind: d.kind, label: d.label,
-      });
-    }
+    const patch = {
+      kind: d.kind, subject: d.subject, chapter: d.chapter,
+      start: d.start, durationMins: d.durationMins, label: d.label,
+    };
+    if (d.id) onUpdateBlock(d.id, patch);
+    else onAddBlock({ date, ...patch });
     closeEditor();
   };
 
   const deleteDraft = () => {
     if (!draft?.id) return;
-    const recurring = isInstanceId(draft.id);
-    const msg = recurring
-      ? 'SKIP THIS ONE TODAY? The weekly slot stays.'
-      : 'DELETE THIS BLOCK? This cannot be undone.';
+    const msg = isInstanceId(draft.id)
+      ? 'Skip this one today? The weekly slot stays.'
+      : 'Delete this block? This cannot be undone.';
     if (window.confirm(msg)) onDeleteBlock(draft.id);
     closeEditor();
   };
@@ -98,12 +108,8 @@ const PlanTab: React.FC<Props> = ({
     if (!draft?.id) return;
     onAddRule({
       days: [new Date(date + 'T12:00:00').getDay()],
-      subject: draft.subject,
-      chapter: draft.chapter,
-      start: draft.start,
-      durationMins: draft.durationMins,
-      kind: draft.kind,
-      label: draft.label,
+      kind: draft.kind, subject: draft.subject, chapter: draft.chapter,
+      start: draft.start, durationMins: draft.durationMins, label: draft.label,
       until: null,
     });
     onDeleteBlock(draft.id);
@@ -116,18 +122,41 @@ const PlanTab: React.FC<Props> = ({
     closeEditor();
   };
 
-  const timerBusy = timer.isRunning;
+  const card = `p-6 md:p-8 rounded-xl border transition-all ${
+    dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
+  }`;
 
   return (
     <div className="space-y-12 md:space-y-14 pb-16">
-      <DateStrip date={date} today={today} plannedMins={plannedMins} theme={theme} onChange={setDate} />
+      <DateStrip date={date} today={today} studyMins={studyMins} theme={theme} onChange={setDate} />
 
-      <section>
+      <section className={card}>
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-6">
+            <span className={`text-[10px] font-bold uppercase tracking-[0.06em] mr-1.5 font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+              Add
+            </span>
+            {QUICK_ADD.map(k => (
+              <button
+                key={k}
+                onClick={() => openNew(k)}
+                className={`px-3.5 py-2 text-[10px] font-medium uppercase tracking-[0.06em] border rounded-md transition-all active:scale-95 font-ui ${
+                  dark ? 'border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/20'
+                       : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300'
+                }`}
+              >
+                {ACTIVITIES[k].label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {blocks.length === 0 && (
-          <p className={`font-ui text-sm mb-4 ${dark ? 'text-white/35' : 'text-black/40'}`}>
-            NOTHING SCHEDULED. THE COMPETITION HAS A PLAN. TAP THE GRID.
+          <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-5 font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+            Nothing scheduled. The competition has a plan.
           </p>
         )}
+
         <DayTimeline
           blocks={blocks}
           theme={theme}
@@ -136,13 +165,11 @@ const PlanTab: React.FC<Props> = ({
           runningBlockId={timer.isRunning ? timer.blockId : undefined}
           onCommit={(id, patch) => onUpdateBlock(id, patch)}
           onOpen={b => setDraft({
-            id: b.id, subject: b.subject, chapter: b.chapter,
-            start: b.start, durationMins: b.durationMins, kind: b.kind, label: b.label,
+            id: b.id, kind: b.kind, subject: b.subject, chapter: b.chapter,
+            start: b.start, durationMins: b.durationMins, label: b.label,
           })}
-          onCreateAt={start => setDraft({
-            subject: activeSubjects[0] || 'Physics', start, durationMins: 60, kind: 'study',
-          })}
-          onDelete={b => { if (window.confirm('DELETE THIS BLOCK?')) onDeleteBlock(b.id); }}
+          onCreateAt={start => openNew('study', start)}
+          onDelete={b => { if (window.confirm('Delete this block?')) onDeleteBlock(b.id); }}
           isRecurring={isInstanceId}
           isMoved={id => isOverridden(schedule, id)}
         />
@@ -169,7 +196,7 @@ const PlanTab: React.FC<Props> = ({
           moved={!!draft.id && isOverridden(schedule, draft.id)}
           /* Engaging a block on a day you are not living is meaningless, and
              a second timer while one runs is refused upstream anyway. */
-          canEngage={date === today && !timerBusy}
+          canEngage={date === today && !timer.isRunning}
           theme={theme}
           activeSubjects={activeSubjects}
           currentClass={currentClass}

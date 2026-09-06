@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScheduleBlock, ScheduleState, TimerState } from '../types';
 import { getISTDateString } from '../utils';
-import { subjectStyle } from './colors';
-import { currentBlock, formatClock, formatSpan, materializeDay, nextBlock, nowMinute } from './schedule';
+import { blockStyle, blockTitle, countsAsStudy } from './colors';
+import { currentBlock, formatRange, formatSpan, materializeDay, nextBlock, nowMinute } from './schedule';
 
 interface Props {
   schedule: ScheduleState;
@@ -32,41 +32,41 @@ const NextUpStrip: React.FC<Props> = ({ schedule, timer, theme, onStartBlock, on
   const block = live || nextBlock(blocks, minute);
   if (!block) return null;
 
-  const c = subjectStyle(block.subject);
-  const mins = live ? blockEndIn(block, minute) : block.start - minute;
+  const c = blockStyle(block);
+  const mins = live ? block.start + block.durationMins - minute : block.start - minute;
+  /* Engage only makes sense for work. You do not start a stopwatch on sleep. */
+  const engageable = countsAsStudy(block.kind);
 
   return (
-    <section
-      className={`p-4 md:p-5 rounded-xl border flex items-center gap-4 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}
-    >
-      <span className={`w-1 h-10 rounded-full shrink-0 ${c.dot}`} />
+    <section className={`p-5 md:p-6 rounded-xl border flex items-center gap-4 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <span className={`w-1 h-11 rounded-full shrink-0 ${c.dot}`} />
       <div className="min-w-0 flex-1">
-        <p className={`font-ui text-[9px] uppercase tracking-[0.2em] ${dark ? 'text-white/35' : 'text-black/40'}`}>
-          {live ? `ON THE PLAN NOW · ${formatSpan(mins)} LEFT` : `NEXT UP IN ${formatSpan(mins)}`}
+        <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          {live ? `On the plan now · ${formatSpan(mins)} left` : `Next up in ${formatSpan(mins)}`}
         </p>
-        <p className={`font-ui text-sm font-bold uppercase tracking-wide truncate mt-0.5 ${dark ? 'text-white' : 'text-[#17150F]'}`}>
-          {block.subject}{block.chapter ? ` · ${block.chapter}` : ''}
+        <p className={`text-base num-stat truncate mt-1 ${dark ? 'text-white' : 'text-zinc-900'}`}>
+          {blockTitle(block)}{block.chapter ? ` · ${block.chapter}` : ''}
         </p>
-        <p className={`font-ui text-[10px] tabular-nums ${dark ? 'text-white/35' : 'text-black/40'}`}>
-          {formatClock(block.start)}–{formatClock(block.start + block.durationMins)}
+        <p className={`text-[10px] tabular-nums font-ui mt-0.5 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          {formatRange(block.start, block.durationMins)}
         </p>
       </div>
-      <button
-        onClick={() => onStartBlock(block)}
-        className="shrink-0 px-4 py-2.5 rounded-md bg-[#E10600] text-white font-ui text-[10px] font-bold uppercase tracking-[0.15em]"
-      >
-        ENGAGE
-      </button>
+      {engageable && (
+        <button
+          onClick={() => onStartBlock(block)}
+          className="shrink-0 px-6 md:px-8 py-3 text-[10px] font-bold uppercase tracking-[0.08em] bg-[#E10600] text-white rounded-md hover:bg-red-700 transition-all active:scale-95 font-ui"
+        >
+          Engage
+        </button>
+      )}
       <button
         onClick={onOpenPlan}
-        className={`shrink-0 font-ui text-[10px] uppercase tracking-wider ${dark ? 'text-white/35 hover:text-white' : 'text-black/35 hover:text-black'}`}
+        className={`shrink-0 text-[10px] font-medium uppercase tracking-[0.06em] font-ui transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'}`}
       >
-        PLAN
+        Plan
       </button>
     </section>
   );
 };
-
-const blockEndIn = (b: ScheduleBlock, minute: number) => b.start + b.durationMins - minute;
 
 export default NextUpStrip;

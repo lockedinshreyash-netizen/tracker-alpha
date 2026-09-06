@@ -3,7 +3,7 @@ import { DayMinute, ScheduleBlock } from '../types';
 import BlockCard from './BlockCard';
 import {
   DAY_MINUTES, MIDNIGHT_MINUTE, SNAP_MINS, clampBlock, clashesWith,
-  formatClock, layoutDay, snap,
+  formatHour, layoutDay, snap,
 } from './schedule';
 
 type DragMode = 'move' | 'resize-start' | 'resize-end';
@@ -62,7 +62,7 @@ const DayTimeline: React.FC<Props> = ({
 }) => {
   const dark = theme === 'dark';
   const [pxPerHour, setPxPerHour] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 52 : 66);
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 40 : 62);
   const [preview, setPreview] = useState<{ id: string; start: number; durationMins: number } | null>(null);
   /* A gesture begins in a ref, which cannot wake an effect — this is the bit
      of state whose only job is to get the window listeners attached. */
@@ -274,22 +274,23 @@ const DayTimeline: React.FC<Props> = ({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className={`font-ui text-[10px] uppercase tracking-[0.18em] ${dark ? 'text-white/35' : 'text-black/40'}`}>
-          {readOnly ? 'LOCKED — THE DAY IS SPENT' : 'DRAG TO MOVE · EDGES TO RESIZE'}
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <p className={`text-[10px] font-medium uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          {readOnly ? 'Locked — the day is spent' : 'Tap to add · drag to move'}
         </p>
-        <div className={`inline-flex rounded-md border overflow-hidden ${dark ? 'border-white/[0.08]' : 'border-[#E3E0D9]'}`}>
-          {[46, 66, 96].map(z => (
+        <div className={`inline-flex rounded-md border overflow-hidden shrink-0 ${dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}>
+          {[40, 62, 92].map((z, i) => (
             <button
               key={z}
               onClick={() => setPxPerHour(z)}
-              className={`px-2.5 py-1 font-ui text-[10px] font-bold tracking-wider transition-colors ${
+              aria-label={['Whole day', 'Normal', 'Detailed'][i]}
+              className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.06em] transition-colors font-ui ${
                 pxPerHour === z
                   ? 'bg-[#E10600] text-white'
-                  : dark ? 'text-white/45 hover:text-white/80' : 'text-black/45 hover:text-black/80'
+                  : dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'
               }`}
             >
-              {z === 46 ? 'S' : z === 66 ? 'M' : 'L'}
+              {['Day', 'Fit', 'Zoom'][i]}
             </button>
           ))}
         </div>
@@ -297,8 +298,8 @@ const DayTimeline: React.FC<Props> = ({
 
       <div
         ref={scrollRef}
-        className={`relative rounded-lg border overflow-y-auto overflow-x-hidden ${dark ? 'border-white/[0.06] bg-[#0D0D10]' : 'border-[#E3E0D9] bg-[#FAF9F6]'}`}
-        style={{ maxHeight: 'min(66vh, 760px)' }}
+        className={`relative rounded-lg border overflow-y-auto overflow-x-hidden ${dark ? 'border-white/[0.06] bg-[#0D0D10]' : 'border-zinc-100 bg-zinc-50/60'}`}
+        style={{ maxHeight: 'min(64vh, 720px)' }}
       >
         <div ref={gridRef} className="relative" style={{ height: gridHeight }}>
           {/* Hour rules and the gutter. The gutter keeps its own touch-action
@@ -314,15 +315,15 @@ const DayTimeline: React.FC<Props> = ({
               >
                 <div className={`absolute inset-x-0 top-0 border-t ${
                   isMidnight
-                    ? dark ? 'border-white/20' : 'border-black/20'
-                    : dark ? 'border-white/[0.05]' : 'border-black/[0.05]'
+                    ? dark ? 'border-white/[0.18]' : 'border-zinc-300'
+                    : dark ? 'border-white/[0.05]' : 'border-zinc-200/70'
                 }`} />
-                <span className={`absolute left-2 top-0.5 font-ui text-[9px] tabular-nums ${
+                <span className={`absolute left-2.5 top-0.5 text-[9px] font-medium tabular-nums uppercase tracking-[0.04em] font-ui ${
                   isMidnight
-                    ? dark ? 'text-white/60 font-bold' : 'text-black/60 font-bold'
-                    : dark ? 'text-white/25' : 'text-black/30'
+                    ? dark ? 'text-zinc-400 font-bold' : 'text-zinc-500 font-bold'
+                    : dark ? 'text-zinc-600' : 'text-zinc-400'
                 }`}>
-                  {isMidnight ? 'MIDNIGHT' : formatClock(m)}
+                  {isMidnight ? '12 AM' : formatHour(m)}
                 </span>
               </div>
             );

@@ -9,7 +9,7 @@
 
 import { DailyLog, DayMinute, ScheduleBlock, ScheduleState, Subject, TemplateRule } from '../types';
 import { DAY_START_HOUR, weekdayOf } from '../utils';
-import { isCommitment } from './colors';
+import { countsAsStudy } from './colors';
 
 export const DAY_MINUTES = 1440;
 
@@ -43,12 +43,40 @@ export const nowMinute = (d: Date = new Date()): DayMinute => {
   return (hour * 60 + minute - DAY_START_HOUR * 60 + DAY_MINUTES) % DAY_MINUTES;
 };
 
-/** Minute on the study-day axis → "06:30" on a wall clock. */
-export const formatClock = (m: DayMinute): string => {
+/** Wall-clock hours and minutes for a point on the study-day axis. */
+const wallClock = (m: DayMinute): { h24: number; h12: number; mm: number; ampm: 'AM' | 'PM' } => {
   const wall = (Math.round(m) + DAY_START_HOUR * 60) % DAY_MINUTES;
-  const h = Math.floor(wall / 60);
-  const mm = wall % 60;
-  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  const h24 = Math.floor(wall / 60);
+  return {
+    h24,
+    h12: h24 % 12 === 0 ? 12 : h24 % 12,
+    mm: wall % 60,
+    ampm: h24 < 12 ? 'AM' : 'PM',
+  };
+};
+
+/** Minute on the study-day axis → "6:30 AM". */
+export const formatClock = (m: DayMinute): string => {
+  const { h12, mm, ampm } = wallClock(m);
+  return `${h12}:${String(mm).padStart(2, '0')} ${ampm}`;
+};
+
+/** The axis gutter: "6 AM", "12 PM". Bare hours, so the column stays narrow. */
+export const formatHour = (m: DayMinute): string => {
+  const { h12, ampm } = wallClock(m);
+  return `${h12} ${ampm}`;
+};
+
+/**
+ * A span, with the meridiem written once when both ends share it:
+ * "6:00 – 7:30 AM", but "11:00 AM – 1:00 PM".
+ */
+export const formatRange = (start: DayMinute, durationMins: number): string => {
+  const a = wallClock(start);
+  const b = wallClock(start + durationMins);
+  const left = `${a.h12}:${String(a.mm).padStart(2, '0')}`;
+  const right = `${b.h12}:${String(b.mm).padStart(2, '0')} ${b.ampm}`;
+  return a.ampm === b.ampm ? `${left} – ${right}` : `${left} ${a.ampm} – ${right}`;
 };
 
 /** "1h 30m" / "45m" — for durations, never for a time of day. */
@@ -197,6 +225,28 @@ export const clashesWith = (block: ScheduleBlock, blocks: ScheduleBlock[]): Sche
     b => b.id !== block.id && b.start < blockEnd(block) && block.start < blockEnd(b),
   );
 
+/**
+ * The first gap at or after `from` that fits, so a one-tap add lands somewhere
+ * usable instead of stacking every meal at 8 AM.
+ *
+ * Falls back to `from` when the day is genuinely full — an honest clash the
+ * user can see and move beats silently refusing to add anything.
+ */
+export const firstFreeSlot = (
+  blocks: ScheduleBlock[],
+  from: DayMinute,
+  durationMins: number,
+): DayMinute => {
+  const busy = [...blocks].sort((a, b) => a.start - b.start);
+  let cursor = from;
+  for (const b of busy) {
+    if (blockEnd(b) <= cursor) continue;
+    if (b.start >= cursor + durationMins) break;
+    cursor = blockEnd(b);
+  }
+  return cursor + durationMins <= DAY_MINUTES ? cursor : from;
+};
+
 /** The next block that has not started yet, for the Today strip. */
 export const nextBlock = (blocks: ScheduleBlock[], minute: DayMinute): ScheduleBlock | null =>
   blocks.filter(b => b.start >= minute).sort((a, b) => a.start - b.start)[0] || null;
@@ -248,7 +298,10 @@ export const computeAdherence = (
   date: string,
   minute: DayMinute | null,
 ): DayAdherence => {
-  const planned = blocks.filter(b => !isCommitment(b.kind));
+  /* Only study counts. Sleep and dinner are what the day is made of, not a
+     debt against it — and a block with no subject can never be matched to a
+     log, which carries one. */
+  const planned = blocks.filter(b => countsAsStudy(b.kind) && !!b.subject);
   const perBlock: Record<string, BlockOutcome> = {};
   for (const b of planned) perBlock[b.id] = { minutes: 0, attributed: false };
 
@@ -282,11 +335,12 @@ export const computeAdherence = (
     .sort((a, b) => a.start - b.start);
 
   for (const b of unwatched) {
-    const available = pool[b.subject] || 0;
+    const subject = b.subject!;
+    const available = pool[subject] || 0;
     if (available <= 0) continue;
     const take = Math.min(available, b.durationMins);
     perBlock[b.id].minutes += take;
-    pool[b.subject] = available - take;
+    pool[subject] = available - take;
     if (take > 0) hasInferred = true;
   }
 

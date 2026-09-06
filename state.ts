@@ -101,7 +101,7 @@ export const DEFAULT_REWARDS: RewardsState = {
    thing students abandon in week two. */
 export const DEFAULT_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [] };
 
-const BLOCK_KINDS: BlockKind[] = ['study', 'revision', 'test', 'break', 'fixed'];
+const BLOCK_KINDS: BlockKind[] = ['study', 'revision', 'test', 'class', 'sleep', 'meal', 'gym', 'break', 'travel', 'other'];
 const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
 const asMinute = (v: unknown, fallback: number): number =>
@@ -110,8 +110,8 @@ const asMinute = (v: unknown, fallback: number): number =>
 const asDuration = (v: unknown): number =>
   Number.isFinite(v as number) ? Math.min(1440, Math.max(10, Math.floor(v as number))) : 60;
 
-const asSubject = (v: unknown): Subject =>
-  SUBJECTS.includes(v as Subject) ? (v as Subject) : 'General';
+const asSubject = (v: unknown): Subject | undefined =>
+  SUBJECTS.includes(v as Subject) ? (v as Subject) : undefined;
 
 const asKind = (v: unknown): BlockKind =>
   BLOCK_KINDS.includes(v as BlockKind) ? (v as BlockKind) : 'study';
@@ -181,7 +181,7 @@ export const normalizeSchedule = (raw: unknown): ScheduleState => {
       skipped: o.skipped === true ? true : undefined,
       start: o.start === undefined ? undefined : asMinute(o.start, 0),
       durationMins: o.durationMins === undefined ? undefined : asDuration(o.durationMins),
-      subject: o.subject === undefined ? undefined : asSubject(o.subject),
+      subject: asSubject(o.subject),
       chapter: asText(o.chapter),
     }));
 
