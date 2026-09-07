@@ -32,14 +32,14 @@ const NextUpStrip: React.FC<Props> = ({ schedule, timer, theme, onStartBlock, on
   const block = live || nextBlock(blocks, minute);
   if (!block) return null;
 
-  const c = blockStyle(block);
+  const c = blockStyle(block, schedule.colors);
   const mins = live ? block.start + block.durationMins - minute : block.start - minute;
   /* Engage only makes sense for work. You do not start a stopwatch on sleep. */
   const engageable = countsAsStudy(block.kind);
 
   return (
     <section className={`p-5 md:p-6 rounded-xl border flex items-center gap-4 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-      <span className={`w-1 h-11 rounded-full shrink-0 ${c.dot}`} />
+      <span style={{ background: c.dot }} className="w-1 h-11 rounded-full shrink-0" />
       <div className="min-w-0 flex-1">
         <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           {live ? `On the plan now · ${formatSpan(mins)} left` : `Next up in ${formatSpan(mins)}`}

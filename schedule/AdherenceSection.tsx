@@ -1,6 +1,6 @@
 import React from 'react';
 import { DailyLog, DayMinute, ScheduleBlock } from '../types';
-import { blockStyle, blockTitle } from './colors';
+import { BlockColors, blockStyle, blockTitle } from './colors';
 import { computeAdherence, formatClock, formatSpan } from './schedule';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   /** Where "now" is on this day, or null once the day is over. */
   minute: DayMinute | null;
   theme: 'dark' | 'light';
+  colors?: BlockColors;
 }
 
 /**
@@ -19,7 +20,7 @@ interface Props {
  * to study is not accountability, it's noise. Sleep and meals are excluded
  * upstream by `countsAsStudy`; you do not get graded on dinner.
  */
-const AdherenceSection: React.FC<Props> = ({ blocks, logs, date, minute, theme }) => {
+const AdherenceSection: React.FC<Props> = ({ blocks, logs, date, minute, theme, colors }) => {
   const dark = theme === 'dark';
   const a = computeAdherence(blocks, logs, date, minute);
   if (a.plannedMins === 0) return null;
@@ -75,11 +76,11 @@ const AdherenceSection: React.FC<Props> = ({ blocks, logs, date, minute, theme }
       <div className="mt-8 space-y-1">
         {blocks.filter(b => a.perBlock[b.id]).map(b => {
           const v = verdictFor(b);
-          const c = blockStyle(b);
+          const c = blockStyle(b, colors);
           const o = a.perBlock[b.id];
           return (
             <div key={b.id} className="flex items-center gap-3 py-2">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+              <span style={{ background: c.dot }} className="w-1.5 h-1.5 rounded-full shrink-0" />
               <span className={`text-[10px] shrink-0 tabular-nums font-ui w-[68px] ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
                 {formatClock(b.start)}
               </span>

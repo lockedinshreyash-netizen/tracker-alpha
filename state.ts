@@ -1,4 +1,5 @@
 import { AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, RewardsState, ScheduleBlock, ScheduleState, Subject, TemplateRule } from './types';
+import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
 export const DEFAULT_COACH: CoachState = {
   dismissed: [],
@@ -99,7 +100,7 @@ export const DEFAULT_REWARDS: RewardsState = {
 
 /* An empty plan, not a suggested one. A timetable somebody else wrote is the
    thing students abandon in week two. */
-export const DEFAULT_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [] };
+export const DEFAULT_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [], colors: {} };
 
 const BLOCK_KINDS: BlockKind[] = ['study', 'revision', 'test', 'class', 'sleep', 'meal', 'gym', 'break', 'travel', 'other'];
 const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
@@ -118,6 +119,11 @@ const asKind = (v: unknown): BlockKind =>
 
 const asDate = (v: unknown): string | null =>
   typeof v === 'string' && DATE_SHAPE.test(v) ? v : null;
+
+/* A colour off the wire ends up in an inline `style`, so it is checked against
+   the exact shape rather than trusted — `#rrggbb` and nothing else. */
+const asHex = (v: unknown): string | null =>
+  typeof v === 'string' && HEX_RE.test(v) ? v.toLowerCase() : null;
 
 const asText = (v: unknown): string | undefined =>
   typeof v === 'string' && v.trim() ? v.slice(0, 120) : undefined;
@@ -185,7 +191,17 @@ export const normalizeSchedule = (raw: unknown): ScheduleState => {
       chapter: asText(o.chapter),
     }));
 
-  return { blocks, rules, overrides };
+  /* Only the kinds whose colour the user actually owns. A stored colour for a
+     study kind would be dead weight at best and, if anything ever read it,
+     would break the one guarantee subject colours make. */
+  const colors: Partial<Record<BlockKind, string>> = {};
+  const rawColors = (src.colors && typeof src.colors === 'object' ? src.colors : {}) as Record<string, unknown>;
+  for (const kind of RECOLOURABLE) {
+    const hex = asHex(rawColors[kind]);
+    if (hex) colors[kind] = hex;
+  }
+
+  return { blocks, rules, overrides, colors };
 };
 
 export const DEFAULT_STATE: AppState = {

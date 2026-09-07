@@ -8,6 +8,7 @@ import PomodoroTimer from './PomodoroTimer';
 import CoachCard from './CoachCard';
 import { Recommendation } from './recommend';
 import NextUpStrip from '../schedule/NextUpStrip';
+import ShareButton from '../share/ShareButton';
 
 interface Props {
   state: AppState;
@@ -29,6 +30,8 @@ interface Props {
   onSetCoachMuted: (muted: boolean) => void;
   onStartBlock: (block: ScheduleBlock) => void;
   onOpenPlan: () => void;
+  /** Opens the share sheet on today's card. */
+  onShare: () => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -50,7 +53,8 @@ const TodayTab: React.FC<Props> = ({
   onDismissRecommendation,
   onSetCoachMuted,
   onStartBlock,
-  onOpenPlan
+  onOpenPlan,
+  onShare
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
@@ -166,6 +170,11 @@ const TodayTab: React.FC<Props> = ({
                   <button onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">+</button>
                 </div>
                 <span className={`text-[10px] uppercase font-bold tracking-wider font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Daily Target</span>
+                {/* Beside the hours it would show. Hidden mid-session with the
+                    rest of this card — a day is shared once it is done. */}
+                <span className="ml-auto">
+                  <ShareButton onClick={onShare} theme={theme} label="Share" small />
+                </span>
               </div>
             </div>
           </div>

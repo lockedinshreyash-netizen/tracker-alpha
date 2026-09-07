@@ -9,8 +9,16 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+
+/* Dev-only contact sheet for the share cards (`?share=debug`). Lazily imported
+   so it never reaches a production bundle, and checked before App mounts so the
+   harness is not sitting behind the landing page and the onboarding tour. */
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('share') === 'debug') {
+  import('./share/DebugCards').then(({ default: DebugCards }) => root.render(<DebugCards />));
+} else {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}

@@ -60,6 +60,17 @@ export interface Task {
   text: string;
   completed: boolean;
   subject?: Subject;
+  /* The study day the box was ticked, stamped the same way and for the same
+     reason as `ChapterProgress.completedAt`. A task carries no other clock, so
+     without this "what did I finish today" is unanswerable — the boolean alone
+     is a running total that silently rewrites its own history.
+
+     Absent on every task completed before this existed, and deliberately not
+     backfilled: a task finished at an unknown time must not be credited to
+     today. Anything counting per-period completions has to tolerate that
+     (see `share/stats.ts`, which falls through to another metric rather than
+     report a zero it cannot stand behind). */
+  completedAt?: string; // YYYY-MM-DD (IST)
 }
 
 export interface ChapterProgress {
@@ -325,6 +336,14 @@ export interface ScheduleState {
   blocks: ScheduleBlock[];
   rules: TemplateRule[];
   overrides: BlockOverride[];
+  /**
+   * Per-activity colour overrides, `#rrggbb`, keyed by `BlockKind`.
+   *
+   * Study kinds are never keyed here: a study block wears its subject's colour,
+   * and those are fixed so a subject stays recognisable everywhere it appears.
+   * Absent means "whatever the app ships" — see `ACTIVITY_BASE`.
+   */
+  colors?: Partial<Record<BlockKind, string>>;
 }
 
 export interface AppState {

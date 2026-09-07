@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DayMinute, ScheduleBlock } from '../types';
 import BlockCard from './BlockCard';
+import { BlockColors } from './colors';
 import {
   DAY_MINUTES, MIDNIGHT_MINUTE, SNAP_MINS, clampBlock, clashesWith,
   formatHour, layoutDay, snap,
@@ -24,6 +25,8 @@ interface DragState {
 interface Props {
   blocks: ScheduleBlock[];
   theme: 'dark' | 'light';
+  /** The user's activity colours, handed on to each card. */
+  colors?: BlockColors;
   /** Where "now" sits, or null when the viewed day is not today. */
   minute: DayMinute | null;
   /** Past days are locked: editing yesterday would falsify its adherence. */
@@ -57,7 +60,7 @@ const AUTOSCROLL_STEP_PX = 9;
  * `preview`, and the mutator is called exactly once, on release.
  */
 const DayTimeline: React.FC<Props> = ({
-  blocks, theme, minute, readOnly, runningBlockId,
+  blocks, theme, colors, minute, readOnly, runningBlockId,
   onCommit, onOpen, onCreateAt, onDelete, isRecurring, isMoved,
 }) => {
   const dark = theme === 'dark';
@@ -354,6 +357,7 @@ const DayTimeline: React.FC<Props> = ({
                 lanes={lanes}
                 pxPerHour={pxPerHour}
                 theme={theme}
+                colors={colors}
                 preview={preview && preview.id === block.id ? preview : null}
                 dragging={preview?.id === block.id}
                 clashing={clashing.has(block.id)}

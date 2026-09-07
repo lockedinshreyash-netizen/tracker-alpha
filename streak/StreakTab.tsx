@@ -6,6 +6,7 @@ import QuestionsHeatmap from '../review/QuestionsHeatmap';
 import MonthlyHeatmap from './MonthlyHeatmap';
 import RewardsVault from '../rewards/RewardsVault';
 import { nextReward } from '../rewards/engine';
+import ShareButton from '../share/ShareButton';
 
 interface Props {
   streak: number;
@@ -21,6 +22,8 @@ interface Props {
   onSelectWallpaper: (id: string | null) => void;
   onOpenBook: () => void;
   onClaimHamper: () => void;
+  /** Opens the share sheet on the weekly card — this tab is about the run. */
+  onShare: () => void;
 }
 
 const StreakTab: React.FC<Props> = ({
@@ -36,6 +39,7 @@ const StreakTab: React.FC<Props> = ({
   onSelectWallpaper,
   onOpenBook,
   onClaimHamper,
+  onShare,
 }) => {
   const days = getLast7DaysStats(logs, activeSubjects);
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
@@ -72,6 +76,12 @@ const StreakTab: React.FC<Props> = ({
             </div>
           </div>
         )}
+
+        {/* Under the number it is about, above the vault. The run is the thing
+            worth showing someone. */}
+        <div className="mt-10">
+          <ShareButton onClick={onShare} theme={theme} />
+        </div>
       </div>
 
       <RewardsVault

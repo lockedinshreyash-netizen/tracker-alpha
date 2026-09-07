@@ -89,6 +89,28 @@ export const formatSpan = (mins: number): string => {
   return `${h}h ${rest}m`;
 };
 
+/**
+ * A point on the study-day axis as an `<input type="time">` value, and back.
+ *
+ * The input speaks 24-hour wall clock; the model counts minutes from 04:00.
+ * Going back through this is what lets someone type 01:30 into the end of a
+ * 23:00 block and get a two-hour block rather than a negative one — 01:30 is
+ * minute 1290, which is simply *later* on this axis.
+ */
+export const toClockValue = (m: DayMinute): string => {
+  const { h24, mm } = wallClock(m);
+  return `${String(h24).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
+export const fromClockValue = (value: string): DayMinute | null => {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const mm = Number(match[2]);
+  if (h > 23 || mm > 59) return null;
+  return (h * 60 + mm - DAY_START_HOUR * 60 + DAY_MINUTES) % DAY_MINUTES;
+};
+
 export const snap = (m: number, grid: number = SNAP_MINS): number =>
   Math.round(m / grid) * grid;
 
@@ -133,17 +155,52 @@ export const parseInstanceId = (id: string): { ruleId: string; date: string } | 
  * `weekly` is every seven days on one weekday; `daily` is all seven. Both are
  * the same `TemplateRule` underneath — a full `days` array is what "every day"
  * means — so nothing in the model has to special-case it.
+ *
+ * `custom` is the rest: a rule running Mon–Fri, or Tue and Thu, which the
+ * weekly template can express and these three buttons cannot. It exists so the
+ * grid editor can say what such a rule *is* and leave it alone on save. The
+ * mode used to be inferred as `weekly`, which meant opening a Mon–Fri coaching
+ * block on a Tuesday and pressing Save silently deleted Mon, Wed, Thu and Fri.
  */
-export type RepeatMode = 'none' | 'daily' | 'weekly';
+export type RepeatMode = 'none' | 'daily' | 'weekly' | 'custom';
 
 export const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
-export const repeatOf = (rule: TemplateRule): RepeatMode =>
-  rule.days.length >= 7 ? 'daily' : 'weekly';
+export const repeatOf = (rule: TemplateRule): RepeatMode => {
+  if (rule.days.length >= 7) return 'daily';
+  if (rule.days.length === 1) return 'weekly';
+  return 'custom';
+};
 
-/** The weekday numbers a repeat mode covers on a given date. */
-export const daysForRepeat = (mode: RepeatMode, date: string): number[] =>
-  mode === 'daily' ? [...ALL_WEEKDAYS] : [weekdayOf(date)];
+/**
+ * The weekday numbers a repeat mode covers on a given date.
+ *
+ * `custom` cannot be derived from a date — it is whatever the rule already
+ * says — so the rule's own days are handed back untouched.
+ */
+export const daysForRepeat = (mode: RepeatMode, date: string, current?: number[]): number[] => {
+  if (mode === 'daily') return [...ALL_WEEKDAYS];
+  if (mode === 'custom' && current && current.length > 0) return [...current];
+  return [weekdayOf(date)];
+};
+
+export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * What a rule's `days` says out loud: "Every day", "Every Monday",
+ * "Mon · Tue · Wed · Thu · Fri".
+ *
+ * Anything asking the user to choose between one day and the series has to be
+ * able to name the series, or the choice is between "today" and a mystery.
+ */
+export const repeatSummary = (days: number[]): string => {
+  const sorted = [...days].sort((a, b) => a - b);
+  if (sorted.length >= 7) return 'Every day';
+  if (sorted.length === 1) return `Every ${DAY_NAMES[sorted[0]]}`;
+  return sorted.map(d => DAY_LABELS[d]).join(' · ');
+};
 
 export const ruleAppliesOn = (rule: TemplateRule, date: string): boolean => {
   if (date < rule.from) return false;
@@ -387,7 +444,7 @@ export const computeAdherence = (
 
 /* ── Sync ──────────────────────────────────────────────────────── */
 
-export const EMPTY_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [] };
+export const EMPTY_SCHEDULE: ScheduleState = { blocks: [], rules: [], overrides: [], colors: {} };
 
 const unionById = <T extends { id: string }>(mine: T[], theirs: T[]): T[] => {
   const out = [...mine];
@@ -413,5 +470,9 @@ export const mergeSchedule = (
     blocks: unionById(mine.blocks, theirs.blocks),
     rules: unionById(mine.rules, theirs.rules),
     overrides: unionById(mine.overrides, theirs.overrides),
+    /* Colours are settings, not rows: there is nothing to lose by keeping the
+       other device's picks for activities this one never touched, and this
+       device wins where both chose. */
+    colors: { ...(theirs.colors || {}), ...(mine.colors || {}) },
   };
 };

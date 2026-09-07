@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScheduleBlock } from '../types';
-import { ACTIVITIES, blockStyle, blockTitle, countsAsStudy } from './colors';
+import { ACTIVITIES, BlockColors, blockStyle, blockTitle, countsAsStudy } from './colors';
 import { formatRange } from './schedule';
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   lanes: number;
   pxPerHour: number;
   theme: 'dark' | 'light';
+  /** The user's activity colours. Subjects ignore this — theirs are fixed. */
+  colors?: BlockColors;
   /** Live geometry while this block is under the pointer, else its stored one. */
   preview?: { start: number; durationMins: number } | null;
   dragging: boolean;
@@ -35,11 +37,11 @@ interface Props {
  * would compile to nothing at all.
  */
 const BlockCard: React.FC<Props> = ({
-  block, lane, lanes, pxPerHour, theme, preview, dragging, clashing,
+  block, lane, lanes, pxPerHour, theme, colors, preview, dragging, clashing,
   recurring, moved, readOnly, running, onPointerDown, onKeyDown, onOpen,
 }) => {
   const dark = theme === 'dark';
-  const c = blockStyle(block);
+  const c = blockStyle(block, colors);
 
   const start = preview ? preview.start : block.start;
   const duration = preview ? preview.durationMins : block.durationMins;
@@ -77,12 +79,16 @@ const BlockCard: React.FC<Props> = ({
         touchAction: readOnly ? undefined : 'none',
         cursor: readOnly ? 'pointer' : dragging ? 'grabbing' : 'grab',
         zIndex: dragging ? 40 : 10 + lane,
+        /* Colour is inline, not Tailwind: a user-picked hex cannot become a
+           class name here — this is the CDN build with no JIT, so `bg-[${hex}]`
+           in a template literal compiles to nothing at all. */
+        background: dark ? c.bg : c.bgLight,
+        borderColor: dark ? c.border : c.borderLight,
         /* Only when nothing is being dragged — a transition on the element
            under the finger reads as lag, not polish. */
         transition: dragging ? undefined : 'top 120ms ease, height 120ms ease',
       }}
       className={`group rounded-md border px-2.5 py-1.5 overflow-hidden select-none text-left transition-colors
-        ${dark ? `${c.bg} ${c.border}` : `${c.bgLight} ${c.borderLight}`}
         ${dragging ? 'shadow-2xl ring-1 ring-white/20' : ''}
         ${clashing ? 'ring-1 ring-[#E10600]' : ''}
         ${running ? 'ring-2 ring-[#E10600]' : ''}`}
@@ -98,7 +104,10 @@ const BlockCard: React.FC<Props> = ({
       )}
 
       <div className="flex items-center gap-1.5 pointer-events-none">
-        <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate ${dark ? c.text : c.textLight}`}>
+        <span
+          style={{ color: dark ? c.text : c.textLight }}
+          className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate"
+        >
           {title}
         </span>
         {recurring && <span className={`text-[9px] shrink-0 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`} title="Repeats weekly">↻</span>}

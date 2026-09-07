@@ -120,15 +120,15 @@ Nothing repeats yet. Every day starts from nothing, and most of them stay there.
       {live.length > 0 && (
         <div className="space-y-1.5">
           {live.map(r => {
-            const c = blockStyle(r);
+            const c = blockStyle(r, schedule.colors);
             return (
               <div
                 key={r.id}
                 className={`flex items-center gap-3 p-3.5 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-100'}`}
               >
-                <span className={`w-1 h-9 rounded-full shrink-0 ${c.dot}`} />
+                <span style={{ background: c.dot }} className="w-1 h-9 rounded-full shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate ${dark ? c.text : c.textLight}`}>
+                  <div style={{ color: dark ? c.text : c.textLight }} className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate">
                     {blockTitle(r)}{r.chapter ? ` · ${r.chapter}` : ''}
                   </div>
                   <div className={`text-[10px] tabular-nums font-ui mt-0.5 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>

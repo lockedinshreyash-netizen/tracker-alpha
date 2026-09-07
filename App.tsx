@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
@@ -19,6 +19,11 @@ import LandingPage from './LandingPage';
 import AuthModal from './AuthModal';
 import Header from './Header';
 import TodayTab from './today/TodayTab';
+import { CardPeriod } from './share/types';
+/* The only lazy boundary in the app. The card renderer, its three compositions
+   and the format specs are a chunk that a user who never shares never pays
+   for — and it is fetched on the click, not on the tab. */
+const ShareModal = React.lazy(() => import('./share/ShareModal'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
@@ -148,6 +153,17 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
+  /* Which period the share sheet opened on, or null when it is closed. The
+     entry point decides: Today opens on the day, Streak on the week. */
+  const [sharePeriod, setSharePeriod] = useState<CardPeriod | null>(null);
+  /* Memoised because App re-renders on every timer tick, and a fresh object
+     each time would make the sheet rebuild its card once a second. */
+  const shareInput = useMemo(() => ({
+    logs: state.logs,
+    tasks: state.tasks,
+    dailyQuestionsLog: state.questionTracking.dailyQuestionsLog,
+    dailyGoalHours: state.dailyGoalHours,
+  }), [state.logs, state.tasks, state.questionTracking.dailyQuestionsLog, state.dailyGoalHours]);
   const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
@@ -802,11 +818,19 @@ const App: React.FC = () => {
     });
   };
 
+  /* Ticking the box stamps the day, un-ticking clears it — the flag and the
+     date must never disagree, or a task could be counted for a day it is no
+     longer finished on. */
   const toggleTask = (id: string) => {
     setState(prev => {
+      const today = getISTDateString();
       const nextState = {
         ...prev,
-        tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t),
+        tasks: prev.tasks.map(t =>
+          t.id === id
+            ? { ...t, completed: !t.completed, completedAt: !t.completed ? today : undefined }
+            : t
+        ),
         lastUpdated: Date.now()
       };
       stateRef.current = nextState;
@@ -896,11 +920,29 @@ const App: React.FC = () => {
     }));
   };
 
-  const addRule = (input: Omit<TemplateRule, 'id' | 'from'>) => {
-    withSchedule(s => ({
-      ...s,
-      rules: [...s.rules, { ...input, id: generateId(), from: getISTDateString(), until: null }],
-    }));
+  /* `from` defaults to today, but a rule made while looking at a future day
+     starts there instead — otherwise turning tomorrow's block into a repeat
+     would also drop it onto every day between now and then, including the one
+     the user is standing in. */
+  /** Recolour one activity. Study kinds never reach here — see RECOLOURABLE. */
+  const setBlockColor = (kind: BlockKind, hex: string | null) => {
+    withSchedule(s => {
+      const colors = { ...(s.colors || {}) };
+      if (hex) colors[kind] = hex;
+      else delete colors[kind];
+      return { ...s, colors };
+    });
+  };
+
+  const addRule = (input: Omit<TemplateRule, 'id' | 'from'> & { from?: string }) => {
+    withSchedule(s => {
+      const today = getISTDateString();
+      const from = input.from && input.from > today ? input.from : today;
+      return {
+        ...s,
+        rules: [...s.rules, { ...input, id: generateId(), from, until: null }],
+      };
+    });
   };
 
   /**
@@ -911,25 +953,57 @@ const App: React.FC = () => {
    * spent, so last Monday's adherence would silently be re-measured against a
    * plan that did not exist when it was lived.
    */
-  const updateRule = (id: string, patch: Partial<Omit<TemplateRule, 'id' | 'from' | 'until'>>) => {
+  const updateRule = (
+    id: string,
+    patch: Partial<Omit<TemplateRule, 'id' | 'from' | 'until'>>,
+    opts?: { clearOverrideOn?: string },
+  ) => {
     withSchedule(s => {
       const rule = s.rules.find(r => r.id === id);
       if (!rule) return s;
       const today = getISTDateString();
-      /* Edited the same day it was created: nothing has been lived against it
-         yet, so amend it rather than leaving a zero-length husk behind. */
-      if (rule.from === today) {
-        return { ...s, rules: s.rules.map(r => (r.id === id ? { ...r, ...patch } : r)) };
+
+      /* A change made to the whole series supersedes whatever that one day was
+         individually set to — otherwise the day you dragged would be the only
+         one that did not take the change you just asked every day to take. */
+      const overrides = opts?.clearOverrideOn
+        ? s.overrides.filter(o => !(o.ruleId === id && o.date === opts.clearOverrideOn))
+        : s.overrides;
+
+      /* Nothing has been lived against a rule that starts today or later, so
+         amend it rather than leaving a zero-length husk behind. `>=`, not
+         `===`, matching deleteRule: a rule that begins next Monday has no
+         history to protect, and closing it at yesterday would move its start
+         forward to today. */
+      if (rule.from >= today) {
+        return { ...s, overrides, rules: s.rules.map(r => (r.id === id ? { ...r, ...patch } : r)) };
       }
+
+      const openedId = generateId();
       const closed = { ...rule, until: addDays(today, -1) };
       const opened: TemplateRule = {
         ...rule,
         ...patch,
-        id: generateId(),
+        id: openedId,
         from: today,
         until: null,
       };
-      return { ...s, rules: [...s.rules.map(r => (r.id === id ? closed : r)), opened] };
+
+      /* Overrides are keyed by rule, so re-opening it under a new id orphaned
+         every one of them: a day skipped next week came back, and a day moved
+         next week jumped. The ones still ahead move across with the rule; the
+         ones already lived belong to the closed rule and stay exactly where
+         they are, which is the whole point of closing it rather than editing
+         it in place. */
+      return {
+        ...s,
+        rules: [...s.rules.map(r => (r.id === id ? closed : r)), opened],
+        overrides: overrides.map(o =>
+          o.ruleId === id && o.date >= today
+            ? { ...o, id: instanceId(openedId, o.date), ruleId: openedId }
+            : o,
+        ),
+      };
     });
   };
 
@@ -1453,6 +1527,7 @@ const App: React.FC = () => {
               onSetCoachMuted={setCoachMuted}
               onStartBlock={startBlock}
               onOpenPlan={() => handleTabChange('Plan')}
+              onShare={() => setSharePeriod('daily')}
             />
           )}
           {activeTab === 'Plan' && (
@@ -1468,6 +1543,7 @@ const App: React.FC = () => {
               onUpdateBlock={updateBlock}
               onDeleteBlock={deleteBlock}
               onResetInstance={resetInstance}
+              onSetColor={setBlockColor}
               onAddRule={addRule}
               onUpdateRule={updateRule}
               onDeleteRule={deleteRule}
@@ -1499,6 +1575,7 @@ const App: React.FC = () => {
               onSelectWallpaper={selectWallpaper}
               onOpenBook={() => setIsBookOpen(true)}
               onClaimHamper={claimHamper}
+              onShare={() => setSharePeriod('weekly')}
             />
           )}
           {activeTab === 'Questions' && (
@@ -1565,6 +1642,19 @@ const App: React.FC = () => {
             else handleTabChange('Streak');
           }}
         />
+      )}
+
+      {/* Nothing renders until the chunk arrives; the fallback is deliberately
+          nothing, because a flash of skeleton behind a scrim reads as a fault. */}
+      {sharePeriod && (
+        <React.Suspense fallback={null}>
+          <ShareModal
+            onClose={() => setSharePeriod(null)}
+            initialPeriod={sharePeriod}
+            theme={theme}
+            input={shareInput}
+          />
+        </React.Suspense>
       )}
 
       {isBookOpen && (
