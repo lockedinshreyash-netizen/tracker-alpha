@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PomodoroRuntime, PomodoroSettings, Subject } from '../types';
-import { requestNotificationPermission, notificationPermission } from '../leaderboard/notify';
+import { requestNotificationPermission, notificationPermission } from '../notify/system';
 import {
   MIN_LOGGABLE_MS,
   PHASE_LABEL,

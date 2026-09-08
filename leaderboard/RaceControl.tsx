@@ -96,49 +96,4 @@ export const RaceStrip: React.FC<StripProps> = ({ status, onOpen, theme }) => {
   );
 };
 
-interface ToastProps {
-  event: RaceEvent | null;
-  onDismiss: () => void;
-  theme: 'dark' | 'light';
-}
-
-/**
- * The one thing that interrupts.
- *
- * Only fired for a place changing hands, and only from the engine — never for
- * a gap drifting, never on a timer. Sits clear of the voice control in the
- * bottom-right and of the mobile header above.
- */
-export const RaceToast: React.FC<ToastProps> = ({ event, onDismiss, theme }) => {
-  if (!event) return null;
-  const dark = theme === 'dark';
-  const copy = describeEvent(event);
-
-  return (
-    <div className="fixed top-16 md:top-6 left-1/2 z-[45] w-[min(92vw,26rem)] race-toast" role="status">
-      <button
-        onClick={onDismiss}
-        className={`w-full text-left flex items-start gap-3 p-4 rounded-xl border shadow-2xl backdrop-blur-xl transition-all ${copy.good
-          ? dark ? 'bg-[#111114]/95 border-white/[0.10]' : 'bg-white/95 border-[#E3E0D9]'
-          : dark ? 'bg-[#1A0605]/95 border-[#E10600]/40' : 'bg-white/95 border-[#E10600]/40'}`}
-      >
-        <span className="text-lg leading-none mt-0.5 select-none" aria-hidden="true">{copy.icon}</span>
-        <span className="flex-1 min-w-0">
-          <span className={`block text-[13px] font-bold font-ui leading-snug ${dark ? 'text-white' : 'text-[#17150F]'}`}>
-            {copy.headline}
-          </span>
-          {copy.line && (
-            <span className={`block text-[11px] font-ui mt-1 ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
-              {copy.line}
-            </span>
-          )}
-        </span>
-        <span className={`text-[9px] font-bold uppercase tracking-[0.1em] font-ui flex-shrink-0 ${dark ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}>
-          Dismiss
-        </span>
-      </button>
-    </div>
-  );
-};
-
 export default RaceControlFeed;

@@ -1,20 +1,19 @@
-/* ── When the app is allowed to speak ──
-   The rule this file exists to enforce: a notification is a report from a race
-   that is actually happening, or it is nothing. There is no daily reminder, no
-   "time to study", no nudge fired because the app noticed you were idle. If
-   nothing changed, nothing is sent.
+/* ── When the RACE is allowed to speak ──
+   The app-wide rule — what may interrupt at all, and why a deadline reminder is
+   allowed to when "you haven't studied today" still is not — now lives at the
+   top of notify/channels.ts. Read that first; this file only decides what the
+   race has to say.
 
    Three gates, in order:
      1. Never while a session is running. Focus is the product; interrupting it
         to talk about a leaderboard would be self-defeating.
-     2. Never twice for the same rung of the same gap — see the threshold
-        ladder in raceDay.ts.
+     2. Never twice for the same rung of the same gap — see the threshold ladder
+        in raceDay.ts.
      3. Never inside the cooldown. Several events landing together are merged
         into one message rather than queued.
 
-   Delivery is split by where the user is looking: if the tab is open, the app
-   says it on screen, and only a backgrounded tab gets a system notification.
-   The same event never arrives twice. */
+   Delivery is not decided here. `selectAnnouncement` returns the one thing
+   worth saying, and notify/deliver.ts decides where it goes. */
 
 import { RaceState } from './engine';
 import { RaceEvent, isNotifiable, priorityOf } from './raceDay';
@@ -119,48 +118,3 @@ const familyOf = (kind: string): string =>
 
 /** Events that say everything about the moment they describe. Never merged. */
 const TERMINAL_KINDS = new Set(['took_lead', 'lost_lead']);
-
-export type PermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
-
-export const notificationPermission = (): PermissionState => {
-  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
-  return Notification.permission as PermissionState;
-};
-
-/** Asks once. A browser that has already refused is never asked again. */
-export const requestNotificationPermission = async (): Promise<PermissionState> => {
-  if (notificationPermission() === 'unsupported') return 'unsupported';
-  if (Notification.permission !== 'default') return Notification.permission as PermissionState;
-  try {
-    return (await Notification.requestPermission()) as PermissionState;
-  } catch {
-    return 'denied';
-  }
-};
-
-/**
- * Show a system notification.
- *
- * One tag for the whole feature, so a later message replaces an unread earlier
- * one rather than stacking — the race has a current state, not a backlog.
- * Returns false if it couldn't be shown, so the caller can keep its cooldown
- * unspent.
- */
-export const sendSystemNotification = (copy: NotificationCopy): boolean => {
-  if (notificationPermission() !== 'granted') return false;
-  try {
-    const n = new Notification(copy.title, {
-      body: copy.body,
-      tag: 'tracker-alpha-race',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-    });
-    n.onclick = () => {
-      window.focus();
-      n.close();
-    };
-    return true;
-  } catch {
-    return false;
-  }
-};

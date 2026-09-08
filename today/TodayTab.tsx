@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import { isIdle as pomodoroIsIdle } from './pomodoro';
 import { PomodoroApi } from './usePomodoro';
-import TaskSection from './TaskSection';
+import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
 import CoachCard from './CoachCard';
 import { Recommendation } from './recommend';
 import NextUpStrip from '../schedule/NextUpStrip';
+import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
 
 interface Props {
@@ -15,9 +16,11 @@ interface Props {
   onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource, chapter?: string, blockId?: string) => void;
   onDeleteLog: (id: string) => void;
   onTimerUpdate: (timerUpdate: Partial<TimerState>) => void;
-  onAddTask: (text: string, subject: Subject) => void;
+  onAddTask: (text: string, subject: Subject, column?: TaskColumn) => void;
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
+  onUpdateTask: (id: string, patch: Partial<Omit<Task, 'id'>>) => void;
+  onMoveTask: (id: string, column: TaskColumn, index: number) => void;
   onUpdateDailyGoal: (val: number) => void;
   onSetTimerMode: (mode: TimerMode) => void;
   pomodoro: PomodoroApi;
@@ -42,6 +45,8 @@ const TodayTab: React.FC<Props> = ({
   onAddTask,
   onToggleTask,
   onDeleteTask,
+  onUpdateTask,
+  onMoveTask,
   onUpdateDailyGoal,
   onSetTimerMode,
   pomodoro: pomodoroApi,
@@ -114,9 +119,24 @@ const TodayTab: React.FC<Props> = ({
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const todayLogs = useMemo(() =>
     logs.filter((l) => l.date === getISTDateString()).reverse(),
     [logs]);
+
+  /* Only so a card can show whether it is on today's timeline. Derived rather
+     than stored: a block can be moved, deleted, or exist only as a materialized
+     rule instance, and a flag on the task would go stale on all three. */
+  const todayHours = useMemo(
+    () => Math.round(todayLogs.reduce((n, l) => n + l.hours, 0) * 10) / 10,
+    [todayLogs],
+  );
+
+  const todayBlocks = useMemo(
+    () => materializeDay(state.schedule ?? EMPTY_SCHEDULE, getISTDateString()),
+    [state.schedule],
+  );
 
   const totalToday = todayLogs.reduce((a, b) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
@@ -274,13 +294,51 @@ const TodayTab: React.FC<Props> = ({
         </section>
       )}
 
-      <TaskSection tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} theme={theme} activeSubjectFilter={timer.isRunning ? timer.subject : null} activeSubjects={activeSubjects} />
+      <TaskBoard
+        tasks={tasks}
+        todayBlocks={todayBlocks}
+        theme={theme}
+        activeSubjects={activeSubjects}
+        onAddTask={onAddTask}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
+        onMoveTask={onMoveTask}
+      />
 
+      {/* Collapsed by default. The header keeps the information the list was
+          carrying — how many sessions and how many hours — so folding it away
+          costs nothing at a glance, and the detail is one tap down.
+
+          Local state on purpose: this is a disclosure preference, not data. Put
+          in AppState it would write localStorage and fire a Supabase upsert
+          every time someone opened it, the same reason `lastUsedTab` and
+          `theme` are held out of the sync merges. */}
       <section className="space-y-4">
-        <div className="flex justify-between items-end pb-2">
-          <h3 className={`text-xs font-bold tracking-tight font-ui ${dark ? 'text-zinc-500' : 'text-[#6B675C]'}`}>Session History (Today)</h3>
-        </div>
-        <div className="grid gap-3">
+        <button
+          onClick={() => setHistoryOpen(o => !o)}
+          className="w-full flex justify-between items-center pb-2 group"
+          aria-expanded={historyOpen}
+        >
+          <span className="flex items-baseline gap-3">
+            <h3 className={`text-xs font-bold tracking-tight font-ui ${dark ? 'text-zinc-500' : 'text-[#6B675C]'}`}>Session History (Today)</h3>
+            {todayLogs.length > 0 && (
+              <span className={`text-[10px] font-bold font-ui tabular-nums ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
+                {todayLogs.length} {todayLogs.length === 1 ? 'session' : 'sessions'} · {todayHours}h
+              </span>
+            )}
+          </span>
+          <span
+            className={`text-[10px] font-bold font-ui transition-transform ${historyOpen ? 'rotate-180' : ''} ${dark ? 'text-zinc-600' : 'text-[#8A8577]'}`}
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+        </button>
+        {/* Conditionally rendered rather than hidden with the `hidden`
+            attribute: Tailwind's `.grid { display: grid }` overrides the
+            browser's `[hidden] { display: none }`, so the attribute is set and
+            the list stays on screen. */}
+        {historyOpen && <div className="grid gap-3">
           {todayLogs.length === 0 ? (
             <p className={`text-[10px] font-black uppercase py-4 text-center italic ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>No sessions recorded today.</p>
           ) : (
@@ -299,7 +357,7 @@ const TodayTab: React.FC<Props> = ({
               </div>
             ))
           )}
-        </div>
+        </div>}
       </section>
     </div>
   );

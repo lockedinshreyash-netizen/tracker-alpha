@@ -1,4 +1,4 @@
-import { AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, RewardsState, ScheduleBlock, ScheduleState, Subject, TemplateRule } from './types';
+import { AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, Subject, Task, TaskColumn, TemplateRule } from './types';
 import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
 export const DEFAULT_COACH: CoachState = {
@@ -128,6 +128,95 @@ const asHex = (v: unknown): string | null =>
 const asText = (v: unknown): string | undefined =>
   typeof v === 'string' && v.trim() ? v.slice(0, 120) : undefined;
 
+/* ── Reminders ──
+   Everything off. The app does not start speaking because it was installed;
+   see the rule at the top of notify/channels.ts.
+
+   09:00 as the default hour (300 minutes past the 04:00 study-day start): a
+   deadline that lands in the morning leaves the whole day to act on it, which
+   is the entire point of putting a date on something. */
+export const DEFAULT_REMINDERS: ReminderPrefs = {
+  enabled: false,
+  defaultMinute: 300,
+  leadMinutes: 0,
+  push: false,
+  planBlocks: false,
+};
+
+export const normalizeReminders = (raw: unknown): ReminderPrefs => {
+  const r = { ...DEFAULT_REMINDERS, ...(raw && typeof raw === 'object' ? raw as Partial<ReminderPrefs> : {}) };
+  return {
+    enabled: r.enabled === true,
+    defaultMinute: asMinute(r.defaultMinute, DEFAULT_REMINDERS.defaultMinute),
+    /* A week of lead time on a deadline is not a reminder, it is a second
+       deadline. Clamped rather than rejected so a bad value degrades to "on the
+       day" instead of dropping the whole preference. */
+    leadMinutes: Number.isFinite(r.leadMinutes)
+      ? Math.min(3 * 1440, Math.max(0, Math.floor(r.leadMinutes)))
+      : 0,
+    push: r.push === true,
+    planBlocks: r.planBlocks === true,
+  };
+};
+
+const TASK_COLUMNS: TaskColumn[] = ['todo', 'doing', 'done'];
+
+/**
+ * Whatever was persisted, made safe to render a board from.
+ *
+ * There was no task normalizer before the board — tasks only ever got `[]` from
+ * DEFAULT_STATE and were otherwise trusted. The board cannot do that: it reads
+ * `column` to decide where a card goes and `order` to decide where in the
+ * column, and every task saved before this feature has neither.
+ *
+ * The important job is reconciling `completed` and `column`, which carry the
+ * same truth and can disagree. They disagree in two real situations, not one:
+ * an old task that has never had a column, and a row that came back from a sync
+ * merge with a device still running the previous build. `completed` wins both
+ * times — it is the field share/stats.ts, the voice grammar and every earlier
+ * version of the app have always written.
+ */
+export const normalizeTasks = (raw: unknown): Task[] => {
+  const list = Array.isArray(raw) ? raw : [];
+
+  const cleaned = list
+    .filter((t): t is Task => !!t && typeof t === 'object' && typeof (t as Task).id === 'string' && typeof (t as Task).text === 'string')
+    .map(t => {
+      const completed = t.completed === true;
+      const stored = TASK_COLUMNS.includes(t.column as TaskColumn) ? t.column as TaskColumn : undefined;
+      /* Done and not-done are decided by `completed`. Only the choice between
+         todo and doing is the column's to make, because `completed` cannot
+         express it. */
+      const column: TaskColumn = completed ? 'done' : stored === 'doing' ? 'doing' : 'todo';
+
+      return {
+        id: t.id,
+        text: t.text.slice(0, 500),
+        completed,
+        subject: asSubject(t.subject),
+        completedAt: asDate(t.completedAt) ?? undefined,
+        column,
+        order: Number.isFinite(t.order) ? Math.floor(t.order as number) : undefined,
+        color: asHex(t.color) ?? undefined,
+        dueAt: asDate(t.dueAt) ?? undefined,
+        dueMinute: Number.isFinite(t.dueMinute) ? asMinute(t.dueMinute, 0) : undefined,
+        remindedKey: typeof t.remindedKey === 'string' ? t.remindedKey.slice(0, 120) : undefined,
+      } satisfies Task;
+    });
+
+  /* Backfill `order` per column by the position the task already had in the
+     array, so a list that predates the board opens in the order it was written
+     rather than in an arbitrary one. Only tasks that have no order at all are
+     touched; a partially-ordered column keeps the positions it knows. */
+  const next: Record<TaskColumn, number> = { todo: 0, doing: 0, done: 0 };
+  for (const t of cleaned) {
+    if (t.order === undefined) t.order = next[t.column!];
+    next[t.column!] = Math.max(next[t.column!], t.order) + 1;
+  }
+
+  return cleaned;
+};
+
 /**
  * Whatever was persisted, made safe to render a day from.
  *
@@ -136,8 +225,22 @@ const asText = (v: unknown): string | undefined =>
  * with no date or no id cannot be drawn, moved or deleted — keeping it would
  * only put something on the grid the user has no way to get rid of.
  */
-export const normalizeSchedule = (raw: unknown): ScheduleState => {
+export const normalizeSchedule = (raw: unknown, knownTaskIds?: Set<string>): ScheduleState => {
   const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<ScheduleState>;
+
+  /* A `taskId` pointing at a task that no longer exists would render a block
+     with a title nothing can supply. Dropped when the caller knows the task
+     list — the same stance overrides take when their rule is gone, and what
+     keeps these references bounded rather than accumulating forever.
+
+     Omitting the set means "I cannot check", which keeps the id rather than
+     silently severing every link: a normalizer that cannot see the tasks must
+     not conclude there are none. */
+  const asTaskId = (v: unknown): string | undefined => {
+    if (typeof v !== 'string' || !v) return undefined;
+    if (knownTaskIds && !knownTaskIds.has(v)) return undefined;
+    return v;
+  };
 
   const blocks: ScheduleBlock[] = (Array.isArray(src.blocks) ? src.blocks : [])
     .filter(b => b && typeof b.id === 'string' && asDate(b.date))
@@ -150,6 +253,7 @@ export const normalizeSchedule = (raw: unknown): ScheduleState => {
       durationMins: asDuration(b.durationMins),
       kind: asKind(b.kind),
       label: asText(b.label),
+      taskId: asTaskId(b.taskId),
     }));
 
   const rules: TemplateRule[] = (Array.isArray(src.rules) ? src.rules : [])
@@ -166,6 +270,7 @@ export const normalizeSchedule = (raw: unknown): ScheduleState => {
       durationMins: asDuration(r.durationMins),
       kind: asKind(r.kind),
       label: asText(r.label),
+      taskId: asTaskId(r.taskId),
       from: asDate(r.from)!,
       until: asDate(r.until),
     }))
@@ -229,4 +334,5 @@ export const DEFAULT_STATE: AppState = {
   coach: DEFAULT_COACH,
   rewards: DEFAULT_REWARDS,
   schedule: DEFAULT_SCHEDULE,
+  reminders: DEFAULT_REMINDERS,
 };

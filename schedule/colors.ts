@@ -177,6 +177,16 @@ export const countsAsStudy = (kind: BlockKind): boolean => ACTIVITIES[kind]?.isS
  * subject, and subject colours are fixed. Offering a picker there would either
  * do nothing or quietly break the one thing colour is load-bearing for.
  */
+/* The picker's swatches, shared by the Plan tab's activity palette and the
+   board's card colours so a user's twelve choices are the same twelve
+   everywhere. #E10600 is deliberately absent: the accent belongs to actions and
+   to the now-line, and a card wearing it would compete with them. */
+export const PRESET_COLORS = [
+  '#4C6EF5', '#7048E8', '#BE4BDB', '#E64980',
+  '#F76707', '#FAB005', '#82C91E', '#12B886',
+  '#22B8CF', '#1098AD', '#5C7CFA', '#868E96',
+];
+
 export const RECOLOURABLE: BlockKind[] = BLOCK_KINDS.filter(k => !countsAsStudy(k));
 
 /** What an activity is actually painted with right now. */
@@ -197,8 +207,19 @@ export const blockStyle = (
   return derive(activityColor(block.kind, colors));
 };
 
-/** What to call this block on the grid. */
-export const blockTitle = (block: Pick<ScheduleBlock, 'kind' | 'subject' | 'label'>): string => {
+/**
+ * What to call this block on the grid.
+ *
+ * A linked task's own text wins, because that is the most specific thing
+ * anybody knows about the block — "Finish rotational motion" tells you more
+ * than "Physics". Resolved by the caller rather than looked up here, so this
+ * stays a pure function of the block and nothing has to hand it a task list.
+ */
+export const blockTitle = (
+  block: Pick<ScheduleBlock, 'kind' | 'subject' | 'label'>,
+  taskText?: string,
+): string => {
+  if (taskText) return taskText;
   if (block.label) return block.label;
   if (countsAsStudy(block.kind) && block.subject) return block.subject;
   return ACTIVITIES[block.kind]?.label || 'Other';

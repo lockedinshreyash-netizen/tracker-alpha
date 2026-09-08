@@ -233,6 +233,7 @@ export const materializeDay = (schedule: ScheduleState, date: string): ScheduleB
       durationMins,
       kind: rule.kind,
       label: rule.label,
+      taskId: rule.taskId,
     });
   }
 

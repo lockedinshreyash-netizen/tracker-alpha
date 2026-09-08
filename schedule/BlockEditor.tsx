@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BlockKind, ExamPreference, ScheduleBlock, Subject } from '../types';
+import { BlockKind, ExamPreference, ScheduleBlock, Subject, Task } from '../types';
 import { getChaptersFor } from '../constants';
 import {
   ACTIVITIES, BLOCK_KINDS, BlockColors, blockStyle, blockTitle, countsAsStudy,
@@ -15,6 +15,8 @@ export interface EditorDraft {
   kind: BlockKind;
   subject?: Subject;
   chapter?: string;
+  /** A board card this block is time for. Study kinds only. */
+  taskId?: string;
   start: number;
   durationMins: number;
   label?: string;
@@ -37,6 +39,8 @@ interface Props {
   theme: 'dark' | 'light';
   colors?: BlockColors;
   activeSubjects: Subject[];
+  /** Open board cards, for the task picker. Study kinds only. */
+  openTasks: Task[];
   currentClass: 11 | 12;
   examPreference: ExamPreference;
   onSave: (draft: EditorDraft) => void;
@@ -82,7 +86,7 @@ const LIFE_KINDS = BLOCK_KINDS.filter(k => !countsAsStudy(k));
  */
 const BlockEditor: React.FC<Props> = ({
   draft, dayBlocks, recurring, customDays, moved, canEngage, weekdayName, theme, colors,
-  activeSubjects, currentClass, examPreference,
+  activeSubjects, openTasks, currentClass, examPreference,
   onSave, onDelete, onDeleteSeries, onReset, onEngage, onClose,
 }) => {
   const dark = theme === 'dark';
@@ -105,7 +109,7 @@ const BlockEditor: React.FC<Props> = ({
     /* Switching families drops the detail that no longer applies, so a block
        cannot quietly keep a subject it stopped having. */
     if (countsAsStudy(kind)) set({ kind, label: undefined, subject: d.subject || activeSubjects[0] });
-    else set({ kind, subject: undefined, chapter: undefined });
+    else set({ kind, subject: undefined, chapter: undefined, taskId: undefined });
   };
 
   const setStart = (value: string) => {
@@ -236,6 +240,30 @@ const BlockEditor: React.FC<Props> = ({
                   })}
                 </div>
               </div>
+              {/* Time for something already on the board. The block then shows
+                  the card's own text, so renaming the card renames the block —
+                  it is a reference, not a copy.
+
+                  Deliberately one-directional: finishing this block does not
+                  tick the task off. Sitting down to work on something is not
+                  finishing it, and auto-ticking would make the board lie. */}
+              {openTasks.length > 0 && (
+                <div>
+                  <label className={eyebrow}>For a task <span className="normal-case tracking-normal font-normal">(optional)</span></label>
+                  <select
+                    value={d.taskId || ''}
+                    onChange={e => set({ taskId: e.target.value || undefined })}
+                    className={`${field} w-full`}
+                  >
+                    <option value="">Not linked</option>
+                    {openTasks.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.text.slice(0, 60)}{t.dueAt ? ' — due ' + t.dueAt.slice(8) + '/' + t.dueAt.slice(5, 7) : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {chapters.length > 0 && (
                 <div>
                   <label className={eyebrow}>Chapter</label>

@@ -119,6 +119,26 @@ export const addDays = (date: string, days: number): string =>
 export const weekdayOf = (date: string): number =>
   new Date(dateValue(date)).getUTCDay();
 
+/* India is a fixed +05:30 with no DST, so a wall-clock moment converts to an
+   instant by arithmetic — there is no ambiguous or skipped hour to resolve, and
+   no need for a timezone round-trip. */
+export const IST_OFFSET_MS = 330 * 60_000;
+
+/**
+ * The epoch instant of a wall-clock moment on a given study day, in IST.
+ *
+ * Deliberately NOT the device's local zone. A student on a trip, or a phone
+ * whose clock is set to the wrong region, must not get their 09:00 reminder at
+ * 03:30 — every date in this app already means an Indian date, and this keeps
+ * the times inside those dates honest too.
+ *
+ * `minute` is on the study-day axis, so 0 is 04:00, 1200 is midnight, and 1439
+ * is 03:59 the following calendar morning while still belonging to this study
+ * day. See DayMinute.
+ */
+export const istInstant = (date: string, minute: number): number =>
+  dateValue(date) + (DAY_START_HOUR * 60 + minute) * 60_000 - IST_OFFSET_MS;
+
 /**
  * The longest unbroken run of logged days anywhere in the history.
  *

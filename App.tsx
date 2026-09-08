@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, normalizePomodoro, normalizeSchedule } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks } from './state';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
 import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
@@ -31,7 +31,11 @@ import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow'
 import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
-import { RaceStrip, RaceToast } from './leaderboard/RaceControl';
+import { RaceStrip } from './leaderboard/RaceControl';
+import ToastHost from './notify/ToastHost';
+import { moveCard, nextOrder } from './board/board';
+import { useReminders } from './reminders/useReminders';
+import { materializeDay } from './schedule/schedule';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused } from './today/pomodoro';
@@ -140,7 +144,14 @@ const App: React.FC = () => {
            find its earned tiers already in the vault on first load — `evaluate`
            backfills them from the logs. */
         merged.rewards = normalizeRewards(parsed.rewards);
-        merged.schedule = normalizeSchedule(parsed.schedule);
+        merged.reminders = normalizeReminders(parsed.reminders);
+      merged.tasks = normalizeTasks(parsed.tasks);
+      /* Tasks first, so the schedule can be told which task ids still exist and
+         drop links to ones that are gone — the same stance it takes on an
+         override whose rule has been deleted. This is the one place with both
+         halves in hand, which is why the cleanup happens on load rather than on
+         every write. */
+      merged.schedule = normalizeSchedule(parsed.schedule, new Set(merged.tasks.map(t => t.id)));
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -187,7 +198,12 @@ const App: React.FC = () => {
   const stateRef = useRef(state);
   const preventSyncOnUpdate = useRef(false);
 
-  const activeSubjects = getActiveSubjects(state.examPreference);
+  /* Memoised because `getActiveSubjects` returns a fresh array literal every
+     call, and this is read on every render. An unstable array here silently
+     defeats React.memo on every child that receives it — including the task
+     board, which sits inside a tab that re-renders ten times a second while a
+     stopwatch is running. */
+  const activeSubjects = useMemo(() => getActiveSubjects(state.examPreference), [state.examPreference]);
   const coreSubjects = getCoreSubjects(state.examPreference);
   const coreQSubjects = getCoreQSubjects(state.examPreference);
 
@@ -784,6 +800,131 @@ const App: React.FC = () => {
     ready: syncSettled,
   });
 
+  /* Mounted here for the same reason, and it is the whole of the deadline
+     feature for a signed-out user: nothing in this engine touches Supabase.
+     Push (below) is an additional delivery channel, not a dependency. */
+  const reminderPrefs = state.reminders ?? DEFAULT_REMINDERS;
+  const remindersReady = syncSettled;
+
+  const todayPlanBlocks = useMemo(
+    () => materializeDay(normalizeSchedule(state.schedule), getISTDateString()),
+    [state.schedule],
+  );
+
+  const readReminders = useCallback(() => ({
+    tasks: stateRef.current.tasks,
+    prefs: stateRef.current.reminders ?? DEFAULT_REMINDERS,
+    blocks: materializeDay(normalizeSchedule(stateRef.current.schedule), getISTDateString()),
+  }), []);
+
+  const commitReminded = useCallback((taskId: string, remindedKey: string) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.map(t => (t.id === taskId ? { ...t, remindedKey } : t)),
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  useReminders({
+    tasks: state.tasks,
+    prefs: reminderPrefs,
+    blocks: todayPlanBlocks,
+    read: readReminders,
+    commit: commitReminded,
+    ready: remindersReady,
+    busy: state.timer.isRunning || !pomodoroIsIdle(state.pomodoro),
+  });
+
+  /* Publish what the server should be holding, so a deadline can still arrive
+     with every tab shut.
+
+     Debounced, and skipped entirely when the desired set is unchanged — the
+     no-op contract rewards/engine.ts uses, applied to a network call, so typing
+     in the task editor cannot produce a burst of requests. A signed-out user,
+     or one who never turned push on, never reaches Supabase at all. */
+  const publishedRef = useRef<string>('');
+  useEffect(() => {
+    if (!user || !reminderPrefs.enabled || !reminderPrefs.push || !isInitialSyncDone.current) return;
+
+    const timer = window.setTimeout(async () => {
+      const { desiredRows, reconcile, signatureOf } = await import('./reminders/publish');
+      const rows = desiredRows(stateRef.current.tasks, reminderPrefs, user.id, Date.now());
+      const signature = signatureOf(rows);
+      if (signature === publishedRef.current) return;
+      publishedRef.current = signature;
+      await reconcile(rows, user.id);
+    }, 2_000);
+
+    return () => window.clearTimeout(timer);
+  }, [state.tasks, reminderPrefs, user]);
+
+  /* ── Install to the home screen ──
+     `Header` has always rendered an install button when handed a prompt, and
+     has always been handed null. Wiring it matters now for a specific reason:
+     iOS delivers Web Push ONLY to a PWA installed to the home screen, so
+     without this an iPhone user can turn on closed-app reminders and never
+     receive one, with nothing anywhere explaining why.
+
+     iOS never fires `beforeinstallprompt` at all, so it gets instructions
+     rather than a button — see the Header's own copy. */
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      /* Without preventDefault Chrome shows its own mini-infobar and the event
+         cannot be replayed later from our own button. */
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    try { await installPrompt.userChoice; } catch { /* dismissed */ }
+    /* The event is single-use: a prompt that has been shown cannot be shown
+       again, so holding on to it would leave a button that silently does
+       nothing. */
+    setInstallPrompt(null);
+  }, [installPrompt]);
+
+  /* A notification opened from the lock screen focuses this tab and posts here.
+     The worker deliberately does no routing of its own — it has no idea what
+     the app is showing. */
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'notification-click') return;
+      const channel = event.data.data?.channel;
+      if (channel === 'reminder') handleTabChange('Today');
+      if (channel === 'plan') handleTabChange('Plan');
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+
+  const setReminderPrefs = useCallback((patch: Partial<ReminderPrefs>) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        reminders: { ...(prev.reminders ?? DEFAULT_REMINDERS), ...patch },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
   /* Throw away an in-progress session without logging it. Used by onboarding:
      a running timer hides the goal card the tour needs to point at, and a
      few seconds started mid-tour isn't real study data worth keeping. */
@@ -806,39 +947,84 @@ const App: React.FC = () => {
     });
   };
 
-  const addTask = (text: string, subject: Subject) => {
+  /* ── Tasks ────────────────────────────────────────────────────────
+     Every mutator here is wrapped in useCallback with empty deps. That is not
+     tidiness: today/TodayTab.tsx runs a 100ms interval while a stopwatch is
+     going, so the whole tab re-renders ten times a second through every study
+     session. The board below it is React.memo, and a callback recreated on each
+     render would defeat that silently — every card would re-render ten times a
+     second on the cheapest phone, during the app's core loop.
+
+     Empty deps are safe because each one reads live state through the setState
+     updater and closes over nothing. */
+
+  const addTask = useCallback((text: string, subject: Subject, column: TaskColumn = 'todo') => {
     setState(prev => {
+      const task: Task = {
+        id: generateId(),
+        text,
+        completed: false,
+        subject,
+        column,
+        order: nextOrder(prev.tasks, column),
+      };
       const nextState = {
         ...prev,
-        tasks: [...prev.tasks, { id: generateId(), text, completed: false, subject }],
+        tasks: [...prev.tasks, task],
         lastUpdated: Date.now()
       };
       stateRef.current = nextState;
       return nextState;
     });
-  };
+  }, []);
+
+  /**
+   * Move a card to a column and a position.
+   *
+   * The single code path that writes `completed`, `completedAt` and `column`.
+   * `toggleTask` routes through it rather than writing its own — otherwise the
+   * voice command and the board could disagree about the same card, and the
+   * flag and the date could drift apart.
+   */
+  const moveTask = useCallback((id: string, column: TaskColumn, index: number) => {
+    setState(prev => {
+      const tasks = moveCard(prev.tasks, id, column, index);
+      if (tasks === prev.tasks) return prev;
+      const nextState = { ...prev, tasks, lastUpdated: Date.now() };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  const updateTask = useCallback((id: string, patch: Partial<Omit<Task, 'id'>>) => {
+    setState(prev => {
+      const nextState = {
+        ...prev,
+        tasks: prev.tasks.map(t => (t.id === id ? { ...t, ...patch } : t)),
+        lastUpdated: Date.now()
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
 
   /* Ticking the box stamps the day, un-ticking clears it — the flag and the
      date must never disagree, or a task could be counted for a day it is no
-     longer finished on. */
-  const toggleTask = (id: string) => {
+     longer finished on. Both now happen inside moveCard, which is also what
+     puts the card in the right column. */
+  const toggleTask = useCallback((id: string) => {
     setState(prev => {
-      const today = getISTDateString();
-      const nextState = {
-        ...prev,
-        tasks: prev.tasks.map(t =>
-          t.id === id
-            ? { ...t, completed: !t.completed, completedAt: !t.completed ? today : undefined }
-            : t
-        ),
-        lastUpdated: Date.now()
-      };
+      const task = prev.tasks.find(t => t.id === id);
+      if (!task) return prev;
+      const to: TaskColumn = task.completed ? 'todo' : 'done';
+      const tasks = moveCard(prev.tasks, id, to, 0);
+      const nextState = { ...prev, tasks, lastUpdated: Date.now() };
       stateRef.current = nextState;
       return nextState;
     });
-  };
+  }, []);
 
-  const deleteTask = (id: string) => {
+  const deleteTask = useCallback((id: string) => {
     setState(prev => {
       const nextState = {
         ...prev,
@@ -848,7 +1034,7 @@ const App: React.FC = () => {
       stateRef.current = nextState;
       return nextState;
     });
-  };
+  }, []);
 
   /* ── Plan ─────────────────────────────────────────────────────────
      One helper so the optional slice is dealt with in a single place: every
@@ -1421,7 +1607,10 @@ const App: React.FC = () => {
   /* Normalized on read as well as on load: the realtime path spreads a whole
      remote blob, and a blob written by a build that predates this feature has
      no schedule in it at all. */
-  const schedule = normalizeSchedule(state.schedule);
+  const schedule = useMemo(
+    () => normalizeSchedule(state.schedule, new Set(state.tasks.map(t => t.id))),
+    [state.schedule, state.tasks],
+  );
   /* Oldest un-shown tier first, so someone returning after a long absence is
      walked up their unlocks one at a time instead of seeing only the last. */
   const celebration = pendingCelebrations(rewards)[0];
@@ -1489,8 +1678,8 @@ const App: React.FC = () => {
           daysRemaining={daysRemaining}
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-          installPrompt={null}
-          onInstall={() => { }}
+          installPrompt={installPrompt}
+          onInstall={handleInstall}
           syncStatus={syncStatus}
           user={user}
           onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -1515,6 +1704,8 @@ const App: React.FC = () => {
               onAddTask={addTask}
               onToggleTask={toggleTask}
               onDeleteTask={deleteTask}
+              onUpdateTask={updateTask}
+              onMoveTask={moveTask}
               onUpdateDailyGoal={updateDailyGoal}
               onSetTimerMode={setTimerMode}
               pomodoro={pomodoro}
@@ -1537,6 +1728,7 @@ const App: React.FC = () => {
               timer={state.timer}
               theme={theme}
               activeSubjects={activeSubjects}
+              tasks={state.tasks}
               currentClass={state.currentClass}
               examPreference={state.examPreference || 'JEE'}
               onAddBlock={addBlock}
@@ -1613,6 +1805,8 @@ const App: React.FC = () => {
               examPreference={state.examPreference || 'JEE'}
               onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
               activeSubjects={activeSubjects}
+              reminders={reminderPrefs}
+              onChangeReminders={setReminderPrefs}
             />
           )}
         </main>
@@ -1623,11 +1817,10 @@ const App: React.FC = () => {
         <VoiceControl theme={theme} onCommand={executeVoiceCommand} />
       )}
 
-      {/* A place changing hands, wherever the user happens to be. Suppressed
-          during the tour, which owns the screen. */}
-      {!showOnboarding && (
-        <RaceToast event={race.toast} onDismiss={race.dismissToast} theme={theme} />
-      )}
+      {/* Everything the app says on screen, from any feature, in one place.
+          Suppressed during the tour, which owns the screen. Renders nothing at
+          all when the queue is empty, which is almost always. */}
+      {!showOnboarding && <ToastHost theme={theme} />}
 
       {/* The payoff. Held back until the tour is done and the book is closed,
           so it never lands on top of another full-screen moment. */}

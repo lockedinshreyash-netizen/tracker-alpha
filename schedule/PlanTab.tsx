@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import {
-  BlockKind, DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, TemplateRule, TimerState,
+  BlockKind, DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, Task, TemplateRule, TimerState,
 } from '../types';
 import { addDays, getISTDateString } from '../utils';
+import { openTasks } from '../board/board';
 import AdherenceSection from './AdherenceSection';
 import BlockEditor, { EditorDraft } from './BlockEditor';
 import DateStrip from './DateStrip';
@@ -22,6 +23,8 @@ interface Props {
   timer: TimerState;
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
+  /** Open board cards, so a study block can be time for one. */
+  tasks: Task[];
   currentClass: 11 | 12;
   examPreference: ExamPreference;
   onAddBlock: (input: Omit<ScheduleBlock, 'id'>) => void;
@@ -59,7 +62,7 @@ interface PendingMove {
  * The only state that belongs here is which day you are looking at.
  */
 const PlanTab: React.FC<Props> = ({
-  schedule, logs, timer, theme, activeSubjects, currentClass, examPreference,
+  schedule, logs, timer, theme, activeSubjects, tasks, currentClass, examPreference,
   onAddBlock, onUpdateBlock, onDeleteBlock, onResetInstance, onSetColor,
   onAddRule, onUpdateRule, onDeleteRule, onStartBlock,
 }) => {
@@ -87,6 +90,17 @@ const PlanTab: React.FC<Props> = ({
   /* Yesterday's plan is not editable: changing it after the fact would
      rewrite what its adherence was measured against. */
   const readOnly = date < today;
+
+  /* Resolved once for the whole grid. A block linked to a card shows the card's
+     own text, which is the most specific thing anyone knows about that hour —
+     "Finish rotational motion" says more than "Physics". Passed as display text
+     rather than written onto the block, because the editor reads `label` back
+     off the block when it opens and would then save the task's text as a real
+     label of its own. */
+  const taskNames = useMemo(
+    () => Object.fromEntries(tasks.map(t => [t.id, t.text])),
+    [tasks],
+  );
 
   const studyMins = blocks
     .filter(b => countsAsStudy(b.kind))
@@ -131,7 +145,7 @@ const PlanTab: React.FC<Props> = ({
    */
   const saveDraft = (d: EditorDraft) => {
     const patch = {
-      kind: d.kind, subject: d.subject, chapter: d.chapter,
+      kind: d.kind, subject: d.subject, chapter: d.chapter, taskId: d.taskId,
       start: d.start, durationMins: d.durationMins, label: d.label,
     };
     const rule = d.id ? ruleFor(d.id) : undefined;
@@ -262,11 +276,12 @@ const PlanTab: React.FC<Props> = ({
       minute={minute}
       readOnly={readOnly}
       runningBlockId={timer.isRunning ? timer.blockId : undefined}
+      taskNames={taskNames}
       onCommit={commitGeometry}
       onOpen={b => {
         const rule = ruleFor(b.id);
         setDraft({
-          id: b.id, kind: b.kind, subject: b.subject, chapter: b.chapter,
+          id: b.id, kind: b.kind, subject: b.subject, chapter: b.chapter, taskId: b.taskId,
           start: b.start, durationMins: b.durationMins, label: b.label,
           repeat: rule ? repeatOf(rule) : 'none',
         });
@@ -291,6 +306,7 @@ const PlanTab: React.FC<Props> = ({
       canEngage={date === today && !timer.isRunning}
       theme={theme}
       activeSubjects={activeSubjects}
+      openTasks={openTasks(tasks)}
       currentClass={currentClass}
       examPreference={examPreference}
       weekdayName={weekdayName}

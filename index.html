@@ -82,12 +82,17 @@
 <body>
   <div id="root"></div>
   <script>
+    /* Absolute '/sw.js' with an explicit root scope, not './sw.js'.
+       A relative path resolves against the PAGE, so a deep link would register
+       a worker scoped to that subpath and pushes would never reach it. The
+       worker itself is push-only and installs no fetch handler, so this does
+       not change how anything loads. */
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then(registration => {
-          console.log('SW registered: ', registration);
-        }).catch(registrationError => {
-          console.log('SW registration failed: ', registrationError);
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+          /* No worker means no closed-app push. Everything else — the app, the
+             in-app toasts, reminders while a tab is alive — is unaffected, so
+             there is nothing to report and nothing to retry. */
         });
       });
     }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { DailyLog, DailyQuestionsLog, Subject, ExamPreference } from '../types';
+import { DailyLog, DailyQuestionsLog, Subject, ExamPreference, ReminderPrefs } from '../types';
+import ReminderSettings from '../reminders/ReminderSettings';
 
 interface Props {
   logs: DailyLog[];
@@ -15,9 +16,11 @@ interface Props {
   examPreference: ExamPreference;
   onChangeExamPreference: (p: ExamPreference) => void;
   activeSubjects: Subject[];
+  reminders: ReminderPrefs;
+  onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
 }
 
-const ReviewTab: React.FC<Props> = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, examPreference, onChangeExamPreference, activeSubjects }) => {
+const ReviewTab: React.FC<Props> = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
@@ -96,6 +99,13 @@ const ReviewTab: React.FC<Props> = ({ logs, score, onClearData, theme, user, onO
           </button>
         </div>
       </div>
+
+      <ReminderSettings
+        prefs={reminders}
+        theme={theme}
+        signedIn={!!user}
+        onChange={onChangeReminders}
+      />
 
       <div className={`p-8 rounded-xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">

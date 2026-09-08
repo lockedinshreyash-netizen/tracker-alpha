@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Local secrets. `*.local` above already covers .env.local, which is where the
+# VAPID public key goes; this covers the plain .env some tooling writes instead.
+# The VAPID PRIVATE key must never be in either — it lives only as a Supabase
+# function secret. See supabase/functions/send-reminders/README.md.
+.env
+.env.*
+!.env.example
+
 .claude/settings.local.json
 
 # Editor directories and files

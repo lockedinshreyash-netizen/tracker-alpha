@@ -55,9 +55,19 @@ export interface QuestionTrackingState {
   goalStartDate: string | null; // ISO date when current goal was set (IST)
 }
 
+/** The three columns of the board, left to right. */
+export type TaskColumn = 'todo' | 'doing' | 'done';
+
 export interface Task {
   id: string;
   text: string;
+  /* Still the authoritative flag even though `column` now carries the same
+     truth. share/stats.ts counts `completed && completedAt`, the voice grammar
+     sets it, and every task saved before the board existed has nothing else.
+     The two are always written together, through one code path: `column ===
+     'done'` if and only if `completed`. normalizeTasks forces them to agree,
+     because a sync merge between an old client and a new one can produce a row
+     where they do not. */
   completed: boolean;
   subject?: Subject;
   /* The study day the box was ticked, stamped the same way and for the same
@@ -71,6 +81,45 @@ export interface Task {
      (see `share/stats.ts`, which falls through to another metric rather than
      report a zero it cannot stand behind). */
   completedAt?: string; // YYYY-MM-DD (IST)
+
+  /* Absent on every task that predates the board. `normalizeTasks` derives it
+     from `completed`, so an existing list opens as a populated Todo/Done board
+     rather than an empty one. */
+  column?: TaskColumn;
+
+  /* Position within its own column. Reindexed 0..n across the affected columns
+     on every drop, rather than fractional ranks: a board holds tens of cards,
+     not thousands, and a whole-column reindex is one pass over an array the
+     user is already looking at. Ties are possible after a sync merge unions two
+     devices' tasks, so the sort resolves them by id — see board/board.ts. */
+  order?: number;
+
+  /* `#rrggbb` only. Absent means the card wears its subject's colour, which is
+     the case for almost every card — the override is for the user who wants
+     "red = the thing I keep avoiding". */
+  color?: string;
+
+  /* The study day this is due. Absent means no deadline, and a task with no
+     deadline never produces a notification of any kind. */
+  dueAt?: string; // YYYY-MM-DD (IST study day)
+
+  /* Where in that day it lands, on the study-day minute axis (0 = 04:00 IST) —
+     the same axis as ScheduleBlock.start, so toClockValue/fromClockValue bridge
+     it to an <input type="time"> with no new conversion code. Absent means "use
+     the user's default hour", so changing that default moves every task that
+     never asked for a specific time and none of the ones that did. */
+  dueMinute?: DayMinute;
+
+  /* The fire key of the reminder already delivered for this task — not a
+     boolean. The key contains the due instant, so moving a deadline changes the
+     key and re-arms the reminder by itself, with no separate "clear the flag"
+     path to forget in one of the several places tasks are mutated.
+
+     Lives on the task, inside the synced blob, deliberately: a reminder fired
+     on the laptop must not fire again on the phone an hour later. A
+     device-local ledger would double-fire across devices, which is the one
+     duplicate the user must never see. */
+  remindedKey?: string;
 }
 
 export interface ChapterProgress {
@@ -284,6 +333,16 @@ export interface ScheduleBlock {
   durationMins: number;
   kind: BlockKind;
   label?: string;
+  /* The board card this block is time for, if any. A reference, not a copy —
+     the block shows the task's current text, so renaming the card renames the
+     block. `normalizeSchedule` drops it when no such task exists, the same
+     stance it takes on an override whose rule is gone, which is what keeps
+     these references from accumulating.
+
+     Deliberately one-directional: finishing the block does not tick the task.
+     Sitting down to work on something is not finishing it, and auto-ticking
+     would make the board lie. */
+  taskId?: string;
 }
 
 /**
@@ -303,6 +362,9 @@ export interface TemplateRule {
   durationMins: number;
   kind: BlockKind;
   label?: string;
+  /** As on ScheduleBlock. A repeating slot can be time for a standing task. */
+  taskId?: string;
+
   from: string;          // inclusive YYYY-MM-DD; nothing materializes before this
   until?: string | null; // inclusive last day, or null while the rule is live
 }
@@ -346,6 +408,28 @@ export interface ScheduleState {
   colors?: Partial<Record<BlockKind, string>>;
 }
 
+/**
+ * Deadline reminders. Off until asked for, like every other thing here that can
+ * interrupt.
+ */
+export interface ReminderPrefs {
+  enabled: boolean;
+  /* The hour a dated task speaks at when it was not given one, on the study-day
+     axis: 300 is 09:00. Set once, in settings — a time picker on every task is
+     a tax on the ninety percent of tasks that just want "some time on
+     Thursday". */
+  defaultMinute: DayMinute;
+  /** Minutes before the due instant. 0 fires at the moment itself. */
+  leadMinutes: number;
+  /* Closed-app delivery, opted into separately. Being willing to be reminded
+     while the app is open and being willing to hand a push endpoint to a server
+     are two different decisions — the same split LeaderboardPrefs already makes
+     between `enabled` and `notifications`. */
+  push: boolean;
+  /** "Coaching in 10 minutes", from the Plan timeline. Off by default. */
+  planBlocks: boolean;
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -370,4 +454,7 @@ export interface AppState {
   /* Optional because it arrived after these users already had saved state.
      `normalizeSchedule` fills it on load. */
   schedule?: ScheduleState;
+  /* Optional for the same reason `schedule` is — it arrived after these users
+     already had saved state. `normalizeReminders` fills it on load. */
+  reminders?: ReminderPrefs;
 }

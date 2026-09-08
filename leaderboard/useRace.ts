@@ -18,19 +18,18 @@ import { AppState } from '../types';
 import { getISTDateString } from '../utils';
 import { servedMs } from '../today/pomodoro';
 import { ActivitySignal, LeaderboardRow, fetchBoard, hoursToday, isRanked, publishEntry } from './api';
+import { pushToast } from '../notify/toastBus';
 import { RaceState, buildRaceState, minutesOf } from './engine';
 import { RaceDay, RaceEvent, advanceRaceDay, loadRaceDay, priorityOf, saveRaceDay } from './raceDay';
-import { RaceStatus, raceStatus } from './messages';
+import { RaceStatus, describeEvent, raceStatus } from './messages';
 import {
   Announcement,
-  PermissionState,
   loadNotifyMemory,
-  notificationPermission,
-  requestNotificationPermission,
   saveNotifyMemory,
   selectAnnouncement,
-  sendSystemNotification,
 } from './notify';
+import { PermissionState, notificationPermission, requestNotificationPermission } from '../notify/system';
+import { deliver } from '../notify/deliver';
 
 /* Poll rates. Watching the board is the fastest, because the user is staring
    at numbers they expect to move. A backgrounded tab still polls — that is the
@@ -55,9 +54,6 @@ export interface RaceView {
   day: RaceDay;
   /** Most recent events, newest first — the race control cards. */
   feed: RaceEvent[];
-  /** A single event worth interrupting for, until dismissed. */
-  toast: RaceEvent | null;
-  dismissToast: () => void;
   loading: boolean;
   error: string | null;
   /** The board is missing its activity columns — see fetchBoard. */
@@ -124,7 +120,6 @@ export const useRace = ({ user, state, watching, onNotificationsChange }: Option
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
   const [day, setDay] = useState<RaceDay>(() => loadRaceDay(date));
   const [feed, setFeed] = useState<RaceEvent[]>([]);
-  const [toast, setToast] = useState<RaceEvent | null>(null);
   const [permission, setPermission] = useState<PermissionState>(notificationPermission);
   /* Nudges the memo so "42m on the clock" ages while nothing else changes. */
   const [, setTick] = useState(0);
@@ -276,8 +271,23 @@ export const useRace = ({ user, state, watching, onNotificationsChange }: Option
 
     setFeed(prev => [...events].reverse().concat(prev).slice(0, FEED_SIZE));
 
+    /* Straight onto the shared toast bus. This hook used to hold the live
+       toast and its own dismissal timeout; both now belong to ToastHost, which
+       is the single thing on screen that renders anything the app says. The
+       fixed id means a second place change replaces the first rather than
+       stacking — the race has a current state, not a backlog. */
     const loud = events.filter(e => priorityOf(e) >= TOAST_PRIORITY);
-    if (loud.length) setToast(loud[0]);
+    if (loud.length) {
+      const copy = describeEvent(loud[0]);
+      pushToast({
+        id: 'race',
+        title: copy.headline,
+        body: copy.line,
+        icon: copy.icon,
+        tone: copy.good ? 'good' : 'alert',
+        ttlMs: TOAST_MS,
+      });
+    }
 
     /* One event, one place. On screen if the user is here to read it, on the
        lock screen if they are not — never both. */
@@ -289,24 +299,30 @@ export const useRace = ({ user, state, watching, onNotificationsChange }: Option
       now
     );
     if (!announcement) return;
-    if (document.visibilityState === 'visible') {
-      // The feed and the toast above have already said it.
-      notifyMemoryRef.current = announcement.memory;
-      saveNotifyMemory(announcement.memory);
-      return;
-    }
-    if (!notificationsOn) return;
-    if (sendSystemNotification(announcement.copy)) {
-      notifyMemoryRef.current = announcement.memory;
-      saveNotifyMemory(announcement.memory);
-    }
-  }, [joined, lastFetchedAt, myMinutes, notificationsOn]);
+    if (!notificationsOn && document.visibilityState !== 'visible') return;
 
-  useEffect(() => {
-    if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), TOAST_MS);
-    return () => window.clearTimeout(id);
-  }, [toast]);
+    /* `toast: false` because the feed and the toast pushed above have already
+       said it — this call is only here for the hidden-tab case. The router
+       still records the fire, so nothing else can repeat it.
+
+       Keyed by day and event kind: the cooldowns in notify.ts are the real
+       gate, and this key only stops the exact same announcement being shown
+       twice within one study day. */
+    const key = `race@${dayRef.current.date}:${announcement.event.kind}`;
+    void deliver({
+      channel: 'race',
+      copy: announcement.copy,
+      key,
+      toast: false,
+    }).then(outcome => {
+      /* A dropped outcome means nothing was shown — no permission, or the
+         browser refused — so the cooldown stays unspent rather than sitting
+         silent for 45 minutes on a send that never landed. */
+      if (outcome === 'dropped') return;
+      notifyMemoryRef.current = announcement.memory;
+      saveNotifyMemory(announcement.memory);
+    });
+  }, [joined, lastFetchedAt, myMinutes, notificationsOn]);
 
   /* Minute-resolution copy ages on its own — "40m on the clock" must not still
      say 40 an hour later because nothing else changed. */
@@ -331,8 +347,6 @@ export const useRace = ({ user, state, watching, onNotificationsChange }: Option
     status,
     day,
     feed,
-    toast,
-    dismissToast: () => setToast(null),
     loading,
     error,
     degraded,

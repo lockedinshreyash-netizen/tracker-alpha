@@ -286,19 +286,23 @@ button:active,
   background-image: radial-gradient(120% 140% at 100% 0%, rgba(225, 6, 0, 0.10) 0%, rgba(225, 6, 0, 0) 58%);
 }
 
-@keyframes race-toast-in {
-  from { opacity: 0; transform: translate(-50%, -14px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+/* The toast stack is centred by its container (`left-1/2 -translate-x-1/2`),
+   so the entry animation must NOT carry the -50% itself — the old race-toast
+   keyframe did, because that toast was a single absolutely-centred element
+   rather than one card in a column. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.race-toast {
-  animation: race-toast-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+.toast-in {
+  animation: toast-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
 
   .race-live-dot,
-  .race-toast {
+  .toast-in {
     animation: none;
   }
 }

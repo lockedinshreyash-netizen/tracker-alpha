@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DailyLog, PomodoroRuntime, PomodoroSettings, Subject } from '../types';
 import { generateId, getISTDateString } from '../utils';
 import * as sfx from '../audio';
+import { deliver } from '../notify/deliver';
 import {
   MIN_LOGGABLE_MS,
   PHASE_LABEL,
@@ -106,25 +107,6 @@ export interface PomodoroApi {
 
 const round2 = (n: number) => parseFloat(n.toFixed(2));
 
-/* ── System notification ──
-   Its own tag, so a bell replaces the previous unread bell instead of stacking
-   a queue of them. Failure is silent and never blocks the phase change. */
-const notify = (title: string, body: string) => {
-  try {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission !== 'granted') return;
-    const n = new Notification(title, {
-      body,
-      tag: 'tracker-alpha-pomodoro',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-    });
-    n.onclick = () => { window.focus(); n.close(); };
-  } catch {
-    /* notification skipped */
-  }
-};
-
 export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: Options): PomodoroApi => {
   const [lateBy, setLateBy] = useState<number | null>(null);
   const [staleDrop, setStaleDrop] = useState<string | null>(null);
@@ -228,14 +210,32 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
 
     if (wasWork) sfx.phaseComplete(); else sfx.breakOver();
 
-    if (s.notify && typeof document !== 'undefined' && document.hidden) {
-      const upcomingIsBreak = wasWork;
-      notify(
-        wasWork ? 'Block done' : 'Break over',
-        upcomingIsBreak
-          ? `${formatDuration(p.phaseTotalMs ?? 0)} of ${p.subject} logged. Take the break.`
-          : 'Back to it. Start the next block.',
-      );
+    if (s.notify) {
+      /* Through the shared router rather than a private `new Notification`.
+         That constructor throws outright on Android Chrome, so this bell has
+         never once rung on a phone — the only device where a bell in a
+         backgrounded tab actually matters. notify/system.ts uses the service
+         worker registration where there is one, which works everywhere.
+
+         The `document.hidden` check is gone with it: the router already says a
+         visible tab gets a toast and a hidden one gets a system notification,
+         and a finished block is worth seeing on screen too.
+
+         Keyed by the instant the phase ended, which is already the identity
+         `settle` dedupes on — so the doubled bell that a timeout, a safety
+         interval and a visibility handler all race to produce can only ever be
+         delivered once. */
+      void deliver({
+        channel: 'pomodoro',
+        key: `pomodoro@${p.phaseEndsAt}`,
+        icon: wasWork ? '🔔' : '⏱️',
+        copy: {
+          title: wasWork ? 'Block done' : 'Break over',
+          body: wasWork
+            ? `${formatDuration(p.phaseTotalMs ?? 0)} of ${p.subject} logged. Take the break.`
+            : 'Back to it. Start the next block.',
+        },
+      });
     }
 
     /* A phase that ended out of sight is reported, not silently rolled

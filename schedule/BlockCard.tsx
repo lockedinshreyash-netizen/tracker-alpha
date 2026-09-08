@@ -4,6 +4,9 @@ import { ACTIVITIES, BlockColors, blockStyle, blockTitle, countsAsStudy } from '
 import { formatRange } from './schedule';
 
 interface Props {
+  /* Resolved by the caller, not looked up here: BlockCard has no task list and
+     blockTitle stays a pure function of the block. */
+  taskText?: string;
   block: ScheduleBlock;
   lane: number;
   lanes: number;
@@ -38,7 +41,7 @@ interface Props {
  */
 const BlockCard: React.FC<Props> = ({
   block, lane, lanes, pxPerHour, theme, colors, preview, dragging, clashing,
-  recurring, moved, readOnly, running, onPointerDown, onKeyDown, onOpen,
+  recurring, moved, readOnly, running, taskText, onPointerDown, onKeyDown, onOpen,
 }) => {
   const dark = theme === 'dark';
   const c = blockStyle(block, colors);
@@ -56,7 +59,7 @@ const BlockCard: React.FC<Props> = ({
      that the whole card is the move target and the edges are given up. */
   const showHandles = !readOnly && height >= 44;
 
-  const title = blockTitle(block);
+  const title = blockTitle(block, taskText);
   const isStudy = countsAsStudy(block.kind);
   /* The subtitle is whatever the title didn't already say. */
   const sub = isStudy ? block.chapter : (block.label ? ACTIVITIES[block.kind].label : null);

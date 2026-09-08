@@ -23,6 +23,9 @@ interface DragState {
 }
 
 interface Props {
+  /* blockId -> the linked task's text. Built once by PlanTab; the card must not
+     be handed a task list just to render a title. */
+  taskNames?: Record<string, string>;
   blocks: ScheduleBlock[];
   theme: 'dark' | 'light';
   /** The user's activity colours, handed on to each card. */
@@ -60,7 +63,7 @@ const AUTOSCROLL_STEP_PX = 9;
  * `preview`, and the mutator is called exactly once, on release.
  */
 const DayTimeline: React.FC<Props> = ({
-  blocks, theme, colors, minute, readOnly, runningBlockId,
+  blocks, theme, colors, minute, readOnly, runningBlockId, taskNames,
   onCommit, onOpen, onCreateAt, onDelete, isRecurring, isMoved,
 }) => {
   const dark = theme === 'dark';
@@ -353,6 +356,7 @@ const DayTimeline: React.FC<Props> = ({
               <BlockCard
                 key={block.id}
                 block={block}
+                taskText={block.taskId ? taskNames?.[block.taskId] : undefined}
                 lane={lane}
                 lanes={lanes}
                 pxPerHour={pxPerHour}

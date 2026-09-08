@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BlockKind, Subject } from '../types';
 import {
-  ACTIVITIES, ACTIVITY_BASE, BlockColors, RECOLOURABLE, activityColor, derive, subjectStyle,
+  ACTIVITIES, ACTIVITY_BASE, BlockColors, PRESET_COLORS, RECOLOURABLE, activityColor, derive, subjectStyle,
 } from './colors';
 
 interface Props {
@@ -19,12 +19,6 @@ interface Props {
  * everywhere else in the app, and a gym block wearing it would read as a
  * warning. The native picker underneath covers everything else.
  */
-const PRESETS = [
-  '#4C6EF5', '#7048E8', '#BE4BDB', '#E64980',
-  '#F76707', '#FAB005', '#82C91E', '#12B886',
-  '#22B8CF', '#1098AD', '#5C7CFA', '#868E96',
-];
-
 /**
  * Colours for the parts of the day that are yours.
  *
@@ -113,7 +107,7 @@ Paint your own day. Tap anything below to change it.
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {PRESETS.map(hex => {
+            {PRESET_COLORS.map(hex => {
               const on = current.toLowerCase() === hex.toLowerCase();
               return (
                 <button
