@@ -150,6 +150,18 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
 
     if (credit.loggable) {
       const hours = round2(credit.hours);
+      /* The block's real interval. `opts.at` is the instant the phase ended —
+         the bell time for one that finished while the tab was hidden, so the
+         hours land on the study day they were served — and the credited
+         duration is what was actually served rather than the phase length, so
+         a block ended early is recorded at its true span.
+
+         This is exact rather than inferred: nothing here reconstructs a start
+         time from a date and an hours figure, which is the one thing the
+         analysis must never be fed. */
+      const endedAt = Math.floor(opts.at);
+      const startedAt = endedAt - Math.round(credit.hours * 3_600_000);
+
       log = {
         id: generateId(),
         date: getISTDateString(new Date(opts.at)),
@@ -158,6 +170,8 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
         quality: DEFAULT_QUALITY,
         distractions: 0,
         source: 'pomodoro',
+        startedAt,
+        endedAt,
       };
       pendingRating.push({ logId: log.id, subject: p.subject, hours, partial: credit.partial });
       while (pendingRating.length > MAX_PENDING_RATINGS) pendingRating.shift();
@@ -351,7 +365,13 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
   /* ── Legacy flush ──
      A block measured by the previous build was parked, unlogged, waiting for a
      rating. Write it once — at a neutral quality, since nobody is going to
-     rate it now — and be rid of the field. */
+     rate it now — and be rid of the field.
+
+     Deliberately written with no `startedAt`/`endedAt`. The old shape recorded
+     only a subject and an hours figure, so when this block ran is genuinely
+     unknown; the analysis will ignore it rather than be handed a start time
+     reconstructed from today's clock. The hours still count everywhere hours
+     count. */
   const legacyFlushed = useRef(false);
   useEffect(() => {
     if (!ready || legacyFlushed.current) return;

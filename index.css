@@ -439,3 +439,259 @@ button:active,
     transform: skewX(var(--au-skew, -10deg));
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE OBSERVATORY
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Alpha proper is the execution environment — loud, red, built to be used while
+   a clock is running. The Observatory is the opposite room: calm, spacious, and
+   made to be read rather than operated.
+
+   The whole surface is built from soft cards on a quiet ground, one idea per
+   card, a big plain number at the top of each and a sentence of plain English
+   under it. No blueprint grids, no hairline technical annotation, no mono
+   micro-labels — a seventeen-year-old should be able to glance at any card and
+   know what it says without being taught to read it. */
+
+.obs {
+  --o-ground:  #F5F4F1;
+  --o-card:    #FFFFFF;
+  --o-sunk:    #F0EEEA;
+  --o-ink:     #100F0E;
+  --o-ink-2:   #6B6863;
+  --o-ink-3:   #A6A29A;
+  --o-line:    rgba(16, 15, 14, 0.08);
+  --o-bar:     #C9C5BD;
+  --o-accent:  #E10600;
+  --o-accent-soft: rgba(225, 6, 0, 0.10);
+  --o-shadow:  0 1px 2px rgba(16,15,14,.04), 0 8px 24px -12px rgba(16,15,14,.10);
+  --o-radius:  22px;
+
+  background: var(--o-ground);
+  color: var(--o-ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.obs-dark {
+  --o-ground:  #09090A;
+  --o-card:    #151517;
+  --o-sunk:    #1E1E21;
+  --o-ink:     #FAFAF9;
+  --o-ink-2:   #9C9992;
+  --o-ink-3:   #64615C;
+  --o-line:    rgba(255, 255, 255, 0.08);
+  --o-bar:     #3A393C;
+  --o-accent:  #FF4A42;
+  --o-accent-soft: rgba(255, 74, 66, 0.14);
+  --o-shadow:  none;
+}
+
+/* ── Surfaces ── */
+.o-card {
+  background: var(--o-card);
+  border: 1px solid var(--o-line);
+  border-radius: var(--o-radius);
+  box-shadow: var(--o-shadow);
+  padding: 28px;
+}
+
+@media (min-width: 768px) {
+  .o-card { padding: 34px 38px; }
+}
+
+/* ── Type ──
+   One scale, used consistently. Numbers are the loudest thing on any card and
+   everything else is quiet around them. */
+.o-hero {
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.o-num {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.o-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.o-body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--o-ink-2);
+}
+
+/* The one uppercase label style, used sparingly — card eyebrows only. */
+.o-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--o-ink-3);
+}
+
+.o-accent { color: var(--o-accent); }
+
+/* ── Bars ──
+   Rounded, generous, and never thinner than they need to be. A 2px hairline
+   reads as a technical drawing; a 10px rounded bar reads as something a person
+   made for another person. */
+.o-track {
+  background: var(--o-sunk);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.o-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--o-accent);
+}
+
+/* ── Chips ── */
+.o-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--o-sunk);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--o-ink-2);
+  white-space: nowrap;
+}
+
+.o-chip-accent {
+  background: var(--o-accent-soft);
+  color: var(--o-accent);
+}
+
+/* ── Buttons ── */
+.o-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 30px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: var(--o-accent);
+  color: #FFFFFF;
+  transition: transform 120ms ease, opacity 160ms ease;
+}
+
+.o-btn:hover { opacity: 0.9; }
+.o-btn:active { transform: scale(0.975); }
+
+.o-btn-quiet {
+  background: transparent;
+  color: var(--o-ink);
+  border: 1px solid var(--o-line);
+}
+
+.o-btn-quiet:hover { background: var(--o-sunk); opacity: 1; }
+
+/* ═══ Motion ═══
+   Content settles into place once. Nothing loops, nothing floats, nothing
+   waits on a scroll position — the first frame is the finished page. */
+@keyframes o-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.o-in {
+  opacity: 0;
+  animation: o-in 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Bars grow from their base — the one bit of motion that carries meaning,
+   because the whole point of this page is time accumulating. */
+@keyframes o-grow-y {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes o-grow-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.o-bar {
+  transform-origin: bottom center;
+  transform: scaleY(0);
+  animation: o-grow-y 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.o-bar-x {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: o-grow-x 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* The ring on the hero card draws itself once. */
+@keyframes o-trace {
+  to { stroke-dashoffset: var(--o-trace-to, 0); }
+}
+
+.o-ring {
+  animation: o-trace 1100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Entering the Observatory: Alpha fades, the calm ground comes up. Short —
+   the point is a change of room, not a loading screen. */
+@keyframes o-veil {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.o-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  background: var(--o-ground);
+  animation: o-veil 620ms ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o-in, .o-bar, .o-bar-x, .o-ring {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    stroke-dashoffset: var(--o-trace-to, 0);
+  }
+  .o-veil { display: none; }
+}
+
+/* ── Example states ──
+   A chart with nothing in it teaches nobody anything, and a student who opens
+   the Observatory on day one deserves to see what they are working towards
+   rather than a blank rectangle.
+
+   So empty charts draw a worked example — and every one of them is plainly
+   marked as an example and drawn in outline, never filled. That distinction is
+   load-bearing: this feature's whole claim is that it never shows you a number
+   it cannot stand behind, and an example rendered in the same ink as real data
+   would break that on the first screen. Nothing here is ever attributed to the
+   user, and it disappears the moment there is one real session to draw. */
+.o-ghost {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.o-ghost-bar {
+  background: transparent !important;
+  border: 1.5px dashed var(--o-bar);
+}

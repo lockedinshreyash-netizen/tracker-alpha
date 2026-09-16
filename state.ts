@@ -1,4 +1,4 @@
-import { AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, Subject, Task, TaskColumn, TemplateRule } from './types';
+import { AnalysisState, AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
 import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
 export const DEFAULT_COACH: CoachState = {
@@ -119,6 +119,15 @@ const asKind = (v: unknown): BlockKind =>
 
 const asDate = (v: unknown): string | null =>
   typeof v === 'string' && DATE_SHAPE.test(v) ? v : null;
+
+/* A 1–5 self-report, or nothing. Clamping an out-of-range value would invent a
+   rating the user never gave; these fields are optional precisely so that
+   "they did not say" stays expressible. */
+const asRating = (v: unknown): number | undefined => {
+  if (!Number.isFinite(v as number)) return undefined;
+  const n = Math.round(v as number);
+  return n >= 1 && n <= 5 ? n : undefined;
+};
 
 /* A colour off the wire ends up in an inline `style`, so it is checked against
    the exact shape rather than trusted — `#rrggbb` and nothing else. */
@@ -309,6 +318,147 @@ export const normalizeSchedule = (raw: unknown, knownTaskIds?: Set<string>): Sch
   return { blocks, rules, overrides, colors };
 };
 
+/* ── Sleep ──
+   Off, and empty. The card does not render, nothing is written, and no other
+   feature depends on it — a user who never touches this switch experiences no
+   difference at all. */
+export const DEFAULT_SLEEP: SleepState = { enabled: false, logs: [] };
+
+/* A night shorter than this is a nap or a typo, and one longer than this is a
+   mis-set date. Either way it would drag every average it lands in, and the
+   analysis has no way to tell it apart from a real night after the fact. */
+const MIN_SLEEP_MS = 30 * 60_000;
+const MAX_SLEEP_MS = 16 * 3_600_000;
+
+/**
+ * Whatever was persisted, made safe to analyse.
+ *
+ * Same stance as `normalizeSchedule`: validate every field, drop the row when
+ * its identity or its arithmetic is unusable. A sleep row is only ever read to
+ * be averaged, so an impossible duration is worse than a missing one — it
+ * cannot be seen on screen and cannot be corrected, but it silently moves a
+ * mean the student is being shown as a fact about themselves.
+ */
+export const normalizeSleep = (raw: unknown): SleepState => {
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<SleepState>;
+
+  const seen = new Set<string>();
+  const logs: SleepLog[] = (Array.isArray(src.logs) ? src.logs : [])
+    .filter(l => l && asDate(l.date) && Number.isFinite(l.bedAt) && Number.isFinite(l.wakeAt))
+    .map(l => ({
+      date: asDate(l.date)!,
+      bedAt: Math.floor(l.bedAt),
+      wakeAt: Math.floor(l.wakeAt),
+      quality: asRating(l.quality),
+      energy: asRating(l.energy),
+    }))
+    .filter(l => {
+      const span = l.wakeAt - l.bedAt;
+      if (span < MIN_SLEEP_MS || span > MAX_SLEEP_MS) return false;
+      /* One night per study day. A duplicate can only come from a sync merge
+         racing two devices, and keeping both would double-count that night in
+         every average. First wins, which is the same rule the by-id unions of
+         `logs` and `tasks` already follow. */
+      if (seen.has(l.date)) return false;
+      seen.add(l.date);
+      return true;
+    })
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  return { enabled: src.enabled === true, logs };
+};
+
+/**
+ * Two devices' sleep logs, unioned by date.
+ *
+ * Runs in the **local-newer sync path only**, exactly like `mergeSchedule` and
+ * the by-id merges of `logs` and `tasks`. A union everywhere would look kinder
+ * and be wrong: a night deleted on the phone has to be able to reach the
+ * laptop, and a device that only ever unions can never be told something is
+ * gone.
+ *
+ * `enabled` is a setting rather than a row, so local always wins — turning the
+ * feature off here must not be undone by a stale remote copy that still has it
+ * on.
+ */
+export const mergeSleep = (local: SleepState, remote: SleepState): SleepState => {
+  const byDate = new Map(local.logs.map(l => [l.date, l]));
+  for (const l of remote.logs) if (!byDate.has(l.date)) byDate.set(l.date, l);
+  return {
+    enabled: local.enabled,
+    logs: [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+  };
+};
+
+/* ── The experiment ──
+   Unstarted. There is no implicit enrolment: the clock begins when the student
+   presses begin, and not one observation is counted before that instant. */
+export const DEFAULT_ANALYSIS: AnalysisState = {
+  startedAt: null,
+  startedOn: null,
+  introSeen: false,
+};
+
+export const normalizeAnalysis = (raw: unknown): AnalysisState => {
+  const a = { ...DEFAULT_ANALYSIS, ...(raw && typeof raw === 'object' ? raw as Partial<AnalysisState> : {}) };
+
+  /* A start instant in the future is a wrong device clock, and it would make
+     the day counter read zero or negative forever with no way for the user to
+     understand why. Dropped back to unstarted, which is at least a state with
+     a visible way out. */
+  const started = Number.isFinite(a.startedAt) && (a.startedAt as number) > 0 && (a.startedAt as number) <= Date.now()
+    ? Math.floor(a.startedAt as number)
+    : null;
+
+  return {
+    startedAt: started,
+    startedOn: started === null ? null : asDate(a.startedOn),
+    introSeen: a.introSeen === true,
+  };
+};
+
+/**
+ * Two devices' experiment records.
+ *
+ * The **earlier** start always wins. The experiment began once, on whichever
+ * device the student happened to be holding, and a later start arriving from
+ * another device would silently shorten a day count they have been watching go
+ * up. `introSeen` is a union for the same reason it is stored at all — having
+ * watched the opening sequence is not something a second device should undo.
+ */
+export const mergeAnalysis = (local: AnalysisState, remote: AnalysisState): AnalysisState => {
+  const localFirst =
+    local.startedAt !== null &&
+    (remote.startedAt === null || local.startedAt <= remote.startedAt);
+  const winner = localFirst ? local : (remote.startedAt !== null ? remote : local);
+  return {
+    startedAt: winner.startedAt,
+    startedOn: winner.startedOn,
+    introSeen: local.introSeen || remote.introSeen,
+  };
+};
+
+/* ── Question entries ──
+   A tally cannot say when anything happened, so these are collected from the
+   moment the field exists. Capped per day because the + button can be tapped
+   arbitrarily often and this rides inside the synced blob. */
+export const MAX_QUESTION_ENTRIES = 200;
+
+const Q_SUBJECTS: QSubject[] = ['physics', 'chemistry', 'math', 'biology'];
+
+export const normalizeQuestionEntries = (raw: unknown): QuestionEntry[] | undefined => {
+  if (!Array.isArray(raw)) return undefined;
+  const entries = raw
+    .filter((e): e is QuestionEntry =>
+      !!e && typeof e === 'object' &&
+      Number.isFinite((e as QuestionEntry).at) &&
+      Q_SUBJECTS.includes((e as QuestionEntry).subject) &&
+      Number.isFinite((e as QuestionEntry).count))
+    .map(e => ({ at: Math.floor(e.at), subject: e.subject, count: Math.max(1, Math.floor(e.count)) }))
+    .slice(-MAX_QUESTION_ENTRIES);
+  return entries.length ? entries : undefined;
+};
+
 export const DEFAULT_STATE: AppState = {
   currentClass: 11,
   examPreference: 'JEE',
@@ -335,4 +485,6 @@ export const DEFAULT_STATE: AppState = {
   rewards: DEFAULT_REWARDS,
   schedule: DEFAULT_SCHEDULE,
   reminders: DEFAULT_REMINDERS,
+  sleep: DEFAULT_SLEEP,
+  analysis: DEFAULT_ANALYSIS,
 };

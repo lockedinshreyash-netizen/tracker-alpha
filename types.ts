@@ -38,11 +38,49 @@ export interface DailyLog {
      guess it — a log carries no start time, so without this the best the
      Plan tab can do is match on subject and hours. */
   blockId?: string;
+
+  /* When the session actually happened. Epoch ms UTC, not ISO strings: ~13
+     bytes rather than 24 inside the synced blob, no parse step, and every
+     consumer already converts through `getISTDateString(new Date(ms))`.
+
+     Present ONLY on sessions the app measured itself. A manual backfill has no
+     clock behind it, and inventing one would put fiction into every
+     time-of-day average — so these stay absent there, and absent on every log
+     written before the fields existed. Deliberately never backfilled: see
+     `isObserved` in insight/buckets.ts, which is the single predicate deciding
+     what the analysis is allowed to look at.
+
+     Both or neither. A log with one of the two is treated as having neither. */
+  startedAt?: number;
+  endedAt?: number;
+}
+
+/**
+ * One batch of questions, as it was entered.
+ *
+ * `DailyQuestionsLog.counts` is a running per-day tally and cannot say *when*
+ * anything was solved, so questions-per-hour by time of day is unanswerable
+ * from it. These entries are collected silently from the moment the field
+ * exists — the metric they enable is not surfaced yet, but data you did not
+ * start collecting is data you cannot analyse later.
+ *
+ * Bounded per day by `MAX_QUESTION_ENTRIES` in state.ts, so a user tapping +1
+ * two hundred times cannot grow the synced blob without limit.
+ */
+export interface QuestionEntry {
+  at: number; // epoch ms
+  subject: QSubject;
+  count: number;
 }
 
 export interface DailyQuestionsLog {
   date: string; // YYYY-MM-DD (IST)
   counts: Partial<Record<QSubject, number>>;
+  /* Absent on every day logged before this existed. `counts` stays
+     authoritative for every total the app already prints — these are additive
+     detail, never a replacement, so an old day keeps working and a partially
+     recorded day cannot under-report. */
+  entries?: QuestionEntry[];
 }
 
 export type WeeklyGoalBySubject = Partial<Record<QSubject, number | null>>;
@@ -136,7 +174,12 @@ export interface ChapterProgress {
   lastRevisedAt?: string; // YYYY-MM-DD (IST)
 }
 
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review';
+/* `Observatory` is a destination, not another productivity tab. Alpha proper
+   is the execution environment — do the work, plan the work, review the work —
+   and the Observatory is the room you step into to look at what all of that
+   has added up to. The separation is the point: the other seven ask you to do
+   something, this one asks you to look. */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Observatory';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -288,6 +331,66 @@ export type TopicResult = 'solid' | 'shaky' | 'gap';
 export interface TopicMastery {
   result: TopicResult;
   date: string; // YYYY-MM-DD (IST)
+}
+
+/* ────────────────────────────────────────────────────────────────
+   THE ANALYSIS — the student's experiment on themselves
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * One night, keyed by the study day the user **woke into**.
+ *
+ * Keying on the wake day rather than the sleep day is the whole reason this
+ * shape works: "sleep versus that day's output" becomes a direct join with no
+ * off-by-one, and "the night of the 5th" — which means different things to
+ * different people — never has to be resolved.
+ *
+ * Duration is NEVER stored. It is `wakeAt - bedAt`, and a stored copy is a
+ * second source of truth that two devices can disagree about after one edit.
+ */
+export interface SleepLog {
+  date: string;      // YYYY-MM-DD (IST study day woken into)
+  bedAt: number;     // epoch ms
+  wakeAt: number;    // epoch ms
+  quality?: number;  // 1–5
+  energy?: number;   // 1–5, morning readiness
+}
+
+/**
+ * Sleep tracking. Off until explicitly asked for, like everything here that
+ * touches something personal.
+ *
+ * Bedtimes and wake times are a behavioural record of a minor's home life, so
+ * this is the one part of the analysis that collects nothing at all until the
+ * switch is thrown — and turning it back off offers to delete what was
+ * gathered. It never reaches the leaderboard or a share card.
+ */
+export interface SleepState {
+  enabled: boolean;
+  logs: SleepLog[];
+}
+
+/**
+ * The experiment itself.
+ *
+ * `startedAt` is the psychological anchor and the analytical boundary at once:
+ * the student can point at a date and say "that is when I started measuring
+ * how I study", and nothing recorded before that instant is ever counted as an
+ * observation. History is not retroactively conscripted into an experiment it
+ * was not part of — which is also the only way "DAY 04 OF OBSERVATION" can be
+ * a true statement rather than a decoration.
+ *
+ * `introSeen` is separate from `startedAt` because the first-run sequence and
+ * the experiment are two different things: a user can reach the end of the
+ * introduction and not press begin.
+ */
+export interface AnalysisState {
+  /** Epoch ms the user pressed BEGIN, or null while the experiment is unstarted. */
+  startedAt: number | null;
+  /** The IST study day that instant fell in. Day 1 of observation. */
+  startedOn: string | null;
+  /** The opening sequence has been played through at least once. */
+  introSeen: boolean;
 }
 
 /* ────────────────────────────────────────────────────────────────
@@ -457,4 +560,8 @@ export interface AppState {
   /* Optional for the same reason `schedule` is — it arrived after these users
      already had saved state. `normalizeReminders` fills it on load. */
   reminders?: ReminderPrefs;
+  /* Both optional for that same reason, and both filled on load by their
+     normalizers in state.ts. */
+  sleep?: SleepState;
+  analysis?: AnalysisState;
 }

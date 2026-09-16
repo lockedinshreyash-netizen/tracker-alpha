@@ -75,13 +75,26 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
       );
+    /* A subject inscribed in a circle with the construction lines left in —
+       the Vitruvian method rather than the picture, and the only icon here
+       that is a diagram rather than a pictogram. It should not look like the
+       others; the room it opens is not like the others. */
+    case 'Observatory':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="9" />
+          <line x1="12" y1="3" x2="12" y2="21" strokeWidth={0.9} />
+          <line x1="3" y1="12" x2="21" y2="12" strokeWidth={0.9} />
+          <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+        </svg>
+      );
   }
 };
 
 const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const tabs: TabType[] = ['Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review'];
+  const tabs: TabType[] = ['Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Observatory'];
   const dark = theme === 'dark';
 
   const handleTabClick = (tab: TabType) => {
@@ -154,8 +167,19 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
           {tabs.map(tab => {
             const isActive = activeTab === tab;
             return (
+              <React.Fragment key={tab}>
+              {/* A rule above the Observatory, and nothing else in this list
+                  gets one. The seven above are places you go to do something;
+                  this is the room you step into to look at what all of it
+                  added up to, and the nav should say so before you click. */}
+              {tab === 'Observatory' && (
+                <div
+                  className={`my-2 ${collapsed ? 'mx-3' : 'mx-4'}`}
+                  style={{ height: 1, background: dark ? 'rgba(255,255,255,.07)' : '#E3E0D9' }}
+                  aria-hidden="true"
+                />
+              )}
               <button
-                key={tab}
                 onClick={() => handleTabClick(tab)}
                 data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : tab === 'Plan' ? 'plan-nav' : undefined}
                 className={`flex items-center gap-3 rounded-lg transition-all duration-200 group relative
@@ -186,6 +210,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
                   </div>
                 )}
               </button>
+              </React.Fragment>
             );
           })}
         </nav>

@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs } from './types';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, mergeSleep, mergeAnalysis } from './state';
+import { buildExperiment } from './insight/observe';
+import AnalysisIntro from './analysis/AnalysisIntro';
+import ObservatoryTab from './analysis/ObservatoryTab';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
 import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
@@ -152,6 +155,13 @@ const App: React.FC = () => {
          halves in hand, which is why the cleanup happens on load rather than on
          every write. */
       merged.schedule = normalizeSchedule(parsed.schedule, new Set(merged.tasks.map(t => t.id)));
+      /* Both arrived after these users already had saved state, and both are
+         only ever read to be averaged — so an impossible row is worse than a
+         missing one. It cannot be seen on screen and cannot be corrected, but
+         it silently moves a figure the student is being shown as a fact about
+         themselves. */
+      merged.sleep = normalizeSleep(parsed.sleep);
+      merged.analysis = normalizeAnalysis(parsed.analysis);
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -164,6 +174,17 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
+  /* True for the length of the Observatory entry transition, then cleared.
+     Alpha's chrome falls away, the paper comes up, the geometry resolves.
+     Deliberately short (~700ms): the point is psychological separation, and a
+     door you have to wait for stops being a door and becomes an obstacle. */
+  const [entering, setEntering] = useState(false);
+  const enterTimer = useRef<number | null>(null);
+  const beginEntry = () => {
+    setEntering(true);
+    if (enterTimer.current) window.clearTimeout(enterTimer.current);
+    enterTimer.current = window.setTimeout(() => setEntering(false), 760);
+  };
   /* Which period the share sheet opened on, or null when it is closed. The
      entry point decides: Today opens on the day, Streak on the week. */
   const [sharePeriod, setSharePeriod] = useState<CardPeriod | null>(null);
@@ -276,7 +297,14 @@ const App: React.FC = () => {
                  wrong: deleting a block on the phone has to reach the laptop,
                  and a device that unions can never be told something is gone.
                  The only place it is safe to merge is the local-newer branch
-                 below, where the deletions in play are this device's own. */
+                 below, where the deletions in play are this device's own.
+                 `sleep` rides it for the same reason. */
+              /* `analysis` is the exception, and the only one: its merge takes
+                 the EARLIER start rather than unioning rows, so it cannot
+                 resurrect anything — it can only stop a remote copy pushing the
+                 experiment's beginning forwards and shortening a day count
+                 mid-session. */
+              analysis: mergeAnalysis(normalizeAnalysis(prev.analysis), normalizeAnalysis(remoteState.analysis)),
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -330,6 +358,14 @@ const App: React.FC = () => {
                 normalizeRewards(localState.rewards),
                 normalizeRewards(remoteState.rewards),
               ),
+              /* Merged rather than taken wholesale even here, for the one
+                 property `mergeAnalysis` guarantees: the experiment began once,
+                 and a later start arriving from another device must not shorten
+                 a day count the student has been watching go up. */
+              analysis: mergeAnalysis(
+                normalizeAnalysis(localState.analysis),
+                normalizeAnalysis(remoteState.analysis),
+              ),
             };
           }
 
@@ -374,6 +410,20 @@ const App: React.FC = () => {
             schedule: mergeSchedule(
               normalizeSchedule(localState.schedule),
               normalizeSchedule(remoteState.schedule),
+            ),
+            /* Union by date, in this branch only — exactly the rule the by-id
+               merges of `logs` and `tasks` above follow, and for the same
+               reason: a night recorded on the phone must survive, and a night
+               deleted on the phone must still be able to reach the laptop. A
+               device that only ever unions can never be told something is
+               gone. */
+            sleep: mergeSleep(
+              normalizeSleep(localState.sleep),
+              normalizeSleep(remoteState.sleep),
+            ),
+            analysis: mergeAnalysis(
+              normalizeAnalysis(localState.analysis),
+              normalizeAnalysis(remoteState.analysis),
             ),
           };
         });
@@ -457,6 +507,12 @@ const App: React.FC = () => {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
+    /* Arriving in the Observatory is a change of mode rather than a route
+       change, so it gets a transition — and it gets it here, in the one
+       navigation path, so the door on Today and the item in the sidebar feel
+       identical. Leaving needs none: returning to Alpha is returning to the
+       normal state of things. */
+    if (tab === 'Observatory') beginEntry();
   };
 
   /* ── Rewards ──────────────────────────────────────────────────────────── */
@@ -565,10 +621,22 @@ const App: React.FC = () => {
        unchanged — only the paths that genuinely know pass them. */
     chapter?: string,
     blockId?: string,
+    /* When the session actually ran. Trailing and optional like the two above,
+       so every existing call site is unchanged — only the paths that genuinely
+       measured the time pass them, and a manual backfill passes nothing. That
+       asymmetry is the whole guarantee: a log with no clock behind it can never
+       reach the analysis, because it has no timestamps to be read. */
+    startedAt?: number,
+    endedAt?: number,
   ) => {
     if (hours <= 0) return;
     const today = getISTDateString();
     setState(prev => {
+      /* Both or neither. Half an interval cannot be placed on a clock, and a
+         log carrying one of the two would be silently dropped downstream by
+         `isObserved` anyway — better not to write it. */
+      const timed = Number.isFinite(startedAt) && Number.isFinite(endedAt) && (endedAt as number) > (startedAt as number);
+
       const newLog: DailyLog = {
         id: generateId(),
         date: today,
@@ -579,6 +647,8 @@ const App: React.FC = () => {
         source,
         chapter,
         blockId,
+        startedAt: timed ? Math.floor(startedAt as number) : undefined,
+        endedAt: timed ? Math.floor(endedAt as number) : undefined,
       };
       const nextState = { ...prev, logs: [...prev.logs, newLog], lastUpdated: Date.now() };
       stateRef.current = nextState;
@@ -924,6 +994,123 @@ const App: React.FC = () => {
       return nextState;
     });
   }, []);
+
+  /* ── The analysis ────────────────────────────────────────────────
+     The experiment has a genuine beginning. `startedAt` is both the
+     psychological anchor — a date the student can point at — and the
+     analytical boundary: `observedSince` counts nothing before it, so a user
+     with two years of history who begins today is honestly on day 1 with zero
+     observations. Conscripting that history would make the day counter a
+     decoration rather than a fact. */
+  const analysis = state.analysis ?? DEFAULT_ANALYSIS;
+  const sleep = state.sleep ?? DEFAULT_SLEEP;
+  const [introOpen, setIntroOpen] = useState(false);
+
+  useEffect(() => () => {
+    if (enterTimer.current) window.clearTimeout(enterTimer.current);
+  }, []);
+
+  const beginAnalysis = useCallback(() => {
+    setState(prev => {
+      /* Already running: pressing begin again must not restart the clock and
+         wipe out the days already observed. */
+      if (prev.analysis?.startedAt) return prev;
+      const now = Date.now();
+      const nextState: AppState = {
+        ...prev,
+        analysis: { startedAt: now, startedOn: getISTDateString(new Date(now)), introSeen: true },
+        lastUpdated: now,
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+    setIntroOpen(false);
+  }, []);
+
+  const markIntroSeen = useCallback(() => {
+    setState(prev => {
+      if (prev.analysis?.introSeen) return prev;
+      const nextState: AppState = {
+        ...prev,
+        analysis: { ...(prev.analysis ?? DEFAULT_ANALYSIS), introSeen: true },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  /* One night per study day, replacing whatever was there — the card offers
+     "Change" rather than a second entry, and two rows for one night would
+     double-count it in every average. */
+  const logSleep = useCallback((log: SleepLog) => {
+    setState(prev => {
+      const current = prev.sleep ?? DEFAULT_SLEEP;
+      const nextState: AppState = {
+        ...prev,
+        sleep: {
+          ...current,
+          logs: [...current.logs.filter(l => l.date !== log.date), log]
+            .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+        },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  const clearNight = useCallback((date: string) => {
+    setState(prev => {
+      const current = prev.sleep ?? DEFAULT_SLEEP;
+      const nextState: AppState = {
+        ...prev,
+        sleep: { ...current, logs: current.logs.filter(l => l.date !== date) },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  /* Turning it off stops collection; it does not delete. Erasing months of
+     someone's record because they tapped a switch would be the wrong default
+     in the one direction that cannot be undone — deletion is its own button. */
+  const setSleepEnabled = useCallback((enabled: boolean) => {
+    setState(prev => {
+      const current = prev.sleep ?? DEFAULT_SLEEP;
+      const nextState: AppState = {
+        ...prev,
+        sleep: { ...current, enabled },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  const deleteAllSleep = useCallback(() => {
+    if (!window.confirm('DELETE EVERY NIGHT RECORDED? This cannot be undone.')) return;
+    setState(prev => {
+      const current = prev.sleep ?? DEFAULT_SLEEP;
+      const nextState: AppState = {
+        ...prev,
+        sleep: { ...current, logs: [] },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  /* Memoised on the three inputs it actually reads. App re-renders ten times a
+     second while a stopwatch runs (today/TodayTab.tsx keeps a 100ms interval),
+     and this walks every log to bucket it — recomputing that per tick would
+     cost the app's core loop for a panel that cannot have changed. */
+  const experiment = useMemo(
+    () => buildExperiment(analysis, state.logs, sleep.logs),
+    [analysis, state.logs, sleep.logs],
+  );
 
   /* Throw away an in-progress session without logging it. Used by onboarding:
      a running timer hides the goal card the tour needs to point at, and a
@@ -1273,17 +1460,32 @@ const App: React.FC = () => {
 
   const logQuestions = (subject: QSubject, count: number) => {
     const today = getISTDateString();
+    const at = Date.now();
     setState(prev => {
       const logs = [...prev.questionTracking.dailyQuestionsLog];
       const idx = logs.findIndex((l) => l.date === today);
+
+      /* Stamped from here on, and deliberately not surfaced anywhere yet.
+         `counts` stays the authoritative total for every figure the app already
+         prints; these are additive detail. Questions-per-hour by time of day is
+         unanswerable from a per-day tally, and data you did not start
+         collecting is data you cannot analyse later — so it starts accruing now
+         and the metric it enables can wait for the evidence to exist.
+
+         Capped per day: the + button can be tapped arbitrarily often and this
+         rides inside the synced blob. */
+      const entry = { at, subject, count };
+
       if (idx >= 0) {
         const updated = { ...logs[idx] };
         updated.counts = { ...updated.counts, [subject]: (updated.counts?.[subject] || 0) + count };
+        updated.entries = [...(updated.entries ?? []), entry].slice(-MAX_QUESTION_ENTRIES);
         logs[idx] = updated;
       } else {
         logs.push({
           date: today,
-          counts: { [subject]: count }
+          counts: { [subject]: count },
+          entries: [entry],
         });
       }
       const nextState = {
@@ -1428,10 +1630,14 @@ const App: React.FC = () => {
 
         const t = current.timer;
         if (!t.isRunning && !t.accumulatedMs) return { ok: false, message: 'NOTHING RUNNING.' };
-        const elapsedMs = (t.isRunning ? Date.now() - (t.startTime || Date.now()) : 0) + t.accumulatedMs;
+        const endedAt = Date.now();
+        const elapsedMs = (t.isRunning ? endedAt - (t.startTime || endedAt) : 0) + t.accumulatedMs;
         const hours = elapsedMs / (1000 * 60 * 60);
-        // Ending by voice still ends a stopwatch the app timed itself.
-        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer');
+        /* Ending by voice still ends a stopwatch the app timed itself, so it
+           carries the same interval the button would have recorded. Stopping a
+           session by speaking rather than tapping must not make it invisible to
+           the analysis. */
+        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, t.startTime ?? undefined, endedAt);
         updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0 });
         return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
       }
@@ -1719,6 +1925,9 @@ const App: React.FC = () => {
               onStartBlock={startBlock}
               onOpenPlan={() => handleTabChange('Plan')}
               onShare={() => setSharePeriod('daily')}
+              experiment={experiment}
+              sleep={sleep}
+              onEnterObservatory={() => handleTabChange('Observatory')}
             />
           )}
           {activeTab === 'Plan' && (
@@ -1809,8 +2018,42 @@ const App: React.FC = () => {
               onChangeReminders={setReminderPrefs}
             />
           )}
+          {activeTab === 'Observatory' && (
+            <ObservatoryTab
+              experiment={experiment}
+              logs={state.logs}
+              sleep={sleep}
+              theme={theme}
+              analysisStartedAt={analysis.startedAt}
+              arriving={entering}
+              onReadIntro={() => setIntroOpen(true)}
+              onBegin={beginAnalysis}
+              onToggleSleep={setSleepEnabled}
+              onDeleteAllSleep={deleteAllSleep}
+              onLogSleep={logSleep}
+              onClearNight={clearNight}
+            />
+          )}
         </main>
       </div>
+
+      {/* Alpha falling away as the Observatory comes up. Painted above the
+          whole app rather than inside the tab, because what it is covering is
+          the transition between two modes of the application. */}
+      {entering && <div className={`obs ${theme === 'dark' ? 'obs-dark' : ''} o-veil`} aria-hidden="true" />}
+
+      {/* The opening plates. Full-screen and above everything, because the
+          whole point of the first run is that it is not a widget on a page —
+          it is the instrument powering on. Suppressed during the tour, which
+          owns the screen. */}
+      {!showOnboarding && introOpen && (
+        <AnalysisIntro
+          theme={theme}
+          alreadyStarted={analysis.startedAt !== null}
+          onBegin={beginAnalysis}
+          onClose={() => { markIntroSeen(); setIntroOpen(false); }}
+        />
+      )}
 
       {/* Kept out of the way of the tour's spotlight and of Lock-In. */}
       {!showOnboarding && (

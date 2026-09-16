@@ -20,7 +20,10 @@ interface Props {
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
 }
 
-const ReviewTab: React.FC<Props> = ({ logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog, examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders }) => {
+const ReviewTab: React.FC<Props> = ({
+  logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog,
+  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders,
+}) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
@@ -106,6 +109,7 @@ const ReviewTab: React.FC<Props> = ({ logs, score, onClearData, theme, user, onO
         signedIn={!!user}
         onChange={onChangeReminders}
       />
+
 
       <div className={`p-8 rounded-xl border flex flex-col md:flex-row justify-between items-center gap-6 ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`}>
         <div className="flex-1">

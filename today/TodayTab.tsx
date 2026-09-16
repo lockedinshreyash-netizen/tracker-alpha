@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, SleepState, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import { isIdle as pomodoroIsIdle } from './pomodoro';
 import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
-import CoachCard from './CoachCard';
 import { Recommendation } from './recommend';
+import ObservatoryStrip from '../analysis/ObservatoryStrip';
+import SleepReminder from '../analysis/SleepReminder';
+import { ExperimentState } from '../insight/observe';
 import NextUpStrip from '../schedule/NextUpStrip';
 import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
 
 interface Props {
   state: AppState;
-  onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource, chapter?: string, blockId?: string) => void;
+  onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource, chapter?: string, blockId?: string, startedAt?: number, endedAt?: number) => void;
   onDeleteLog: (id: string) => void;
   onTimerUpdate: (timerUpdate: Partial<TimerState>) => void;
   onAddTask: (text: string, subject: Subject, column?: TaskColumn) => void;
@@ -35,6 +37,10 @@ interface Props {
   onOpenPlan: () => void;
   /** Opens the share sheet on today's card. */
   onShare: () => void;
+  experiment: ExperimentState;
+  sleep: SleepState;
+  /** The door into the Observatory. Today never shows the room itself. */
+  onEnterObservatory: () => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -59,7 +65,10 @@ const TodayTab: React.FC<Props> = ({
   onSetCoachMuted,
   onStartBlock,
   onOpenPlan,
-  onShare
+  onShare,
+  experiment,
+  sleep,
+  onEnterObservatory,
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
@@ -102,12 +111,24 @@ const TodayTab: React.FC<Props> = ({
   const handleStopTimer = () => {
     const currentTimer = timerRef.current;
     if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
-    const finalMs = (currentTimer.isRunning ? Date.now() - (currentTimer.startTime || Date.now()) : 0) + currentTimer.accumulatedMs;
+    const endedAt = Date.now();
+    const finalMs = (currentTimer.isRunning ? endedAt - (currentTimer.startTime || endedAt) : 0) + currentTimer.accumulatedMs;
     /* Measured by the stopwatch, so it counts towards the leaderboard. The
        chapter and block ride along when the session was started from a plan —
        that stamp is the only thing that lets adherence say a block was
-       honoured rather than infer it from subject and hours. */
-    onLog(currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer', currentTimer.chapter, currentTimer.blockId);
+       honoured rather than infer it from subject and hours.
+
+       The two instants were already in hand here and were being thrown away:
+       `finalMs` is computed from `startTime` and then only its magnitude
+       survived. Passing them is what makes every time-of-day question
+       answerable — and the stopwatch has no pause (`accumulatedMs` is never
+       written non-zero anywhere), so the pair really is one contiguous
+       interval rather than a summary of several. */
+    onLog(
+      currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer',
+      currentTimer.chapter, currentTimer.blockId,
+      currentTimer.startTime ?? undefined, endedAt,
+    );
     onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, chapter: undefined, blockId: undefined });
   };
 
@@ -158,16 +179,30 @@ const TodayTab: React.FC<Props> = ({
           onOpenPlan={onOpenPlan}
         />
       )}
+      {/* The door into the Observatory, where the coach card used to sit — one
+          line of invitation and, once the study is running, the day count.
+          Nothing else: Today answers "what do I need to do today", and a
+          longitudinal chart here answers a question nobody asked while a timer
+          is waiting to be started.
+
+          Hidden mid-session for the same reason everything else here is — the
+          last thing anyone needs while a clock is running is somewhere else to
+          go. */}
       {!timer.isRunning && !pomodoroBusy && (
-        <CoachCard
-          state={state}
-          exam={examPreference}
-          activeSubjects={activeSubjects}
+        <ObservatoryStrip
+          experiment={experiment}
           theme={theme}
-          onEngage={onEngageRecommendation}
-          onDismiss={onDismissRecommendation}
-          onSetMuted={onSetCoachMuted}
+          onEnter={onEnterObservatory}
         />
+      )}
+
+      {/* The only thing sleep leaves on Today: a single dismissable line, and
+          only on a morning it has not been logged. The entry itself lives in
+          the Observatory, beside the one thing that reads it — Today is for
+          what you need to do today, and sleep is an input to a study rather
+          than a task. */}
+      {!timer.isRunning && !pomodoroBusy && (
+        <SleepReminder sleep={sleep} theme={theme} onOpen={onEnterObservatory} />
       )}
       {!timer.isRunning && (
         <section className={`p-6 md:p-10 rounded-xl border flex flex-col gap-8 md:gap-10 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
