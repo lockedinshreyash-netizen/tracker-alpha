@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DailyLog, SleepLog, SleepState } from '../types';
+import { AiInsight, AiPrefs, DailyLog, SleepLog, SleepState } from '../types';
 import { getISTDateString } from '../utils';
 import {
   ExperimentState, dayRows, evidenceGates, formatRange, formatStartDate,
@@ -9,6 +9,8 @@ import WhenYouStudy from './WhenYouStudy';
 import RecentDays from './RecentDays';
 import ProgressRows from './ProgressRows';
 import SleepEntry, { fmtDuration } from './SleepEntry';
+import ExplainCard from './ExplainCard';
+import { worthExplaining } from '../insight/packet';
 
 interface Props {
   experiment: ExperimentState;
@@ -23,6 +25,10 @@ interface Props {
   onDeleteAllSleep: () => void;
   onLogSleep: (log: SleepLog) => void;
   onClearNight: (date: string) => void;
+  ai: AiPrefs;
+  signedIn: boolean;
+  onToggleAi: (enabled: boolean) => void;
+  onCacheInsight: (hash: string, insight: AiInsight) => void;
 }
 
 /**
@@ -73,6 +79,7 @@ const Card: React.FC<{
 const ObservatoryTab: React.FC<Props> = ({
   experiment, logs, sleep, theme, arriving,
   onReadIntro, onBegin, onToggleSleep, onDeleteAllSleep, onLogSleep, onClearNight,
+  ai, signedIn, onToggleAi, onCacheInsight,
 }) => {
   const dark = theme === 'dark';
   const today = getISTDateString();
@@ -297,6 +304,20 @@ const ObservatoryTab: React.FC<Props> = ({
               Alpha will never suggest sleeping less to study more.
             </p>
           </Card>
+
+          {/* Last, and least important. Everything above is arithmetic Alpha
+              does itself; this only puts some of it into sentences, and only
+              when asked. Renders nothing at all unless the deployment has the
+              feature configured. */}
+          <ExplainCard
+            experiment={experiment}
+            sleepLogs={sleep.logs}
+            ai={ai}
+            signedIn={signedIn}
+            worth={worthExplaining(experiment)}
+            onToggle={onToggleAi}
+            onCached={onCacheInsight}
+          />
         </div>
 
         <p className="o-body text-center mt-9" style={{ fontSize: 13, color: 'var(--o-ink-3)' }}>

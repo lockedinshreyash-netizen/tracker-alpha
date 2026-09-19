@@ -8,6 +8,7 @@ import PomodoroTimer from './PomodoroTimer';
 import { Recommendation } from './recommend';
 import ObservatoryStrip from '../analysis/ObservatoryStrip';
 import SleepReminder from '../analysis/SleepReminder';
+import NoticeLine from '../notify/NoticeLine';
 import { ExperimentState } from '../insight/observe';
 import NextUpStrip from '../schedule/NextUpStrip';
 import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
@@ -41,6 +42,12 @@ interface Props {
   sleep: SleepState;
   /** The door into the Observatory. Today never shows the room itself. */
   onEnterObservatory: () => void;
+  /* Set only when an app-wide announcement is live, unread, and the user has
+     closed its modal without acknowledging it. The modal is the notice; this
+     line is the way back to one that was waved off, so nothing published is
+     ever lost to a stray tap on the scrim. */
+  unreadAnnouncements: number;
+  onOpenAnnouncement: () => void;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -69,6 +76,8 @@ const TodayTab: React.FC<Props> = ({
   experiment,
   sleep,
   onEnterObservatory,
+  unreadAnnouncements,
+  onOpenAnnouncement,
 }) => {
   const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
@@ -203,6 +212,21 @@ const TodayTab: React.FC<Props> = ({
           than a task. */}
       {!timer.isRunning && !pomodoroBusy && (
         <SleepReminder sleep={sleep} theme={theme} onOpen={onEnterObservatory} />
+      )}
+
+      {/* The same line, for the same reason: something to read that is not a
+          task for today. No cross on this one — an announcement is dismissed by
+          reading it, and a line that could be flicked away without opening it
+          would be a notice that never arrived.
+
+          Hidden mid-session with everything else here. */}
+      {!timer.isRunning && !pomodoroBusy && unreadAnnouncements > 0 && (
+        <NoticeLine
+          theme={theme}
+          label="A message from LOCK IN"
+          detail={unreadAnnouncements > 1 ? `${unreadAnnouncements} unread` : 'Tap to read'}
+          onOpen={onOpenAnnouncement}
+        />
       )}
       {!timer.isRunning && (
         <section className={`p-6 md:p-10 rounded-xl border flex flex-col gap-8 md:gap-10 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>

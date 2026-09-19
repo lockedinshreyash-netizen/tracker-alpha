@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
+import { AiInsight, AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, mergeSleep, mergeAnalysis } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, DEFAULT_AI, MAX_AI_CACHE, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
 import { buildExperiment } from './insight/observe';
 import AnalysisIntro from './analysis/AnalysisIntro';
 import ObservatoryTab from './analysis/ObservatoryTab';
@@ -43,6 +43,11 @@ import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
+import { useAdmin } from './admin/useAdmin';
+import AdminTab from './admin/AdminTab';
+import { useAnnouncements } from './announce/useAnnouncements';
+import AnnouncementModal from './announce/AnnouncementModal';
+import FeedbackWidget from './feedback/FeedbackWidget';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -162,6 +167,7 @@ const App: React.FC = () => {
          themselves. */
       merged.sleep = normalizeSleep(parsed.sleep);
       merged.analysis = normalizeAnalysis(parsed.analysis);
+      merged.ai = normalizeAi(parsed.ai);
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -212,6 +218,30 @@ const App: React.FC = () => {
      and could overwrite real saved settings. isInitialSyncDone is a ref (no
      re-render), hence this companion state flag. */
   const [syncSettled, setSyncSettled] = useState(false);
+
+  /* ── Staff ──
+     Asked of the server, never read out of AppState: that blob is written by
+     this client, so a role kept there would be a privilege the client could
+     grant itself. This only decides whether the console is drawn; every query
+     it makes is re-authorized in the database. See admin/useAdmin. */
+  const { isAdmin, checked: adminChecked } = useAdmin(user);
+
+  /* ── App-wide announcements ──
+     Checked on the way into Today and nowhere else, which is the whole
+     feature: one message, one tab, one acknowledgement. Signed-out users have
+     no per-user read state to keep, so they are never shown one. */
+  const announcements = useAnnouncements(user, activeTab === 'Today');
+
+  /* A saved `lastUsedTab` of 'Admin' can outlive the role that earned it — an
+     administrator stood down, or somebody signed out on a shared laptop. Wait
+     for the answer (`adminChecked`) before acting, or an administrator's own
+     reload would bounce them off their console while the check is in flight. */
+  useEffect(() => {
+    if (activeTab === 'Admin' && adminChecked && !isAdmin) {
+      setActiveTab('Today');
+      setState(prev => (prev.lastUsedTab === 'Admin' ? { ...prev, lastUsedTab: 'Today' } : prev));
+    }
+  }, [activeTab, adminChecked, isAdmin]);
 
   const isInitialSyncDone = useRef(false);
   const isSyncingRef = useRef(false);
@@ -305,6 +335,7 @@ const App: React.FC = () => {
                  experiment's beginning forwards and shortening a day count
                  mid-session. */
               analysis: mergeAnalysis(normalizeAnalysis(prev.analysis), normalizeAnalysis(remoteState.analysis)),
+              ai: mergeAi(normalizeAi(prev.ai), normalizeAi(remoteState.ai)),
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -366,6 +397,11 @@ const App: React.FC = () => {
                 normalizeAnalysis(localState.analysis),
                 normalizeAnalysis(remoteState.analysis),
               ),
+              /* Safe to union in every path, unlike sleep or logs: a cached
+                 insight is immutable and keyed by a hash of the numbers that
+                 produced it, so there is no stale one to resurrect and nothing
+                 a merge can undo. */
+              ai: mergeAi(normalizeAi(localState.ai), normalizeAi(remoteState.ai)),
             };
           }
 
@@ -425,6 +461,7 @@ const App: React.FC = () => {
               normalizeAnalysis(localState.analysis),
               normalizeAnalysis(remoteState.analysis),
             ),
+            ai: mergeAi(normalizeAi(localState.ai), normalizeAi(remoteState.ai)),
           };
         });
       }
@@ -1082,6 +1119,51 @@ const App: React.FC = () => {
       const nextState: AppState = {
         ...prev,
         sleep: { ...current, enabled },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  const ai = state.ai ?? DEFAULT_AI;
+
+  /* Turning it off deletes what it wrote, on the device and in the cloud. The
+     student owns this text; leaving it behind after they opted out would be the
+     one thing the consent copy promises does not happen. */
+  const setAiEnabled = useCallback((enabled: boolean) => {
+    setState(prev => {
+      const nextState: AppState = {
+        ...prev,
+        ai: enabled
+          ? { ...(prev.ai ?? DEFAULT_AI), enabled: true }
+          : { enabled: false, cache: {} },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+
+    if (!enabled && user) {
+      /* Best effort and deliberately not awaited — the switch must flip
+         instantly, and a failed cleanup is retried the next time it is
+         toggled. RLS restricts this to the caller's own rows. */
+      supabase.from('ai_insights').delete().eq('user_id', user.id)
+        .then(({ error }) => { if (error) console.error('AI cleanup:', error.message); });
+    }
+  }, [user]);
+
+  const cacheInsight = useCallback((hash: string, insight: AiInsight) => {
+    setState(prev => {
+      const current = prev.ai ?? DEFAULT_AI;
+      /* Newest kept when the cap bites. An old week is the one nobody reopens,
+         and this rides in the synced blob. */
+      const entries = (Object.entries({ ...current.cache, [hash]: insight }) as [string, AiInsight][])
+        .sort((a, b) => b[1].at - a[1].at)
+        .slice(0, MAX_AI_CACHE);
+      const nextState: AppState = {
+        ...prev,
+        ai: { ...current, cache: Object.fromEntries(entries) },
         lastUpdated: Date.now(),
       };
       stateRef.current = nextState;
@@ -1862,6 +1944,7 @@ const App: React.FC = () => {
         theme={theme}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+        isAdmin={isAdmin}
       />
 
       <AuthModal
@@ -1928,6 +2011,8 @@ const App: React.FC = () => {
               experiment={experiment}
               sleep={sleep}
               onEnterObservatory={() => handleTabChange('Observatory')}
+              unreadAnnouncements={announcements.open ? 0 : announcements.queue.length}
+              onOpenAnnouncement={announcements.reopen}
             />
           )}
           {activeTab === 'Plan' && (
@@ -2018,6 +2103,13 @@ const App: React.FC = () => {
               onChangeReminders={setReminderPrefs}
             />
           )}
+          {/* Drawn only for an administrator, and `user` is guaranteed here
+              because `isAdmin` can only be true for a signed-in session.
+              Hiding it is not the control; every query inside it is refused by
+              row-level security for anybody else. */}
+          {activeTab === 'Admin' && isAdmin && user && (
+            <AdminTab adminId={user.id} theme={theme} />
+          )}
           {activeTab === 'Observatory' && (
             <ObservatoryTab
               experiment={experiment}
@@ -2032,6 +2124,10 @@ const App: React.FC = () => {
               onDeleteAllSleep={deleteAllSleep}
               onLogSleep={logSleep}
               onClearNight={clearNight}
+              ai={ai}
+              signedIn={!!user}
+              onToggleAi={setAiEnabled}
+              onCacheInsight={cacheInsight}
             />
           )}
         </main>
@@ -2064,6 +2160,42 @@ const App: React.FC = () => {
           Suppressed during the tour, which owns the screen. Renders nothing at
           all when the queue is empty, which is almost always. */}
       {!showOnboarding && <ToastHost theme={theme} />}
+
+      {/* One message from the people who make the app, on the way into Today.
+          Queued behind every other full-screen moment for the same reason
+          those are queued behind each other: two interruptions arriving at
+          once is one interruption nobody reads.
+
+          Only on Today. An announcement that could open over the Plan grid or
+          mid-way through the Observatory would be a modal that follows you
+          around the app, which is the thing this feature is deliberately not. */}
+      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod
+        && activeTab === 'Today' && announcements.current && (
+        <AnnouncementModal
+          announcement={announcements.current}
+          index={0}
+          total={announcements.queue.length}
+          theme={theme}
+          saving={announcements.saving}
+          error={announcements.error}
+          onAcknowledge={announcements.acknowledgeCurrent}
+          onAcknowledgeAll={announcements.acknowledgeAll}
+          onSetAside={announcements.setAside}
+        />
+      )}
+
+      {/* "Need help? Tell us." Bottom-left, clear of the mic in the opposite
+          corner, and gone during any full-screen moment — a floating bubble
+          over the reward modal or the book is a bubble in the way. */}
+      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen && (
+        <FeedbackWidget
+          user={user}
+          theme={theme}
+          route={activeTab}
+          railPx={sidebarCollapsed ? 60 : 200}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+        />
+      )}
 
       {/* The payoff. Held back until the tour is done and the book is closed,
           so it never lands on top of another full-screen moment. */}

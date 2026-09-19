@@ -179,7 +179,13 @@ export interface ChapterProgress {
    and the Observatory is the room you step into to look at what all of that
    has added up to. The separation is the point: the other seven ask you to do
    something, this one asks you to look. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Observatory';
+/* `Admin` is the one member of this union that is not a place in the product.
+   It is the staff console, it is absent from the rail for everybody else, and
+   — because a tab in a union is not a permission — every query it makes is
+   re-authorized in the database against the caller's own JWT. A saved
+   `lastUsedTab` of 'Admin' on an account that is no longer an administrator
+   falls back to Today; see App. */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Observatory' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -393,6 +399,47 @@ export interface AnalysisState {
   introSeen: boolean;
 }
 
+/**
+ * One generated interpretation, as it came back.
+ *
+ * Cached rather than re-derived because it is the one thing on this page that
+ * costs real money to produce. Everything else the Observatory shows is
+ * arithmetic and is recomputed on every render.
+ */
+export interface AiInsight {
+  headline: string;
+  paragraphs: string[];
+  caveat: string;
+  /** Epoch ms it was generated, so the UI can say how fresh it is. */
+  at: number;
+}
+
+/**
+ * AI preferences. Off, and off means *nothing* — see the guarantee below.
+ *
+ * Separate from every other switch on purpose. Being willing to have your
+ * numbers analysed on your own device and being willing to have them sent to a
+ * third party are two different decisions, and the second one is the only one
+ * that has a cost and a privacy cost attached. Same split `LeaderboardPrefs`
+ * makes between `enabled` and `notifications`, and `ReminderPrefs` between
+ * `enabled` and `push`.
+ *
+ * While `enabled` is false: no packet is built, no request is made, no cache is
+ * written, and the packet builder is not even downloaded — it is a dynamic
+ * import. Ten thousand users who never turn this on cost exactly nothing.
+ */
+export interface AiPrefs {
+  enabled: boolean;
+  /**
+   * packetHash -> insight. The hash covers the statistics *and* the prompt
+   * version, so a week that has not changed never regenerates, and editing the
+   * prompt correctly invalidates everything at once.
+   *
+   * Bounded by `MAX_AI_CACHE` in state.ts — this rides in the synced blob.
+   */
+  cache: Record<string, AiInsight>;
+}
+
 /* ────────────────────────────────────────────────────────────────
    SCHEDULING — the Plan tab
    ──────────────────────────────────────────────────────────────── */
@@ -564,4 +611,5 @@ export interface AppState {
      normalizers in state.ts. */
   sleep?: SleepState;
   analysis?: AnalysisState;
+  ai?: AiPrefs;
 }

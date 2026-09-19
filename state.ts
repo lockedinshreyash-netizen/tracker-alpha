@@ -1,4 +1,4 @@
-import { AnalysisState, AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
+import { AiInsight, AiPrefs, AnalysisState, AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
 import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
 export const DEFAULT_COACH: CoachState = {
@@ -459,6 +459,60 @@ export const normalizeQuestionEntries = (raw: unknown): QuestionEntry[] | undefi
   return entries.length ? entries : undefined;
 };
 
+/* ── AI ──
+   Off. Nothing is built, sent, or cached until the student asks for it. */
+export const DEFAULT_AI: AiPrefs = { enabled: false, cache: {} };
+
+/* Cached interpretations ride inside the synced blob, so the cache is bounded.
+   Twelve is about three months of weekly reviews — long enough that reopening
+   an old week is free, short enough that the blob never notices. */
+export const MAX_AI_CACHE = 12;
+
+export const normalizeAi = (raw: unknown): AiPrefs => {
+  const a = (raw && typeof raw === 'object' ? raw : {}) as Partial<AiPrefs>;
+
+  const entries = Object.entries(a.cache && typeof a.cache === 'object' ? a.cache : {})
+    .filter((e): e is [string, AiInsight] => {
+      const v = e[1] as AiInsight;
+      return !!v && typeof v === 'object'
+        && typeof v.headline === 'string'
+        && Array.isArray(v.paragraphs)
+        && Number.isFinite(v.at);
+    })
+    .map(([k, v]) => [k, {
+      /* Length-capped on the way in as well as on the way out. This text is
+         rendered into the page, and it arrives from a model through a network
+         call — trusting its shape because we asked nicely for a shape is not a
+         thing this codebase does anywhere else either. */
+      headline: v.headline.slice(0, 200),
+      paragraphs: v.paragraphs.filter(p => typeof p === 'string').slice(0, 3).map(p => p.slice(0, 600)),
+      caveat: typeof v.caveat === 'string' ? v.caveat.slice(0, 300) : '',
+      at: Math.floor(v.at),
+    }] as [string, AiInsight])
+    /* Newest kept when the cap bites — an old week is the one nobody reopens. */
+    .sort((x, y) => y[1].at - x[1].at)
+    .slice(0, MAX_AI_CACHE);
+
+  return { enabled: a.enabled === true, cache: Object.fromEntries(entries) };
+};
+
+/**
+ * Two devices' caches, unioned.
+ *
+ * Unlike `sleep` and `logs`, a union is safe in *every* sync path here: a
+ * cached insight is immutable and keyed by the hash of the numbers that
+ * produced it, so there is no such thing as a stale one and nothing to
+ * resurrect. Merging rather than last-write-wins means generating a review on
+ * the laptop does not make the phone pay for it again.
+ */
+export const mergeAi = (local: AiPrefs, remote: AiPrefs): AiPrefs => {
+  const merged = { ...remote.cache, ...local.cache };
+  const kept = Object.entries(merged)
+    .sort((x, y) => y[1].at - x[1].at)
+    .slice(0, MAX_AI_CACHE);
+  return { enabled: local.enabled, cache: Object.fromEntries(kept) };
+};
+
 export const DEFAULT_STATE: AppState = {
   currentClass: 11,
   examPreference: 'JEE',
@@ -487,4 +541,5 @@ export const DEFAULT_STATE: AppState = {
   reminders: DEFAULT_REMINDERS,
   sleep: DEFAULT_SLEEP,
   analysis: DEFAULT_ANALYSIS,
+  ai: DEFAULT_AI,
 };

@@ -10,6 +10,10 @@ interface Props {
      gap the size of the old sidebar. */
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /* Whether to draw the staff console in the rail. Server-derived (see
+     admin/useAdmin), and NOT a permission — forcing it true here gets you a
+     tab whose every query the database refuses. */
+  isAdmin: boolean;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -88,13 +92,28 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
         </svg>
       );
+    /* A key. Nothing about the study loop, and it should not pretend to be. */
+    case 'Admin':
+      return (
+        <svg {...props}>
+          <circle cx="8" cy="15" r="4" />
+          <path d="M10.8 12.2 20 3" />
+          <path d="M17 6l2.5 2.5" />
+          <path d="M14.5 8.5 17 11" />
+        </svg>
+      );
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const tabs: TabType[] = ['Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Observatory'];
+  /* Appended, never inserted: the eight the student uses keep the positions
+     their muscle memory knows, and the console arrives at the bottom. */
+  const tabs: TabType[] = [
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Observatory',
+    ...(isAdmin ? (['Admin'] as TabType[]) : []),
+  ];
   const dark = theme === 'dark';
 
   const handleTabClick = (tab: TabType) => {
@@ -168,11 +187,13 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             const isActive = activeTab === tab;
             return (
               <React.Fragment key={tab}>
-              {/* A rule above the Observatory, and nothing else in this list
-                  gets one. The seven above are places you go to do something;
-                  this is the room you step into to look at what all of it
-                  added up to, and the nav should say so before you click. */}
-              {tab === 'Observatory' && (
+              {/* A rule above the Observatory, and above the console for an
+                  administrator. The seven at the top are places you go to do
+                  something; the Observatory is the room you step into to look
+                  at what all of it added up to, and the console is not part of
+                  the student's app at all. Both deserve saying before the
+                  click. */}
+              {(tab === 'Observatory' || tab === 'Admin') && (
                 <div
                   className={`my-2 ${collapsed ? 'mx-3' : 'mx-4'}`}
                   style={{ height: 1, background: dark ? 'rgba(255,255,255,.07)' : '#E3E0D9' }}

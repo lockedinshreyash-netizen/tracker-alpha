@@ -695,3 +695,76 @@ button:active,
   background: transparent !important;
   border: 1.5px dashed var(--o-bar);
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The feedback launcher
+   ══════════════════════════════════════════════════════════════════════════
+
+   Geometry in CSS rather than in Tailwind classes, for the same reason the
+   plan grid does it: Tailwind here is the CDN script with no config, and the
+   one thing this dock genuinely needs is a media query it cannot express —
+   clearing the fixed sidebar on desktop while sitting in the corner on a
+   phone. `--rail` is set inline by the widget from the sidebar's own collapsed
+   state, so the button tracks the rail as it opens and closes.
+
+   Bottom LEFT, deliberately. The mic lives bottom-right (voice/VoiceControl),
+   and two floating circles in the same corner is how a product ends up with a
+   thumb that cannot reach either. */
+
+.fb-dock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 40;
+}
+
+.fb-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.fb-panel {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 80px;
+  z-index: 76;
+  /* The panel scrolls inside itself. On a 640px phone with the keyboard up
+     there is very little room, and a sheet that pushes its own send button off
+     the bottom of the screen is a form nobody can submit. */
+  max-height: min(72vh, 34rem);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  /* Past the rail, whatever width it currently is. */
+  .fb-dock { left: calc(var(--rail, 200px) + 16px); }
+
+  .fb-panel {
+    left: calc(var(--rail, 200px) + 16px);
+    right: auto;
+    width: 23rem;
+  }
+
+  /* On desktop the scrim exists only to catch the click that closes the
+     panel. Dimming the whole app for a 23rem popover would be theatre. */
+  .fb-scrim { background: transparent; }
+}
+
+@keyframes fb-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fb-pop {
+  animation: fb-pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: bottom left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-pop { animation: none; }
+}

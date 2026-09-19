@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SleepState } from '../types';
 import { getISTDateString } from '../utils';
+import NoticeLine from '../notify/NoticeLine';
 
 interface Props {
   sleep: SleepState;
@@ -44,7 +45,9 @@ const dismissedToday = (today: string): boolean => {
  * Three conditions, all required: sleep is on, last night is genuinely not
  * recorded, and it has not already been dismissed today. It is a line with a
  * cross on it, not a card — Today is for what you need to do today, and this is
- * a nudge about somewhere else.
+ * a nudge about somewhere else. That shape now lives in `notify/NoticeLine`,
+ * where announcements reach for it too; what stays here is the only part that
+ * is about sleep — when to show it, and what dismissing it means.
  */
 const SleepReminder: React.FC<Props> = ({ sleep, theme, onOpen }) => {
   const today = getISTDateString();
@@ -63,43 +66,14 @@ const SleepReminder: React.FC<Props> = ({ sleep, theme, onOpen }) => {
   };
 
   return (
-    <div
-      className={`obs ${theme === 'dark' ? 'obs-dark' : ''} flex items-center gap-3`}
-      style={{
-        background: 'var(--o-card)',
-        border: '1px solid var(--o-line)',
-        borderRadius: 999,
-        padding: '10px 12px 10px 18px',
-      }}
-    >
-      <span
-        className="shrink-0"
-        style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--o-accent)' }}
-        aria-hidden="true"
-      />
-      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-        <span className="o-body" style={{ fontSize: 14, color: 'var(--o-ink)', fontWeight: 600 }}>
-          Log last night's sleep
-        </span>
-        <span className="o-body ml-2" style={{ fontSize: 13.5 }}>
-          in the Observatory
-        </span>
-      </button>
-      <button
-        onClick={dismiss}
-        aria-label="Dismiss until tomorrow"
-        className="shrink-0 flex items-center justify-center transition-opacity hover:opacity-60"
-        style={{
-          width: 30, height: 30, borderRadius: 999,
-          background: 'var(--o-sunk)', color: 'var(--o-ink-3)',
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+    <NoticeLine
+      theme={theme}
+      label="Log last night's sleep"
+      detail="in the Observatory"
+      onOpen={onOpen}
+      onDismiss={dismiss}
+      dismissLabel="Dismiss until tomorrow"
+    />
   );
 };
 
