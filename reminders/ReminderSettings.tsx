@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ReminderPrefs } from '../types';
 import { formatClock, fromClockValue, toClockValue } from '../schedule/schedule';
-import { PermissionState, notificationPermission, requestNotificationPermission } from '../notify/system';
+import { PermissionState, notificationPermission, requestNotificationPermission, showSystem } from '../notify/system';
 
 interface Props {
   prefs: ReminderPrefs;
@@ -24,6 +24,43 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
   const dark = theme === 'dark';
   const [permission, setPermission] = useState<PermissionState>(notificationPermission);
   const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  /* ── The permission prompt, on its own ──
+     Every switch below used to be the only way to reach it, which meant the
+     answer to "why do I get no notifications?" was buried inside a feature the
+     user might not want. Asking here, once, separates "may this app speak" from
+     "what should it speak about". */
+  const ask = async () => {
+    setBusy(true);
+    setTestResult(null);
+    setPermission(await requestNotificationPermission());
+    setBusy(false);
+  };
+
+  /* ── The test ──
+     Deliberately `showSystem` rather than `deliver`. The router would see a
+     visible tab and correctly choose an in-app toast — which is the one thing
+     this button must not do, because a toast proves nothing about the channel
+     the user is complaining is broken. This goes through the service worker
+     registration exactly as a real reminder does, so it tests the whole path:
+     permission, worker, and the browser's own notification settings. */
+  const sendTest = async () => {
+    setBusy(true);
+    setTestResult(null);
+    const shown = await showSystem({
+      channel: 'reminder',
+      key: `test@${Date.now()}`,
+      copy: {
+        title: 'Notifications are working',
+        body: 'This is what a deadline will look like. Nothing else changes.',
+      },
+    });
+    setBusy(false);
+    setTestResult(shown
+      ? 'Sent. If nothing appeared, notifications are muted for this browser in your system settings.'
+      : 'Could not show it. Check that notifications are allowed for this site.');
+  };
 
   /* A permission revoked in browser settings turns PUSH off, and only push —
      that is the part which genuinely cannot work any more.
@@ -85,8 +122,59 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
       </button>
     );
 
+  const stateCopy: Record<PermissionState, string> = {
+    unsupported: 'This browser cannot show notifications at all.',
+    default: 'Not asked yet. Nothing can reach you until you allow it.',
+    granted: 'Allowed. Reminders and the Pomodoro bell can reach you.',
+    denied: 'Blocked. Allow notifications for this site in your browser settings, then reload.',
+  };
+
   return (
     <div className={card}>
+      {/* ── Permission ──
+          First, and above everything, because it is the gate every other
+          switch in the app depends on — the Pomodoro bell and the race alerts
+          included, and neither of those lives on this screen. A user whose
+          browser is set to Blocked can turn on every toggle in the product and
+          hear nothing, which is exactly the report this answers. */}
+      <div className="flex justify-between items-start gap-6">
+        <div className="flex-1">
+          <h4 className="text-sm font-bold uppercase font-ui">Notifications</h4>
+          <p className={`text-[11px] font-bold mt-1 uppercase ${permission === 'granted' ? 'text-zinc-500' : 'text-[#E10600]'}`}>
+            {permission === 'granted' ? 'Allowed' : permission === 'denied' ? 'Blocked by your browser' : permission === 'unsupported' ? 'Unsupported' : 'Not enabled'}
+          </p>
+          <p className={rowNote}>{stateCopy[permission]}</p>
+        </div>
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          {permission === 'default' && (
+            <button
+              onClick={ask}
+              disabled={busy}
+              className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] rounded-lg bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97 font-ui disabled:opacity-50 whitespace-nowrap"
+            >
+              Allow
+            </button>
+          )}
+          {permission === 'granted' && (
+            <button
+              onClick={sendTest}
+              disabled={busy}
+              className={`px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] rounded-lg border transition-colors active:scale-97 font-ui disabled:opacity-50 whitespace-nowrap ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-zinc-300 text-zinc-500 hover:text-zinc-700'}`}
+            >
+              Send test
+            </button>
+          )}
+        </div>
+      </div>
+
+      {testResult && (
+        <p className={`mt-3 text-[11px] font-ui leading-relaxed ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+          {testResult}
+        </p>
+      )}
+
+      <div className={`mt-6 pt-6 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`} />
+
       <div className="flex justify-between items-start gap-6">
         <div className="flex-1">
           <h4 className="text-sm font-bold uppercase font-ui">Deadline Reminders</h4>

@@ -1,24 +1,31 @@
 /* ── Service worker ──
-   One job: receive pushes when no tab of this app exists at all.
+   Two jobs: receive pushes when no tab of this app exists, and answer a failed
+   NAVIGATION with an offline page instead of the browser's error.
 
-   Deliberately NO `fetch` handler and NO caches. That is the whole design
-   decision worth recording here, because the obvious instinct is to make a
-   service worker do offline caching too, and doing that here would be a
-   mistake with nothing to gain.
+   ── Why there is now a `fetch` handler, when this file used to forbid one ──
 
-   A `fetch` handler sits in front of every request the app makes, forever. The
-   app currently loads fine, and there has never been a working service worker
-   in production to load it any differently — the previous version of this file
-   lived at the repo root, which Vite does not copy into a build, so the
-   registration 404'd and every user has always been served straight from the
-   network. Introducing a caching layer would therefore not be an optimisation
-   of existing behaviour; it would be a brand-new, app-wide change to how every
-   page load works, shipped as a side effect of adding deadline reminders. That
-   is not a trade worth making. Offline shell caching may well be worth doing
-   one day, but it is its own decision about an app that already works.
+   Because Chrome will not fire `beforeinstallprompt` without it. That is not a
+   style preference, it is the documented installability rule: since Chrome 108
+   (mobile) / 112 (desktop) a service worker is no longer needed to install from
+   the browser MENU, but "the algorithm that displays the install prompt still
+   requires the presence of a fetch() handler". No handler, no event, no custom
+   Install button — which is exactly why this app has never shown one.
 
-   So: push, notification clicks, subscription renewal. Nothing else. This
-   worker is invisible to loading, which is exactly what it should be.
+   The original objection stands in full and is not being overruled; it was
+   aimed at a CACHING fetch handler, and this is not one:
+
+     • Only `navigate` requests are intercepted. Scripts, styles, fonts, images
+       and every Supabase call are never touched — they do not reach this
+       handler at all, so there is no per-request cost and no cache to go stale.
+     • Nothing is cache-first. A navigation goes to the network exactly as it
+       does today; the cache is consulted ONLY when that network fetch throws.
+     • One file is precached, `offline.html`, and it is versioned with the
+       worker, so there is no way to pin a stale application shell.
+
+   Chrome's own guidance warns against the empty no-op fetch handler people
+   added purely to satisfy this check, because it costs performance and buys the
+   user nothing. An offline fallback is the opposite trade: the requirement is
+   met by something the user actually benefits from.
 
    (For the record, so it is not rebuilt: the previous file precached
    './index.tsx', './App.tsx' and './types.ts' — source paths that do not exist
@@ -27,10 +34,15 @@
    no `activate` step, so anything that ever did land would have been pinned
    permanently with no way out.) */
 
-/* Bumped only when this file's behaviour changes. Not a cache version — there
-   are no caches — but it makes "which worker is running" answerable in
-   DevTools without diffing source. */
-const VERSION = 'push-v1';
+/* Bumped when this file's behaviour changes. It also names the offline cache
+   below, so bumping it retires the previous one — and it makes "which worker is
+   running" answerable in DevTools without diffing source. */
+const VERSION = 'push-offline-v2';
+
+/* Bumped with VERSION so a new worker replaces the old page rather than
+   inheriting it. One entry, and it is not the app shell. */
+const OFFLINE_CACHE = `alpha-offline-${VERSION}`;
+const OFFLINE_URL = '/offline.html';
 
 /* The cache the old root-level sw.js would have created. It never populated in
    production because that file was never served, but a dev machine that ran
@@ -40,18 +52,63 @@ const LEGACY_CACHES = ['lockin-cache-v1'];
 
 const ICON = '/icon-192.png';
 
-self.addEventListener('install', () => {
-  /* Nothing to precache, so there is nothing to wait for. Taking over
-     immediately means a user who enables reminders is not told to reload
-     before the first one can arrive. */
-  self.skipWaiting();
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(OFFLINE_CACHE);
+      /* `reload` so a worker update never re-stores the copy the previous
+         worker's own cache handed back. */
+      await cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
+    } catch {
+      /* A failed precache must not fail the install — the worker's real job is
+         push, and a missing fallback page only costs the offline courtesy.
+         `cache.addAll` rejecting as a unit is what broke the previous worker
+         here; one optional entry in a try is the lesson from it. */
+    }
+    /* Taking over immediately means a user who enables reminders is not told to
+       reload before the first one can arrive. */
+    self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
-    await Promise.all(names.filter(n => LEGACY_CACHES.includes(n)).map(n => caches.delete(n)));
+    await Promise.all(
+      names
+        /* The dead worker's cache, plus every previous version of our own —
+           anything that is not the cache this worker just filled. */
+        .filter(n => LEGACY_CACHES.includes(n) || (n.startsWith('alpha-offline-') && n !== OFFLINE_CACHE))
+        .map(n => caches.delete(n)),
+    );
     await self.clients.claim();
+  })());
+});
+
+/* ── Fetch: navigations only ──
+   Read the header before changing this. The narrowness IS the design.
+
+   `request.mode === 'navigate'` is true for exactly one request per page load —
+   the document itself. Everything else returns immediately without calling
+   `respondWith`, which hands the request straight back to the browser as though
+   this handler did not exist.
+
+   Network first, always. The cached page is reached only by the `catch`, i.e.
+   only when the device is genuinely offline, so a deploy is never shadowed by a
+   stale copy of the app. */
+self.addEventListener('fetch', event => {
+  if (event.request.mode !== 'navigate') return;
+
+  event.respondWith((async () => {
+    try {
+      return await fetch(event.request);
+    } catch {
+      const cached = await caches.match(OFFLINE_URL);
+      /* If even the fallback is missing, re-throwing would show the browser's
+         own error page — which is the behaviour we had before this handler, so
+         it is the correct thing to fall back to. */
+      return cached ?? Response.error();
+    }
   })());
 });
 

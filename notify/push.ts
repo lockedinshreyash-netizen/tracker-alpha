@@ -32,11 +32,19 @@ const urlBase64ToUint8Array = (base64: string): Uint8Array => {
   return out;
 };
 
-const keyOf = (sub: PushSubscription, name: 'p256dh' | 'auth'): string => {
-  const key = sub.getKey(name);
-  if (!key) return '';
-  return btoa(String.fromCharCode(...new Uint8Array(key)));
-};
+/* ── Why `toJSON()` and not `getKey()` ──
+   These two values are re-encoded and handed to a server that must decode them
+   to derive the message encryption. The Push API already publishes them in the
+   one encoding every push server expects — `subscription.toJSON().keys` is
+   base64URL, per spec, produced by the browser.
+
+   This used to read the raw bytes with `getKey()` and re-encode them with
+   `btoa`, which produces standard base64: a different alphabet (`+` and `/`
+   instead of `-` and `_`) plus `=` padding. Over an 88-character key at least
+   one substituted character is near-certain, so the server's base64url decode
+   would reject essentially every subscription. Nobody had hit it because push
+   has never been deployed — which is exactly the kind of bug that survives to
+   launch day. */
 
 /** Store this device's endpoint against the signed-in user. */
 export const publishSubscription = async (sub: PushSubscription): Promise<boolean> => {
@@ -44,7 +52,7 @@ export const publishSubscription = async (sub: PushSubscription): Promise<boolea
   if (!user) return false;
 
   const json = sub.toJSON();
-  if (!json.endpoint) return false;
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
 
   /* The endpoint is the primary key, so re-subscribing on this device replaces
      this device's row rather than adding a fourth one for a user with three
@@ -52,8 +60,8 @@ export const publishSubscription = async (sub: PushSubscription): Promise<boolea
   const { error } = await supabase.from('push_subscriptions').upsert({
     endpoint: json.endpoint,
     user_id: user.id,
-    p256dh: keyOf(sub, 'p256dh'),
-    auth: keyOf(sub, 'auth'),
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
     user_agent: navigator.userAgent.slice(0, 300),
     last_seen_at: new Date().toISOString(),
     failure_count: 0,

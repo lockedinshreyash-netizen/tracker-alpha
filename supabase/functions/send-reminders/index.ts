@@ -36,6 +36,49 @@ const secretMatches = (given: string, expected: string): boolean => {
   return diff === 0;
 };
 
+/* ── VAPID keys: base64url in, JWK out ──
+   `importVapidKeys` takes `JsonWebKey` objects, and every VAPID generator in
+   existence — `npx web-push generate-vapid-keys`, and the snippet in this
+   function's README — emits two base64url strings instead. Handing those
+   strings straight to it (which is what this function used to do) throws
+   inside `crypto.importKey` on the very first invocation.
+
+   The conversion is mechanical. A VAPID public key is the uncompressed P-256
+   point `0x04 || X(32) || Y(32)`; the private key is the 32-byte scalar `d`.
+   A JWK wants those three coordinates separately, still base64url, and the
+   private JWK needs X and Y alongside `d`. */
+
+const b64urlToBytes = (s: string): Uint8Array => {
+  const padded = s.replace(/-/g, '+').replace(/_/g, '/')
+    + '='.repeat((4 - (s.length % 4)) % 4);
+  const raw = atob(padded);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+};
+
+const bytesToB64url = (b: Uint8Array): string =>
+  btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const vapidJwks = (publicKey: string, privateKey: string) => {
+  const pub = b64urlToBytes(publicKey);
+  if (pub.length !== 65 || pub[0] !== 0x04) {
+    throw new Error(`VAPID_PUBLIC_KEY must be a 65-byte uncompressed P-256 point, got ${pub.length} bytes`);
+  }
+  const d = b64urlToBytes(privateKey);
+  if (d.length !== 32) {
+    throw new Error(`VAPID_PRIVATE_KEY must be 32 bytes, got ${d.length}`);
+  }
+
+  const x = bytesToB64url(pub.slice(1, 33));
+  const y = bytesToB64url(pub.slice(33, 65));
+
+  return {
+    publicKey: { kty: 'EC', crv: 'P-256', x, y, ext: true } as JsonWebKey,
+    privateKey: { kty: 'EC', crv: 'P-256', x, y, d: bytesToB64url(d), ext: true } as JsonWebKey,
+  };
+};
+
 Deno.serve(async req => {
   const expected = Deno.env.get('CRON_SECRET') ?? '';
   const given = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
@@ -46,16 +89,20 @@ Deno.serve(async req => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  const server = await webpush.ApplicationServer.new({
-    contactInformation: Deno.env.get('VAPID_SUBJECT') ?? 'mailto:noreply@example.com',
-    vapidKeys: await webpush.importVapidKeys(
-      {
-        publicKey: Deno.env.get('VAPID_PUBLIC_KEY')!,
-        privateKey: Deno.env.get('VAPID_PRIVATE_KEY')!,
-      },
-      { extractable: false },
-    ),
-  });
+  let server: webpush.ApplicationServer;
+  try {
+    server = await webpush.ApplicationServer.new({
+      contactInformation: Deno.env.get('VAPID_SUBJECT') ?? 'mailto:noreply@example.com',
+      vapidKeys: await webpush.importVapidKeys(
+        vapidJwks(Deno.env.get('VAPID_PUBLIC_KEY')!, Deno.env.get('VAPID_PRIVATE_KEY')!),
+        { extractable: false },
+      ),
+    });
+  } catch (e) {
+    /* Bad or missing keys. Said plainly and once, rather than throwing a raw
+       WebCrypto error into the cron's logs every single minute forever. */
+    return ok({ error: 'vapid_misconfigured', detail: String(e) }, 503);
+  }
 
   const { data: due, error: dueError } = await supabase
     .from('due_reminders')

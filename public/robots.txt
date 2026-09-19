@@ -1,0 +1,5 @@
+# Tracker Alpha — https://trackeralpha.in
+User-agent: *
+Allow: /
+
+Sitemap: https://trackeralpha.in/sitemap.xml

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "voice:generate": "node scripts/generate-voice.ts",
-    "voice:check": "node scripts/check-voice.ts"
+    "voice:check": "node scripts/check-voice.ts",
+    "assets:generate": "node scripts/generate-assets.mjs public"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.39.7",

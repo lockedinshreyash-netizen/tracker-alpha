@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One URL, because the app is one URL. Tabs are React state, not routes: there
+  is no /streak or /plan for a crawler to fetch, and listing them would be
+  listing pages that return the same document. A sitemap that lies is worse than
+  a short one.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://trackeralpha.in/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

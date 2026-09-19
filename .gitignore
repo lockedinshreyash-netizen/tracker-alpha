@@ -20,6 +20,10 @@ dist-ssr
 .env.*
 !.env.example
 
+# The generated VAPID pair, so the private half is reachable for
+# `supabase secrets set` without ever being committed.
+vapid.local.json
+
 .claude/settings.local.json
 
 # Editor directories and files

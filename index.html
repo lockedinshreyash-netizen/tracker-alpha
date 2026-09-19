@@ -4,11 +4,110 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#F2F0EC" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       Search and social
+       ───────────────────────────────────────────────────────────────────────
+       This block is what a crawler sees. The app is a single-page React bundle,
+       so a crawler that does not execute JavaScript sees THIS and nothing else
+       — the <div id="root"> below is empty until the bundle boots. Every claim
+       about what Tracker Alpha is has to be here, in the HTML, or it is not
+       being made at all.
+
+       One name, everywhere. The title, the manifest and the structured data all
+       say "Tracker Alpha"; before this they said three different things
+       (LOCK IN JEE'27 Tracker / Tracker Alpha / LOCK IN), which splits the
+       ranking signal across three brands and leaves the result looking
+       unowned. "LOCK IN" survives as the in-app wordmark, which is the right
+       place for it.
+
+       Absolute URLs throughout. Crawlers and social unfurlers resolve og:image
+       and canonical against their own origin, not the page's, so a relative
+       path here is a missing image everywhere it matters.
+       ══════════════════════════════════════════════════════════════════════ -->
+
+  <title>Tracker Alpha — Free JEE 2027 Study Tracker</title>
+  <meta name="description"
+    content="Free study tracker for JEE 2027 aspirants. Log study hours, plan your whole day, track syllabus and questions chapter by chapter, and hold a daily streak. No fluff." />
+  <link rel="canonical" href="https://trackeralpha.in/" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="author" content="Tracker Alpha" />
+
+  <!-- Two colours, because the app has two themes and the browser chrome should
+       not fight the page it is wrapping. -->
+  <meta name="theme-color" content="#0B0B0D" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F2F0EC" media="(prefers-color-scheme: light)" />
+
+  <!-- Icons. `favicon.ico` is the one Google's result row actually reads: it
+       fetches /favicon.ico and the <link rel="icon"> set, and before this the
+       page declared neither, which is why the search result has no logo. -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Open Graph — WhatsApp, Telegram, LinkedIn, Discord, iMessage. WhatsApp is
+       the one that matters for this audience, and it is also the strictest:
+       it wants an absolute https image and gives up quietly without one. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Tracker Alpha" />
+  <meta property="og:title" content="Tracker Alpha — Free JEE 2027 Study Tracker" />
+  <meta property="og:description"
+    content="Log study hours, plan your whole day, track syllabus and questions, and hold a daily streak. Free, no fluff." />
+  <meta property="og:url" content="https://trackeralpha.in/" />
+  <meta property="og:image" content="https://trackeralpha.in/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Tracker Alpha — the free JEE 2027 study tracker" />
+  <meta property="og:locale" content="en_IN" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Tracker Alpha — Free JEE 2027 Study Tracker" />
+  <meta name="twitter:description"
+    content="Log study hours, plan your whole day, track syllabus and questions, and hold a daily streak. Free, no fluff." />
+  <meta name="twitter:image" content="https://trackeralpha.in/og-image.png" />
+
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>LOCK IN JEE’27 Tracker</title>
-  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-title" content="Alpha">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Structured data. This is what lets a result carry a name, a rating slot
+       and a price rather than a bare blue link. `offers` at 0 is not decoration:
+       "free" is the single most load-bearing word in this product's pitch, and
+       SoftwareApplication is the only way to state it as a fact rather than as
+       marketing inside a description. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Tracker Alpha",
+    "alternateName": "LOCK IN",
+    "url": "https://trackeralpha.in/",
+    "description": "Free study tracker for JEE 2027 aspirants. Log study hours, plan your whole day, track syllabus and questions chapter by chapter, and hold a daily streak.",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Any — web browser, installable on Android and iOS",
+    "browserRequirements": "Requires JavaScript.",
+    "inLanguage": "en-IN",
+    "isAccessibleForFree": true,
+    "image": "https://trackeralpha.in/og-image.png",
+    "screenshot": "https://trackeralpha.in/og-image.png",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "INR"
+    },
+    "featureList": [
+      "Study session timer with focus quality and distraction tracking",
+      "Full-day planner with repeating blocks and plan-vs-actual adherence",
+      "Class 11 and 12 syllabus progress for JEE and NEET",
+      "Practice question tracking with weekly goals",
+      "Daily streaks and milestone rewards",
+      "Daily hours leaderboard"
+    ]
+  }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

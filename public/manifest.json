@@ -1,21 +1,36 @@
 {
-  "name": "Tracker Alpha",
+  "id": "/",
+  "name": "Tracker Alpha — JEE 2027 Study Tracker",
   "short_name": "Alpha",
-  "description": "Discipline-first tracker for JEE 2027 aspirants.",
+  "description": "The free JEE 2027 study tracker. Log hours, plan your day, track syllabus and questions, and hold a streak. No fluff.",
+  "lang": "en-IN",
+  "dir": "ltr",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
   "background_color": "#0B0B0D",
   "theme_color": "#0B0B0D",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Offline · Tracker Alpha</title>
+  <!--
+    Reached only when a navigation fails with no network (see the fetch handler
+    in sw.js). Deliberately self-contained: no stylesheet, no font CDN, no
+    script. Every external reference here would be a second thing to fail on a
+    page whose entire job is to work when nothing loads.
+
+    The voice is the app's, minus the pressure. Somebody on a train with no
+    signal has not slacked off, and telling them the competition is studying
+    would be the app being stupid rather than blunt.
+  -->
+  <style>
+    :root { color-scheme: dark; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0B0B0D;
+      color: #FAFAF9;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      min-height: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px 24px;
+      background: radial-gradient(120% 80% at 50% 0%, rgba(225, 6, 0, 0.14) 0%, transparent 62%);
+    }
+
+    img { width: 72px; height: 72px; }
+
+    h1 {
+      margin: 28px 0 0;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+    }
+
+    .rule { width: 56px; height: 3px; background: #E10600; margin: 18px 0; }
+
+    p {
+      margin: 0;
+      max-width: 30rem;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #A1A1AA;
+    }
+
+    button {
+      margin-top: 32px;
+      padding: 14px 32px;
+      border: 0;
+      border-radius: 10px;
+      background: #E10600;
+      color: #fff;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    button:active { transform: scale(0.98); }
+
+    small {
+      margin-top: 40px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #52525B;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <img src="/icon-192.png" alt="Tracker Alpha" />
+    <h1>No connection</h1>
+    <div class="rule"></div>
+    <p>
+      Tracker Alpha could not reach the network. Your logs, plan and streak are
+      stored on this device — nothing has been lost, and everything syncs the
+      moment you are back online.
+    </p>
+    <button onclick="location.reload()">Try again</button>
+    <small>Tracker Alpha</small>
+  </main>
+</body>
+
+</html>

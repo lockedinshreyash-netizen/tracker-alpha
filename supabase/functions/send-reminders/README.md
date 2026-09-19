@@ -12,22 +12,33 @@ control.
 
 ---
 
-## 1. Generate a VAPID key pair
+## 1. The VAPID key pair — already generated
+
+A pair has been generated for this project and written to **`vapid.local.json`**
+in the repo root. That file is gitignored and must stay that way.
+
+To generate a fresh pair instead (both formats below are base64url, which is what
+`npx --yes web-push generate-vapid-keys` also emits):
 
 ```bash
-npx --yes web-push generate-vapid-keys
+node -e "const{webcrypto:c}=require('crypto');(async()=>{const k=await c.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);console.log('public :',Buffer.from(await c.subtle.exportKey('raw',k.publicKey)).toString('base64url'));console.log('private:',(await c.subtle.exportKey('jwk',k.privateKey)).d)})()"
 ```
 
-`npx`, not an install — nothing lands in `package.json`. Keep both values.
+**The private key never enters this repo.** It exists only in `vapid.local.json`
+locally and as a Supabase function secret (step 4).
 
-**The private key never enters this repo.** It exists only as a Supabase function
-secret (step 4). `.gitignore` covers `.env` and `.env.*` as a guard, but the rule
-is the habit, not the file.
+> **Format note.** `@negrel/webpush`'s `importVapidKeys` takes `JsonWebKey`
+> objects, while every VAPID generator emits base64url strings. The function used
+> to hand the raw env strings straight to it, which throws inside
+> `crypto.importKey` on the first invocation — `vapidJwks()` in `index.ts` now
+> does the conversion, so the base64url values below are the correct thing to set.
 
 ## 2. Client env
 
-```bash
-echo 'VITE_VAPID_PUBLIC_KEY=BJ…' >> .env.local
+Already written to `.env.local`:
+
+```
+VITE_VAPID_PUBLIC_KEY=<the public key>
 ```
 
 The public key is public by definition — it is handed to the browser's push
@@ -50,14 +61,22 @@ feature.
 npx supabase login
 npx supabase link --project-ref <PROJECT_REF>
 
+# Every value is read out of the gitignored file rather than pasted into a
+# shell history. CRON_SECRET is NOT generated inline here on purpose: step 6
+# needs the same value again, and `$(openssl rand -hex 32)` inline would set a
+# secret nobody ever sees.
 npx supabase secrets set \
-  VAPID_PUBLIC_KEY=BJ… \
-  VAPID_PRIVATE_KEY=k7… \
-  VAPID_SUBJECT=mailto:you@example.com \
-  CRON_SECRET=$(openssl rand -hex 32)
+  VAPID_PUBLIC_KEY="$(node -p "require('./vapid.local.json').publicKey")" \
+  VAPID_PRIVATE_KEY="$(node -p "require('./vapid.local.json').privateKey")" \
+  VAPID_SUBJECT="$(node -p "require('./vapid.local.json').subject")" \
+  CRON_SECRET="$(node -p "require('./vapid.local.json').cronSecret")"
 ```
 
-Keep the `CRON_SECRET` value — step 6 needs it. `SUPABASE_URL` and
+`vapid.local.json` holds all four. Print the cron secret when step 6 needs it:
+
+```bash
+node -p "require('./vapid.local.json').cronSecret"
+``` `SUPABASE_URL` and
 `SUPABASE_SERVICE_ROLE_KEY` are injected automatically; do not set them.
 
 ## 5. Deploy the function
@@ -99,9 +118,11 @@ cannot work without it.
 In order, because each step depends on the one above:
 
 1. **Worker.** DevTools → Application → Service Workers shows `/sw.js` activated
-   at scope `/`. **Cache Storage must be empty** — this worker is push-only and
-   installs no `fetch` handler, so it must be invisible to page loads. A Network
-   recording of a reload should look exactly as it did before.
+   at scope `/`. **Cache Storage must hold exactly one entry, `/offline.html`.**
+   The worker's `fetch` handler is navigation-only and network-first, so a
+   Network recording of a reload should look as it always did; anything else in
+   that cache means somebody has started caching the app shell, which this
+   worker deliberately does not do.
 2. **Delivery.** DevTools → Application → Service Workers → *Push*, with a
    payload like `{"title":"Test","body":"Hello","key":"t@1"}`. A notification
    appears; clicking it focuses the existing tab rather than opening a second

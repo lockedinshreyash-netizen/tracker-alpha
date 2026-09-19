@@ -48,6 +48,8 @@ import AdminTab from './admin/AdminTab';
 import { useAnnouncements } from './announce/useAnnouncements';
 import AnnouncementModal from './announce/AnnouncementModal';
 import FeedbackWidget from './feedback/FeedbackWidget';
+import { useInstall } from './install/useInstall';
+import InstallBanner from './install/InstallBanner';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -970,40 +972,19 @@ const App: React.FC = () => {
   }, [state.tasks, reminderPrefs, user]);
 
   /* ── Install to the home screen ──
-     `Header` has always rendered an install button when handed a prompt, and
-     has always been handed null. Wiring it matters now for a specific reason:
-     iOS delivers Web Push ONLY to a PWA installed to the home screen, so
-     without this an iPhone user can turn on closed-app reminders and never
-     receive one, with nothing anywhere explaining why.
+     Moved wholesale into `install/useInstall`, which also serves the mobile
+     banner. It matters for a reason beyond convenience: iOS delivers Web Push
+     ONLY to a PWA installed to the home screen, so without this an iPhone user
+     can turn on closed-app reminders and never receive one, with nothing
+     anywhere explaining why.
 
-     iOS never fires `beforeinstallprompt` at all, so it gets instructions
-     rather than a button — see the Header's own copy. */
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      /* Without preventDefault Chrome shows its own mini-infobar and the event
-         cannot be replayed later from our own button. */
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    const onInstalled = () => setInstallPrompt(null);
-    window.addEventListener('beforeinstallprompt', onPrompt);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
-
-  const handleInstall = useCallback(async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    try { await installPrompt.userChoice; } catch { /* dismissed */ }
-    /* The event is single-use: a prompt that has been shown cannot be shown
-       again, so holding on to it would leave a button that silently does
-       nothing. */
-    setInstallPrompt(null);
-  }, [installPrompt]);
+     For the record of what was actually wrong: `Header` has always rendered an
+     Install button when handed a prompt, and the prompt never arrived — Chrome
+     fires `beforeinstallprompt` only for a page whose service worker has a
+     `fetch` handler, and ours deliberately had none. The worker now carries a
+     navigation-only offline fallback, which satisfies that rule with something
+     the user gains from. */
+  const install = useInstall();
 
   /* A notification opened from the lock screen focuses this tab and posts here.
      The worker deliberately does no routing of its own — it has no idea what
@@ -1967,8 +1948,8 @@ const App: React.FC = () => {
           daysRemaining={daysRemaining}
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-          installPrompt={installPrompt}
-          onInstall={handleInstall}
+          installPrompt={install.mode === 'prompt' ? true : null}
+          onInstall={() => { void install.install(); }}
           syncStatus={syncStatus}
           user={user}
           onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -2182,6 +2163,14 @@ const App: React.FC = () => {
           onAcknowledgeAll={announcements.acknowledgeAll}
           onSetAside={announcements.setAside}
         />
+      )}
+
+      {/* One offer, on a phone, once. Held back behind every full-screen moment
+          for the same reason everything else here is: the first run already has
+          a landing page and a tour, and a third thing asking for a tap on top
+          of those is how all three get dismissed unread. */}
+      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen && (
+        <InstallBanner install={install} theme={theme} />
       )}
 
       {/* "Need help? Tell us." Bottom-left, clear of the mic in the opposite
