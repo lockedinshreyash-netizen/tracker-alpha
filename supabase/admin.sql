@@ -239,12 +239,17 @@ create table if not exists public.announcements (
   expires_at   timestamptz,
 
   constraint announcement_type_valid
-    check (type in ('announcement', 'update', 'important', 'maintenance')),
+    check (type in ('announcement', 'update', 'important', 'maintenance', 'poll', 'video')),
   -- Bounded because both strings are rendered verbatim into a modal every user
   -- of the app will see. Long enough for a real message, short enough that it
   -- cannot become a wall.
   constraint announcement_title_len check (char_length(trim(title)) between 3 and 90),
-  constraint announcement_body_len  check (char_length(trim(body)) between 3 and 1200),
+  -- A poll's question is its title and a video's subject is its title, so both
+  -- are allowed an empty body. The four prose types still have to say something.
+  constraint announcement_body_len  check (
+    char_length(trim(body)) <= 1200
+    and (type in ('poll', 'video') or char_length(trim(body)) >= 3)
+  ),
   -- An expiry before publication would be a notice that is live and expired at
   -- the same instant; the visibility policy would simply never match it.
   constraint announcement_window
@@ -355,39 +360,11 @@ create policy "own reads deletable"
 -- The console's list: every announcement, plus how many people have actually
 -- acknowledged it. Counted in the database rather than by pulling the reads
 -- table into the browser, for the obvious reason.
-create or replace function public.admin_list_announcements()
-returns table (
-  id           uuid,
-  title        text,
-  body         text,
-  type         text,
-  created_at   timestamptz,
-  published_at timestamptz,
-  expires_at   timestamptz,
-  read_count   bigint
-)
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-begin
-  if not public.is_admin() then
-    raise exception 'not authorized' using errcode = '42501';
-  end if;
-
-  return query
-    select a.id, a.title, a.body, a.type, a.created_at, a.published_at, a.expires_at,
-           count(r.user_id) as read_count
-    from public.announcements a
-    left join public.announcement_reads r on r.announcement_id = a.id
-    group by a.id
-    order by a.created_at desc;
-end;
-$$;
-
-revoke all on function public.admin_list_announcements() from public;
-grant execute on function public.admin_list_announcements() to authenticated;
+-- The console's listing function — every announcement plus its reach — lives at
+-- the END of this file instead of here. It reads the poll tables added in §9,
+-- and while plpgsql would resolve those names at call time rather than at
+-- creation, a definition that only works because of that is a definition that
+-- breaks the first time somebody reorders the file.
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -606,3 +583,362 @@ grant execute on function public.admin_list_feedback(text, int) to authenticated
 -- ═══════════════════════════════════════════════════════════════════════════
 
 --   alter publication supabase_realtime add table public.announcements;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 9. Polls and video announcements
+--
+-- Added after §1–§8 shipped, so everything here is an ALTER rather than a
+-- rewrite: the file stays re-runnable against a database that already has the
+-- original four announcement types in it.
+--
+-- TWO NEW TYPES, TWO DIFFERENT SHAPES OF EXTRA DATA.
+--
+--   video — one string, so it is one column on `announcements`.
+--   poll  — a list the user votes against, so it is two tables.
+--
+-- The poll is the interesting one, and the design turns on a single rule:
+-- NOBODY EVER READS ANOTHER PERSON'S VOTE. Not another student, and not an
+-- administrator. Results exist only as aggregates, returned by one function
+-- that counts rows the caller cannot select. A poll that quietly tells staff
+-- who picked what is a different product from the one this claims to be, and
+-- the users it would be reporting on are minors.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+alter table public.announcements
+  -- 'private' → only administrators may read the tally.
+  -- 'live'    → every signed-in user may, and the app refreshes it as votes land.
+  add column if not exists poll_visibility text,
+  -- The 11-character YouTube id, never a URL. The admin pastes whatever link
+  -- they have and the client extracts this; storing the raw URL would mean the
+  -- embed is built from user input, which is how an iframe src becomes a
+  -- vulnerability.
+  add column if not exists video_id text;
+
+-- Postgres has no `add constraint if not exists`, so every one of these is a
+-- drop-then-add. Re-running the file is therefore safe, and an existing
+-- database picks up the widened type list here rather than from the CREATE
+-- TABLE above, which does nothing once the table exists.
+alter table public.announcements drop constraint if exists announcement_type_valid;
+alter table public.announcements add constraint announcement_type_valid
+  check (type in ('announcement', 'update', 'important', 'maintenance', 'poll', 'video'));
+
+alter table public.announcements drop constraint if exists announcement_body_len;
+alter table public.announcements add constraint announcement_body_len check (
+  char_length(trim(body)) <= 1200
+  and (type in ('poll', 'video') or char_length(trim(body)) >= 3)
+);
+
+alter table public.announcements drop constraint if exists announcement_poll_shape;
+alter table public.announcements add constraint announcement_poll_shape check (
+  -- Biconditional, deliberately: a poll must declare a visibility, and nothing
+  -- that is not a poll may carry one. Without the second half, changing a
+  -- poll's type would leave a stale setting behind that the UI would not show
+  -- and the results function would still act on.
+  (type = 'poll') = (poll_visibility is not null)
+  and (poll_visibility is null or poll_visibility in ('private', 'live'))
+);
+
+alter table public.announcements drop constraint if exists announcement_video_shape;
+alter table public.announcements add constraint announcement_video_shape check (
+  (type = 'video') = (video_id is not null)
+  -- Exactly YouTube's id alphabet and length. This value is interpolated into
+  -- an iframe src, so it is validated as a shape rather than trusted as a
+  -- string — the one field in this schema that reaches an embed.
+  and (video_id is null or video_id ~ '^[A-Za-z0-9_-]{11}$')
+);
+
+
+-- ── The options ────────────────────────────────────────────────────────────
+
+create table if not exists public.announcement_poll_options (
+  id              uuid primary key default gen_random_uuid(),
+  announcement_id uuid not null references public.announcements (id) on delete cascade,
+  -- `idx`, not `position`: POSITION is a SQL function name, and a RETURNS TABLE
+  -- output parameter called `position` collides with it inside plpgsql.
+  idx             int  not null,
+  label           text not null,
+
+  unique (announcement_id, idx),
+  constraint poll_option_label_len check (char_length(trim(label)) between 1 and 80)
+);
+
+create index if not exists poll_options_by_announcement
+  on public.announcement_poll_options (announcement_id, idx);
+
+alter table public.announcement_poll_options enable row level security;
+
+-- ── Why this policy is a bare EXISTS ──
+-- It does not repeat the published/expired predicate from the announcements
+-- policy, and it must not. A subquery inside a policy is executed with the
+-- calling user's own permissions, so row-level security on `announcements`
+-- applies to it: the row is found only if the caller could have selected the
+-- announcement itself. Restating the predicate would be a second copy to keep
+-- in sync, and the copy that drifts is the one that leaks a draft.
+drop policy if exists "poll options follow their announcement" on public.announcement_poll_options;
+create policy "poll options follow their announcement"
+  on public.announcement_poll_options for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.announcements a
+      where a.id = announcement_poll_options.announcement_id
+    )
+  );
+
+drop policy if exists "admins write poll options" on public.announcement_poll_options;
+create policy "admins write poll options"
+  on public.announcement_poll_options for all
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+
+-- ── The votes ──────────────────────────────────────────────────────────────
+
+create table if not exists public.announcement_poll_votes (
+  announcement_id uuid not null references public.announcements (id) on delete cascade,
+  user_id         uuid not null references auth.users (id) on delete cascade,
+  option_id       uuid not null references public.announcement_poll_options (id) on delete cascade,
+  voted_at        timestamptz not null default now(),
+
+  -- One vote per person per poll, enforced by the key rather than by the app —
+  -- the same trick `announcement_reads` uses. Changing your mind is an UPDATE
+  -- of this row, so there is no way to accumulate two.
+  primary key (announcement_id, user_id)
+);
+
+create index if not exists poll_votes_by_option
+  on public.announcement_poll_votes (option_id);
+
+alter table public.announcement_poll_votes enable row level security;
+
+-- ── You may read exactly one vote row: your own ──
+-- There is deliberately no administrator clause here. Staff read the tally
+-- through `poll_results()` and cannot read this table at all, so "who voted for
+-- what" is not a question the product is able to answer. That is a decision
+-- about minors' data, not an oversight — see this section's header.
+drop policy if exists "read own vote" on public.announcement_poll_votes;
+create policy "read own vote"
+  on public.announcement_poll_votes for select
+  to authenticated
+  using (auth.uid() = announcement_poll_votes.user_id);
+
+-- Casting a vote. The EXISTS does two jobs at once: it proves the option
+-- belongs to THIS poll (so a crafted request cannot add a vote for an option of
+-- some other announcement), and — because the options policy above is itself
+-- subject to the announcements policy — it proves the poll is one the caller is
+-- allowed to see at all. A draft cannot be voted on.
+drop policy if exists "cast own vote" on public.announcement_poll_votes;
+create policy "cast own vote"
+  on public.announcement_poll_votes for insert
+  to authenticated
+  with check (
+    auth.uid() = announcement_poll_votes.user_id
+    and exists (
+      select 1 from public.announcement_poll_options o
+      where o.id = announcement_poll_votes.option_id
+        -- FULLY QUALIFIED, and it has to be. `announcement_poll_options` has an
+        -- `announcement_id` column of its own, so an unqualified reference here
+        -- binds to the INNER row and the condition silently degrades to
+        -- `o.announcement_id = o.announcement_id` — always true. That would let
+        -- a crafted request file a vote against this poll while pointing at an
+        -- option belonging to a different one.
+        and o.announcement_id = announcement_poll_votes.announcement_id
+    )
+  );
+
+drop policy if exists "change own vote" on public.announcement_poll_votes;
+create policy "change own vote"
+  on public.announcement_poll_votes for update
+  to authenticated
+  using (auth.uid() = announcement_poll_votes.user_id)
+  with check (
+    auth.uid() = announcement_poll_votes.user_id
+    and exists (
+      select 1 from public.announcement_poll_options o
+      where o.id = announcement_poll_votes.option_id
+        and o.announcement_id = announcement_poll_votes.announcement_id
+    )
+  );
+
+drop policy if exists "retract own vote" on public.announcement_poll_votes;
+create policy "retract own vote"
+  on public.announcement_poll_votes for delete
+  to authenticated
+  using (auth.uid() = announcement_poll_votes.user_id);
+
+
+-- ── The tally ──────────────────────────────────────────────────────────────
+-- The only way anybody sees a result. Definer, because it counts rows in a
+-- table no client may select — which is exactly what makes aggregate-only
+-- access possible.
+create or replace function public.poll_results(p_announcement uuid)
+returns table (opt_id uuid, opt_idx int, opt_label text, vote_count bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_visibility text;
+  v_published  timestamptz;
+  v_expires    timestamptz;
+  v_admin      boolean := public.is_admin();
+begin
+  select a.poll_visibility, a.published_at, a.expires_at
+    into v_visibility, v_published, v_expires
+  from public.announcements a
+  where a.id = p_announcement;
+
+  if v_visibility is null then
+    raise exception 'not a poll' using errcode = 'P0002';
+  end if;
+
+  if not v_admin then
+    -- A private poll's tally is for staff. The app never offers it to anyone
+    -- else, and this is the reason that stays true when the app is bypassed.
+    if v_visibility <> 'live' then
+      raise exception 'results are private' using errcode = '42501';
+    end if;
+    -- And a live poll's tally is still only readable while the poll itself is.
+    if v_published is null or v_published > now()
+       or (v_expires is not null and v_expires <= now()) then
+      raise exception 'not authorized' using errcode = '42501';
+    end if;
+  end if;
+
+  return query
+    select o.id, o.idx, o.label, count(w.user_id)
+    from public.announcement_poll_options o
+    left join public.announcement_poll_votes w on w.option_id = o.id
+    where o.announcement_id = p_announcement
+    group by o.id, o.idx, o.label
+    order by o.idx;
+end;
+$$;
+
+revoke all on function public.poll_results(uuid) from public;
+grant execute on function public.poll_results(uuid) to authenticated;
+
+
+-- ── Creating one ───────────────────────────────────────────────────────────
+-- A poll is an announcement plus its options, and the two must land together or
+-- not at all. Through PostgREST that is two requests and therefore two chances
+-- to leave a poll with no options on somebody's Today page. One function, one
+-- transaction, and the same guard as everything else in this file.
+--
+-- All six types go through it rather than only the poll, so there is one
+-- creation path to reason about. The INSERT policy in §3 stays as the backstop.
+create or replace function public.admin_create_announcement(
+  p_title           text,
+  p_body            text,
+  p_type            text,
+  p_publish         boolean default false,
+  p_expires_at      timestamptz default null,
+  p_poll_visibility text default null,
+  p_video_id        text default null,
+  p_options         text[] default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id     uuid;
+  v_label  text;
+  v_i      int := 0;
+  v_count  int := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  if p_type = 'poll' then
+    -- Checked here rather than left to a constraint: "at least two options"
+    -- spans two tables, and a CHECK cannot see across one.
+    v_count := coalesce(array_length(p_options, 1), 0);
+    if v_count < 2 or v_count > 6 then
+      raise exception 'a poll needs between 2 and 6 options' using errcode = '22023';
+    end if;
+  end if;
+
+  insert into public.announcements
+    (title, body, type, created_by, published_at, expires_at, poll_visibility, video_id)
+  values (
+    trim(p_title), coalesce(trim(p_body), ''), p_type, auth.uid(),
+    case when p_publish then now() else null end,
+    p_expires_at,
+    case when p_type = 'poll' then coalesce(p_poll_visibility, 'live') else null end,
+    case when p_type = 'video' then p_video_id else null end
+  )
+  returning id into v_id;
+
+  if p_type = 'poll' then
+    foreach v_label in array p_options loop
+      insert into public.announcement_poll_options (announcement_id, idx, label)
+      values (v_id, v_i, trim(v_label));
+      v_i := v_i + 1;
+    end loop;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.admin_create_announcement(text, text, text, boolean, timestamptz, text, text, text[]) from public;
+grant execute on function public.admin_create_announcement(text, text, text, boolean, timestamptz, text, text, text[]) to authenticated;
+
+
+-- ── The console's listing ──
+-- Placed last because it reads `announcement_reads` (§4) and
+-- `announcement_poll_votes` (§9), so every table it touches exists by the time
+-- this statement runs on a fresh database.
+-- Dropped before it is created, not `create or replace`. This function's
+-- RETURNS TABLE gained columns when polls and video arrived, and Postgres
+-- refuses to replace a function whose return type changed — so a plain
+-- `create or replace` here would fail on every database that already ran an
+-- earlier version of this file.
+drop function if exists public.admin_list_announcements();
+
+create function public.admin_list_announcements()
+returns table (
+  id              uuid,
+  title           text,
+  body            text,
+  type            text,
+  created_at      timestamptz,
+  published_at    timestamptz,
+  expires_at      timestamptz,
+  read_count      bigint,
+  poll_visibility text,
+  video_id        text,
+  vote_count      bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  return query
+    select a.id, a.title, a.body, a.type, a.created_at, a.published_at, a.expires_at,
+           -- Counted as correlated subqueries rather than by joining both child
+           -- tables: two LEFT JOINs against one parent multiply each other's
+           -- rows, and the read count would come back as reads x votes.
+           (select count(*) from public.announcement_reads r where r.announcement_id = a.id),
+           a.poll_visibility,
+           a.video_id,
+           (select count(*) from public.announcement_poll_votes w where w.announcement_id = a.id)
+    from public.announcements a
+    order by a.created_at desc;
+end;
+$$;
+
+revoke all on function public.admin_list_announcements() from public;
+grant execute on function public.admin_list_announcements() to authenticated;

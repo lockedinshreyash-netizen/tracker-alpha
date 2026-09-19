@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Announcement } from './api';
 import { TYPE_FACE } from './face';
+import PollBody from './PollBody';
+import VideoBody from './VideoBody';
 
 interface Props {
   announcement: Announcement;
@@ -8,6 +10,8 @@ interface Props {
   index: number;
   total: number;
   theme: 'dark' | 'light';
+  /** Needed to record a vote. Null only if the session vanished mid-read. */
+  userId: string | null;
   saving: boolean;
   error: string | null;
   onAcknowledge: () => void;
@@ -30,11 +34,17 @@ interface Props {
  * that never went out.
  */
 const AnnouncementModal: React.FC<Props> = ({
-  announcement, index, total, theme, saving, error,
+  announcement, index, total, theme, userId, saving, error,
   onAcknowledge, onAcknowledgeAll, onSetAside,
 }) => {
   const dark = theme === 'dark';
   const face = TYPE_FACE[announcement.type];
+  const isPoll = announcement.type === 'poll' && announcement.options.length > 0;
+
+  /* Only so the footer can stop saying "Skip" once an answer is in. The vote
+     itself is the poll's business, not this component's. */
+  const [voted, setVoted] = useState(false);
+  useEffect(() => { setVoted(false); }, [announcement.id]);
 
   /* Escape sets it aside; it never acknowledges. Same reasoning as the scrim. */
   useEffect(() => {
@@ -93,10 +103,31 @@ const AnnouncementModal: React.FC<Props> = ({
           <div className="accent-line mt-5 mb-5" />
 
           {/* `pre-wrap` so the paragraph breaks an admin typed are the
-              paragraph breaks every user reads. */}
-          <p className={`text-[13px] leading-relaxed font-ui whitespace-pre-wrap ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-            {announcement.body}
-          </p>
+              paragraph breaks every user reads. A poll's question is its title
+              and a video's subject is its title, so both are allowed to arrive
+              with nothing here. */}
+          {announcement.body.trim() && (
+            <p className={`text-[13px] leading-relaxed font-ui whitespace-pre-wrap ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+              {announcement.body}
+            </p>
+          )}
+
+          {announcement.type === 'video' && announcement.video_id && (
+            <div className={announcement.body.trim() ? 'mt-5' : ''}>
+              <VideoBody videoId={announcement.video_id} title={announcement.title} theme={theme} />
+            </div>
+          )}
+
+          {isPoll && (
+            <div className={announcement.body.trim() ? 'mt-5' : ''}>
+              <PollBody
+                announcement={announcement}
+                userId={userId}
+                theme={theme}
+                onVoted={() => setVoted(true)}
+              />
+            </div>
+          )}
 
           {error && (
             <p className="mt-5 text-[11px] font-bold font-ui text-[#E10600]">
@@ -111,7 +142,16 @@ const AnnouncementModal: React.FC<Props> = ({
             disabled={saving}
             className="flex-1 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97 font-ui disabled:opacity-50"
           >
-            {saving ? 'Saving…' : error ? 'Try again' : total > 1 ? 'Got it — next' : 'Got it'}
+            {saving
+              ? 'Saving…'
+              : error
+                ? 'Try again'
+                /* A poll you have not answered is skipped, not agreed with —
+                   "Got it" on an unanswered question reads as if pressing it
+                   were the answer. */
+                : isPoll && !voted
+                  ? (total > 1 ? 'Skip — next' : 'Skip')
+                  : total > 1 ? 'Got it — next' : 'Got it'}
           </button>
 
           {/* Only when there is a backlog. One notice does not need two ways

@@ -2157,6 +2157,7 @@ const App: React.FC = () => {
           index={0}
           total={announcements.queue.length}
           theme={theme}
+          userId={user?.id ?? null}
           saving={announcements.saving}
           error={announcements.error}
           onAcknowledge={announcements.acknowledgeCurrent}

@@ -54,7 +54,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
         ))}
       </div>
 
-      {section === 'announce' && <AnnouncementsAdmin adminId={adminId} theme={theme} />}
+      {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'people' && <AdminRoster adminId={adminId} theme={theme} />}
     </div>

@@ -17,11 +17,75 @@
 
 import { supabase } from '../supabaseClient';
 
-export type AnnouncementType = 'announcement' | 'update' | 'important' | 'maintenance';
+export type AnnouncementType =
+  | 'announcement' | 'update' | 'important' | 'maintenance'
+  /* Carries options and collects one vote per user. See supabase/admin.sql §9. */
+  | 'poll'
+  /* Carries a YouTube id and nothing else. */
+  | 'video';
 
 export const ANNOUNCEMENT_TYPES: AnnouncementType[] = [
-  'announcement', 'update', 'important', 'maintenance',
+  'announcement', 'update', 'important', 'maintenance', 'poll', 'video',
 ];
+
+/** 'live' — everyone watches the tally. 'private' — only administrators see it. */
+export type PollVisibility = 'private' | 'live';
+
+export interface PollOption {
+  id: string;
+  idx: number;
+  label: string;
+}
+
+export interface PollTally {
+  optionId: string;
+  label: string;
+  votes: number;
+}
+
+export const POLL_MIN_OPTIONS = 2;
+export const POLL_MAX_OPTIONS = 6;
+
+/**
+ * The 11-character id out of whatever YouTube link was pasted.
+ *
+ * Every shape YouTube hands out: `watch?v=`, `youtu.be/`, `/shorts/`,
+ * `/embed/`, `/live/`. Returns null rather than guessing, because the value
+ * ends up interpolated into an iframe `src` — the database enforces the same
+ * shape again (`announcement_video_shape`), so a bad one cannot be stored even
+ * if this is bypassed.
+ */
+export const youTubeId = (raw: string): string | null => {
+  const input = raw.trim();
+  if (!input) return null;
+
+  /* A bare id, pasted on its own. */
+  if (/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
+
+  const patterns = [
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+    /youtu\.be\/([A-Za-z0-9_-]{11})/,
+    /\/shorts\/([A-Za-z0-9_-]{11})/,
+    /\/embed\/([A-Za-z0-9_-]{11})/,
+    /\/live\/([A-Za-z0-9_-]{11})/,
+  ];
+  for (const re of patterns) {
+    const hit = input.match(re);
+    if (hit) return hit[1];
+  }
+  return null;
+};
+
+/* youtube-nocookie, not youtube.com. It sets no tracking cookie until the video
+   is actually played, and the audience here is largely minors. */
+export const embedUrl = (id: string, autoplay: boolean): string =>
+  `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1${autoplay ? '&autoplay=1' : ''}`;
+
+export const watchUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`;
+
+/* hqdefault rather than maxresdefault: every video has one, and a missing
+   maxres renders as a grey placeholder rather than falling back. */
+export const thumbUrl = (id: string): string => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 
 export interface Announcement {
   id: string;
@@ -31,14 +95,28 @@ export interface Announcement {
   created_at: string;
   published_at: string | null;
   expires_at: string | null;
+  /** Set only on a poll. */
+  poll_visibility: PollVisibility | null;
+  /** Set only on a video. */
+  video_id: string | null;
+  /** Ordered. Empty for everything that is not a poll. */
+  options: PollOption[];
 }
 
 /** What the console lists: every notice, live or not, plus its reach. */
 export interface AdminAnnouncement extends Announcement {
   read_count: number;
+  /** Total votes cast, across all options. Zero for everything but a poll. */
+  vote_count: number;
 }
 
-const COLUMNS = 'id,title,body,type,created_at,published_at,expires_at';
+/* The options ride along as an embedded resource rather than a second query.
+   PostgREST applies row-level security to an embed exactly as it would to a
+   direct select, so a draft poll's options are no more reachable this way than
+   the draft itself is. */
+const COLUMNS =
+  'id,title,body,type,created_at,published_at,expires_at,poll_visibility,video_id,'
+  + 'announcement_poll_options(id,idx,label)';
 
 /* The type column is constrained in the database, but a row written before a
    type was added — or by a later migration — must not render as a blank
@@ -56,6 +134,18 @@ const asAnnouncement = (row: any): Announcement => ({
   created_at: String(row.created_at ?? ''),
   published_at: row.published_at ?? null,
   expires_at: row.expires_at ?? null,
+  poll_visibility: row.poll_visibility === 'private' || row.poll_visibility === 'live'
+    ? row.poll_visibility
+    : null,
+  video_id: typeof row.video_id === 'string' ? row.video_id : null,
+  /* Sorted here rather than trusted from the wire: PostgREST does not promise
+     an order on an embedded resource, and a poll whose options shuffle between
+     renders is a poll nobody can answer. */
+  options: Array.isArray(row.announcement_poll_options)
+    ? (row.announcement_poll_options as any[])
+      .map(o => ({ id: String(o.id), idx: Number(o.idx), label: String(o.label ?? '') }))
+      .sort((a, b) => a.idx - b.idx)
+    : [],
 });
 
 /* A student who has been away for a term should not be walked through forty
@@ -142,34 +232,123 @@ export interface DraftInput {
   expiresAt: string | null;
   /** Save as a draft, or put it in front of every user now. */
   publish: boolean;
+  /** Poll only. */
+  pollVisibility?: PollVisibility;
+  /** Poll only, 2–6 entries, in order. */
+  options?: string[];
+  /** Video only — the extracted id, never a URL. */
+  videoId?: string;
 }
 
-/** Every announcement, newest first, with how many people have read each. */
+/**
+ * Every announcement, newest first, with how many people have read each and —
+ * for a poll — how many have voted.
+ *
+ * `asAnnouncement` leaves `options` empty here: the RPC does not return them
+ * and the console does not need them, because a poll's tally comes from
+ * `pollResults` rather than from counting rows in the browser.
+ *
+ * Note the explicit `vote_count`. The rows come back as `any` from `rpc`, so
+ * TypeScript cannot tell that a field of `AdminAnnouncement` is missing from
+ * the mapping — leaving it out compiled cleanly and rendered "undefined votes".
+ */
 export const listAllAnnouncements = async (): Promise<AdminAnnouncement[]> => {
   const { data, error } = await supabase.rpc('admin_list_announcements');
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row: any): AdminAnnouncement => ({
     ...asAnnouncement(row),
     read_count: Number(row.read_count ?? 0),
+    vote_count: Number(row.vote_count ?? 0),
   }));
 };
 
-export const createAnnouncement = async (
-  userId: string,
-  draft: DraftInput,
-): Promise<void> => {
-  const { error } = await supabase.from('announcements').insert({
-    title: draft.title.trim(),
-    body: draft.body.trim(),
-    type: draft.type,
-    /* Pinned to the caller here and pinned again by the insert policy's WITH
-       CHECK, which is the one that actually matters. */
-    created_by: userId,
-    published_at: draft.publish ? new Date().toISOString() : null,
-    expires_at: draft.expiresAt,
+/**
+ * Create one announcement of any type.
+ *
+ * An RPC rather than an insert, because a poll is an announcement PLUS its
+ * options and the two have to land together. Through PostgREST that is two
+ * requests, and the gap between them is a published poll with no options on
+ * everybody's Today page. The function does both in one transaction, pins
+ * `created_by` to the caller's own verified id, and re-checks `is_admin()`
+ * before either write.
+ *
+ * All six types go through it so there is a single creation path; the INSERT
+ * policy on the table stays as the backstop.
+ */
+export const createAnnouncement = async (draft: DraftInput): Promise<void> => {
+  const { error } = await supabase.rpc('admin_create_announcement', {
+    p_title: draft.title.trim(),
+    p_body: draft.body.trim(),
+    p_type: draft.type,
+    p_publish: draft.publish,
+    p_expires_at: draft.expiresAt,
+    p_poll_visibility: draft.type === 'poll' ? (draft.pollVisibility ?? 'live') : null,
+    p_video_id: draft.type === 'video' ? (draft.videoId ?? null) : null,
+    p_options: draft.type === 'poll'
+      ? (draft.options ?? []).map(o => o.trim()).filter(Boolean)
+      : null,
   });
   if (error) throw error;
+};
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Polls
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The tally.
+ *
+ * `poll_results` is a definer function because it counts rows in a table no
+ * client may select — that is the whole mechanism behind aggregate-only
+ * results. It refuses a private poll to anybody but an administrator, and
+ * refuses an unpublished one to anybody but an administrator, so the caller
+ * does not get to decide what it is allowed to see.
+ */
+export const pollResults = async (announcementId: string): Promise<PollTally[]> => {
+  const { data, error } = await supabase.rpc('poll_results', { p_announcement: announcementId });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    optionId: String(r.opt_id),
+    label: String(r.opt_label ?? ''),
+    votes: Number(r.vote_count ?? 0),
+  }));
+};
+
+/** Which option this user picked, or null. Their own row is the only one visible. */
+export const myVote = async (announcementId: string, userId: string): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from('announcement_poll_votes')
+    .select('option_id')
+    .eq('announcement_id', announcementId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) return null;
+  return data?.option_id ? String(data.option_id) : null;
+};
+
+/**
+ * Cast or change a vote.
+ *
+ * An upsert on the composite primary key `(announcement_id, user_id)`, so
+ * changing your mind rewrites the one row you already own and a double tap
+ * cannot produce two votes. The same structural guarantee `announcement_reads`
+ * relies on.
+ */
+export const castVote = async (
+  announcementId: string,
+  userId: string,
+  optionId: string,
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from('announcement_poll_votes')
+    .upsert(
+      { announcement_id: announcementId, user_id: userId, option_id: optionId, voted_at: new Date().toISOString() },
+      { onConflict: 'announcement_id,user_id' },
+    );
+  return !error;
 };
 
 /** Publish now, or pull a live notice back to a draft. */

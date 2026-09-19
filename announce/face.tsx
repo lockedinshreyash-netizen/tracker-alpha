@@ -66,4 +66,25 @@ export const TYPE_FACE: Record<AnnouncementType, TypeFace> = {
       </svg>
     ),
   },
+  poll: {
+    label: 'Poll',
+    urgent: false,
+    icon: (
+      <svg {...stroke}>
+        <line x1="5" y1="20" x2="5" y2="12" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="19" y1="20" x2="19" y2="15" />
+      </svg>
+    ),
+  },
+  video: {
+    label: 'New video',
+    urgent: false,
+    icon: (
+      <svg {...stroke}>
+        <rect x="2.5" y="5" width="19" height="14" rx="4" />
+        <path d="M10.5 9.5 15 12l-4.5 2.5z" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
 };
