@@ -22,8 +22,22 @@ interface LookupState {
   error: string | null;
 }
 
-/** Shared by the modal (looks up by user id) and the page (looks up by handle) — fetches the profile, then the one stat it shows, in that order. */
-const useProfileLookup = (lookup: () => Promise<Profile | null>, dep: string | null): LookupState => {
+/**
+ * Shared by the modal (looks up by user id) and the page (looks up by
+ * handle) — fetches the profile, then the one stat it shows, in that order.
+ *
+ * The RPC-fetched total is skipped entirely when the profile turns out to be
+ * the viewer's own — see ProfileModal/ProfilePage, which use `ownTotalHours`
+ * (every logged hour on this device, not just the app-timed subset the RPC
+ * can see for anyone else) instead. Fetching a number nobody will render
+ * would be the exact "unnecessary duplicate request" this app avoids
+ * elsewhere.
+ */
+const useProfileLookup = (
+  lookup: () => Promise<Profile | null>,
+  dep: string | null,
+  currentUserId: string | null
+): LookupState => {
   const [state, setState] = useState<LookupState>({ profile: null, totalHours: null, loading: true, error: null });
 
   useEffect(() => {
@@ -36,7 +50,9 @@ const useProfileLookup = (lookup: () => Promise<Profile | null>, dep: string | n
         const profile = await lookup();
         if (cancelled) return;
         if (!profile) { setState({ profile: null, totalHours: null, loading: false, error: null }); return; }
-        const totalHours = await fetchTotalHours(profile.user_id).catch(() => 0);
+        const totalHours = profile.user_id === currentUserId
+          ? null
+          : await fetchTotalHours(profile.user_id).catch(() => 0);
         if (cancelled) return;
         setState({ profile, totalHours, loading: false, error: null });
       } catch (e) {
@@ -46,7 +62,7 @@ const useProfileLookup = (lookup: () => Promise<Profile | null>, dep: string | n
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dep]);
+  }, [dep, currentUserId]);
 
   return state;
 };
@@ -123,15 +139,20 @@ interface ModalProps {
   onViewFull: (handle: string) => void;
   onEdit: () => void;
   currentUserId: string | null;
+  /** This device's true cumulative hours — every logged session, any source. Shown only when the profile being viewed turns out to be the viewer's own. */
+  ownTotalHours: number;
   theme: 'dark' | 'light';
 }
 
-export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull, onEdit, currentUserId, theme }) => {
+export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull, onEdit, currentUserId, ownTotalHours, theme }) => {
   const dark = theme === 'dark';
   const { profile, totalHours, loading, error } = useProfileLookup(
     () => (userId ? fetchProfileByUserId(userId) : Promise.resolve(null)),
-    userId
+    userId,
+    currentUserId
   );
+  const isOwn = Boolean(profile && profile.user_id === currentUserId);
+  const displayHours = isOwn ? ownTotalHours : totalHours;
 
   if (!userId) return null;
 
@@ -162,8 +183,8 @@ export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull
           <>
             <ProfileCard
               profile={profile}
-              totalHours={totalHours}
-              isOwn={profile.user_id === currentUserId}
+              totalHours={displayHours}
+              isOwn={isOwn}
               onEdit={() => { onClose(); onEdit(); }}
               theme={theme}
               compact
@@ -184,14 +205,18 @@ export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull
 interface PageProps {
   handle: string;
   currentUserId: string | null;
+  /** This device's true cumulative hours — every logged session, any source. Shown only when the profile being viewed turns out to be the viewer's own. */
+  ownTotalHours: number;
   onBack: () => void;
   onEdit: () => void;
   theme: 'dark' | 'light';
 }
 
-export const ProfilePage: React.FC<PageProps> = ({ handle, currentUserId, onBack, onEdit, theme }) => {
+export const ProfilePage: React.FC<PageProps> = ({ handle, currentUserId, ownTotalHours, onBack, onEdit, theme }) => {
   const dark = theme === 'dark';
-  const { profile, totalHours, loading, error } = useProfileLookup(() => fetchProfileByHandle(handle), handle);
+  const { profile, totalHours, loading, error } = useProfileLookup(() => fetchProfileByHandle(handle), handle, currentUserId);
+  const isOwn = Boolean(profile && profile.user_id === currentUserId);
+  const displayHours = isOwn ? ownTotalHours : totalHours;
 
   useEffect(() => {
     if (profile) document.title = `${profile.display_name} · Tracker Alpha`;
@@ -212,8 +237,8 @@ export const ProfilePage: React.FC<PageProps> = ({ handle, currentUserId, onBack
         {!loading && profile && (
           <ProfileCard
             profile={profile}
-            totalHours={totalHours}
-            isOwn={profile.user_id === currentUserId}
+            totalHours={displayHours}
+            isOwn={isOwn}
             onEdit={onEdit}
             theme={theme}
           />

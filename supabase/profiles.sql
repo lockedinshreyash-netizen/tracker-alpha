@@ -141,7 +141,11 @@ begin
     seed_name := 'Racer';
   end if;
 
-  seed_handle := lower(encode(gen_random_bytes(5), 'hex'));
+  -- md5()/random() are Postgres built-ins — unlike gen_random_bytes(), which
+  -- needs the pgcrypto extension and isn't guaranteed to be enabled (or on
+  -- this function's restricted search_path) on every project. A handle only
+  -- needs to avoid collisions, not be cryptographically random.
+  seed_handle := substr(md5(random()::text || clock_timestamp()::text), 1, 10);
   -- One pseudo-random pick out of 16, seeded from the user's own id so it's
   -- stable if this ever runs twice for the same uid (it can't, given the
   -- select above, but stable-over-arbitrary is a free property here).

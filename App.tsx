@@ -1633,6 +1633,14 @@ const App: React.FC = () => {
      leaderboard row or a chat bubble on the Ranks tab, and reachable directly
      by /u/:handle regardless of which tab was last active. */
   const profileCtl = useProfileController(user);
+  /* Every logged hour, any source — the same figure Header's own tooltip and
+     the Review tab already show. Memoized because it otherwise re-sums the
+     full log history on every render, including the ones a running timer
+     fires many times a minute. */
+  const ownTotalHours = useMemo(
+    () => state.logs.reduce((sum, l) => sum + l.hours, 0),
+    [state.logs]
+  );
   const handleTabChangeAndExitProfile = (tab: TabType) => {
     profileCtl.goHome();
     handleTabChange(tab);
@@ -1960,6 +1968,7 @@ const App: React.FC = () => {
         onViewFull={profileCtl.viewFullProfile}
         onEdit={profileCtl.openEditProfile}
         currentUserId={user?.id ?? null}
+        ownTotalHours={ownTotalHours}
         theme={theme}
       />
 
@@ -1989,8 +1998,6 @@ const App: React.FC = () => {
           logs={state.logs}
           examPreference={state.examPreference || 'JEE'}
           targetExamDate={targetExamDate}
-          ownProfile={profileCtl.ownProfile}
-          onOpenOwnProfile={() => user && profileCtl.openProfile(user.id)}
         />
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
@@ -1998,6 +2005,7 @@ const App: React.FC = () => {
             <ProfilePage
               handle={profileCtl.routeHandle}
               currentUserId={user?.id ?? null}
+              ownTotalHours={ownTotalHours}
               onBack={profileCtl.goHome}
               onEdit={profileCtl.openEditProfile}
               theme={theme}
