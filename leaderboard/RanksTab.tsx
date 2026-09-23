@@ -8,6 +8,7 @@ import RaceStatusCard from './RaceStatusCard';
 import RaceRecap from './RaceRecap';
 import RaceControlFeed from './RaceControl';
 import RaceTimeline from './RaceTimeline';
+import RaceChat from './RaceChat';
 
 interface Props {
   user: User | null;
@@ -205,6 +206,8 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
           </p>
         )}
       </section>
+
+      <RaceChat userId={user.id} displayName={prefs.displayName} raceDate={race.race.date} theme={theme} />
 
       {untimed > 0 && (
         <p className={`text-[10px] font-ui leading-relaxed px-1 ${muted}`}>
