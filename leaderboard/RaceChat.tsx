@@ -34,6 +34,10 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
 
   const chat = useRaceChat({ userId, displayName, raceDate, enabled: true });
   const [draft, setDraft] = useState('');
+  /* Local and unpersisted, same stance Today's own collapsed session history
+     takes — a disclosure preference isn't data, and putting it in AppState
+     would fire a Supabase upsert every time somebody folded the panel. */
+  const [collapsed, setCollapsed] = useState(false);
 
   /* Only other senders ever show a name+avatar (see ChatBubble) — no point batching my own id in. */
   const senderIds = useMemo(
@@ -91,6 +95,19 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
     el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_PX)}px`;
   }, [draft]);
 
+  /* The list unmounts while collapsed, so the scroll-tracking effect above
+     can't see messages that arrived in the meantime. Re-opening jumps
+     straight to the bottom and resyncs its counters rather than replaying
+     whatever built up as one fake "new message" burst. */
+  useEffect(() => {
+    if (collapsed) return;
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    prevLenRef.current = chat.messages.length;
+    setNewCount(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed]);
+
   const scrollToBottom = () => {
     const el = listRef.current;
     if (!el) return;
@@ -126,82 +143,102 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
 
   return (
     <section className={`rounded-xl border overflow-hidden ${card}`}>
-      <div className={`flex items-center justify-between gap-4 px-5 pt-5 pb-3`}>
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        aria-expanded={!collapsed}
+        className="w-full flex items-center justify-between gap-4 px-5 pt-5 pb-3"
+      >
         <h3 className={`text-[9px] font-black uppercase tracking-[0.18em] font-ui ${muted}`}>
           Race chat
         </h3>
-        <span className={`text-[9px] font-ui ${muted}`}>
-          {chat.loading ? 'Loading…' : 'Live'}
+        <span className="flex items-center gap-2">
+          <span className={`text-[9px] font-ui ${muted}`}>
+            {collapsed
+              ? (chat.messages.length ? `${chat.messages.length} message${chat.messages.length === 1 ? '' : 's'}` : 'Minimized')
+              : (chat.loading ? 'Loading…' : 'Live')}
+          </span>
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
+            className={`${muted} transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </span>
-      </div>
+      </button>
 
-      <div className="relative">
-        <div
-          ref={listRef}
-          onScroll={onScroll}
-          className="h-[320px] md:h-[380px] overflow-y-auto px-5 py-2 space-y-2.5"
-        >
-          {!chat.loading && chat.messages.length === 0 && (
-            <div className="h-full flex items-center justify-center">
-              <p className={`text-[11px] font-ui italic text-center px-6 ${muted}`}>
-                Nobody's said anything yet. Be the first.
-              </p>
+      {!collapsed && (
+        <>
+          <div className="relative">
+            <div
+              ref={listRef}
+              onScroll={onScroll}
+              className="h-[320px] md:h-[380px] overflow-y-auto px-5 py-2 space-y-2.5"
+            >
+              {!chat.loading && chat.messages.length === 0 && (
+                <div className="h-full flex items-center justify-center">
+                  <p className={`text-[11px] font-ui italic text-center px-6 ${muted}`}>
+                    Nobody's said anything yet. Be the first.
+                  </p>
+                </div>
+              )}
+
+              {chat.messages.map(msg => (
+                <ChatBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={msg.user_id === userId}
+                  profile={profiles[msg.user_id]}
+                  onOpenProfile={onOpenProfile}
+                  dark={dark}
+                  muted={muted}
+                  heading={heading}
+                  theme={theme}
+                  onDismiss={chat.dismiss}
+                />
+              ))}
             </div>
+
+            {newCount > 0 && (
+              <button
+                onClick={scrollToBottom}
+                className="absolute left-1/2 -translate-x-1/2 bottom-3 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.08em] font-ui bg-[#E10600] text-white shadow-lg active:scale-[0.97] transition-transform"
+              >
+                {newCount} new {newCount === 1 ? 'message' : 'messages'} ↓
+              </button>
+            )}
+          </div>
+
+          {chat.error && (
+            <p className={`text-[9px] font-ui text-center px-5 pt-2 ${muted}`}>{chat.error}</p>
           )}
 
-          {chat.messages.map(msg => (
-            <ChatBubble
-              key={msg.id}
-              msg={msg}
-              isMe={msg.user_id === userId}
-              profile={profiles[msg.user_id]}
-              onOpenProfile={onOpenProfile}
-              dark={dark}
-              muted={muted}
-              heading={heading}
-              theme={theme}
-              onDismiss={chat.dismiss}
+          <div className={`flex items-end gap-2.5 p-3.5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => window.setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 250)}
+              maxLength={chat.maxLength}
+              rows={1}
+              placeholder="Write a message…"
+              className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`}
             />
-          ))}
-        </div>
-
-        {newCount > 0 && (
-          <button
-            onClick={scrollToBottom}
-            className="absolute left-1/2 -translate-x-1/2 bottom-3 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.08em] font-ui bg-[#E10600] text-white shadow-lg active:scale-[0.97] transition-transform"
-          >
-            {newCount} new {newCount === 1 ? 'message' : 'messages'} ↓
-          </button>
-        )}
-      </div>
-
-      {chat.error && (
-        <p className={`text-[9px] font-ui text-center px-5 pt-2 ${muted}`}>{chat.error}</p>
+            <button
+              onClick={() => void handleSend()}
+              disabled={!canSend}
+              aria-label="Send message"
+              className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-black transition-all active:scale-[0.96] ${canSend
+                ? 'bg-[#E10600] text-white hover:bg-red-700'
+                : dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed'}`}
+            >
+              <span aria-hidden="true">➤</span>
+            </button>
+          </div>
+        </>
       )}
-
-      <div className={`flex items-end gap-2.5 p-3.5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => window.setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 250)}
-          maxLength={chat.maxLength}
-          rows={1}
-          placeholder="Write a message…"
-          className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`}
-        />
-        <button
-          onClick={() => void handleSend()}
-          disabled={!canSend}
-          aria-label="Send message"
-          className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-black transition-all active:scale-[0.96] ${canSend
-            ? 'bg-[#E10600] text-white hover:bg-red-700'
-            : dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed'}`}
-        >
-          <span aria-hidden="true">➤</span>
-        </button>
-      </div>
     </section>
   );
 };

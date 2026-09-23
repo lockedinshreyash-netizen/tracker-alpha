@@ -34,7 +34,7 @@ const glyphProps = {
 
 /* Five dark neutral tones, all drawn from the app's own near-black family
    (bg-base/card/inset) rather than inventing a new palette. */
-const TONES = ['#141417', '#111114', '#17171c', '#0D0D10', '#191a20'];
+export const TONES = ['#141417', '#111114', '#17171c', '#0D0D10', '#191a20'];
 
 export const ALPHA_AVATARS: AlphaAvatar[] = [
   {

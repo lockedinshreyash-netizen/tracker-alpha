@@ -44,6 +44,17 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
   const dark = theme === 'dark';
   const [name, setName] = useState(prefs.displayName);
 
+  /* Hooks must run unconditionally on every render of this component — the
+     two early returns below (signed out / not on the board) must never sit
+     between a hook and the top of the function, or leaving the board (which
+     flips prefs.enabled and sends this component down the earlier branch)
+     changes how many hooks got called on that render. React detects the
+     mismatch and throws, which — with no error boundary above it — takes
+     down the whole app to a blank screen. race.race.entrants is always a
+     valid array regardless of which branch below actually renders, so this
+     is safe to call up here unconditionally. */
+  const profiles = useProfiles(race.race.entrants.map(r => r.userId));
+
   const card = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]';
   const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
   const heading = dark ? 'text-white' : 'text-[#17150F]';
@@ -120,7 +131,6 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
 
   /* ── In the race ── */
   const { entrants, position } = race.race;
-  const profiles = useProfiles(entrants.map(r => r.userId));
   const untimed = untimedHoursToday(logs);
   const { permission, enabled: notificationsOn } = race.notifications;
 

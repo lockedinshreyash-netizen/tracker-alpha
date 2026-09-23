@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlphaAvatarGlyph, getAlphaAvatar } from './alphaAvatars';
+import { AlphaAvatarGlyph, TONES, getAlphaAvatar } from './alphaAvatars';
 import { ProfileSummary } from './profileApi';
 
 /* ── The one place avatar rendering happens ──
@@ -8,13 +8,49 @@ import { ProfileSummary } from './profileApi';
    photo, an Alpha Avatar, or nothing loaded yet" is decided once, not
    reimplemented per feature. */
 
+/** Stable hash so the same name always lands on the same tone — a deterministic pick, not a random one that would flicker between renders. */
+const hashString = (s: string): number => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+/**
+ * The default identity when nobody has picked an Alpha Avatar or a photo yet
+ * — which, before every viewer's profile row has loaded, is most of a
+ * leaderboard. A name-derived initial is legible immediately (it needs no
+ * network round trip: the caller already knows the name from the leaderboard
+ * row or chat message itself) and, critically, differs per person — the thing
+ * a single shared placeholder glyph cannot do.
+ */
+export const InitialsAvatar: React.FC<{ name: string; size: number; className?: string }> = ({ name, size, className = '' }) => {
+  const trimmed = name.trim();
+  const letter = trimmed ? trimmed[0].toUpperCase() : '?';
+  const tone = TONES[hashString(trimmed || '?') % TONES.length];
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full flex-shrink-0 ${className}`}
+      style={{ width: size, height: size, background: tone, color: '#F2F0EC' }}
+    >
+      <span className="font-ui font-black leading-none" style={{ fontSize: size * 0.42 }}>{letter}</span>
+    </div>
+  );
+};
+
 interface AvatarProps {
   profile: ProfileSummary | null | undefined;
+  /**
+   * Source of the fallback initial when there's no chosen avatar to show yet
+   * — a leaderboard row or chat bubble already has this string on hand and
+   * should pass it; without it, profile.display_name is used once the
+   * profile itself has loaded.
+   */
+  name?: string;
   size: number;
   className?: string;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ profile, size, className = '' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ profile, name, size, className = '' }) => {
   if (profile?.avatar_type === 'upload' && profile.avatar_url) {
     return (
       <img
@@ -28,14 +64,18 @@ export const Avatar: React.FC<AvatarProps> = ({ profile, size, className = '' })
     );
   }
 
-  // Covers both a resolved Alpha Avatar and "not fetched yet" — getAlphaAvatar
-  // falls back to the default glyph for a null/unknown id, so a profile still
-  // loading never renders as a broken image or an empty ring.
-  return (
-    <div className={`flex-shrink-0 ${className}`}>
-      <AlphaAvatarGlyph avatar={getAlphaAvatar(profile?.avatar_id)} size={size} />
-    </div>
-  );
+  if (profile?.avatar_type === 'alpha' && profile.avatar_id) {
+    return (
+      <div className={`flex-shrink-0 ${className}`}>
+        <AlphaAvatarGlyph avatar={getAlphaAvatar(profile.avatar_id)} size={size} />
+      </div>
+    );
+  }
+
+  // No avatar chosen, or the profile hasn't loaded yet — an initial derived
+  // from whatever name is already on hand, never a generic glyph every
+  // unresolved user would otherwise share.
+  return <InitialsAvatar name={name ?? profile?.display_name ?? ''} size={size} className={className} />;
 };
 
 interface UserChipProps {
@@ -72,7 +112,7 @@ export const UserChip: React.FC<UserChipProps> = ({
       onClick={e => { e.stopPropagation(); onOpen(userId); }}
       className={`inline-flex items-center gap-2 min-w-0 text-left group active:scale-[0.98] transition-transform ${className}`}
     >
-      <Avatar profile={profile} size={size} className="ring-1 ring-inset ring-white/10 group-hover:ring-[#E10600]/40 transition-all rounded-full" />
+      <Avatar profile={profile} name={name} size={size} className="ring-1 ring-inset ring-white/10 group-hover:ring-[#E10600]/40 transition-all rounded-full" />
       <span className={nameClassName ?? defaultNameClass}>
         {name}
       </span>
