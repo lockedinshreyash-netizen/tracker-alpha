@@ -95,7 +95,7 @@ export const ProfileCard: React.FC<CardProps> = ({ profile, totalHours, isOwn, o
 
       <div className="grid grid-cols-2 gap-2 w-full mt-6">
         <div className={`px-3 py-3 rounded-lg border ${inset}`}>
-          <p className={`text-[8px] font-bold uppercase tracking-[0.12em] font-ui ${muted}`}>Studied</p>
+          <p className={`text-[8px] font-bold uppercase tracking-[0.12em] font-ui ${muted}`}>Total studied</p>
           <p className={`num-stat text-base mt-1 ${heading}`}>
             {totalHours === null ? '—' : formatGap(Math.round(totalHours * 60))}
           </p>
