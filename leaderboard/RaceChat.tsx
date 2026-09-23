@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clockLabel } from './messages';
 import { validateMessage } from './chatApi';
 import { ChatEntry, useRaceChat } from './useRaceChat';
+import { UserChip } from '../profile/Avatar';
+import { useProfiles } from '../profile/profileCache';
+import { ProfileSummary } from '../profile/profileApi';
 
 /* ── Race Chat ──
    The room for whoever is in today's race right now. Lives inside RanksTab,
@@ -14,6 +17,7 @@ interface Props {
   userId: string;
   displayName: string;
   raceDate: string;
+  onOpenProfile: (userId: string) => void;
   theme: 'dark' | 'light';
 }
 
@@ -22,7 +26,7 @@ interface Props {
 const BOTTOM_THRESHOLD = 80;
 const MAX_TEXTAREA_PX = 108;
 
-const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, theme }) => {
+const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfile, theme }) => {
   const dark = theme === 'dark';
   const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
   const heading = dark ? 'text-white' : 'text-[#17150F]';
@@ -30,6 +34,13 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, theme }) => 
 
   const chat = useRaceChat({ userId, displayName, raceDate, enabled: true });
   const [draft, setDraft] = useState('');
+
+  /* Only other senders ever show a name+avatar (see ChatBubble) — no point batching my own id in. */
+  const senderIds = useMemo(
+    () => Array.from(new Set(chat.messages.filter(m => m.user_id !== userId).map(m => m.user_id))),
+    [chat.messages, userId]
+  );
+  const profiles = useProfiles(senderIds);
 
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -143,9 +154,12 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, theme }) => 
               key={msg.id}
               msg={msg}
               isMe={msg.user_id === userId}
+              profile={profiles[msg.user_id]}
+              onOpenProfile={onOpenProfile}
               dark={dark}
               muted={muted}
               heading={heading}
+              theme={theme}
               onDismiss={chat.dismiss}
             />
           ))}
@@ -195,11 +209,14 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, theme }) => 
 const ChatBubble: React.FC<{
   msg: ChatEntry;
   isMe: boolean;
+  profile: ProfileSummary | undefined;
+  onOpenProfile: (userId: string) => void;
   dark: boolean;
   muted: string;
   heading: string;
+  theme: 'dark' | 'light';
   onDismiss: (id: string) => void;
-}> = ({ msg, isMe, dark, muted, heading, onDismiss }) => {
+}> = ({ msg, isMe, profile, onOpenProfile, dark, muted, heading, theme, onDismiss }) => {
   const bubble = isMe
     ? 'bg-[#E10600]/10 border-[#E10600]/25'
     : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]';
@@ -208,7 +225,16 @@ const ChatBubble: React.FC<{
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] md:max-w-[70%] min-w-0 px-3.5 py-2.5 rounded-lg border ${bubble}`}>
         {!isMe && (
-          <p className={`text-[10px] font-bold font-ui mb-0.5 truncate ${heading}`}>{msg.display_name}</p>
+          <UserChip
+            userId={msg.user_id}
+            name={msg.display_name}
+            profile={profile}
+            onOpen={onOpenProfile}
+            theme={theme}
+            size={20}
+            className="mb-1"
+            nameClassName={`truncate text-[10px] font-bold font-ui ${heading}`}
+          />
         )}
         <p className={`text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${dark ? 'text-zinc-200' : 'text-[#17150F]'} ${msg.pending ? 'opacity-50' : ''}`}>
           {msg.message}

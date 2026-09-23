@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, SyncStatus, ExamPreference } from './types';
 import { calculateStreak } from './utils';
+import { Avatar } from './profile/Avatar';
+import { Profile } from './profile/profileApi';
 
 interface Props {
   currentClass: 11 | 12;
@@ -17,6 +19,9 @@ interface Props {
   logs: DailyLog[];
   examPreference: ExamPreference;
   targetExamDate: Date;
+  /** Null until ensure_profile() resolves — the avatar button only renders once there's something to show. */
+  ownProfile: Profile | null;
+  onOpenOwnProfile: () => void;
 }
 
 const Header: React.FC<Props> = ({
@@ -32,7 +37,9 @@ const Header: React.FC<Props> = ({
   onOpenAuth,
   logs,
   examPreference,
-  targetExamDate
+  targetExamDate,
+  ownProfile,
+  onOpenOwnProfile,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -64,7 +71,16 @@ const Header: React.FC<Props> = ({
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {user && ownProfile && (
+              <button
+                onClick={onOpenOwnProfile}
+                aria-label="Your profile"
+                className="active:scale-[0.94] transition-transform"
+              >
+                <Avatar profile={ownProfile} size={30} className="ring-1 ring-inset ring-white/10 rounded-full" />
+              </button>
+            )}
             {!user && (
               <button
                 onClick={onOpenAuth}

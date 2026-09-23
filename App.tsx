@@ -35,6 +35,9 @@ import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
 import { RaceStrip } from './leaderboard/RaceControl';
+import { useProfileController } from './profile/useProfileController';
+import { ProfileModal, ProfilePage } from './profile/ProfileView';
+import EditProfile from './profile/EditProfile';
 import ToastHost from './notify/ToastHost';
 import { moveCard, nextOrder } from './board/board';
 import { useReminders } from './reminders/useReminders';
@@ -1625,6 +1628,16 @@ const App: React.FC = () => {
   });
   const inTheRace = Boolean(user && state.leaderboard?.enabled);
 
+  /* ── Profiles ──
+     Mounted here for the same reason: a profile has to be openable from a
+     leaderboard row or a chat bubble on the Ranks tab, and reachable directly
+     by /u/:handle regardless of which tab was last active. */
+  const profileCtl = useProfileController(user);
+  const handleTabChangeAndExitProfile = (tab: TabType) => {
+    profileCtl.goHome();
+    handleTabChange(tab);
+  };
+
   /* Voice sets a chapter status outright. Deliberately separate from
      toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
   const setChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string, status: SyllabusStatus) => {
@@ -1921,7 +1934,7 @@ const App: React.FC = () => {
 
       <Sidebar
         activeTab={activeTab}
-        onTabChange={handleTabChange}
+        onTabChange={handleTabChangeAndExitProfile}
         theme={theme}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
@@ -1938,6 +1951,24 @@ const App: React.FC = () => {
           setSyncStatus('syncing');
         }}
       />
+
+      <ProfileModal
+        userId={profileCtl.openProfileUserId}
+        onClose={profileCtl.closeProfile}
+        onViewFull={profileCtl.viewFullProfile}
+        onEdit={profileCtl.openEditProfile}
+        currentUserId={user?.id ?? null}
+        theme={theme}
+      />
+
+      {profileCtl.editing && profileCtl.ownProfile && (
+        <EditProfile
+          profile={profileCtl.ownProfile}
+          onClose={profileCtl.closeEditProfile}
+          onSaved={profileCtl.onSaved}
+          theme={theme}
+        />
+      )}
 
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
@@ -1956,9 +1987,21 @@ const App: React.FC = () => {
           logs={state.logs}
           examPreference={state.examPreference || 'JEE'}
           targetExamDate={targetExamDate}
+          ownProfile={profileCtl.ownProfile}
+          onOpenOwnProfile={() => user && profileCtl.openProfile(user.id)}
         />
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
+          {profileCtl.routeHandle ? (
+            <ProfilePage
+              handle={profileCtl.routeHandle}
+              currentUserId={user?.id ?? null}
+              onBack={profileCtl.goHome}
+              onEdit={profileCtl.openEditProfile}
+              theme={theme}
+            />
+          ) : (
+          <>
           {/* One line of the race, where the sessions actually get started. */}
           {activeTab === 'Today' && inTheRace && (
             <div className="mb-8">
@@ -2063,6 +2106,7 @@ const App: React.FC = () => {
               onJoin={joinLeaderboard}
               onLeave={exitLeaderboard}
               onOpenAuth={() => setIsAuthModalOpen(true)}
+              onOpenProfile={profileCtl.openProfile}
               theme={theme}
             />
           )}
@@ -2110,6 +2154,8 @@ const App: React.FC = () => {
               onToggleAi={setAiEnabled}
               onCacheInsight={cacheInsight}
             />
+          )}
+          </>
           )}
         </main>
       </div>

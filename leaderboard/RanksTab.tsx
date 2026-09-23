@@ -9,6 +9,8 @@ import RaceRecap from './RaceRecap';
 import RaceControlFeed from './RaceControl';
 import RaceTimeline from './RaceTimeline';
 import RaceChat from './RaceChat';
+import { UserChip } from '../profile/Avatar';
+import { useProfiles } from '../profile/profileCache';
 
 interface Props {
   user: User | null;
@@ -18,6 +20,7 @@ interface Props {
   onJoin: (displayName: string) => void;
   onLeave: () => void;
   onOpenAuth: () => void;
+  onOpenProfile: (userId: string) => void;
   theme: 'dark' | 'light';
 }
 
@@ -37,7 +40,7 @@ const Movement: React.FC<{ delta: number; dark: boolean }> = ({ delta, dark }) =
   );
 };
 
-const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, theme }) => {
+const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, onOpenProfile, theme }) => {
   const dark = theme === 'dark';
   const [name, setName] = useState(prefs.displayName);
 
@@ -117,6 +120,7 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
 
   /* ── In the race ── */
   const { entrants, position } = race.race;
+  const profiles = useProfiles(entrants.map(r => r.userId));
   const untimed = untimedHoursToday(logs);
   const { permission, enabled: notificationsOn } = race.notifications;
 
@@ -171,9 +175,14 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
                 <Movement delta={delta} dark={dark} />
 
                 <div className="flex-1 min-w-0">
-                  <p className={`truncate text-sm font-bold font-ui ${racer.isMe ? 'text-[#E10600]' : heading}`}>
-                    {racer.name}{racer.isMe && ' (you)'}
-                  </p>
+                  <UserChip
+                    userId={racer.userId}
+                    name={`${racer.name}${racer.isMe ? ' (you)' : ''}`}
+                    profile={profiles[racer.userId]}
+                    onOpen={onOpenProfile}
+                    theme={theme}
+                    nameClassName={`truncate text-sm font-bold font-ui ${racer.isMe ? 'text-[#E10600]' : heading}`}
+                  />
                   <p className={`text-[10px] font-ui mt-0.5 truncate flex items-center gap-1.5 ${muted}`}>
                     {racer.studying && (
                       <>
@@ -207,7 +216,7 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
         )}
       </section>
 
-      <RaceChat userId={user.id} displayName={prefs.displayName} raceDate={race.race.date} theme={theme} />
+      <RaceChat userId={user.id} displayName={prefs.displayName} raceDate={race.race.date} onOpenProfile={onOpenProfile} theme={theme} />
 
       {untimed > 0 && (
         <p className={`text-[10px] font-ui leading-relaxed px-1 ${muted}`}>
