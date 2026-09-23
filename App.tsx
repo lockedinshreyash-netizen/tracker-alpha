@@ -1939,6 +1939,8 @@ const App: React.FC = () => {
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
         isAdmin={isAdmin}
+        ownProfile={profileCtl.ownProfile}
+        onOpenAccount={profileCtl.openEditProfile}
       />
 
       <AuthModal

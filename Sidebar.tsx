@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { TabType } from './types';
+import { Avatar } from './profile/Avatar';
+import { Profile } from './profile/profileApi';
 
 interface Props {
   activeTab: TabType;
@@ -14,6 +16,10 @@ interface Props {
      admin/useAdmin), and NOT a permission — forcing it true here gets you a
      tab whose every query the database refuses. */
   isAdmin: boolean;
+  /* Null until signed in and ensure_profile() resolves — the account row
+     falls back to the plain "Tracker Alpha" footer until then. */
+  ownProfile: Profile | null;
+  onOpenAccount: () => void;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -105,7 +111,7 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /* Appended, never inserted: the eight the student uses keep the positions
@@ -236,9 +242,34 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
           })}
         </nav>
 
-        {/* Bottom accent */}
+        {/* Account — the one entry point that opens straight into editing
+            rather than the public card RanksTab/RaceChat open on someone
+            else's identity; see profile/EditProfile.tsx. Falls back to the
+            plain footer until there's a profile to show. */}
         <div className={`px-4 py-4 border-t ${dark ? 'border-white/[0.04]' : 'border-[#E3E0D9]'}`}>
-          {!collapsed ? (
+          {ownProfile ? (
+            <button
+              onClick={onOpenAccount}
+              data-onboarding-target="account-nav"
+              className={`w-full flex items-center gap-2.5 rounded-lg transition-all group relative ${collapsed ? 'justify-center py-1' : 'px-1 py-1'} ${dark ? 'hover:bg-white/[0.04]' : 'hover:bg-[#F2F0EC]'}`}
+            >
+              <Avatar
+                profile={ownProfile}
+                size={28}
+                className="ring-1 ring-inset ring-white/10 rounded-full flex-shrink-0"
+              />
+              {!collapsed && (
+                <span className={`text-[11px] font-bold font-ui truncate ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+                  {ownProfile.display_name}
+                </span>
+              )}
+              {collapsed && (
+                <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-[#17150F] text-[#F2F0EC]'}`}>
+                  {ownProfile.display_name}
+                </div>
+              )}
+            </button>
+          ) : !collapsed ? (
             <p className={`text-[8px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
               Tracker Alpha
             </p>
