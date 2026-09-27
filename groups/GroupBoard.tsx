@@ -189,7 +189,7 @@ const GroupBoard: React.FC<Props> = ({ group, userId, onOpenProfile, onGoTo, the
             {hidden.length > 0 && (
               <li className={`px-5 md:px-6 py-3 border-t ${t.rule}`}>
                 <p className={`text-[11px] font-ui ${t.muted}`}>
-                  {hidden.length === 1 ? '1 member keeps' : `${hidden.length} members keep`} their hours private:{' '}
+                  {hidden.length === 1 ? '1 member keeps' : `${hidden.length} members keep`} their hours hidden:{' '}
                   {hidden.map(h => nameOf(h.user_id)).join(', ')}
                 </p>
               </li>

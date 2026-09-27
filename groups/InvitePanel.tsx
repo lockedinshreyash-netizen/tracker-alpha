@@ -145,7 +145,7 @@ const InvitePanel: React.FC<Props> = ({ code, user, onJoined, onDismiss, onOpenA
       {g.description && <p className={`text-[12px] font-ui mt-4 leading-relaxed ${t.muted}`}>{g.description}</p>}
 
       <div className={`mt-6 pt-5 border-t ${t.rule}`}>
-        <Eyebrow dark={dark} className="mb-4">What this group sees of you · change any time</Eyebrow>
+        <Eyebrow dark={dark} className="mb-4">What other members will see · you can change this later</Eyebrow>
         <SharingFields
           shareHours={shareHours}
           shareTasks={shareTasks}

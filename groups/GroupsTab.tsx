@@ -287,7 +287,7 @@ const GroupsTab: React.FC<Props> = ({
                     {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
                     {g.role !== 'member' && <> · {g.role}</>}
                     {g.visibility === 'discoverable' && <> · public</>}
-                    {!g.share_hours && <> · hours private</>}
+                    {!g.share_hours && <> · your hours hidden</>}
                     {!!g.pending_requests && (
                       <span className="text-[#E10600]"> · {g.pending_requests} {g.pending_requests === 1 ? 'request' : 'requests'}</span>
                     )}

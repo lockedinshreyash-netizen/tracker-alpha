@@ -289,7 +289,7 @@ const PublicGroupSheet: React.FC<{
             </div>
           )}
           <div className={`pt-5 border-t ${t.rule}`}>
-            <Eyebrow dark={dark} className="mb-4">What this group sees of you · change any time</Eyebrow>
+            <Eyebrow dark={dark} className="mb-4">What other members will see · you can change this later</Eyebrow>
             <SharingFields
               shareHours={shareHours}
               shareTasks={shareTasks}

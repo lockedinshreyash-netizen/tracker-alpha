@@ -56,7 +56,8 @@ const expiresLabel = (iso: string | null): string => {
   return `Expires in ${Math.round(hours / 24)} days`;
 };
 
-const TASK_BADGE: Record<string, string> = { summary: 'Task count', tasks: 'Tasks' };
+/* Roster badges: what each member shows this group. Hidden things get no badge. */
+const TASK_BADGE: Record<string, string> = { summary: 'Task count', tasks: 'All tasks' };
 
 /* The admin's side of the same refusals INVITE_STATUS_COPY words for the joiner. */
 const APPROVAL_COPY: Record<string, string> = {
@@ -182,8 +183,11 @@ const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenPr
           </div>
           <ul className="pb-2">
             {requests.map(r => {
-              const shares = [r.share_hours && 'hours', r.share_tasks !== 'private' && TASK_BADGE[r.share_tasks]?.toLowerCase()]
-                .filter(Boolean).join(' · ');
+              const shares = [
+                r.share_hours && 'their study hours',
+                r.share_tasks === 'summary' && 'how many tasks they’ve done',
+                r.share_tasks === 'tasks' && 'every task on their list',
+              ].filter(Boolean).join(' and ');
               const answer = (approve: boolean) => void act(`req-${r.user_id}`, async () => {
                 const result = await respondJoinRequest(group.id, r.user_id, approve);
                 // Approval re-checks bans and limits; say which one stopped it.
@@ -205,7 +209,7 @@ const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenPr
                         nameClassName={`truncate text-[13px] font-bold font-ui ${t.heading}`}
                       />
                       <p className={`text-[10px] font-ui mt-1 ${t.muted}`}>
-                        Will share: {shares || 'nothing'}
+                        {shares ? `Will show ${shares}` : 'Will show only their name'}
                       </p>
                     </div>
                     <button onClick={() => answer(false)} disabled={busy === `req-${r.user_id}`} className={`${small} ${t.muted} hover:text-[#E10600]`}>
