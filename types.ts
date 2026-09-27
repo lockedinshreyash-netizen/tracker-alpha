@@ -185,7 +185,9 @@ export interface ChapterProgress {
    re-authorized in the database against the caller's own JWT. A saved
    `lastUsedTab` of 'Admin' on an account that is no longer an administrator
    falls back to Today; see App. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Observatory' | 'Admin';
+/* `Groups` is server state end to end — nothing about a group lives in
+   AppState, so nothing about it rides the synced blob. */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {

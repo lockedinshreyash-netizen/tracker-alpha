@@ -148,7 +148,7 @@ const HeroSection: React.FC<Props> = ({ onCtaClick, examPref, onExamPrefChange }
               Start tracking free
             </button>
             <span className="font-data" style={{ fontSize: '12px', color: INK_FAINT }}>
-              1,500+ aspirants tracking
+              Hundreds of students tracking
             </span>
           </div>
         </div>

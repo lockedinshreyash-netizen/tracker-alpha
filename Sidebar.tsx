@@ -20,6 +20,9 @@ interface Props {
      falls back to the plain "Tracker Alpha" footer until then. */
   ownProfile: Profile | null;
   onOpenAccount: () => void;
+  /* Unread group messages across every group. A count and nothing else —
+     which group, and from whom, is the Groups tab's business. */
+  groupsUnread?: number;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -85,6 +88,16 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
       );
+    /* Two people, one slightly behind the other — company, not a crowd. */
+    case 'Groups':
+      return (
+        <svg {...props}>
+          <circle cx="9" cy="8" r="3.2" />
+          <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+          <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6" />
+          <path d="M18 14.4c1.8.9 3 2.9 3 5.6" />
+        </svg>
+      );
     /* A subject inscribed in a circle with the construction lines left in —
        the Vitruvian method rather than the picture, and the only icon here
        that is a diagram rather than a pictogram. It should not look like the
@@ -111,13 +124,16 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  /* Appended, never inserted: the eight the student uses keep the positions
-     their muscle memory knows, and the console arrives at the bottom. */
+  /* Appended, never inserted: the tabs the student uses keep the positions
+     their muscle memory knows, and the console arrives at the bottom. Groups
+     went in after Review for the same reason — above the Observatory's rule,
+     because it is a place you go to do something, but below everything that
+     was already there. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Observatory',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Groups', 'Observatory',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';
@@ -134,8 +150,12 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           data-onboarding-mobile-menu="toggle"
-          className={`p-2 rounded-md transition-all ${dark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-[#6B675C] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
+          aria-label={groupsUnread > 0 && !mobileOpen ? `Menu, ${groupsUnread} unread group messages` : 'Menu'}
+          className={`relative p-2 rounded-md transition-all ${dark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-[#6B675C] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
         >
+          {groupsUnread > 0 && !mobileOpen && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#E10600]" aria-hidden="true" />
+          )}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             {mobileOpen ? (
               <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
@@ -228,6 +248,19 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
                   <span className={`text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? (dark ? 'text-white' : 'text-[#17150F]') : ''}`}>
                     {tab}
                   </span>
+                )}
+
+                {tab === 'Groups' && groupsUnread > 0 && (
+                  collapsed ? (
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#E10600]" aria-label={`${groupsUnread} unread`} />
+                  ) : (
+                    <span
+                      className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#E10600] text-white text-[9px] font-black font-ui flex items-center justify-center"
+                      aria-label={`${groupsUnread} unread`}
+                    >
+                      {groupsUnread > 99 ? '99+' : groupsUnread}
+                    </span>
+                  )
                 )}
 
                 {/* Tooltip on collapsed */}

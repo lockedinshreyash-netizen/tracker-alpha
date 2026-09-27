@@ -50,9 +50,12 @@ const useProfileLookup = (
         const profile = await lookup();
         if (cancelled) return;
         if (!profile) { setState({ profile: null, totalHours: null, loading: false, error: null }); return; }
+        // null on failure, not 0 — a fetch that errored (RPC missing, network
+        // blip) must not render identically to someone who genuinely has no
+        // ranked hours yet. ProfileCard already shows null as "—".
         const totalHours = profile.user_id === currentUserId
           ? null
-          : await fetchTotalHours(profile.user_id).catch(() => 0);
+          : await fetchTotalHours(profile.user_id).catch(() => null);
         if (cancelled) return;
         setState({ profile, totalHours, loading: false, error: null });
       } catch (e) {

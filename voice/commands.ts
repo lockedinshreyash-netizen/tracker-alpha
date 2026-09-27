@@ -101,6 +101,7 @@ const TAB_ALIASES: [TabType, string[]][] = [
   ['Questions', ['questions', 'question', 'practice', 'pyq', 'pyqs']],
   ['Ranks', ['ranks', 'rank', 'leaderboard', 'ranking', 'rankings', 'board']],
   ['Review', ['review', 'reviews', 'score', 'progress', 'stats']],
+  ['Groups', ['groups', 'group', 'friends', 'batch', 'squad']],
 ];
 
 const STATUS_ALIASES: [SyllabusStatus, string[]][] = [

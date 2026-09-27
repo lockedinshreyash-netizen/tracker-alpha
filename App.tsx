@@ -53,6 +53,10 @@ import AnnouncementModal from './announce/AnnouncementModal';
 import FeedbackWidget from './feedback/FeedbackWidget';
 import { useInstall } from './install/useInstall';
 import InstallBanner from './install/InstallBanner';
+import GroupsTab from './groups/GroupsTab';
+import { useGroups } from './groups/useGroups';
+import { clearPendingInvite, takePendingInvite } from './groups/invite';
+import { forgetGroupsOnDevice } from './groups/publish';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -208,6 +212,10 @@ const App: React.FC = () => {
     dailyGoalHours: state.dailyGoalHours,
   }), [state.logs, state.tasks, state.questionTracking.dailyQuestionsLog, state.dailyGoalHours]);
   const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
+  /* A group invite from `/?join=CODE`, lifted out of the URL on the first
+     render and held (in localStorage too) until it is used or dismissed — the
+     person opening it has often not signed up yet. See groups/invite.ts. */
+  const [pendingInvite, setPendingInvite] = useState<string | null>(takePendingInvite);
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -278,7 +286,10 @@ const App: React.FC = () => {
         handleInitialSync(u.id);
         setShowLanding(false);
       } else {
-        setShowLanding(!hasVisited);
+        /* An invite link skips the landing page: the person was sent to a
+           specific group by a friend, and a pitch for the whole product
+           standing between them and it is the fastest way to lose them. */
+        setShowLanding(!hasVisited && !pendingInvite);
         // Local-only session: there is no cloud pull to wait for.
         setSyncSettled(true);
       }
@@ -529,6 +540,7 @@ const App: React.FC = () => {
           if (key.startsWith('sb-')) localStorage.removeItem(key);
         });
         localStorage.removeItem('locked_in_state_v2');
+        forgetGroupsOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -1628,6 +1640,23 @@ const App: React.FC = () => {
   });
   const inTheRace = Boolean(user && state.leaderboard?.enabled);
 
+  /* ── Groups ──
+     Mounted here for useRace's reason: what a group can see of you has to
+     stay current while you are on Today, where the hours are logged and the
+     tasks are ticked — not only while the Groups tab is open. Waits on the
+     cloud pull, or a fresh device would publish its empty defaults. */
+  const groupsState = useGroups({
+    user,
+    logs: state.logs,
+    tasks: state.tasks,
+    watching: activeTab === 'Groups',
+    ready: syncSettled,
+  });
+  const handleInviteHandled = useCallback(() => {
+    clearPendingInvite();
+    setPendingInvite(null);
+  }, []);
+
   /* ── Profiles ──
      Mounted here for the same reason: a profile has to be openable from a
      leaderboard row or a chat bubble on the Ranks tab, and reachable directly
@@ -1912,6 +1941,20 @@ const App: React.FC = () => {
   const showOnboarding =
     showLanding === false && needsOnboarding && syncSettled && !isAuthModalOpen;
 
+  /* An invite takes you to Groups once you can see it — after the landing
+     page and onboarding — and once more after signing in, when the card
+     changes from "sign in to join" to the group itself. Keyed so it never
+     pulls somebody back to Groups after they have walked away from it. */
+  const routedInviteRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingInvite || showLanding !== false || showOnboarding) return;
+    const key = `${pendingInvite}:${user ? 'in' : 'out'}`;
+    if (routedInviteRef.current === key) return;
+    routedInviteRef.current = key;
+    handleTabChangeAndExitProfile('Groups');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInvite, showLanding, showOnboarding, user]);
+
   // While checking session, show nothing (prevents flash)
   if (showLanding === null) {
     return <div style={{ background: theme === 'dark' ? '#0B0B0D' : '#F2F0EC', width: '100vw', height: '100vh' }} />;
@@ -1949,6 +1992,7 @@ const App: React.FC = () => {
         isAdmin={isAdmin}
         ownProfile={profileCtl.ownProfile}
         onOpenAccount={profileCtl.openEditProfile}
+        groupsUnread={groupsState.totalUnread}
       />
 
       <AuthModal
@@ -2115,6 +2159,18 @@ const App: React.FC = () => {
               race={race}
               onJoin={joinLeaderboard}
               onLeave={exitLeaderboard}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onOpenProfile={profileCtl.openProfile}
+              theme={theme}
+            />
+          )}
+          {activeTab === 'Groups' && (
+            <GroupsTab
+              user={user}
+              groups={groupsState}
+              tasks={state.tasks}
+              pendingInvite={pendingInvite}
+              onInviteHandled={handleInviteHandled}
               onOpenAuth={() => setIsAuthModalOpen(true)}
               onOpenProfile={profileCtl.openProfile}
               theme={theme}
