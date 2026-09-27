@@ -4,6 +4,36 @@ import { ExamPreference, Subject, SyllabusStatus } from './types';
 export const JEE_2027_DATE = new Date('2027-01-01');
 export const NEET_2027_DATE = new Date('2027-05-02');
 
+/* The same two defaults as study-day strings, which is what the date maths in
+   utils.ts works on. Neither is an officially announced date — they are the
+   app's placeholders, and a student who knows their real date sets it (see
+   `examDates` on AppState). Everything that reads an exam date goes through
+   `resolveExamDate`, so the default and the override can never disagree. */
+export const DEFAULT_EXAM_DATE: Record<ExamPreference, string> = {
+  JEE: '2027-01-01',
+  NEET: '2027-05-02',
+};
+
+export interface ResolvedExamDate {
+  /** YYYY-MM-DD */
+  date: string;
+  /** True when the student has not set their own and this is the app's placeholder. */
+  isDefault: boolean;
+}
+
+export const resolveExamDate = (
+  exam: ExamPreference = 'JEE',
+  examDates?: Partial<Record<ExamPreference, string>>,
+): ResolvedExamDate => {
+  const own = examDates?.[exam];
+  return own && /^\d{4}-\d{2}-\d{2}$/.test(own)
+    ? { date: own, isDefault: false }
+    : { date: DEFAULT_EXAM_DATE[exam], isDefault: true };
+};
+
+/** As a Date, for the countdown code that already takes one. */
+export const examDateAsDate = (resolved: ResolvedExamDate): Date => new Date(resolved.date);
+
 export const getActiveSubjects = (preference: ExamPreference = 'JEE'): Subject[] => {
   return preference === 'NEET' 
     ? ['Physics', 'Chemistry', 'Biology', 'General'] 

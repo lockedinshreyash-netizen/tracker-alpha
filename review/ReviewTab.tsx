@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, DailyQuestionsLog, Subject, ExamPreference, ReminderPrefs } from '../types';
 import ReminderSettings from '../reminders/ReminderSettings';
+import ExamDateField from '../mentor/ExamDateField';
 
 interface Props {
   logs: DailyLog[];
@@ -18,11 +19,14 @@ interface Props {
   activeSubjects: Subject[];
   reminders: ReminderPrefs;
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
+  examDates?: Partial<Record<ExamPreference, string>>;
+  onSetExamDate: (date: string | null) => void;
 }
 
 const ReviewTab: React.FC<Props> = ({
   logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog,
   examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders,
+  examDates, onSetExamDate,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
@@ -120,6 +124,7 @@ const ReviewTab: React.FC<Props> = ({
           <p className="text-[9px] text-zinc-600 uppercase font-medium mt-1">
             Your previous subject data is safe and will reappear if you switch back.
           </p>
+          <ExamDateField exam={examPreference} examDates={examDates} onSet={onSetExamDate} theme={theme} />
         </div>
         <div className="flex gap-2">
           {(['JEE', 'NEET'] as const).map(e => (

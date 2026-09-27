@@ -23,6 +23,9 @@ interface Props {
   /* Unread group messages across every group. A count and nothing else —
      which group, and from whom, is the Groups tab's business. */
   groupsUnread?: number;
+  /* Whether this account is in the Mentor beta. Server-derived (see
+     mentor/useMentorAccess) and, like isAdmin, not a permission. */
+  showMentor?: boolean;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -111,6 +114,14 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
         </svg>
       );
+    /* A compass needle: direction, not answers. */
+    case 'Mentor':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15.5 8.5 13.4 13.4 8.5 15.5 10.6 10.6z" />
+        </svg>
+      );
     /* A key. Nothing about the study loop, and it should not pretend to be. */
     case 'Admin':
       return (
@@ -124,7 +135,7 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0 }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0, showMentor = false }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /* Appended, never inserted: the tabs the student uses keep the positions
@@ -134,6 +145,8 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
      was already there. */
   const tabs: TabType[] = [
     'Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Groups', 'Observatory',
+    /* Appended for the same muscle-memory reason, and only for the beta. */
+    ...(showMentor ? (['Mentor'] as TabType[]) : []),
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';
@@ -228,7 +241,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
               )}
               <button
                 onClick={() => handleTabClick(tab)}
-                data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : tab === 'Plan' ? 'plan-nav' : undefined}
+                data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : tab === 'Plan' ? 'plan-nav' : tab === 'Mentor' ? 'mentor-nav' : undefined}
                 className={`flex items-center gap-3 rounded-lg transition-all duration-200 group relative
                   ${collapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'}
                   ${isActive
