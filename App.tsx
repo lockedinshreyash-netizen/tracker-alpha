@@ -2173,6 +2173,7 @@ const App: React.FC = () => {
               onInviteHandled={handleInviteHandled}
               onOpenAuth={() => setIsAuthModalOpen(true)}
               onOpenProfile={profileCtl.openProfile}
+              isStaff={isAdmin}
               theme={theme}
             />
           )}

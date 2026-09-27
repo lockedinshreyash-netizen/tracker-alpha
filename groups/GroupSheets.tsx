@@ -1,12 +1,19 @@
 /* ── Create, edit, join ──
    Three short forms. Create and Edit share one body because a group's
    settings are the same fields whether it is new or not; only Create asks
-   about your own hours, because only Create is also you joining. */
+   about your own sharing, because only Create is also you joining.
+
+   Access — who can find the group and how people get in — is its own block,
+   and in Edit it is drawn only for the owner, because the server refuses it
+   from anyone else (update_group). Making a group public puts its name in
+   front of every student in the app; that is the owner's call. */
 
 import React, { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import {
+  GroupVisibility,
   InvitePolicy,
+  JoinPolicy,
   MAX_GROUP_DESCRIPTION,
   MAX_GROUP_NAME,
   MyGroup,
@@ -15,10 +22,13 @@ import {
   humanError,
   isCompleteCode,
   normalizeInviteCode,
+  TaskShareLevel,
+  setSharing,
   updateGroup,
   validateGroupName,
 } from './api';
-import { GROUP_ICONS, Segmented, Sheet, Switch, btn, tokens } from './ui';
+import { GROUP_ICONS, Eyebrow, Segmented, Sheet, btn, tokens } from './ui';
+import SharingFields from './SharingFields';
 import InvitePanel from './InvitePanel';
 
 interface Fields {
@@ -27,6 +37,63 @@ interface Fields {
   icon: string | null;
   invitePolicy: InvitePolicy;
 }
+
+interface Access {
+  visibility: GroupVisibility;
+  joinPolicy: JoinPolicy;
+}
+
+/** Private → invite only. Public → listed in Explore, and either open or by request. */
+const AccessFields: React.FC<{
+  value: Access;
+  onChange: (v: Access) => void;
+  dark: boolean;
+}> = ({ value, onChange, dark }) => {
+  const t = tokens(dark);
+  const label = `block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`;
+  const isPublic = value.visibility === 'discoverable';
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className={label}>Who can find this group</p>
+        <Segmented<GroupVisibility>
+          value={value.visibility}
+          onChange={v => onChange({
+            visibility: v,
+            // Public needs a way in; asking is the safer default.
+            joinPolicy: v === 'private' ? 'invite' : value.joinPolicy === 'open' ? 'open' : 'request',
+          })}
+          options={[{ value: 'private', label: 'Private' }, { value: 'discoverable', label: 'Public' }]}
+          dark={dark}
+          label="Who can find this group"
+        />
+        <p className={`text-[10px] font-ui mt-2 leading-relaxed ${t.muted}`}>
+          {isPublic
+            ? 'Listed in Explore. Anyone signed in sees the name, icon, description and member count. Hours, tasks, members and chat stay members-only.'
+            : 'Not listed anywhere. The only way in is an invite link or code.'}
+        </p>
+      </div>
+
+      {isPublic && (
+        <div>
+          <p className={label}>Who can join</p>
+          <Segmented<JoinPolicy>
+            value={value.joinPolicy === 'open' ? 'open' : 'request'}
+            onChange={v => onChange({ ...value, joinPolicy: v })}
+            options={[{ value: 'open', label: 'Anyone' }, { value: 'request', label: 'Approve requests' }]}
+            dark={dark}
+            label="Who can join"
+          />
+          <p className={`text-[10px] font-ui mt-2 leading-relaxed ${t.muted}`}>
+            {value.joinPolicy === 'open'
+              ? 'Anyone can walk straight in and read the chat history. Invite links still work.'
+              : 'People ask to join; you and your admins approve or decline. Invite links skip the queue.'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const GroupFields: React.FC<{
   value: Fields;
@@ -44,7 +111,7 @@ const GroupFields: React.FC<{
           value={value.name}
           onChange={e => onChange({ ...value, name: e.target.value })}
           maxLength={MAX_GROUP_NAME}
-          placeholder="ALLEN KATRAJ — JEE 2027"
+          placeholder="e.g. JEE 2027 Study Group"
           autoFocus
           className={t.input}
         />
@@ -58,7 +125,7 @@ const GroupFields: React.FC<{
           onChange={e => onChange({ ...value, description: e.target.value })}
           maxLength={MAX_GROUP_DESCRIPTION}
           rows={2}
-          placeholder="Batch B2. Minimum 6 hours or you explain yourself."
+          placeholder="e.g. Six hours a day, minimum. No excuses."
           className={`${t.input} resize-none`}
         />
       </div>
@@ -120,6 +187,8 @@ export const CreateGroupSheet: React.FC<{
   const t = tokens(dark);
   const [fields, setFields] = useState<Fields>({ name: '', description: '', icon: '🔥', invitePolicy: 'admins' });
   const [shareHours, setShareHours] = useState(true);
+  const [shareTasks, setShareTasks] = useState<TaskShareLevel>('private');
+  const [access, setAccess] = useState<Access>({ visibility: 'private', joinPolicy: 'invite' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = validateGroupName(fields.name);
@@ -129,7 +198,11 @@ export const CreateGroupSheet: React.FC<{
     setSaving(true);
     setError(null);
     try {
-      const id = await createGroup({ ...fields, name, description: fields.description.trim(), shareHours });
+      const id = await createGroup({ ...fields, ...access, name, description: fields.description.trim(), shareHours });
+      /* A second call rather than a new create_group parameter, so this works
+         against the schema already deployed. If it fails the group exists with
+         tasks private — the safe side — and the Tasks section shows exactly that. */
+      if (shareTasks !== 'private') await setSharing(id, shareHours, shareTasks).catch(() => {});
       onCreated(id);
     } catch (e) {
       setError(humanError(e));
@@ -152,12 +225,17 @@ export const CreateGroupSheet: React.FC<{
       }
     >
       <GroupFields value={fields} onChange={setFields} dark={dark} />
-      <div className={`pt-5 border-t ${t.rule} flex items-start justify-between gap-4`}>
-        <div>
-          <p className={`text-[12px] font-bold font-ui ${t.heading}`}>Show my study hours to this group</p>
-          <p className={`text-[11px] font-ui mt-1 ${t.muted}`}>Your totals only. Change it any time.</p>
-        </div>
-        <Switch on={shareHours} onToggle={setShareHours} label="Show my study hours to this group" dark={dark} />
+      <div className={`pt-5 border-t ${t.rule}`}>
+        <AccessFields value={access} onChange={setAccess} dark={dark} />
+      </div>
+      <div className={`pt-5 border-t ${t.rule}`}>
+        <Eyebrow dark={dark} className="mb-4">What this group sees of you · change any time</Eyebrow>
+        <SharingFields
+          shareHours={shareHours}
+          shareTasks={shareTasks}
+          onChange={(h, tk) => { setShareHours(h); setShareTasks(tk); }}
+          dark={dark}
+        />
       </div>
     </Sheet>
   );
@@ -177,16 +255,28 @@ export const EditGroupSheet: React.FC<{
     icon: group.icon,
     invitePolicy: group.invite_policy,
   });
+  const isOwner = group.role === 'owner';
+  const [access, setAccess] = useState<Access>({
+    visibility: group.visibility,
+    joinPolicy: group.join_policy ?? 'invite',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = validateGroupName(fields.name);
 
   const submit = async () => {
     if (!name || saving) return;
+    const goingPublic = access.visibility === 'discoverable' && group.visibility !== 'discoverable';
+    if (goingPublic && !window.confirm('Make this group public? Its name, icon, description and member count will be listed in Explore for every student.')) return;
     setSaving(true);
     setError(null);
     try {
-      await updateGroup(group.id, { ...fields, name, description: fields.description.trim() });
+      await updateGroup(group.id, {
+        ...fields,
+        name,
+        description: fields.description.trim(),
+        ...(isOwner ? { access } : {}),
+      });
       onSaved();
     } catch (e) {
       setError(humanError(e));
@@ -209,6 +299,18 @@ export const EditGroupSheet: React.FC<{
       }
     >
       <GroupFields value={fields} onChange={setFields} dark={dark} />
+      <div className={`pt-5 border-t ${t.rule}`}>
+        {isOwner ? (
+          <AccessFields value={access} onChange={setAccess} dark={dark} />
+        ) : (
+          <p className={`text-[11px] font-ui leading-relaxed ${t.muted}`}>
+            {group.visibility === 'discoverable'
+              ? `Public · ${group.join_policy === 'open' ? 'anyone can join' : 'join by request'}.`
+              : 'Private · invite only.'}{' '}
+            Only the owner can change who can find and join this group.
+          </p>
+        )}
+      </div>
     </Sheet>
   );
 };

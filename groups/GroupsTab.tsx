@@ -23,8 +23,12 @@ import GroupBoard from './GroupBoard';
 import GroupChat from './GroupChat';
 import GroupProgress from './GroupProgress';
 import GroupMembers from './GroupMembers';
+import ExploreGroups from './ExploreGroups';
+import { sharingSummary } from './SharingFields';
 
 type Section = 'board' | 'chat' | 'progress' | 'members';
+/* Two lists, one tab: the groups you are in, and the ones you could be. */
+type View = 'mine' | 'explore';
 
 const LAST_GROUP_KEY = 'groups_last_open_v1';
 const readLast = (): string | null => { try { return localStorage.getItem(LAST_GROUP_KEY); } catch { return null; } };
@@ -40,11 +44,14 @@ interface Props {
   onInviteHandled: () => void;
   onOpenAuth: () => void;
   onOpenProfile: (userId: string) => void;
+  /* App staff — draws the takedown button on public groups. Not a permission;
+     delete_group() re-checks is_admin() server-side. */
+  isStaff: boolean;
   theme: 'dark' | 'light';
 }
 
 const GroupsTab: React.FC<Props> = ({
-  user, groups, tasks, pendingInvite, onInviteHandled, onOpenAuth, onOpenProfile, theme,
+  user, groups, tasks, pendingInvite, onInviteHandled, onOpenAuth, onOpenProfile, isStaff, theme,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -53,6 +60,7 @@ const GroupsTab: React.FC<Props> = ({
   const [section, setSection] = useState<Section>('board');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [view, setView] = useState<View>('mine');
 
   const list = groups.groups;
   const open: MyGroup | null = useMemo(
@@ -92,6 +100,7 @@ const GroupsTab: React.FC<Props> = ({
   const afterJoin = useCallback(async (groupId: string) => {
     onInviteHandled();
     setJoining(false);
+    setView('mine');
     await groups.refresh();
     openGroup(groupId, 'board');
   }, [groups, onInviteHandled, openGroup]);
@@ -123,8 +132,11 @@ const GroupsTab: React.FC<Props> = ({
     const sections: { value: Section; label: string }[] = [
       { value: 'board', label: 'Board' },
       { value: 'chat', label: open.unread > 0 && section !== 'chat' ? `Chat · ${open.unread > 99 ? '99+' : open.unread}` : 'Chat' },
-      { value: 'progress', label: 'Progress' },
-      { value: 'members', label: 'Members' },
+      { value: 'progress', label: 'Tasks' },
+      {
+        value: 'members',
+        label: open.pending_requests ? `Members · ${open.pending_requests > 99 ? '99+' : open.pending_requests}` : 'Members',
+      },
     ];
 
     return (
@@ -139,13 +151,30 @@ const GroupsTab: React.FC<Props> = ({
         <header className="flex items-center gap-4">
           <GroupIcon icon={open.icon} name={open.name} size={56} dark={dark} />
           <div className="min-w-0 flex-1">
-            <h1 className={`text-xl md:text-2xl font-black uppercase tracking-tight font-ui truncate ${t.heading}`}>{open.name}</h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className={`text-xl md:text-2xl font-black uppercase tracking-tight font-ui truncate ${t.heading}`}>{open.name}</h1>
+              {open.visibility === 'discoverable' && (
+                <span
+                  className={`flex-shrink-0 text-[8px] font-black uppercase tracking-[0.12em] font-ui px-1.5 py-0.5 rounded border ${t.rule} ${t.muted}`}
+                  title={open.join_policy === 'open' ? 'Listed in Explore · anyone can join' : 'Listed in Explore · join by request'}
+                >
+                  Public
+                </span>
+              )}
+            </div>
             <p className={`text-[11px] font-ui mt-0.5 ${t.muted}`}>
               <button onClick={() => setSection('members')} className="hover:text-[#E10600] transition-colors">
                 {open.member_count} {open.member_count === 1 ? 'member' : 'members'}
               </button>
               {open.description && <span className="hidden md:inline"> · {open.description}</span>}
             </p>
+            {/* What this group can see of you, one tap from changing it. */}
+            <button
+              onClick={() => setSection('progress')}
+              className={`mt-1 text-[10px] font-bold uppercase tracking-[0.08em] font-ui ${t.muted} hover:text-[#E10600] transition-colors`}
+            >
+              {sharingSummary(open.share_hours, open.share_tasks)} ›
+            </button>
           </div>
         </header>
         {open.description && (
@@ -198,6 +227,21 @@ const GroupsTab: React.FC<Props> = ({
         <button onClick={() => setJoining(true)} className={`py-4 ${btn} ${t.ghost}`}>Join with code</button>
       </div>
 
+      <div className="md:max-w-xs">
+        <Segmented<View>
+          value={view}
+          onChange={setView}
+          options={[{ value: 'mine', label: 'My groups' }, { value: 'explore', label: 'Explore' }]}
+          dark={dark}
+          label="Which groups"
+          size="sm"
+        />
+      </div>
+
+      {view === 'explore' ? (
+        <ExploreGroups onOpenGroup={id => openGroup(id)} onJoined={id => void afterJoin(id)} isStaff={isStaff} theme={theme} />
+      ) : (
+      <>
       {groups.error && (
         <p className={`text-[11px] font-ui px-4 py-3 rounded-lg border ${t.inset} ${groups.setupMissing ? 'text-[#E10600]' : t.muted}`}>
           {groups.error}
@@ -223,6 +267,9 @@ const GroupsTab: React.FC<Props> = ({
               <li>· A chat that’s still there tomorrow</li>
               <li>· Task progress — only if you choose to share it</li>
             </ul>
+            <button onClick={() => setView('explore')} className={`mt-6 text-[10px] font-black uppercase tracking-[0.12em] font-ui text-[#E10600]`}>
+              Or find a public group →
+            </button>
           </section>
         )
       ) : (
@@ -239,7 +286,11 @@ const GroupsTab: React.FC<Props> = ({
                   <p className={`text-[10px] font-ui mt-0.5 ${t.muted}`}>
                     {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
                     {g.role !== 'member' && <> · {g.role}</>}
+                    {g.visibility === 'discoverable' && <> · public</>}
                     {!g.share_hours && <> · hours private</>}
+                    {!!g.pending_requests && (
+                      <span className="text-[#E10600]"> · {g.pending_requests} {g.pending_requests === 1 ? 'request' : 'requests'}</span>
+                    )}
                   </p>
                 </div>
                 {g.unread > 0 && (
@@ -255,6 +306,8 @@ const GroupsTab: React.FC<Props> = ({
             </li>
           ))}
         </ul>
+      )}
+      </>
       )}
 
       {creating && (

@@ -70,11 +70,10 @@ create table if not exists public.groups (
   -- points). Rendered as text by React, never as HTML or a URL, so there is
   -- nothing to validate beyond length.
   icon          text,
-  -- 'private'      — reachable only by invite. The only value anything sets.
-  -- 'discoverable' — metadata (name, icon, description, size) readable by any
-  --                  signed-in user, for a future directory. The SELECT policy
-  --                  below already honours it; what does not exist yet is a
-  --                  way to set it or a join path that skips the invite.
+  -- 'private'      — reachable only by invite.
+  -- 'discoverable' — listed in Explore: name, icon, description and size are
+  --                  readable by any signed-in user. Hours, tasks, the member
+  --                  list and the chat stay members-only either way.
   visibility    text        not null default 'private',
   -- Who may mint invites. Admins always can.
   invite_policy text        not null default 'admins',
@@ -135,6 +134,52 @@ create table if not exists public.group_bans (
   banned_at timestamptz not null default now(),
   primary key (group_id, user_id)
 );
+
+-- ── Public groups ──
+-- Added after the first version shipped, so they go on as alterations; the
+-- whole file stays re-runnable.
+--
+-- `join_policy` says how someone who found the group in Explore gets in:
+-- 'open' (straight in), 'request' (an admin approves), or 'invite' (they
+-- don't — which is what every private group is). The biconditional below makes
+-- the pairing a fact rather than a convention: a private group cannot be
+-- 'open' (a leftover setting nobody sees but join_public_group would honour),
+-- and a listed group cannot be a dead end nobody can enter. An invite link
+-- works in every case; it is an admin's own say-so.
+alter table public.groups add column if not exists join_policy text not null default 'invite';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint
+                  where conrelid = 'public.groups'::regclass and conname = 'group_join_policy_valid') then
+    alter table public.groups
+      add constraint group_join_policy_valid check (join_policy in ('invite', 'open', 'request'));
+  end if;
+  if not exists (select 1 from pg_constraint
+                  where conrelid = 'public.groups'::regclass and conname = 'group_join_matches_visibility') then
+    alter table public.groups
+      add constraint group_join_matches_visibility check ((visibility = 'private') = (join_policy = 'invite'));
+  end if;
+end $$;
+
+-- A pending request to join a group whose join_policy is 'request'. It carries
+-- the requester's sharing choices, asked at the moment they asked to join, so
+-- approval applies what they agreed to rather than a default they never saw.
+-- One row per (group, user): asking twice updates the one request.
+create table if not exists public.group_join_requests (
+  group_id    uuid        not null references public.groups (id) on delete cascade,
+  user_id     uuid        not null references auth.users (id) on delete cascade,
+  message     text,
+  share_hours boolean     not null default false,
+  share_tasks text        not null default 'private',
+  created_at  timestamptz not null default now(),
+  primary key (group_id, user_id),
+  constraint request_message_length    check (message is null or char_length(message) <= 140),
+  constraint request_share_tasks_valid check (share_tasks in ('private', 'summary', 'tasks'))
+);
+
+-- "My pending requests" and the per-user cap. The primary key leads with group.
+create index if not exists group_join_requests_by_user on public.group_join_requests (user_id);
 
 create table if not exists public.group_invites (
   id         uuid        primary key default gen_random_uuid(),
@@ -308,6 +353,7 @@ alter table public.group_members         enable row level security;
 alter table public.group_bans            enable row level security;
 alter table public.group_invites         enable row level security;
 alter table public.group_invite_attempts enable row level security;
+alter table public.group_join_requests   enable row level security;
 alter table public.group_messages        enable row level security;
 alter table public.study_days            enable row level security;
 alter table public.task_shares           enable row level security;
@@ -333,6 +379,14 @@ create policy "group admins read bans"
   on public.group_bans for select
   to authenticated
   using (public.role_rank(public.group_role(group_id)) >= 2);
+
+-- group_join_requests: your own, and the group's admins. Writes only through
+-- request_to_join / cancel_join_request / respond_join_request.
+drop policy if exists "requesters and admins read join requests" on public.group_join_requests;
+create policy "requesters and admins read join requests"
+  on public.group_join_requests for select
+  to authenticated
+  using (user_id = auth.uid() or public.role_rank(public.group_role(group_id)) >= 2);
 
 -- group_invites: the group's admins, and a member reading invites they made
 -- themselves (under invite_policy = 'members'). Membership is re-checked so a
@@ -557,13 +611,37 @@ as $$
         window_start = case when a.window_start > now() - interval '15 minutes' then a.window_start else now() end;
 $$;
 
+-- ── Access ──
+-- The one place a (visibility, join_policy) pair is decided, so create and
+-- update cannot disagree about what "public with no join mode" means: a
+-- private group is always 'invite', and a listed group defaults to asking.
+create or replace function public.normalize_group_access(p_visibility text, p_join_policy text)
+returns text[]
+language sql
+immutable
+as $$
+  select case
+    when coalesce(p_visibility, 'private') <> 'discoverable' then array['private', 'invite']
+    when p_join_policy = 'open' then array['discoverable', 'open']
+    else array['discoverable', 'request']
+  end;
+$$;
+
 -- ── Create ──
+-- The old five-argument signature is dropped rather than left beside this one:
+-- two overloads that both accept five named arguments make every PostgREST
+-- call ambiguous. The new parameters have defaults, so a client still sending
+-- the old five keeps working — run this file, then deploy.
+drop function if exists public.create_group(text, text, text, text, boolean);
+
 create or replace function public.create_group(
   p_name          text,
   p_description   text default null,
   p_icon          text default null,
   p_invite_policy text default 'admins',
-  p_share_hours   boolean default true
+  p_share_hours   boolean default true,
+  p_visibility    text default 'private',
+  p_join_policy   text default 'invite'
 )
 returns uuid
 language plpgsql
@@ -571,8 +649,9 @@ security definer
 set search_path = public
 as $$
 declare
-  uid uuid := auth.uid();
-  gid uuid;
+  uid    uuid := auth.uid();
+  gid    uuid;
+  access text[] := public.normalize_group_access(p_visibility, p_join_policy);
 begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -584,12 +663,14 @@ begin
     raise exception 'owned group limit' using errcode = 'P0001', hint = 'owned_limit';
   end if;
 
-  insert into public.groups (name, description, icon, invite_policy, created_by)
+  insert into public.groups (name, description, icon, invite_policy, visibility, join_policy, created_by)
   values (
     trim(p_name),
     nullif(trim(coalesce(p_description, '')), ''),
     nullif(trim(coalesce(p_icon, '')), ''),
     coalesce(p_invite_policy, 'admins'),
+    access[1],
+    access[2],
     uid
   )
   returning id into gid;
@@ -601,22 +682,43 @@ begin
 end;
 $$;
 
--- ── Settings ── admins and the owner. Visibility is deliberately not a
--- parameter yet; see the column comment.
+-- ── Settings ── admins may change the name, icon, description and invite
+-- rules. Who can find the group and how people get in are the OWNER's: making
+-- a group public shows its name to every student in the app, which is not a
+-- decision an admin appointed last week should be able to make for everyone.
+-- Null access arguments mean "leave as is". Going private drops pending
+-- requests — they asked to join a group that no longer takes requests.
+drop function if exists public.update_group(uuid, text, text, text, text);
+
 create or replace function public.update_group(
   p_group         uuid,
   p_name          text,
   p_description   text,
   p_icon          text,
-  p_invite_policy text
+  p_invite_policy text,
+  p_visibility    text default null,
+  p_join_policy   text default null
 )
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  my_role text := public.group_role(p_group);
+  cur     public.groups;
+  access  text[];
 begin
-  if public.role_rank(public.group_role(p_group)) < 2 then
+  if public.role_rank(my_role) < 2 then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  select * into cur from public.groups where id = p_group;
+  access := public.normalize_group_access(
+    coalesce(p_visibility, cur.visibility),
+    coalesce(p_join_policy, cur.join_policy)
+  );
+  if (access[1] <> cur.visibility or access[2] <> cur.join_policy) and my_role <> 'owner' then
     raise exception 'not authorized' using errcode = '42501';
   end if;
 
@@ -625,21 +727,42 @@ begin
          description   = nullif(trim(coalesce(p_description, '')), ''),
          icon          = nullif(trim(coalesce(p_icon, '')), ''),
          invite_policy = coalesce(p_invite_policy, invite_policy),
+         visibility    = access[1],
+         join_policy   = access[2],
          updated_at    = now()
    where id = p_group;
+
+  if access[2] <> 'request' then
+    delete from public.group_join_requests where group_id = p_group;
+  end if;
 end;
 $$;
 
--- ── Delete ── the owner only. Members, invites, bans and messages go by cascade.
+-- ── Delete ── the owner, or app staff taking down a PUBLIC group. A listed
+-- group's name and description are shown to every student, most of them
+-- minors, so somebody other than its owner has to be able to remove one.
+-- Staff get no such power over private groups, which they cannot see anyway.
+--
+-- is_admin() lives in admin.sql. It is called through EXECUTE, guarded by
+-- to_regprocedure, so this file still installs and runs on a project where
+-- admin.sql was never applied (the staff branch is simply never true).
 create or replace function public.delete_group(p_group uuid)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  staff boolean := false;
 begin
   if public.group_role(p_group) is distinct from 'owner' then
-    raise exception 'not authorized' using errcode = '42501';
+    if to_regprocedure('public.is_admin()') is not null then
+      execute 'select public.is_admin()' into staff;
+    end if;
+    if not coalesce(staff, false)
+       or not exists (select 1 from public.groups where id = p_group and visibility = 'discoverable') then
+      raise exception 'not authorized' using errcode = '42501';
+    end if;
   end if;
   delete from public.groups where id = p_group;
 end;
@@ -991,7 +1114,11 @@ $$;
 
 -- The group list: one call, with the counts it shows. Unread stops counting
 -- at 100 ("99+"), so a dormant member of a busy group never pays for a count
--- of ten thousand rows.
+-- of ten thousand rows. Pending join requests are counted for admins only.
+--
+-- Dropped first: its RETURNS TABLE gained columns with public groups, and
+-- Postgres refuses to `create or replace` a function whose return type changed.
+drop function if exists public.my_groups();
 create or replace function public.my_groups()
 returns table (
   id              uuid,
@@ -999,6 +1126,7 @@ returns table (
   description     text,
   icon            text,
   visibility      text,
+  join_policy     text,
   invite_policy   text,
   created_at      timestamptz,
   role            text,
@@ -1007,14 +1135,15 @@ returns table (
   joined_at       timestamptz,
   member_count    int,
   unread          int,
-  last_message_at timestamptz
+  last_message_at timestamptz,
+  pending_requests int
 )
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select g.id, g.name, g.description, g.icon, g.visibility, g.invite_policy, g.created_at,
+  select g.id, g.name, g.description, g.icon, g.visibility, g.join_policy, g.invite_policy, g.created_at,
          m.role, m.share_hours, m.share_tasks, m.joined_at,
          (select count(*) from public.group_members c where c.group_id = g.id)::int,
          (select count(*) from (
@@ -1024,11 +1153,14 @@ as $$
              limit 100
           ) u)::int,
          (select x.created_at from public.group_messages x
-           where x.group_id = g.id order by x.id desc limit 1)
+           where x.group_id = g.id order by x.id desc limit 1),
+         case when public.role_rank(m.role) >= 2
+              then (select count(*) from public.group_join_requests r where r.group_id = g.id)::int
+              else 0 end
     from public.group_members m
     join public.groups g on g.id = m.group_id
    where m.user_id = auth.uid()
-   order by 14 desc nulls last, g.name;
+   order by 15 desc nulls last, g.name;
 $$;
 
 -- Who is in a group, what they share, and nothing about when they last read.
@@ -1151,6 +1283,203 @@ end;
 $$;
 
 
+-- ── Explore ──
+-- Listed groups, biggest first, optionally filtered by name. Answers only what
+-- the listing shows plus the caller's own relationship to each group, so the
+-- button can say Open / Join / Request / Requested without a second call.
+-- Bounded: at most 50 a page, and the search text is treated as text — `%`
+-- and `_` typed by a user are escaped, not wildcards.
+create or replace function public.explore_groups(
+  p_query  text default null,
+  p_limit  int  default 30,
+  p_offset int  default 0
+)
+returns table (
+  id           uuid,
+  name         text,
+  description  text,
+  icon         text,
+  join_policy  text,
+  member_count int,
+  created_at   timestamptz,
+  my_status    text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select g.id, g.name, g.description, g.icon, g.join_policy,
+         (select count(*) from public.group_members c where c.group_id = g.id)::int as members,
+         g.created_at,
+         case
+           when exists (select 1 from public.group_members m where m.group_id = g.id and m.user_id = auth.uid()) then 'member'
+           when exists (select 1 from public.group_bans b where b.group_id = g.id and b.user_id = auth.uid()) then 'banned'
+           when exists (select 1 from public.group_join_requests r where r.group_id = g.id and r.user_id = auth.uid()) then 'requested'
+         end
+    from public.groups g
+   where g.visibility = 'discoverable'
+     and auth.uid() is not null
+     and (coalesce(trim(p_query), '') = ''
+          or g.name ilike '%' || replace(replace(replace(trim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%')
+   order by members desc, g.created_at desc, g.id
+   limit greatest(1, least(coalesce(p_limit, 30), 50))
+   offset greatest(0, coalesce(p_offset, 0));
+$$;
+
+-- Walking into an 'open' group. Same caps and ban check as redeem_invite; the
+-- sharing choices are the ones the person just saw on the join sheet.
+create or replace function public.join_public_group(
+  p_group       uuid,
+  p_share_hours boolean default true,
+  p_share_tasks text default 'private'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.group_members where group_id = p_group and user_id = uid) then
+    return jsonb_build_object('status', 'member', 'group_id', p_group);
+  end if;
+  -- Lock the group row: its join_policy cannot flip to private between this
+  -- check and the insert below.
+  perform 1 from public.groups where id = p_group and visibility = 'discoverable' and join_policy = 'open' for share;
+  if not found then
+    return jsonb_build_object('status', 'not_open');
+  end if;
+  if exists (select 1 from public.group_bans where group_id = p_group and user_id = uid) then
+    return jsonb_build_object('status', 'banned');
+  end if;
+  if (select count(*) from public.group_members where group_id = p_group) >= 500 then
+    return jsonb_build_object('status', 'full');
+  end if;
+  if (select count(*) from public.group_members where user_id = uid) >= 30 then
+    return jsonb_build_object('status', 'limit');
+  end if;
+
+  insert into public.group_members (group_id, user_id, role, share_hours, share_tasks)
+  values (
+    p_group, uid, 'member', coalesce(p_share_hours, false),
+    case when p_share_tasks in ('summary', 'tasks') then p_share_tasks else 'private' end
+  )
+  on conflict (group_id, user_id) do nothing;
+  delete from public.group_join_requests where group_id = p_group and user_id = uid;
+
+  return jsonb_build_object('status', 'joined', 'group_id', p_group);
+end;
+$$;
+
+-- Asking to join a 'request' group. Asking again updates the same request.
+-- Ten pending at once per person, so one account cannot carpet every listed
+-- group's admins with requests.
+create or replace function public.request_to_join(
+  p_group       uuid,
+  p_message     text default null,
+  p_share_hours boolean default true,
+  p_share_tasks text default 'private'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.group_members where group_id = p_group and user_id = uid) then
+    return jsonb_build_object('status', 'member', 'group_id', p_group);
+  end if;
+  if not exists (select 1 from public.groups where id = p_group and visibility = 'discoverable' and join_policy = 'request') then
+    return jsonb_build_object('status', 'not_open');
+  end if;
+  if exists (select 1 from public.group_bans where group_id = p_group and user_id = uid) then
+    return jsonb_build_object('status', 'banned');
+  end if;
+  if not exists (select 1 from public.group_join_requests where group_id = p_group and user_id = uid)
+     and (select count(*) from public.group_join_requests where user_id = uid) >= 10 then
+    return jsonb_build_object('status', 'too_many_requests');
+  end if;
+
+  insert into public.group_join_requests (group_id, user_id, message, share_hours, share_tasks)
+  values (
+    p_group, uid,
+    nullif(left(trim(coalesce(p_message, '')), 140), ''),
+    coalesce(p_share_hours, false),
+    case when p_share_tasks in ('summary', 'tasks') then p_share_tasks else 'private' end
+  )
+  on conflict (group_id, user_id) do update
+    set message = excluded.message, share_hours = excluded.share_hours, share_tasks = excluded.share_tasks;
+
+  return jsonb_build_object('status', 'requested', 'group_id', p_group);
+end;
+$$;
+
+create or replace function public.cancel_join_request(p_group uuid)
+returns void
+language sql
+volatile
+security definer
+set search_path = public
+as $$
+  delete from public.group_join_requests where group_id = p_group and user_id = auth.uid();
+$$;
+
+-- An admin's answer. Approval re-checks everything a join checks — the person
+-- may have been banned, or joined 30 groups, since they asked — and either way
+-- the request is gone afterwards: a refusal the requester can't see isn't one.
+create or replace function public.respond_join_request(p_group uuid, p_user uuid, p_approve boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  req public.group_join_requests;
+begin
+  if public.role_rank(public.group_role(p_group)) < 2 then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  select * into req from public.group_join_requests
+   where group_id = p_group and user_id = p_user
+   for update;
+  if not found then
+    return jsonb_build_object('status', 'gone');
+  end if;
+  delete from public.group_join_requests where group_id = p_group and user_id = p_user;
+
+  if not coalesce(p_approve, false) then
+    return jsonb_build_object('status', 'declined');
+  end if;
+  if exists (select 1 from public.group_bans where group_id = p_group and user_id = p_user) then
+    return jsonb_build_object('status', 'banned');
+  end if;
+  if (select count(*) from public.group_members where group_id = p_group) >= 500 then
+    return jsonb_build_object('status', 'full');
+  end if;
+  if (select count(*) from public.group_members where user_id = p_user) >= 30 then
+    return jsonb_build_object('status', 'limit');
+  end if;
+
+  insert into public.group_members (group_id, user_id, role, share_hours, share_tasks)
+  values (p_group, p_user, 'member', req.share_hours, req.share_tasks)
+  on conflict (group_id, user_id) do nothing;
+
+  return jsonb_build_object('status', 'approved');
+end;
+$$;
+
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 6. Privileges
 --
@@ -1169,8 +1498,13 @@ begin
     'public.role_rank(text)',
     'public.group_role(uuid)',
     'public.is_group_member(uuid)',
-    'public.create_group(text, text, text, text, boolean)',
-    'public.update_group(uuid, text, text, text, text)',
+    'public.create_group(text, text, text, text, boolean, text, text)',
+    'public.update_group(uuid, text, text, text, text, text, text)',
+    'public.explore_groups(text, int, int)',
+    'public.join_public_group(uuid, boolean, text)',
+    'public.request_to_join(uuid, text, boolean, text)',
+    'public.cancel_join_request(uuid)',
+    'public.respond_join_request(uuid, uuid, boolean)',
     'public.delete_group(uuid)',
     'public.create_invite(uuid, int, int)',
     'public.revoke_invite(uuid)',
@@ -1196,6 +1530,7 @@ begin
   foreach fn in array array[
     'public.generate_invite_code()',
     'public.normalize_invite_code(text)',
+    'public.normalize_group_access(text, text)',
     'public.invite_throttled(uuid)',
     'public.invite_note_failure(uuid)',
     'public.group_messages_before_insert()',

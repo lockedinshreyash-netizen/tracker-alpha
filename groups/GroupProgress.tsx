@@ -1,4 +1,4 @@
-/* ── Progress: what you share, and what they share ──
+/* ── Tasks: what you share, and what they share ──
    The privacy controls live at the top of this section, not in a settings
    page, because this is where their consequences are visible. The card says
    in plain words what THIS group can see of you right now — computed from
@@ -17,7 +17,8 @@ import { useProfiles } from '../profile/profileCache';
 import { MyGroup, TaskProgressEntry, TaskShareLevel, fetchTaskProgress, humanError, setSharing } from './api';
 import { taskSnapshot } from './publish';
 import { GroupsState } from './useGroups';
-import { Eyebrow, Segmented, Switch, tokens } from './ui';
+import { Eyebrow, tokens } from './ui';
+import SharingFields from './SharingFields';
 
 interface Props {
   group: MyGroup;
@@ -27,12 +28,6 @@ interface Props {
   onOpenProfile: (userId: string) => void;
   theme: 'dark' | 'light';
 }
-
-const LEVEL_COPY: Record<TaskShareLevel, string> = {
-  private: 'Nothing about your tasks.',
-  summary: 'A count, like “8/10 done today”. No task names.',
-  tasks: 'Your open tasks and what you finished today, by name.',
-};
 
 const REFRESH_MS = 60_000;
 
@@ -101,41 +96,14 @@ const GroupProgress: React.FC<Props> = ({ group, userId, tasks, groups, onOpenPr
       <section className={`p-6 md:p-8 rounded-xl border ${t.card}`} aria-labelledby="sharing-heading">
         <Eyebrow dark={dark}><span id="sharing-heading">What {group.name} sees of you</span></Eyebrow>
 
-        <div className="flex items-start justify-between gap-4 mt-5">
-          <div>
-            <p className={`text-[13px] font-bold font-ui ${t.heading}`}>Study hours</p>
-            <p className={`text-[11px] font-ui mt-1 leading-relaxed ${t.muted}`}>
-              {group.share_hours
-                ? 'On. Your totals appear on this group’s board.'
-                : 'Off. You’re listed on the board without a number.'}
-            </p>
-          </div>
-          <Switch
-            on={group.share_hours}
-            onToggle={v => void save(v, group.share_tasks)}
-            label="Share study hours with this group"
+        <div className="mt-5">
+          <SharingFields
+            shareHours={group.share_hours}
+            shareTasks={group.share_tasks}
+            onChange={(h, tk) => void save(h, tk)}
             dark={dark}
             disabled={saving}
           />
-        </div>
-
-        <div className={`mt-6 pt-6 border-t ${t.rule}`}>
-          <p className={`text-[13px] font-bold font-ui ${t.heading}`}>Today’s tasks</p>
-          <div className="mt-3">
-            <Segmented
-              value={group.share_tasks}
-              onChange={v => void save(group.share_hours, v)}
-              options={[
-                { value: 'private', label: 'Private' },
-                { value: 'summary', label: 'Summary' },
-                { value: 'tasks', label: 'Tasks' },
-              ]}
-              dark={dark}
-              label="Share today’s tasks with this group"
-              disabled={saving}
-            />
-          </div>
-          <p className={`text-[11px] font-ui mt-2 ${t.muted}`}>{LEVEL_COPY[group.share_tasks]}</p>
         </div>
 
         <p className={`mt-6 px-4 py-3 rounded-lg border text-[11px] font-ui leading-relaxed ${t.inset} ${t.body}`}>

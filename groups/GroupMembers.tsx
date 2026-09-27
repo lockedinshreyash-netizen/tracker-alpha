@@ -12,17 +12,20 @@ import {
   GroupBan,
   GroupInvite,
   GroupMember,
+  JoinRequest,
   MyGroup,
   createInvite,
   deleteGroup,
   fetchBans,
   fetchInvites,
+  fetchJoinRequests,
   fetchMembers,
   formatInviteCode,
   humanError,
   inviteLink,
   leaveGroup,
   removeMember,
+  respondJoinRequest,
   revokeInvite,
   setMemberRole,
   transferOwnership,
@@ -55,6 +58,13 @@ const expiresLabel = (iso: string | null): string => {
 
 const TASK_BADGE: Record<string, string> = { summary: 'Task count', tasks: 'Tasks' };
 
+/* The admin's side of the same refusals INVITE_STATUS_COPY words for the joiner. */
+const APPROVAL_COPY: Record<string, string> = {
+  banned: 'They’re banned from this group. Unban them first.',
+  full: 'This group is full — 500 members.',
+  limit: 'They’re already in 30 groups.',
+};
+
 const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenProfile, theme }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -65,6 +75,7 @@ const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenPr
   const [members, setMembers] = useState<GroupMember[] | null>(null);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [bans, setBans] = useState<GroupBan[]>([]);
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [managing, setManaging] = useState<string | null>(null);
@@ -77,26 +88,29 @@ const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenPr
 
   const load = useCallback(async () => {
     try {
-      const [m, inv, b] = await Promise.all([
+      const [m, inv, b, rq] = await Promise.all([
         fetchMembers(group.id),
         canInvite ? fetchInvites(group.id) : Promise.resolve([]),
         isAdmin ? fetchBans(group.id) : Promise.resolve([]),
+        // Requests exist only for a public group that asks; anything else has none to fetch.
+        isAdmin && group.join_policy === 'request' ? fetchJoinRequests(group.id) : Promise.resolve([]),
       ]);
       setMembers(m);
       setInvites(inv);
       setBans(b);
+      setRequests(rq);
       setError(null);
     } catch (e) {
       setError(humanError(e));
       setMembers(prev => prev ?? []);
     }
-  }, [group.id, canInvite, isAdmin]);
+  }, [group.id, group.join_policy, canInvite, isAdmin]);
 
   useEffect(() => { void load(); }, [load]);
 
   const profileIds = useMemo(
-    () => [...(members ?? []).map(m => m.user_id), ...bans.map(b => b.user_id)],
-    [members, bans]
+    () => [...(members ?? []).map(m => m.user_id), ...bans.map(b => b.user_id), ...requests.map(r => r.user_id)],
+    [members, bans, requests]
   );
   const profiles = useProfiles(profileIds);
   const nameOf = (id: string) => profiles[id]?.display_name ?? (id === userId ? 'You' : 'Member');
@@ -159,6 +173,57 @@ const GroupMembers: React.FC<Props> = ({ group, userId, groups, onLeft, onOpenPr
   return (
     <div className="space-y-5">
       {error && <p className={`text-[11px] font-ui px-4 py-3 rounded-lg border ${t.inset} text-[#E10600]`}>{error}</p>}
+
+      {/* ── Requests to join ── first, because somebody is waiting on them. */}
+      {isAdmin && requests.length > 0 && (
+        <section className={section}>
+          <div className="px-5 md:px-6 pt-5 pb-3">
+            <Eyebrow dark={dark}>{requests.length} {requests.length === 1 ? 'request' : 'requests'} to join</Eyebrow>
+          </div>
+          <ul className="pb-2">
+            {requests.map(r => {
+              const shares = [r.share_hours && 'hours', r.share_tasks !== 'private' && TASK_BADGE[r.share_tasks]?.toLowerCase()]
+                .filter(Boolean).join(' · ');
+              const answer = (approve: boolean) => void act(`req-${r.user_id}`, async () => {
+                const result = await respondJoinRequest(group.id, r.user_id, approve);
+                // Approval re-checks bans and limits; say which one stopped it.
+                if (result.status !== 'approved' && result.status !== 'declined' && result.status !== 'gone') {
+                  setError(APPROVAL_COPY[result.status] ?? 'Couldn’t add them.');
+                }
+              });
+              return (
+                <li key={r.user_id} className="px-5 md:px-6 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <UserChip
+                        userId={r.user_id}
+                        name={nameOf(r.user_id)}
+                        profile={profiles[r.user_id]}
+                        onOpen={onOpenProfile}
+                        theme={theme}
+                        size={30}
+                        nameClassName={`truncate text-[13px] font-bold font-ui ${t.heading}`}
+                      />
+                      <p className={`text-[10px] font-ui mt-1 ${t.muted}`}>
+                        Will share: {shares || 'nothing'}
+                      </p>
+                    </div>
+                    <button onClick={() => answer(false)} disabled={busy === `req-${r.user_id}`} className={`${small} ${t.muted} hover:text-[#E10600]`}>
+                      Decline
+                    </button>
+                    <button onClick={() => answer(true)} disabled={busy === `req-${r.user_id}`} className={`px-4 py-2 ${btn} ${t.primary}`}>
+                      Approve
+                    </button>
+                  </div>
+                  {r.message && (
+                    <p className={`mt-2 ml-10 text-[12px] font-ui italic leading-relaxed ${t.body}`}>“{r.message}”</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* ── Invite ── */}
       {canInvite && (

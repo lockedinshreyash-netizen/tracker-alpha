@@ -15,6 +15,10 @@ import { supabase } from '../supabaseClient';
 export type GroupRole = 'owner' | 'admin' | 'member';
 export type TaskShareLevel = 'private' | 'summary' | 'tasks';
 export type InvitePolicy = 'admins' | 'members';
+/** 'discoverable' = listed in Explore. */
+export type GroupVisibility = 'private' | 'discoverable';
+/** How someone who found the group in Explore gets in. Private groups are always 'invite'. */
+export type JoinPolicy = 'invite' | 'open' | 'request';
 
 /** One row of my_groups(): the group, my membership, and the counts the list shows. */
 export interface MyGroup {
@@ -22,7 +26,10 @@ export interface MyGroup {
   name: string;
   description: string | null;
   icon: string | null;
-  visibility: 'private' | 'discoverable';
+  visibility: GroupVisibility;
+  /* Absent until supabase/groups.sql is re-run with public groups in it;
+     every consumer treats a missing value as 'invite'. */
+  join_policy?: JoinPolicy;
   invite_policy: InvitePolicy;
   created_at: string;
   role: GroupRole;
@@ -33,6 +40,29 @@ export interface MyGroup {
   /** Others' live messages past my read marker, capped at 100 by the server. */
   unread: number;
   last_message_at: string | null;
+  /** Join requests waiting on an admin. Always 0 for plain members. */
+  pending_requests?: number;
+}
+
+/** One row of explore_groups(). */
+export interface ExploreGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  join_policy: JoinPolicy;
+  member_count: number;
+  created_at: string;
+  /** The caller's own relationship to the group. */
+  my_status: 'member' | 'requested' | 'banned' | null;
+}
+
+export interface JoinRequest {
+  user_id: string;
+  message: string | null;
+  share_hours: boolean;
+  share_tasks: TaskShareLevel;
+  created_at: string;
 }
 
 export interface GroupMember {
@@ -90,7 +120,9 @@ export interface GroupBan {
 
 export type InviteStatus =
   | 'ok' | 'member' | 'joined'
-  | 'invalid' | 'revoked' | 'expired' | 'exhausted' | 'banned' | 'full' | 'limit' | 'throttled';
+  | 'invalid' | 'revoked' | 'expired' | 'exhausted' | 'banned' | 'full' | 'limit' | 'throttled'
+  | 'requested' | 'not_open' | 'too_many_requests'
+  | 'approved' | 'declined' | 'gone';
 
 export interface InvitePreview {
   status: InviteStatus;
@@ -181,6 +213,8 @@ export const createGroup = (input: {
   icon: string | null;
   invitePolicy: InvitePolicy;
   shareHours: boolean;
+  visibility: GroupVisibility;
+  joinPolicy: JoinPolicy;
 }): Promise<string> =>
   rpc<string>('create_group', {
     p_name: input.name,
@@ -188,6 +222,9 @@ export const createGroup = (input: {
     p_icon: input.icon,
     p_invite_policy: input.invitePolicy,
     p_share_hours: input.shareHours,
+    // Only sent when public, so a private group still creates against a
+    // schema that predates public groups.
+    ...(input.visibility === 'discoverable' ? { p_visibility: input.visibility, p_join_policy: input.joinPolicy } : {}),
   });
 
 export const updateGroup = (groupId: string, input: {
@@ -195,6 +232,8 @@ export const updateGroup = (groupId: string, input: {
   description: string;
   icon: string | null;
   invitePolicy: InvitePolicy;
+  /** Owner only — the server refuses anyone else who sends a change here. */
+  access?: { visibility: GroupVisibility; joinPolicy: JoinPolicy };
 }): Promise<void> =>
   rpc<void>('update_group', {
     p_group: groupId,
@@ -202,6 +241,7 @@ export const updateGroup = (groupId: string, input: {
     p_description: input.description,
     p_icon: input.icon,
     p_invite_policy: input.invitePolicy,
+    ...(input.access ? { p_visibility: input.access.visibility, p_join_policy: input.access.joinPolicy } : {}),
   });
 
 export const deleteGroup = (groupId: string): Promise<void> => rpc('delete_group', { p_group: groupId });
@@ -240,6 +280,51 @@ export const fetchLeaderboard = (groupId: string, from: string | null, to: strin
 
 export const fetchTaskProgress = (groupId: string): Promise<TaskProgressEntry[]> =>
   rpc<TaskProgressEntry[] | null>('group_task_progress', { p_group: groupId }).then(rows => rows ?? []);
+
+/* ── Explore ── */
+
+export const EXPLORE_PAGE = 30;
+
+export const exploreGroups = (query: string, offset = 0): Promise<ExploreGroup[]> =>
+  rpc<ExploreGroup[] | null>('explore_groups', {
+    p_query: query.trim() || null,
+    p_limit: EXPLORE_PAGE,
+    p_offset: offset,
+  }).then(rows => rows ?? []);
+
+export const joinPublicGroup = (groupId: string, shareHours: boolean, shareTasks: TaskShareLevel): Promise<InvitePreview> =>
+  rpc<InvitePreview>('join_public_group', { p_group: groupId, p_share_hours: shareHours, p_share_tasks: shareTasks });
+
+export const requestToJoin = (
+  groupId: string,
+  message: string,
+  shareHours: boolean,
+  shareTasks: TaskShareLevel
+): Promise<InvitePreview> =>
+  rpc<InvitePreview>('request_to_join', {
+    p_group: groupId,
+    p_message: message.trim() || null,
+    p_share_hours: shareHours,
+    p_share_tasks: shareTasks,
+  });
+
+export const cancelJoinRequest = (groupId: string): Promise<void> => rpc('cancel_join_request', { p_group: groupId });
+
+export const respondJoinRequest = (groupId: string, userId: string, approve: boolean): Promise<InvitePreview> =>
+  rpc<InvitePreview>('respond_join_request', { p_group: groupId, p_user: userId, p_approve: approve });
+
+/** Pending requests to a group — RLS returns them only to its admins. */
+export const fetchJoinRequests = async (groupId: string): Promise<JoinRequest[]> => {
+  const { data, error } = await supabase
+    .from('group_join_requests')
+    .select('user_id, message, share_hours, share_tasks, created_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as JoinRequest[];
+};
+
+export const MAX_REQUEST_MESSAGE = 140;
 
 /* ── Invites ── */
 
@@ -290,4 +375,6 @@ export const INVITE_STATUS_COPY: Partial<Record<InviteStatus, string>> = {
   full: 'This group is full.',
   limit: 'You’re in 30 groups already. Leave one first.',
   throttled: 'Too many wrong codes. Wait 15 minutes and try again.',
+  not_open: 'This group isn’t taking people that way any more.',
+  too_many_requests: 'You have 10 requests waiting already. Cancel one first.',
 };

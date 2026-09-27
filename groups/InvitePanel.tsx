@@ -5,14 +5,14 @@
 
    That switch is on by default and it is on screen, not buried: a study group
    whose board is empty is not a study group, and the person joining can see
-   exactly what they are agreeing to before they tap Join. Tasks are not asked
-   about here at all; they start private and are changed later, in Progress,
-   by someone who has seen the group first. */
+   exactly what they are agreeing to before they tap Join. Tasks sit right
+   under it, starting private: offered, visible, never assumed. */
 
 import React, { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { INVITE_STATUS_COPY, InvitePreview, formatInviteCode, humanError, previewInvite, redeemInvite } from './api';
-import { Eyebrow, GroupIcon, Switch, btn, tokens } from './ui';
+import { INVITE_STATUS_COPY, InvitePreview, formatInviteCode, humanError, previewInvite, redeemInvite, TaskShareLevel, setSharing } from './api';
+import { Eyebrow, GroupIcon, btn, tokens } from './ui';
+import SharingFields from './SharingFields';
 
 interface Props {
   code: string;
@@ -31,6 +31,7 @@ const InvitePanel: React.FC<Props> = ({ code, user, onJoined, onDismiss, onOpenA
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shareHours, setShareHours] = useState(true);
+  const [shareTasks, setShareTasks] = useState<TaskShareLevel>('private');
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
@@ -49,6 +50,12 @@ const InvitePanel: React.FC<Props> = ({ code, user, onJoined, onDismiss, onOpenA
     setError(null);
     try {
       const result = await redeemInvite(code, shareHours);
+      /* Only on a fresh join: someone re-opening a link to a group they are
+         already in must not have their existing choice overwritten from here.
+         Same second-call reasoning as CreateGroupSheet. */
+      if (result.status === 'joined' && result.group_id && shareTasks !== 'private') {
+        await setSharing(result.group_id, shareHours, shareTasks).catch(() => {});
+      }
       if ((result.status === 'joined' || result.status === 'member') && result.group_id) {
         onJoined(result.group_id);
         return;
@@ -137,18 +144,16 @@ const InvitePanel: React.FC<Props> = ({ code, user, onJoined, onDismiss, onOpenA
       </div>
       {g.description && <p className={`text-[12px] font-ui mt-4 leading-relaxed ${t.muted}`}>{g.description}</p>}
 
-      <div className={`mt-6 pt-5 border-t ${t.rule} flex items-start justify-between gap-4`}>
-        <div>
-          <p className={`text-[12px] font-bold font-ui ${t.heading}`}>Show my study hours to this group</p>
-          <p className={`text-[11px] font-ui mt-1 leading-relaxed ${t.muted}`}>
-            {shareHours
-              ? 'Members see your totals for today, this week and this month. Not your subjects, not your logs.'
-              : 'You’ll be on the member list without a number. You can turn this on later.'}
-          </p>
-        </div>
-        <Switch on={shareHours} onToggle={setShareHours} label="Show my study hours to this group" dark={dark} />
+      <div className={`mt-6 pt-5 border-t ${t.rule}`}>
+        <Eyebrow dark={dark} className="mb-4">What this group sees of you · change any time</Eyebrow>
+        <SharingFields
+          shareHours={shareHours}
+          shareTasks={shareTasks}
+          onChange={(h, tk) => { setShareHours(h); setShareTasks(tk); }}
+          dark={dark}
+          disabled={joining}
+        />
       </div>
-      <p className={`text-[11px] font-ui mt-3 ${t.muted}`}>Your tasks stay private. You can share them later, per group.</p>
 
       <div className="flex items-center gap-5 mt-6">
         <button onClick={() => void join()} disabled={joining} className={`flex-1 md:flex-none px-10 py-4 ${btn} ${joining ? t.disabled : t.primary}`}>
