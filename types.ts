@@ -158,22 +158,6 @@ export interface Task {
      device-local ledger would double-fire across devices, which is the one
      duplicate the user must never see. */
   remindedKey?: string;
-
-  /* How long the card is expected to take, in minutes. Written by the Mentor's
-     day plans (and editable there); absent on every hand-made card. It is what
-     lets "planned 5h, did 3h" be measured at all — a task list with no sizes
-     cannot be compared against a day. */
-  estMins?: number;
-
-  /* The syllabus chapter this card is work on, exactly as it appears in
-     SYLLABUS_DATA. Optional for the same reason `DailyLog.chapter` is. */
-  chapter?: string;
-
-  /* Present only on cards the Mentor proposed and the user accepted. Lets the
-     planner measure how much of its own plan actually got done, and lets an
-     undo find exactly what one acceptance added — without it, "the Mentor's
-     cards" would have to be guessed from their text. */
-  origin?: 'mentor';
 }
 
 export interface ChapterProgress {
@@ -203,10 +187,7 @@ export interface ChapterProgress {
    falls back to Today; see App. */
 /* `Groups` is server state end to end — nothing about a group lives in
    AppState, so nothing about it rides the synced blob. */
-/* `Mentor` is drawn only for accounts in the closed beta (see
-   mentor/useMentorAccess) — like `Admin`, the tab being in this union is not a
-   permission; the edge function re-checks access on every call. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin' | 'Mentor';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -601,95 +582,9 @@ export interface ReminderPrefs {
   planBlocks: boolean;
 }
 
-/* ────────────────────────────────────────────────────────────────
-   THE MENTOR
-   ──────────────────────────────────────────────────────────────── */
-
-/**
- * What the student has told the Mentor about their time, set only through a
- * card they accepted — never inferred silently from something said in chat.
- */
-export interface MentorPrefs {
-  /** Study hours available per weekday, 0=Sun … 6=Sat. Null until told. */
-  weeklyHours: number[] | null;
-  /** Weekdays with no study planned at all. */
-  restDays: number[];
-  /** "Finish the syllabus by…", YYYY-MM-DD. Null means "by the exam". */
-  syllabusBy: string | null;
-}
-
-/** One chapter's worth of work in one roadmap week. */
-export interface RoadmapItem {
-  classId: 11 | 12;
-  subject: Subject;
-  chapter: string;
-  /** learn = first pass, finish = already open, revise = go back over it. */
-  action: 'learn' | 'finish' | 'revise';
-  /** The share of this chapter's estimated hours placed in this week. */
-  hours: number;
-}
-
-export interface RoadmapWeek {
-  /** Monday of the week, YYYY-MM-DD (IST study day). */
-  start: string;
-  /** Hours of capacity the engine assumed for this week. */
-  capacity: number;
-  items: RoadmapItem[];
-}
-
-/**
- * The one active syllabus roadmap.
- *
- * Built by `mentor/roadmap.ts` from parameters — the model chooses the target
- * date and the hours, never the week lists. Re-planning replaces it with the
- * next revision; weeks already lived are carried over unchanged, the same
- * stance `updateRule` takes on the Plan tab.
- */
-export interface Roadmap {
-  revision: number;
-  createdOn: string;   // YYYY-MM-DD
-  updatedAt: number;   // epoch ms, the sync tiebreak
-  targetDate: string;  // YYYY-MM-DD
-  hoursPerDay: number;
-  restDays: number[];
-  /** `classId|subject|chapter` keys the student chose to leave out. */
-  excluded: string[];
-  effortVersion: number;
-  /** Estimated hours remaining when this revision was made (mid estimate). */
-  baselineHours: number;
-  weeks: RoadmapWeek[];
-}
-
-/** A line per roadmap revision, so re-planning is visible rather than silent. */
-export interface RoadmapRevision {
-  revision: number;
-  createdOn: string;
-  targetDate: string;
-  baselineHours: number;
-}
-
-/**
- * The Mentor's slice of the synced blob. Conversations are NOT here — they
- * are strictly device-local (see mentor/threads.ts). Only things the student
- * accepted live here.
- */
-export interface MentorState {
-  /** Consent to send study data to the model provider. Off means nothing is sent. */
-  enabled: boolean;
-  /** Which consent copy was agreed to. Bumped when what is sent changes. */
-  consentVersion: number;
-  prefs: MentorPrefs;
-  roadmap: Roadmap | null;
-  roadmapHistory: RoadmapRevision[];
-}
-
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
-  /* The student's own exam date per exam, YYYY-MM-DD. Absent means the app's
-     default for that exam (see `resolveExamDate` in constants.tsx). Keyed by
-     exam so switching from JEE to NEET cannot carry a JEE date across. */
-  examDates?: Partial<Record<ExamPreference, string>>;
   logs: DailyLog[];
   progress: ChapterProgress[];
   lastUsedTab: TabType;
@@ -719,7 +614,4 @@ export interface AppState {
   sleep?: SleepState;
   analysis?: AnalysisState;
   ai?: AiPrefs;
-  /* Optional for the same reason as the slices above; `normalizeMentor` fills
-     it on load. */
-  mentor?: MentorState;
 }

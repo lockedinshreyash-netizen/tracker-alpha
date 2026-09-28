@@ -1,4 +1,4 @@
-import { AiInsight, AiPrefs, AnalysisState, AppState, BlockKind, BlockOverride, CoachState, ExamPreference, LeaderboardPrefs, MentorPrefs, MentorState, Roadmap, RoadmapItem, RoadmapRevision, RoadmapWeek, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
+import { AiInsight, AiPrefs, AnalysisState, AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
 import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
 export const DEFAULT_COACH: CoachState = {
@@ -210,11 +210,6 @@ export const normalizeTasks = (raw: unknown): Task[] => {
         dueAt: asDate(t.dueAt) ?? undefined,
         dueMinute: Number.isFinite(t.dueMinute) ? asMinute(t.dueMinute, 0) : undefined,
         remindedKey: typeof t.remindedKey === 'string' ? t.remindedKey.slice(0, 120) : undefined,
-        estMins: Number.isFinite(t.estMins) && (t.estMins as number) > 0
-          ? Math.min(600, Math.round(t.estMins as number))
-          : undefined,
-        chapter: typeof t.chapter === 'string' && t.chapter ? t.chapter.slice(0, 120) : undefined,
-        origin: t.origin === 'mentor' ? 'mentor' : undefined,
       } satisfies Task;
     });
 
@@ -518,150 +513,6 @@ export const mergeAi = (local: AiPrefs, remote: AiPrefs): AiPrefs => {
   return { enabled: local.enabled, cache: Object.fromEntries(kept) };
 };
 
-/* ── Exam dates ──
-   Only well-formed dates for known exams survive. Anything else falls back to
-   the app's default for that exam via `resolveExamDate`. */
-export const normalizeExamDates = (raw: unknown): Partial<Record<ExamPreference, string>> => {
-  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const out: Partial<Record<ExamPreference, string>> = {};
-  for (const exam of ['JEE', 'NEET'] as ExamPreference[]) {
-    const d = asDate(r[exam]);
-    if (d) out[exam] = d;
-  }
-  return out;
-};
-
-/* ── Mentor ──
-   Off. Nothing about the Mentor is sent anywhere until the student turns it on
-   and agrees to the current consent copy. */
-export const MENTOR_CONSENT_VERSION = 1;
-
-export const DEFAULT_MENTOR: MentorState = {
-  enabled: false,
-  consentVersion: 0,
-  prefs: { weeklyHours: null, restDays: [], syllabusBy: null },
-  roadmap: null,
-  roadmapHistory: [],
-};
-
-const MAX_ROADMAP_HISTORY = 10;
-/* A roadmap longer than this is not a plan anyone follows, and the cap keeps a
-   corrupt blob from growing the synced state without bound. */
-const MAX_ROADMAP_WEEKS = 80;
-
-const asWeekdays = (v: unknown): number[] =>
-  Array.isArray(v)
-    ? [...new Set(v.filter(d => Number.isInteger(d) && d >= 0 && d <= 6) as number[])].sort()
-    : [];
-
-/* `step` is the precision kept: quarter hours for what a student types, tenths
-   for what the roadmap engine computes — normalizing must never re-round a
-   stored roadmap into something other than what was built and shown. */
-const asHours = (v: unknown, max: number, step = 0.25): number | null =>
-  typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(max, Math.round(v / step) * step) : null;
-const asTenths = (v: unknown, max: number): number | null => {
-  const h = asHours(v, max, 0.1);
-  return h === null ? null : Math.round(h * 10) / 10;
-};
-
-const normalizeRoadmap = (raw: unknown): Roadmap | null => {
-  if (!raw || typeof raw !== 'object') return null;
-  const r = raw as Partial<Roadmap>;
-  const targetDate = asDate(r.targetDate);
-  const createdOn = asDate(r.createdOn);
-  if (!targetDate || !createdOn || !Array.isArray(r.weeks)) return null;
-
-  const weeks: RoadmapWeek[] = r.weeks.slice(0, MAX_ROADMAP_WEEKS)
-    .filter(w => w && asDate(w.start))
-    .map(w => ({
-      start: asDate(w.start)!,
-      capacity: asTenths(w.capacity, 7 * 16) ?? 0,
-      items: (Array.isArray(w.items) ? w.items : [])
-        .filter(i => i && (i.classId === 11 || i.classId === 12) && asSubject(i.subject) && typeof i.chapter === 'string')
-        .slice(0, 60)
-        .map((i): RoadmapItem => ({
-          classId: i.classId,
-          subject: asSubject(i.subject)!,
-          chapter: i.chapter.slice(0, 120),
-          action: i.action === 'finish' || i.action === 'revise' ? i.action : 'learn',
-          hours: asTenths(i.hours, 200) ?? 0,
-        })),
-    }));
-
-  return {
-    revision: Number.isInteger(r.revision) && (r.revision as number) > 0 ? r.revision as number : 1,
-    createdOn,
-    updatedAt: Number.isFinite(r.updatedAt) ? r.updatedAt as number : 0,
-    targetDate,
-    hoursPerDay: asTenths(r.hoursPerDay, 16) ?? 0,
-    restDays: asWeekdays(r.restDays),
-    excluded: Array.isArray(r.excluded) ? r.excluded.filter(k => typeof k === 'string').slice(0, 200) : [],
-    effortVersion: Number.isInteger(r.effortVersion) ? r.effortVersion as number : 0,
-    baselineHours: asTenths(r.baselineHours, 10_000) ?? 0,
-    weeks,
-  };
-};
-
-export const normalizeMentor = (raw: unknown): MentorState => {
-  const m = (raw && typeof raw === 'object' ? raw : {}) as Partial<MentorState>;
-  const p = (m.prefs && typeof m.prefs === 'object' ? m.prefs : {}) as Partial<MentorPrefs>;
-
-  const weeklyHours = Array.isArray(p.weeklyHours) && p.weeklyHours.length === 7
-    ? p.weeklyHours.map(h => asHours(h, 16) ?? 0)
-    : null;
-
-  return {
-    enabled: m.enabled === true,
-    consentVersion: Number.isInteger(m.consentVersion) ? m.consentVersion as number : 0,
-    prefs: {
-      weeklyHours,
-      restDays: asWeekdays(p.restDays),
-      syllabusBy: asDate(p.syllabusBy),
-    },
-    roadmap: normalizeRoadmap(m.roadmap),
-    roadmapHistory: (Array.isArray(m.roadmapHistory) ? m.roadmapHistory : [])
-      .filter(h => h && asDate(h.createdOn) && asDate(h.targetDate))
-      .slice(-MAX_ROADMAP_HISTORY)
-      .map(h => ({
-        revision: Number.isInteger(h.revision) ? h.revision : 0,
-        createdOn: asDate(h.createdOn)!,
-        targetDate: asDate(h.targetDate)!,
-        baselineHours: asTenths(h.baselineHours, 10_000) ?? 0,
-      })),
-  };
-};
-
-/**
- * Two devices' Mentor slices.
- *
- * Consent stays with the device the user is looking at, like `ai.enabled`.
- * The roadmap is a single document, so it cannot be unioned — the later
- * revision wins, ties broken by the edit clock, which is the only honest
- * reading of two devices re-planning independently. History is a union by
- * revision, bounded.
- */
-export const mergeMentor = (local: MentorState, remote: MentorState): MentorState => {
-  const lr = local.roadmap;
-  const rr = remote.roadmap;
-  const roadmap = !lr ? rr : !rr ? lr
-    : rr.revision > lr.revision || (rr.revision === lr.revision && rr.updatedAt > lr.updatedAt) ? rr : lr;
-
-  const byRev = new Map<number, RoadmapRevision>();
-  for (const h of [...remote.roadmapHistory, ...local.roadmapHistory]) byRev.set(h.revision, h);
-
-  return {
-    enabled: local.enabled,
-    consentVersion: local.consentVersion,
-    prefs: {
-      weeklyHours: local.prefs.weeklyHours ?? remote.prefs.weeklyHours,
-      restDays: local.prefs.weeklyHours || local.prefs.restDays.length ? local.prefs.restDays : remote.prefs.restDays,
-      syllabusBy: local.prefs.syllabusBy ?? remote.prefs.syllabusBy,
-    },
-    roadmap,
-    roadmapHistory: [...byRev.values()].sort((a, b) => a.revision - b.revision).slice(-MAX_ROADMAP_HISTORY),
-  };
-};
-
 export const DEFAULT_STATE: AppState = {
   currentClass: 11,
   examPreference: 'JEE',
@@ -691,5 +542,4 @@ export const DEFAULT_STATE: AppState = {
   sleep: DEFAULT_SLEEP,
   analysis: DEFAULT_ANALYSIS,
   ai: DEFAULT_AI,
-  mentor: DEFAULT_MENTOR,
 };

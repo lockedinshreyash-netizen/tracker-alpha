@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 import type { User } from '@supabase/supabase-js';
 import { AiInsight, AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
-import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS, resolveExamDate, examDateAsDate } from './constants';
+import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, DEFAULT_AI, MAX_AI_CACHE, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi, normalizeMentor, mergeMentor, normalizeExamDates, MENTOR_CONSENT_VERSION } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, DEFAULT_AI, MAX_AI_CACHE, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
 import { buildExperiment } from './insight/observe';
 import AnalysisIntro from './analysis/AnalysisIntro';
 import ObservatoryTab from './analysis/ObservatoryTab';
@@ -58,15 +57,6 @@ import GroupsTab from './groups/GroupsTab';
 import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
 import { forgetGroupsOnDevice } from './groups/publish';
-import MentorTab from './mentor/MentorTab';
-import { useMentor } from './mentor/useMentor';
-import { useMentorAccess, MENTOR_AVAILABLE, MENTOR_TAB_VISIBLE } from './mentor/useMentorAccess';
-import MentorGate from './mentor/MentorGate';
-import { clearPendingBetaInvite, takePendingBetaInvite } from './mentor/invite';
-import { applyOps, ApplyResult, MentorOp } from './mentor/ops';
-import { forgetMentorOnDevice } from './mentor/threads';
-import { slippedTasks } from './mentor/replan';
-import NoticeLine from './notify/NoticeLine';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -187,8 +177,6 @@ const App: React.FC = () => {
       merged.sleep = normalizeSleep(parsed.sleep);
       merged.analysis = normalizeAnalysis(parsed.analysis);
       merged.ai = normalizeAi(parsed.ai);
-      merged.mentor = normalizeMentor(parsed.mentor);
-      merged.examDates = normalizeExamDates(parsed.examDates);
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -228,9 +216,6 @@ const App: React.FC = () => {
      render and held (in localStorage too) until it is used or dismissed — the
      person opening it has often not signed up yet. See groups/invite.ts. */
   const [pendingInvite, setPendingInvite] = useState<string | null>(takePendingInvite);
-  /* A Mentor beta invite from `/?beta=CODE` — the same carry-through-sign-up
-     handling as a group invite, in its own slot (mentor/invite.ts). */
-  const [pendingBeta, setPendingBeta] = useState<string | null>(takePendingBetaInvite);
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -290,60 +275,6 @@ const App: React.FC = () => {
     stateRef.current = state;
   }, [state]);
 
-  /* ── The Mentor ──
-     Access is asked of the server (closed beta), never read from AppState.
-     The loop is mounted here rather than in the tab so a reply keeps arriving
-     while the student looks at another tab. It never writes AppState except
-     through `commitMentorOps`, which only a tap on a card can reach. */
-  const mentorAccess = useMentorAccess(user);
-  const mentorPrefs = normalizeMentor(state.mentor);
-  const mentorConsented = mentorPrefs.enabled && mentorPrefs.consentVersion === MENTOR_CONSENT_VERSION;
-  /* The AI half needs the build flag, an account and consent. Without it the
-     tab still works as a deterministic planner. */
-  const mentorModelReady = MENTOR_AVAILABLE && mentorAccess.allowed && !!user;
-  const getMentorState = useCallback(() => stateRef.current, []);
-  /* flushSync so the reducer's inverse is in hand when this returns — the card
-     needs it for UNDO. The reducer is deterministic (ids are minted when the
-     proposal is built), so a StrictMode double-invoke produces one result. */
-  const commitMentorOps = useCallback((ops: MentorOp[]): ApplyResult | null => {
-    let out: ApplyResult | null = null;
-    flushSync(() => {
-      setState(prev => {
-        const r = applyOps(prev, ops, getISTDateString());
-        out = r;
-        stateRef.current = r.state;
-        return r.state;
-      });
-    });
-    return out;
-  }, []);
-  const mentor = useMentor({
-    userId: user?.id ?? null,
-    active: mentorModelReady && mentorConsented,
-    getState: getMentorState,
-    commit: commitMentorOps,
-  });
-  /* "Cards slipped" on Today, waved away for the rest of the study day. */
-  const [slipDismissedOn, setSlipDismissedOn] = useState<string | null>(null);
-
-  /* A saved Mentor tab from a build that shipped it, opened on one that does
-     not. (Not being in the beta is not a reason to leave: the tab shows the
-     invite gate instead.) */
-  useEffect(() => {
-    if (activeTab === 'Mentor' && !MENTOR_TAB_VISIBLE) {
-      setActiveTab('Today');
-      setState(prev => (prev.lastUsedTab === 'Mentor' ? { ...prev, lastUsedTab: 'Today' } : prev));
-    }
-  }, [activeTab]);
-
-  /* Once in, a carried invite has done its job. */
-  useEffect(() => {
-    if (mentorAccess.allowed && pendingBeta) {
-      clearPendingBetaInvite();
-      setPendingBeta(null);
-    }
-  }, [mentorAccess.allowed, pendingBeta]);
-
   // Handle Auth, Initial Fetch, and Landing Page gating
   useEffect(() => {
     const hasVisited = localStorage.getItem('hasVisited') === 'true';
@@ -358,7 +289,7 @@ const App: React.FC = () => {
         /* An invite link skips the landing page: the person was sent to a
            specific group by a friend, and a pitch for the whole product
            standing between them and it is the fastest way to lose them. */
-        setShowLanding(!hasVisited && !pendingInvite && !pendingBeta);
+        setShowLanding(!hasVisited && !pendingInvite);
         // Local-only session: there is no cloud pull to wait for.
         setSyncSettled(true);
       }
@@ -421,9 +352,6 @@ const App: React.FC = () => {
                  mid-session. */
               analysis: mergeAnalysis(normalizeAnalysis(prev.analysis), normalizeAnalysis(remoteState.analysis)),
               ai: mergeAi(normalizeAi(prev.ai), normalizeAi(remoteState.ai)),
-              /* Consent stays with this device; the roadmap goes to the later
-                 revision. See mergeMentor. */
-              mentor: mergeMentor(normalizeMentor(prev.mentor), normalizeMentor(remoteState.mentor)),
             }));
             setTimeout(() => { preventSyncOnUpdate.current = false; }, 200);
           }
@@ -490,7 +418,6 @@ const App: React.FC = () => {
                  produced it, so there is no stale one to resurrect and nothing
                  a merge can undo. */
               ai: mergeAi(normalizeAi(localState.ai), normalizeAi(remoteState.ai)),
-              mentor: mergeMentor(normalizeMentor(localState.mentor), normalizeMentor(remoteState.mentor)),
             };
           }
 
@@ -551,7 +478,6 @@ const App: React.FC = () => {
               normalizeAnalysis(remoteState.analysis),
             ),
             ai: mergeAi(normalizeAi(localState.ai), normalizeAi(remoteState.ai)),
-            mentor: mergeMentor(normalizeMentor(localState.mentor), normalizeMentor(remoteState.mentor)),
           };
         });
       }
@@ -615,8 +541,6 @@ const App: React.FC = () => {
         });
         localStorage.removeItem('locked_in_state_v2');
         forgetGroupsOnDevice();
-        /* Mentor conversations live only on this device; they leave with the account. */
-        forgetMentorOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -1238,37 +1162,6 @@ const App: React.FC = () => {
         ai: { ...current, cache: Object.fromEntries(entries) },
         lastUpdated: Date.now(),
       };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  /* Consent to the current copy, or withdrawal. Turning it off deletes every
-     conversation on this device — the only place they exist. Cards already
-     applied are ordinary tasks, roadmap and syllabus now, and stay. */
-  const setMentorEnabled = useCallback((enabled: boolean) => {
-    setState(prev => {
-      const m = normalizeMentor(prev.mentor);
-      const nextState: AppState = {
-        ...prev,
-        mentor: { ...m, enabled, consentVersion: enabled ? MENTOR_CONSENT_VERSION : m.consentVersion },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-    if (!enabled) mentor.forgetAll();
-  }, [mentor.forgetAll]);
-
-  /* The student's own exam date for the exam they are on; null restores the
-     app's default. Keyed by exam, so a JEE date never follows them to NEET. */
-  const setExamDate = useCallback((date: string | null) => {
-    setState(prev => {
-      const exam = prev.examPreference || 'JEE';
-      const examDates = { ...(prev.examDates ?? {}) };
-      if (date) examDates[exam] = date;
-      else delete examDates[exam];
-      const nextState: AppState = { ...prev, examDates, lastUpdated: Date.now() };
       stateRef.current = nextState;
       return nextState;
     });
@@ -2007,7 +1900,7 @@ const App: React.FC = () => {
             return { ok: true, message: `LOCK-IN SCORE: ${score}/100.` };
           }
           case 'daysLeft': {
-            const days = getDaysRemaining(examDateAsDate(resolveExamDate(exam, current.examDates)));
+            const days = getDaysRemaining(exam === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE);
             return { ok: true, message: `${days} DAYS TO ${exam} 2027.` };
           }
           default:
@@ -2020,16 +1913,8 @@ const App: React.FC = () => {
     }
   };
 
-  /* The student's own date when they have set one, the app's placeholder
-     otherwise — the same resolution the Mentor's pace check uses. */
-  const targetExamDate = examDateAsDate(resolveExamDate(state.examPreference || 'JEE', state.examDates));
+  const targetExamDate = state.examPreference === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE;
   const daysRemaining = getDaysRemaining(targetExamDate);
-  /* Planned cards that slipped: a line on Today, not a card — Today is for
-     today, and the replanning happens in the Mentor. Pure arithmetic, never an
-     AI call; waved away for the rest of the study day. */
-  const slippedCount = mentorAccess.allowed && mentorConsented && slipDismissedOn !== getISTDateString()
-    ? slippedTasks(state.tasks, getISTDateString()).length
-    : 0;
   const streakCount = calculateStreak(state.logs);
   const verifiedStreakCount = calculateVerifiedStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
@@ -2070,18 +1955,6 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInvite, showLanding, showOnboarding, user]);
 
-  /* A beta invite takes you to the Mentor's gate, by the same rule as a group
-     invite: once you can see it, and once more after signing in. */
-  const routedBetaRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!pendingBeta || !MENTOR_TAB_VISIBLE || showLanding !== false || showOnboarding) return;
-    const key = `${pendingBeta}:${user ? 'in' : 'out'}`;
-    if (routedBetaRef.current === key) return;
-    routedBetaRef.current = key;
-    handleTabChangeAndExitProfile('Mentor');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingBeta, showLanding, showOnboarding, user]);
-
   // While checking session, show nothing (prevents flash)
   if (showLanding === null) {
     return <div style={{ background: theme === 'dark' ? '#0B0B0D' : '#F2F0EC', width: '100vw', height: '100vh' }} />;
@@ -2120,7 +1993,6 @@ const App: React.FC = () => {
         ownProfile={profileCtl.ownProfile}
         onOpenAccount={profileCtl.openEditProfile}
         groupsUnread={groupsState.totalUnread}
-        showMentor={MENTOR_TAB_VISIBLE}
       />
 
       <AuthModal
@@ -2188,20 +2060,6 @@ const App: React.FC = () => {
           {activeTab === 'Today' && inTheRace && (
             <div className="mb-8">
               <RaceStrip status={race.status} onOpen={() => handleTabChange('Ranks')} theme={theme} />
-            </div>
-          )}
-          {/* Planned cards that slipped: a line, not a card — Today is for today,
-              and the replanning happens in the Mentor. Computed, never an AI call. */}
-          {activeTab === 'Today' && slippedCount > 0 && (
-            <div className="mb-6">
-              <NoticeLine
-                theme={theme}
-                label={`${slippedCount} planned card${slippedCount === 1 ? '' : 's'} slipped`}
-                detail="Replan them without overloading tomorrow"
-                onOpen={() => { handleTabChange('Mentor'); mentor.runAction('replan'); }}
-                onDismiss={() => setSlipDismissedOn(getISTDateString())}
-                dismissLabel="Not today"
-              />
             </div>
           )}
           {activeTab === 'Today' && (
@@ -2332,8 +2190,6 @@ const App: React.FC = () => {
               dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
               examPreference={state.examPreference || 'JEE'}
               onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
-              examDates={state.examDates}
-              onSetExamDate={setExamDate}
               activeSubjects={activeSubjects}
               reminders={reminderPrefs}
               onChangeReminders={setReminderPrefs}
@@ -2343,32 +2199,6 @@ const App: React.FC = () => {
               because `isAdmin` can only be true for a signed-in session.
               Hiding it is not the control; every query inside it is refused by
               row-level security for anybody else. */}
-          {/* In the beta: the Mentor. Everyone else: the invite gate. The
-              server re-checks access on every model call either way. */}
-          {activeTab === 'Mentor' && MENTOR_TAB_VISIBLE && mentorAccess.allowed && (
-            <MentorTab
-              state={state}
-              theme={theme}
-              mentor={mentor}
-              signedIn={!!user}
-              modelReady={mentorModelReady}
-              canInvite={mentorAccess.canInvite}
-              onEnable={() => setMentorEnabled(true)}
-              onDisable={() => setMentorEnabled(false)}
-              onSetExamDate={setExamDate}
-              onOpenAuth={() => setIsAuthModalOpen(true)}
-            />
-          )}
-          {activeTab === 'Mentor' && MENTOR_TAB_VISIBLE && !mentorAccess.allowed && mentorAccess.checked && (
-            <MentorGate
-              theme={theme}
-              signedIn={!!user}
-              pendingCode={pendingBeta}
-              onOpenAuth={() => setIsAuthModalOpen(true)}
-              onJoined={() => { clearPendingBetaInvite(); setPendingBeta(null); mentorAccess.refresh(); }}
-              onDropPending={() => { clearPendingBetaInvite(); setPendingBeta(null); }}
-            />
-          )}
           {activeTab === 'Admin' && isAdmin && user && (
             <AdminTab adminId={user.id} theme={theme} />
           )}

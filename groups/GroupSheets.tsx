@@ -286,7 +286,7 @@ export const EditGroupSheet: React.FC<{
 
   return (
     <Sheet
-      title="Group settings"
+      title="Edit group"
       onClose={onClose}
       dark={dark}
       footer={
