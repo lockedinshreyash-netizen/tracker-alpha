@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Announcement } from './api';
 import { TYPE_FACE } from './face';
-import PollBody from './PollBody';
+import PollBody, { PollHandle, PollStatus } from './PollBody';
 import VideoBody from './VideoBody';
 
 interface Props {
@@ -41,10 +41,27 @@ const AnnouncementModal: React.FC<Props> = ({
   const face = TYPE_FACE[announcement.type];
   const isPoll = announcement.type === 'poll' && announcement.options.length > 0;
 
-  /* Only so the footer can stop saying "Skip" once an answer is in. The vote
-     itself is the poll's business, not this component's. */
-  const [voted, setVoted] = useState(false);
-  useEffect(() => { setVoted(false); }, [announcement.id]);
+  /* While a poll's options are open, the primary button is Submit — never Skip.
+     A big red "Skip" under an unanswered question was the most prominent thing
+     on the card, and people pressed it thinking it was how you answer. Skipping
+     is a small text link in the header now: available, not suggested. */
+  const pollRef = useRef<PollHandle | null>(null);
+  const [poll, setPoll] = useState<PollStatus>({ open: isPoll, draft: null });
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => { setPoll({ open: isPoll, draft: null }); }, [announcement.id, isPoll]);
+  const onPollStatus = useCallback((s: PollStatus) => setPoll(s), []);
+  const asking = isPoll && poll.open;
+  const live = announcement.poll_visibility === 'live';
+
+  const submit = async () => {
+    if (!pollRef.current || submitting) return;
+    setSubmitting(true);
+    const ok = await pollRef.current.submit();
+    setSubmitting(false);
+    /* A private poll has nothing more to show once the vote is in, so Submit
+       also marks it read and moves on. A live one stays open on its results. */
+    if (ok && !live) onAcknowledge();
+  };
 
   /* Escape sets it aside; it never acknowledges. Same reasoning as the scrim. */
   useEffect(() => {
@@ -91,6 +108,17 @@ const AnnouncementModal: React.FC<Props> = ({
                 {index + 1} of {total}
               </span>
             )}
+            {/* Skipping still marks it read — it just no longer looks like the
+                way to answer. */}
+            {asking && (
+              <button
+                onClick={onAcknowledge}
+                disabled={saving || submitting}
+                className={`${total > 1 ? 'ml-3' : 'ml-auto'} text-[10px] font-ui underline underline-offset-2 transition-colors disabled:opacity-50 ${dark ? 'text-zinc-600 hover:text-zinc-400' : 'text-zinc-400 hover:text-zinc-600'}`}
+              >
+                Skip
+              </button>
+            )}
           </div>
 
           <h2
@@ -121,10 +149,12 @@ const AnnouncementModal: React.FC<Props> = ({
           {isPoll && (
             <div className={announcement.body.trim() ? 'mt-5' : ''}>
               <PollBody
+                key={announcement.id}
+                ref={pollRef}
                 announcement={announcement}
                 userId={userId}
                 theme={theme}
-                onVoted={() => setVoted(true)}
+                onStatus={onPollStatus}
               />
             </div>
           )}
@@ -138,19 +168,16 @@ const AnnouncementModal: React.FC<Props> = ({
 
         <div className={`px-7 md:px-8 py-5 border-t flex flex-col sm:flex-row gap-2.5 ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
           <button
-            onClick={onAcknowledge}
-            disabled={saving}
+            onClick={asking && !error ? submit : onAcknowledge}
+            disabled={saving || (asking && !error && (submitting || !poll.draft || !userId))}
             className="flex-1 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97 font-ui disabled:opacity-50"
           >
-            {saving
+            {saving || submitting
               ? 'Saving…'
               : error
                 ? 'Try again'
-                /* A poll you have not answered is skipped, not agreed with —
-                   "Got it" on an unanswered question reads as if pressing it
-                   were the answer. */
-                : isPoll && !voted
-                  ? (total > 1 ? 'Skip — next' : 'Skip')
+                : asking
+                  ? 'Submit'
                   : total > 1 ? 'Got it — next' : 'Got it'}
           </button>
 

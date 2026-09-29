@@ -1,12 +1,25 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Announcement, PollTally, castVote, myVote, pollResults } from './api';
 
 interface Props {
   announcement: Announcement;
   userId: string | null;
   theme: 'dark' | 'light';
-  /** Told once a vote lands, so the footer can change what it offers. */
-  onVoted: () => void;
+  /** Reports whether the options are open for an answer and which one is
+      picked but not yet submitted, so the footer can offer Submit. */
+  onStatus: (status: PollStatus) => void;
+}
+
+export interface PollStatus {
+  /** The options are showing as buttons — unanswered, or changing an answer. */
+  open: boolean;
+  /** Picked, not yet submitted. */
+  draft: string | null;
+}
+
+/** What the modal's footer calls. Resolves true once the vote has landed. */
+export interface PollHandle {
+  submit: () => Promise<boolean>;
 }
 
 /* How often a live tally refreshes while somebody is looking at it.
@@ -50,7 +63,13 @@ const CheckGlyph: React.FC = () => (
  * can press "See results" on a live poll, because refusing that would be
  * pretending the tally is secret when it is not.
  */
-const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => {
+/*
+ * Tapping an option SELECTS it; the modal's primary button submits it. It used
+ * to be one tap per vote with the footer's big red button reading "Skip" — the
+ * most prominent control on the poll was the one that threw it away, and
+ * people pressed it without ever seeing that the options were the answer.
+ */
+const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Props, ref: any) => {
   const dark = theme === 'dark';
   const live = announcement.poll_visibility === 'live';
 
@@ -66,6 +85,8 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
      row you already own — and a poll you cannot correct on a phone is a poll
      whose first accidental tap is final. */
   const [changing, setChanging] = useState(false);
+  /* Picked but not submitted. Nothing is written until the footer's Submit. */
+  const [draft, setDraft] = useState<string | null>(null);
 
   /* Set on mount, not just cleared on unmount. React StrictMode mounts, tears
      down and remounts every effect in development — the teardown flips this to
@@ -123,8 +144,13 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
     };
   }, [showBars, loadTally]);
 
-  const vote = async (optionId: string) => {
-    if (!userId || pending) return;
+  const open = !showBars && (!answered || changing);
+  useEffect(() => {
+    onStatus({ open, draft: open ? draft : null });
+  }, [open, draft, onStatus]);
+
+  const vote = async (optionId: string): Promise<boolean> => {
+    if (!userId || pending) return false;
     /* Marked before the request, so the tap is acknowledged on the row that was
        pressed in the same frame rather than after a round trip. On a phone that
        gap is the whole difference between "submitted" and "broken". */
@@ -137,13 +163,18 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
     setPending(null);
     if (!ok) {
       setError('Could not record that. Check your connection and try again.');
-      return;
+      return false;
     }
     setChosen(optionId);
     setChanging(false);
-    onVoted();
+    setDraft(null);
     void loadTally();
+    return true;
   };
+
+  useImperativeHandle(ref, () => ({
+    submit: () => (draft ? vote(draft) : Promise.resolve(false)),
+  }), [draft, vote]);
 
   const total = tally?.reduce((n, t) => n + t.votes, 0) ?? 0;
   const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
@@ -211,19 +242,28 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
           );
         }
 
-        /* ── 1. Not answered yet ── */
+        /* ── 1. Not answered yet ── a pick, not a vote; Submit sends it. */
+        const picked = draft === option.id;
         return (
           <button
             key={option.id}
-            onClick={() => vote(option.id)}
+            onClick={() => { setDraft(option.id); setError(null); }}
             disabled={pending !== null}
-            aria-pressed={mine}
-            className={`${rowBase} flex items-center gap-2 transition-all active:scale-97 disabled:cursor-default ${mine
+            aria-pressed={picked}
+            className={`${rowBase} flex items-center gap-2.5 transition-all active:scale-97 disabled:cursor-default ${picked
               ? 'border-[#E10600]/45 ' + (dark ? 'bg-[#E10600]/[0.10] text-white' : 'bg-[#E10600]/[0.06] text-[#17150F]')
               : dark
                 ? 'bg-[#0D0D10] border-white/[0.08] text-zinc-200 hover:border-white/[0.18]'
                 : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] hover:border-[#D6D1C5]'} ${pending && !saving ? 'opacity-40' : ''}`}
           >
+            <span
+              aria-hidden="true"
+              className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center ${picked
+                ? 'border-[#E10600]'
+                : dark ? 'border-white/[0.25]' : 'border-[#C9C4B8]'}`}
+            >
+              {picked && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600]" />}
+            </span>
             <span className="flex-1 min-w-0 truncate">{option.label}</span>
             {saving && (
               <span className={`text-[9px] font-bold uppercase tracking-[0.08em] flex-shrink-0 ${muted}`}>
@@ -246,7 +286,7 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
           {showBars
             ? `${total} ${total === 1 ? 'vote' : 'votes'} · updating live`
             : changing
-              ? 'Pick a different answer.'
+              ? 'Pick a different answer, then submit.'
               : answered
                 ? <><span className="font-bold text-[#E10600]">Answer recorded.</span>{live ? ' Loading results…' : ' Results are private — only the LOCK IN team sees them.'}</>
                 : live
@@ -267,7 +307,7 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
         {/* Recovering a mis-tap. Only once there is something to change. */}
         {answered && !changing && (
           <button
-            onClick={() => setChanging(true)}
+            onClick={() => { setChanging(true); setDraft(null); }}
             className={`ml-auto text-[10px] font-bold uppercase tracking-[0.08em] font-ui transition-colors ${muted} hover:text-[#E10600]`}
           >
             Change
@@ -275,7 +315,7 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
         )}
         {changing && (
           <button
-            onClick={() => setChanging(false)}
+            onClick={() => { setChanging(false); setDraft(null); }}
             className={`ml-auto text-[10px] font-bold uppercase tracking-[0.08em] font-ui transition-colors ${muted} hover:text-[#E10600]`}
           >
             Keep mine
@@ -284,6 +324,6 @@ const PollBody: React.FC<Props> = ({ announcement, userId, theme, onVoted }) => 
       </div>
     </div>
   );
-};
+});
 
 export default PollBody;
