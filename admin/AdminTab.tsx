@@ -2,24 +2,26 @@ import React, { useState } from 'react';
 import AnnouncementsAdmin from './AnnouncementsAdmin';
 import FeedbackInbox from './FeedbackInbox';
 import AdminRoster from './AdminRoster';
+import ModerationAdmin from './ModerationAdmin';
 
 interface Props {
   adminId: string;
   theme: 'dark' | 'light';
 }
 
-type Section = 'announce' | 'inbox' | 'people';
+type Section = 'announce' | 'inbox' | 'moderation' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'announce', label: 'Announcements' },
   { id: 'inbox', label: 'Feedback' },
+  { id: 'moderation', label: 'Moderation' },
   { id: 'people', label: 'Administrators' },
 ];
 
 /**
  * The console.
  *
- * Three sections behind one switch rather than three tabs in the rail: the rail
+ * Four sections behind one switch rather than three tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -40,12 +42,12 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
         </p>
       </div>
 
-      <div className={`inline-flex p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-[#E3E0D9] bg-white'}`}>
+      <div className={`inline-flex max-w-full overflow-x-auto p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-[#E3E0D9] bg-white'}`}>
         {SECTIONS.map(s => (
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
-            className={`px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-all font-ui ${section === s.id
+            className={`shrink-0 px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-all font-ui ${section === s.id
               ? 'bg-[#E10600] text-white'
               : dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
           >
@@ -56,6 +58,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
 
       {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
+      {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}
       {section === 'people' && <AdminRoster adminId={adminId} theme={theme} />}
     </div>
   );

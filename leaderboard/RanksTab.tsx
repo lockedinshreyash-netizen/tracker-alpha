@@ -17,7 +17,8 @@ interface Props {
   logs: DailyLog[];
   prefs: LeaderboardPrefs;
   race: RaceView;
-  onJoin: (displayName: string) => void;
+  /** Resolves to a message when the server refused (a ban), else null. */
+  onJoin: (displayName: string) => Promise<string | null>;
   onLeave: () => void;
   onOpenAuth: () => void;
   onOpenProfile: (userId: string) => void;
@@ -43,6 +44,8 @@ const Movement: React.FC<{ delta: number; dark: boolean }> = ({ delta, dark }) =
 const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, onOpenProfile, theme }) => {
   const dark = theme === 'dark';
   const [name, setName] = useState(prefs.displayName);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   /* Hooks must run unconditionally on every render of this component — the
      two early returns below (signed out / not on the board) must never sit
@@ -110,14 +113,24 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
           />
 
           <button
-            disabled={!valid}
-            onClick={() => valid && onJoin(valid)}
-            className={`w-full mt-6 py-4 rounded-lg font-black uppercase tracking-[0.2em] text-[10px] font-ui transition-all active:scale-[0.98] ${valid
+            disabled={!valid || joining}
+            onClick={async () => {
+              if (!valid) return;
+              setJoining(true);
+              setJoinError(null);
+              const refused = await onJoin(valid);
+              setJoining(false);
+              setJoinError(refused);
+            }}
+            className={`w-full mt-6 py-4 rounded-lg font-black uppercase tracking-[0.2em] text-[10px] font-ui transition-all active:scale-[0.98] ${valid && !joining
               ? 'bg-[#E10600] text-white hover:bg-red-700'
               : dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed'}`}
           >
-            Join the race
+            {joining ? 'Joining…' : 'Join the race'}
           </button>
+          {joinError && (
+            <p className="text-[11px] font-ui text-[#E10600] mt-3">{joinError}</p>
+          )}
 
           <p className={`text-[9px] font-ui leading-relaxed mt-5 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'} ${muted}`}>
             This publishes your display name, today's hour total, and whether a session is running

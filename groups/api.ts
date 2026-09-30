@@ -11,6 +11,7 @@
    with any arguments gets exactly what the database's policies allow. */
 
 import { supabase } from '../supabaseClient';
+import { reasonArg } from '../moderation/api';
 
 export type GroupRole = 'owner' | 'admin' | 'member';
 export type TaskShareLevel = 'private' | 'summary' | 'tasks';
@@ -250,8 +251,11 @@ export const leaveGroup = (groupId: string): Promise<void> => rpc('leave_group',
 export const fetchMembers = (groupId: string): Promise<GroupMember[]> =>
   rpc<GroupMember[] | null>('group_members_list', { p_group: groupId }).then(rows => rows ?? []);
 
-export const removeMember = (groupId: string, userId: string, ban: boolean): Promise<void> =>
-  rpc('remove_member', { p_group: groupId, p_user: userId, p_ban: ban });
+/* The reason is shown to the removed person as a notice (supabase/moderation.sql).
+   Left out of the call entirely when blank, so a removal with no reason still
+   works against a database that has not been migrated yet. */
+export const removeMember = (groupId: string, userId: string, ban: boolean, reason = ''): Promise<void> =>
+  rpc('remove_member', { p_group: groupId, p_user: userId, p_ban: ban, ...reasonArg(reason) });
 
 export const unbanMember = (groupId: string, userId: string): Promise<void> =>
   rpc('unban_member', { p_group: groupId, p_user: userId });

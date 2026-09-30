@@ -50,6 +50,9 @@ import { useAdmin } from './admin/useAdmin';
 import AdminTab from './admin/AdminTab';
 import { useAnnouncements } from './announce/useAnnouncements';
 import AnnouncementModal from './announce/AnnouncementModal';
+import { useModerationNotices } from './moderation/useModerationNotices';
+import RemovalNoticeModal from './moderation/RemovalNoticeModal';
+import { humanError as moderationError, rejoinLeaderboard } from './moderation/api';
 import FeedbackWidget from './feedback/FeedbackWidget';
 import { useInstall } from './install/useInstall';
 import InstallBanner from './install/InstallBanner';
@@ -1589,7 +1592,19 @@ const App: React.FC = () => {
      joins, and leaving deletes their row rather than hiding it. Publishing is
      owned by useRace, which flips to an immediate write the moment `enabled`
      turns on — one place decides what this device tells the board. */
-  const joinLeaderboard = (displayName: string) => {
+  /* Asks the server first, because staff may have removed or banned this
+     account from the race (supabase/moderation.sql). A plain removal is
+     cleared by choosing to join again; a ban is refused, and the reason
+     comes back to the join screen instead of a board that would never list
+     them. */
+  const joinLeaderboard = async (displayName: string): Promise<string | null> => {
+    try {
+      if ((await rejoinLeaderboard()) === 'banned') {
+        return 'You’re banned from the race. You can’t join until the ban is lifted.';
+      }
+    } catch (e) {
+      return moderationError(e);
+    }
     setState(prev => {
       const nextState = {
         ...prev,
@@ -1599,6 +1614,7 @@ const App: React.FC = () => {
       stateRef.current = nextState;
       return nextState;
     });
+    return null;
   };
 
   const exitLeaderboard = () => {
@@ -1652,6 +1668,32 @@ const App: React.FC = () => {
     watching: activeTab === 'Groups',
     ready: syncSettled,
   });
+  /* ── Being told you were removed ──
+     Mounted at root: a removal can land while you are on any tab. A race
+     removal turns the race off here (without deleting history — staff
+     already took today's row down), and a group removal re-reads the group
+     list so the group is gone before the notice is even closed. */
+  const turnRaceOffAfterRemoval = useCallback(() => {
+    setState(prev => {
+      if (!prev.leaderboard?.enabled) return prev;
+      const nextState = {
+        ...prev,
+        leaderboard: { ...prev.leaderboard, enabled: false },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+  const refreshGroupsRef = useRef(groupsState.refresh);
+  refreshGroupsRef.current = groupsState.refresh;
+  const moderation = useModerationNotices({
+    user,
+    ready: syncSettled,
+    onLeaderboardRemoved: turnRaceOffAfterRemoval,
+    onGroupRemoved: () => { void refreshGroupsRef.current(); },
+  });
+
   const handleInviteHandled = useCallback(() => {
     clearPendingInvite();
     setPendingInvite(null);
@@ -2276,6 +2318,25 @@ const App: React.FC = () => {
           onAcknowledge={announcements.acknowledgeCurrent}
           onAcknowledgeAll={announcements.acknowledgeAll}
           onSetAside={announcements.setAside}
+        />
+      )}
+
+      {/* You were removed from a group or the race. Any tab, because it can
+          arrive anywhere — but never over a running session (Lock-In owns
+          the screen, and the news keeps until the block is done), and
+          queued behind the other full-screen moments, including an
+          announcement already open on Today. */}
+      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen
+        && !state.timer.isRunning && pomodoroIsIdle(state.pomodoro)
+        && !(activeTab === 'Today' && announcements.current)
+        && moderation.current && (
+        <RemovalNoticeModal
+          notice={moderation.current}
+          total={moderation.total}
+          theme={theme}
+          saving={moderation.saving}
+          error={moderation.error}
+          onAcknowledge={moderation.acknowledge}
         />
       )}
 

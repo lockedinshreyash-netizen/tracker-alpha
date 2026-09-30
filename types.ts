@@ -3,7 +3,7 @@ export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'Biology' | 'General';
 
 export type ExamPreference = 'JEE' | 'NEET';
 
-export type SyllabusStatus = 'not_started' | 'in_progress' | 'completed' | 'revision_pending';
+export type SyllabusStatus = 'not_started' | 'in_progress' | 'practice_pending' | 'completed' | 'revision_pending';
 
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 

@@ -992,7 +992,26 @@ $$;
 
 -- The owner may remove anyone; an admin may remove members. Nobody removes
 -- someone of equal or higher rank, and nobody removes themselves this way.
-create or replace function public.remove_member(p_group uuid, p_user uuid, p_ban boolean default false)
+--
+-- `p_reason` is optional free text the removed person is shown. It is written
+-- to their notice by `record_moderation_notice()` (supabase/moderation.sql),
+-- called through EXECUTE and guarded by to_regprocedure for delete_group's
+-- reason: this file still installs and runs on a project where moderation.sql
+-- was never applied — the removal happens, the notice is simply not written.
+-- The group's name is captured before the delete, because the notice has to
+-- say which group, and it outlives the membership it describes.
+--
+-- The signature gained `p_reason`, so the three-argument version is dropped
+-- first — otherwise both would exist and a call naming three arguments would
+-- be ambiguous to PostgREST.
+drop function if exists public.remove_member(uuid, uuid, boolean);
+
+create or replace function public.remove_member(
+  p_group  uuid,
+  p_user   uuid,
+  p_ban    boolean default false,
+  p_reason text    default null
+)
 returns void
 language plpgsql
 security definer
@@ -1001,6 +1020,7 @@ as $$
 declare
   my_rank     int := public.role_rank(public.group_role(p_group));
   target_role text;
+  group_name  text;
 begin
   if my_rank < 2 or p_user = auth.uid() then
     raise exception 'not authorized' using errcode = '42501';
@@ -1014,12 +1034,19 @@ begin
     raise exception 'not authorized' using errcode = '42501';
   end if;
 
+  select name into group_name from public.groups where id = p_group;
+
   if p_ban then
     insert into public.group_bans (group_id, user_id, banned_by)
     values (p_group, p_user, auth.uid())
     on conflict (group_id, user_id) do nothing;
   end if;
   delete from public.group_members where group_id = p_group and user_id = p_user;
+
+  if to_regprocedure('public.record_moderation_notice(uuid, text, text, text, boolean)') is not null then
+    execute 'select public.record_moderation_notice($1, $2, $3, $4, false)'
+      using p_user, case when p_ban then 'group_banned' else 'group_removed' end, group_name, p_reason;
+  end if;
 end;
 $$;
 
@@ -1511,7 +1538,7 @@ begin
     'public.preview_invite(text)',
     'public.redeem_invite(text, boolean)',
     'public.leave_group(uuid)',
-    'public.remove_member(uuid, uuid, boolean)',
+    'public.remove_member(uuid, uuid, boolean, text)',
     'public.unban_member(uuid, uuid)',
     'public.set_member_role(uuid, uuid, text)',
     'public.transfer_ownership(uuid, uuid)',

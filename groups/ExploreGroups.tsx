@@ -26,6 +26,7 @@ import {
 } from './api';
 import { Eyebrow, GroupIcon, Sheet, btn, tokens } from './ui';
 import SharingFields from './SharingFields';
+import StaffGroupMembers from '../moderation/StaffGroupMembers';
 
 interface Props {
   onOpenGroup: (groupId: string) => void;
@@ -33,6 +34,8 @@ interface Props {
   onJoined: (groupId: string) => void;
   /** App staff may take down a public group. Server-enforced; this only draws the button. */
   isStaff: boolean;
+  /** The signed-in user, so staff are never offered a Remove on their own row. */
+  userId: string | null;
   theme: 'dark' | 'light';
 }
 
@@ -45,7 +48,7 @@ const joinLabel = (g: ExploreGroup): string => {
   return g.join_policy === 'open' ? 'Join' : 'Request';
 };
 
-const ExploreGroups: React.FC<Props> = ({ onOpenGroup, onJoined, isStaff, theme }) => {
+const ExploreGroups: React.FC<Props> = ({ onOpenGroup, onJoined, isStaff, userId, theme }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   const [query, setQuery] = useState('');
@@ -181,12 +184,14 @@ const ExploreGroups: React.FC<Props> = ({ onOpenGroup, onJoined, isStaff, theme 
         <PublicGroupSheet
           group={selected}
           isStaff={isStaff}
+          userId={userId}
           theme={theme}
           onClose={() => setSelected(null)}
           onJoined={id => { setSelected(null); onJoined(id); }}
           onRequested={() => { patchRow(selected.id, { my_status: 'requested' }); setSelected(null); }}
           onCancelled={() => { patchRow(selected.id, { my_status: null }); setSelected(null); }}
           onRemoved={() => { setRows(prev => prev?.filter(r => r.id !== selected.id) ?? prev); setSelected(null); }}
+          onMembersChanged={() => void load(query)}
         />
       )}
     </div>
@@ -196,13 +201,15 @@ const ExploreGroups: React.FC<Props> = ({ onOpenGroup, onJoined, isStaff, theme 
 const PublicGroupSheet: React.FC<{
   group: ExploreGroup;
   isStaff: boolean;
+  userId: string | null;
   theme: 'dark' | 'light';
   onClose: () => void;
   onJoined: (groupId: string) => void;
   onRequested: () => void;
   onCancelled: () => void;
   onRemoved: () => void;
-}> = ({ group: g, isStaff, theme, onClose, onJoined, onRequested, onCancelled, onRemoved }) => {
+  onMembersChanged: () => void;
+}> = ({ group: g, isStaff, userId, theme, onClose, onJoined, onRequested, onCancelled, onRemoved, onMembersChanged }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   const [shareHours, setShareHours] = useState(true);
@@ -299,6 +306,12 @@ const PublicGroupSheet: React.FC<{
             />
           </div>
         </>
+      )}
+
+      {isStaff && (
+        <div className={`pt-5 border-t ${t.rule}`}>
+          <StaffGroupMembers groupId={g.id} selfId={userId} dark={dark} onChanged={onMembersChanged} />
+        </div>
       )}
 
       {isStaff && (

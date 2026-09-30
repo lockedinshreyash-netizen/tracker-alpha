@@ -36,6 +36,7 @@ import {
 import { taskSnapshot } from './publish';
 import { GroupsState } from './useGroups';
 import { Eyebrow, RoleBadge, btn, tokens } from './ui';
+import RemoveForm from '../moderation/RemoveForm';
 
 const REFRESH_MS = 60_000;
 
@@ -74,6 +75,9 @@ const GroupPeople: React.FC<Props> = ({ group, userId, tasks, groups, onInvite, 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [managing, setManaging] = useState<string | null>(null);
+  /* The member whose Remove form is open. The reason typed there is shown to
+     them as a notice (moderation/). */
+  const [removing, setRemoving] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const loadRoster = useCallback(async () => {
@@ -253,7 +257,7 @@ const GroupPeople: React.FC<Props> = ({ group, userId, tasks, groups, onInvite, 
                     theme={theme}
                     trailing={canManage(m) ? (
                       <button
-                        onClick={() => setManaging(open ? null : m.user_id)}
+                        onClick={() => { setManaging(open ? null : m.user_id); setRemoving(null); }}
                         aria-expanded={open}
                         aria-label={`Manage ${nameOf(m.user_id)}`}
                         className={`px-2 py-1 -mr-2 rounded-md ${t.muted} ${t.hover}`}
@@ -286,26 +290,32 @@ const GroupPeople: React.FC<Props> = ({ group, userId, tasks, groups, onInvite, 
                           Transfer ownership
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Remove ${nameOf(m.user_id)}? They can rejoin with a new invite.`)) {
-                            void act(`rm-${m.user_id}`, () => removeMember(group.id, m.user_id, false), () => setManaging(null));
+                      {removing !== m.user_id && (
+                        <button onClick={() => setRemoving(m.user_id)} className={`${small} text-[#E10600]`}>
+                          Remove…
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {open && removing === m.user_id && (
+                    <div className="ml-10">
+                      <RemoveForm
+                        name={nameOf(m.user_id)}
+                        from="group"
+                        banMeans="No invite will let them back in until an admin unbans them."
+                        dark={dark}
+                        onCancel={() => setRemoving(null)}
+                        onConfirm={async (reason, ban) => {
+                          try {
+                            await removeMember(group.id, m.user_id, ban, reason);
+                          } catch (e) {
+                            throw new Error(humanError(e));
                           }
+                          setRemoving(null);
+                          setManaging(null);
+                          await Promise.all([loadRoster(), groups.refresh()]);
                         }}
-                        className={`${small} text-[#E10600]`}
-                      >
-                        Remove
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Remove and ban ${nameOf(m.user_id)}? No invite will let them back in until an admin unbans them.`)) {
-                            void act(`ban-${m.user_id}`, () => removeMember(group.id, m.user_id, true), () => setManaging(null));
-                          }
-                        }}
-                        className={`${small} text-[#E10600]`}
-                      >
-                        Remove & ban
-                      </button>
+                      />
                     </div>
                   )}
                 </li>

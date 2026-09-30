@@ -76,6 +76,7 @@ export const LOCK_IN_QUOTES = [
 export const STATUS_CYCLE: SyllabusStatus[] = [
   'not_started',
   'in_progress',
+  'practice_pending',
   'completed',
   'revision_pending'
 ];
@@ -83,6 +84,7 @@ export const STATUS_CYCLE: SyllabusStatus[] = [
 export const STATUS_LABELS: Record<SyllabusStatus, string> = {
   not_started: 'Not started',
   in_progress: 'In progress',
+  practice_pending: 'Practice left',
   completed: 'Completed',
   revision_pending: 'Revision'
 };
@@ -101,6 +103,13 @@ export const STATUS_COLORS: Record<SyllabusStatus, { border: string, bg: string,
     text: 'text-yellow-500',
     label: 'border-yellow-600/50 text-yellow-600',
     dot: 'bg-yellow-500'
+  },
+  practice_pending: {
+    border: 'border-orange-500/50',
+    bg: 'bg-orange-500/5',
+    text: 'text-orange-400',
+    label: 'border-orange-500/50 text-orange-400',
+    dot: 'bg-orange-400'
   },
   completed: {
     border: 'border-green-600/50',

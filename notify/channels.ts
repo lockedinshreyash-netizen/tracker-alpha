@@ -19,11 +19,15 @@
    day it gets muted, and every one of the channels below stops working at once.
    There is no way to earn that permission back.
 
-   Four channels, four identities, each traceable to a user action:
-     race     — a place changing hands, on a board you asked to join.
-     pomodoro — a bell for a block you started. Asked for, by starting it.
-     reminder — a due date you wrote, on a task you wrote.
-     plan     — a block you put on your own timeline, about to begin.
+   Five channels, five identities, each traceable to a real event:
+     race       — a place changing hands, on a board you asked to join.
+     pomodoro   — a bell for a block you started. Asked for, by starting it.
+     reminder   — a due date you wrote, on a task you wrote.
+     plan       — a block you put on your own timeline, about to begin.
+     moderation — a person removed you from a group or the race, and said why.
+                  Not the app's opinion: somebody else's decision about you,
+                  which you are owed hearing about from the app rather than
+                  finding a group missing from your list.
 
    Four gates, in order:
      1. Never while a session is running. Focus is the product; interrupting it
@@ -43,7 +47,7 @@
    hidden one gets a system notification, a closed app gets a push. Exactly one
    of the three. Never two. */
 
-export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan';
+export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'moderation';
 
 export interface ChannelDef {
   /** Notifications sharing a tag replace one another instead of stacking. */
@@ -61,6 +65,8 @@ export const CHANNELS: Record<Channel, ChannelDef> = {
   race: { tag: () => 'tracker-alpha-race', requireInteraction: false },
   pomodoro: { tag: () => 'tracker-alpha-pomodoro', requireInteraction: false },
   plan: { tag: () => 'tracker-alpha-plan', requireInteraction: false },
+  /* Per notice: two removals are two different things to be told. */
+  moderation: { tag: key => `tracker-alpha-moderation:${key}`, requireInteraction: false },
 
   /* Per task, not per channel. Two deadlines are two different commitments;
      collapsing them under one tag would silently eat one of them, and the one

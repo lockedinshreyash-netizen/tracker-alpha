@@ -134,7 +134,7 @@ export const buildRecommendations = ({ state, exam, activeSubjects, now = new Da
   // How many chapters are already open. Sprawl is the real failure mode, so
   // starting anything new gets expensive past a small number.
   const openCount = state.progress.filter(
-    (p) => p.classId === state.currentClass && p.status === 'in_progress' && subjects.some((s) => s === p.subject),
+    (p) => p.classId === state.currentClass && (p.status === 'in_progress' || p.status === 'practice_pending') && subjects.some((s) => s === p.subject),
   ).length;
 
   const out: Recommendation[] = [];
@@ -175,6 +175,11 @@ export const buildRecommendations = ({ state, exam, activeSubjects, now = new Da
           score = tierScore + Math.min(age * 1.5, 45);
           reason = `${age} days cold${weight ? ` · ${weight.tier === 'critical' ? 'max damage' : weight.tier} chapter` : ''}`;
         }
+      } else if (status === 'practice_pending') {
+        // Theory is done; only the questions stand between it and finished.
+        action = 'finish';
+        score += 25;
+        reason = `Theory done — do the questions and close it out`;
       } else if (status === 'in_progress') {
         action = 'finish';
         const sunk = hoursOnChapter(state.logs, chapter);

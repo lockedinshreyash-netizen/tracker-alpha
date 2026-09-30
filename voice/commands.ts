@@ -107,6 +107,7 @@ const TAB_ALIASES: [TabType, string[]][] = [
 const STATUS_ALIASES: [SyllabusStatus, string[]][] = [
   ['completed', ['done', 'complete', 'completed', 'finished', 'finish']],
   ['in_progress', ['started', 'starting', 'ongoing', 'progress']],
+  ['practice_pending', ['practice', 'practise', 'questions']],
   ['revision_pending', ['revision', 'revise', 'revising', 'rivision']],
   ['not_started', ['untouched', 'unstarted', 'pending', 'nothing']],
 ];

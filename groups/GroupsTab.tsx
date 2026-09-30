@@ -306,7 +306,7 @@ const GroupsTab: React.FC<Props> = ({
       </div>
 
       {view === 'explore' ? (
-        <ExploreGroups onOpenGroup={id => openGroup(id)} onJoined={id => void afterJoin(id)} isStaff={isStaff} theme={theme} />
+        <ExploreGroups onOpenGroup={id => openGroup(id)} onJoined={id => void afterJoin(id)} isStaff={isStaff} userId={user?.id ?? null} theme={theme} />
       ) : (
         <>
           {groups.error && (
