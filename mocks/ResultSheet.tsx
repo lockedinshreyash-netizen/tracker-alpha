@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { ExamPreference, MockChapter, MockMistake, MockResult, MockSubjectScore, MockTest, MockVerdict, Subject } from '../types';
 import { SingleChapterPicker } from './ChapterPicker';
-import { EXAMS, MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, blankScores, chapterKey, examColor, topicKey, totals } from './model';
+import { EXAMS, MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, blankScores, chapterKey, examColor, paperShort, topicKey, totals } from './model';
 import { TakenMock, formatDate } from './insights';
 import { ExamBadge, Eyebrow, Field, ScopeBadge, Sheet, btn, deltaTone, signedPct, subjectDot, tokens } from './ui';
 
@@ -73,7 +73,7 @@ const ResultSheet: React.FC<Props> = ({ test, previous, pref, subjects, today, d
   const subjectsHere = r?.scores.map(s => s.subject) ?? subjects;
   const [date, setDate] = useState(r ? test.date : test.date > today ? today : test.date);
   const [scores, setScores] = useState<ScoreDraft[]>(() =>
-    (r?.scores ?? blankScores(test.exam, subjectsHere)).map(s => ({
+    (r?.scores ?? blankScores(test, subjectsHere)).map(s => ({
       subject: s.subject,
       marks: r ? str(s.marks) : '',
       max: str(s.max),
@@ -154,14 +154,14 @@ const ResultSheet: React.FC<Props> = ({ test, previous, pref, subjects, today, d
           <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>{r ? 'Edit result' : 'Log result'}</p>
           <p className={`font-display text-[22px] leading-tight mt-1.5 truncate ${t.heading}`}>{test.name}</p>
           <div className="flex items-center gap-1.5 mt-2">
-            <ExamBadge exam={test.exam} dark={dark} />
+            <ExamBadge exam={test.exam} paperName={test.paperName} dark={dark} />
             <ScopeBadge scope={test.scope} dark={dark} />
           </div>
         </div>
         <div className="text-right shrink-0">
           <p className={`num-hero text-[40px] tabular-nums ${livePct === null ? t.faint : t.heading}`}>{livePct === null ? '—' : `${Math.round(livePct)}%`}</p>
           {livePct !== null && previous && (
-            <p className={`text-[11px] font-ui font-bold ${deltaTone(livePct - previous.pct, dark)}`}>{signedPct(livePct - previous.pct)} vs last {EXAMS[test.exam].short}</p>
+            <p className={`text-[11px] font-ui font-bold ${deltaTone(livePct - previous.pct, dark)}`}>{signedPct(livePct - previous.pct)} vs last {paperShort(test)}</p>
           )}
           {livePct !== null && <p className={`text-[11px] font-ui ${t.muted}`}>{Math.round(total.marks * 10) / 10} / {total.max}</p>}
         </div>

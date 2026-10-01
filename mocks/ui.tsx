@@ -10,7 +10,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MockExam, MockScope, Subject } from '../types';
 import { SUBJECT_COLORS } from '../schedule/colors';
-import { EXAMS, SCOPES, examColor } from './model';
+import { SCOPES, examColor, paperShort } from './model';
 
 export const tokens = (dark: boolean) => ({
   card: dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm',
@@ -55,10 +55,11 @@ export const Card: React.FC<{
 
 export const subjectDot = (subject: Subject) => (SUBJECT_COLORS[subject] ?? SUBJECT_COLORS.General).dot;
 
-export const ExamBadge: React.FC<{ exam: MockExam; dark: boolean; size?: 'sm' | 'md' }> = ({ exam, dark, size = 'sm' }) => (
-  <span className={`inline-flex items-center gap-1.5 rounded-full border font-ui font-bold ${size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'} ${dark ? 'border-white/[0.08] text-zinc-300' : 'border-zinc-200 text-zinc-700'}`}>
-    <span className="w-1.5 h-1.5 rounded-full" style={{ background: examColor(exam, dark) }} />
-    {EXAMS[exam].short}
+/** `paperName` replaces the label for an "Other" paper the student named. */
+export const ExamBadge: React.FC<{ exam: MockExam; paperName?: string; dark: boolean; size?: 'sm' | 'md' }> = ({ exam, paperName, dark, size = 'sm' }) => (
+  <span className={`inline-flex items-center gap-1.5 rounded-full border font-ui font-bold max-w-[160px] ${size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'} ${dark ? 'border-white/[0.08] text-zinc-300' : 'border-zinc-200 text-zinc-700'}`}>
+    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: examColor(exam, dark) }} />
+    <span className="truncate">{paperShort({ exam, paperName })}</span>
   </span>
 );
 

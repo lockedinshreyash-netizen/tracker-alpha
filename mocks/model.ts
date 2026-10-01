@@ -138,15 +138,43 @@ export const attemptRate = (r: MockResult | undefined): number | null => {
 export const isTaken = (t: MockTest): t is MockTest & { result: MockResult } =>
   !!t.result && t.result.scores.length > 0;
 
-/** "JEE Main Full Test 4" — numbered within its own exam and scope. */
-export const suggestName = (tests: MockTest[], exam: MockExam, scope: MockScope, excludeId?: string): string => {
-  const n = tests.filter(t => t.exam === exam && t.scope === scope && t.id !== excludeId).length + 1;
-  const prefix = exam === 'other' ? '' : `${EXAMS[exam].label} `;
+/* ── Papers ──
+   The thing a trend line, a filter chip and a "vs last" delta compare within.
+   For the fixed exams that is the exam itself; for "Other" it is whatever the
+   student named it, so BITSAT and a school pre-board never share a line. */
+type PaperRef = Pick<MockTest, 'exam' | 'paperName'>;
+
+export const DEFAULT_OTHER_MAX = 300;
+
+export const paperKey = (t: PaperRef): string =>
+  t.exam === 'other' && t.paperName ? `other:${t.paperName.toLowerCase()}` : t.exam;
+export const paperLabel = (t: PaperRef): string =>
+  t.exam === 'other' && t.paperName ? t.paperName : EXAMS[t.exam].label;
+export const paperShort = (t: PaperRef): string =>
+  t.exam === 'other' && t.paperName ? t.paperName : EXAMS[t.exam].short;
+
+/** What a full paper is out of, before anyone edits a subject. */
+export const paperTotal = (t: Pick<MockTest, 'exam' | 'maxMarks'>, subjects: Subject[]): number =>
+  t.exam === 'other' ? (t.maxMarks ?? DEFAULT_OTHER_MAX) : subjects.reduce((a, s) => a + EXAMS[t.exam].max(s), 0);
+
+/** "JEE Main Full Test 4", "BITSAT Full Test 2" — numbered within its own paper and scope. */
+export const suggestName = (tests: MockTest[], paper: PaperRef, scope: MockScope, excludeId?: string): string => {
+  const key = paperKey(paper);
+  const n = tests.filter(t => paperKey(t) === key && t.scope === scope && t.id !== excludeId).length + 1;
+  const prefix = paper.exam === 'other' && !paper.paperName ? '' : `${paperLabel(paper)} `;
   return `${prefix}${SCOPES[scope].noun} ${n}`;
 };
 
-export const blankScores = (exam: MockExam, subjects: Subject[]): MockSubjectScore[] =>
-  subjects.map(subject => ({ subject, marks: 0, max: EXAMS[exam].max(subject) }));
+/* A custom paper's total, split across its subjects as evenly as whole marks
+   allow (300 over three is 100 each; 200 over three is 67/67/66). The result
+   sheet lets each subject's maximum be corrected. */
+export const blankScores = (t: Pick<MockTest, 'exam' | 'maxMarks'>, subjects: Subject[]): MockSubjectScore[] => {
+  if (t.exam !== 'other') return subjects.map(subject => ({ subject, marks: 0, max: EXAMS[t.exam].max(subject) }));
+  const total = t.maxMarks ?? DEFAULT_OTHER_MAX;
+  const base = Math.floor(total / subjects.length);
+  const extra = total - base * subjects.length;
+  return subjects.map((subject, i) => ({ subject, marks: 0, max: Math.max(1, base + (i < extra ? 1 : 0)) }));
+};
 
 /* ── Persistence ── */
 
@@ -320,7 +348,7 @@ export const normalizeMocks = (raw: unknown): MocksState => {
       const scope: MockScope = SCOPE_ORDER.includes(t.scope) ? t.scope : 'full';
       const test: MockTest = {
         id: t.id.slice(0, 64),
-        name: text(t.name, 60) ?? suggestName([], exam, scope),
+        name: text(t.name, 60) ?? suggestName([], { exam, paperName: exam === 'other' ? text(t.paperName, 30) : undefined }, scope),
         date: t.date,
         exam,
         scope,
@@ -329,6 +357,12 @@ export const normalizeMocks = (raw: unknown): MocksState => {
       };
       const series = text(t.series, 40);
       if (series) test.series = series;
+      if (exam === 'other') {
+        const paperName = text(t.paperName, 30);
+        if (paperName) test.paperName = paperName;
+        const maxMarks = num(t.maxMarks, 1, 5000);
+        if (maxMarks !== undefined) test.maxMarks = Math.round(maxMarks);
+      }
       const result = normalizeResult(t.result);
       if (result) test.result = result;
       return test;

@@ -13,7 +13,7 @@
    data, and in AppState it would sync on every tap. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChapterProgress, ErrorEntry, ExamPreference, MockChapter, MockExam, MockResult, MockTest, MocksState, Subject } from '../types';
+import { ChapterProgress, ErrorEntry, ExamPreference, MockChapter, MockResult, MockTest, MocksState, Subject } from '../types';
 import { generateId } from '../utils';
 import ErrorForm, { ErrorDraft, draftFrom, emptyDraft } from './ErrorForm';
 import ErrorNotebook from './ErrorNotebook';
@@ -27,7 +27,7 @@ import {
   ExamFilter, ScopeFilter, applyFilter, buildInsights, fixedLeaks, leaks as leaksOf, mistakeMix,
   readiness as readinessOf, subjectTrends, summarize, takenMocks, topLeaks,
 } from './insights';
-import { EXAMS, SCOPES, SCOPE_ORDER, chapterKey, examColor, isCleared } from './model';
+import { SCOPES, SCOPE_ORDER, chapterKey, examColor, isCleared, paperKey, paperLabel } from './model';
 import { Card, Chip, Eyebrow, ScopeGlyph, Segmented, btn, tokens } from './ui';
 
 interface Props {
@@ -85,10 +85,17 @@ const MocksTab: React.FC<Props> = ({
 
   /* ── Derived ── */
   const everything = useMemo(() => takenMocks(tests), [tests]);
-  const examsPresent = useMemo(() => Array.from(new Set(everything.map(x => x.test.exam))) as MockExam[], [everything]);
+  /* Filter chips are per paper — each fixed exam, and each paper the student
+     named under "Other" — in the order they were first taken. */
+  const papersPresent = useMemo(
+    () => Array.from(new Map<string, MockTest>(everything.map(x => [paperKey(x.test), x.test])).values())
+      .map(t => ({ key: paperKey(t), exam: t.exam, label: paperLabel(t) })),
+    [everything],
+  );
   const scopesPresent = useMemo(() => SCOPE_ORDER.filter(s => everything.some(x => x.test.scope === s)), [everything]);
   // A remembered filter for a classification with no mocks left falls back to everything.
-  const exam: ExamFilter = prefs.exam !== 'all' && !examsPresent.includes(prefs.exam) ? 'all' : prefs.exam;
+  const exam: ExamFilter = prefs.exam !== 'all' && !papersPresent.some(p => p.key === prefs.exam) ? 'all' : prefs.exam;
+  const examLabel = papersPresent.find(p => p.key === exam)?.label ?? '';
   const wanted: ScopeFilter = prefs.scope ?? (scopesPresent.includes('full') && scopesPresent.length > 1 ? 'full' : 'all');
   const scope: ScopeFilter = wanted !== 'all' && !scopesPresent.includes(wanted) ? 'all' : wanted;
   const series = useMemo(() => applyFilter(everything, exam, scope), [everything, exam, scope]);
@@ -113,7 +120,7 @@ const MocksTab: React.FC<Props> = ({
   const metric: Metric = (prefs.metric === 'percentile' && !hasPercentile) || (prefs.metric === 'accuracy' && !hasAccuracy) ? 'score' : prefs.metric;
 
   const previousOf = useCallback((test: MockTest) => {
-    const before = everything.filter(x => x.test.exam === test.exam && x.test.id !== test.id && x.test.date <= test.date);
+    const before = everything.filter(x => paperKey(x.test) === paperKey(test) && x.test.id !== test.id && x.test.date <= test.date);
     return before[before.length - 1] ?? null;
   }, [everything]);
 
@@ -131,6 +138,10 @@ const MocksTab: React.FC<Props> = ({
       updatedAt: Date.now(),
     };
     if (d.series.trim()) test.series = d.series.trim().slice(0, 40); else delete test.series;
+    const paperName = d.exam === 'other' ? d.paperName.trim().slice(0, 30) : '';
+    const maxMarks = d.exam === 'other' ? Math.round(Number(d.maxMarks)) : NaN;
+    if (paperName) test.paperName = paperName; else delete test.paperName;
+    if (Number.isFinite(maxMarks) && maxMarks > 0) test.maxMarks = Math.min(5000, maxMarks); else delete test.maxMarks;
     onUpsertMock(test);
     const past = plan?.past;
     setPlan(null);
@@ -207,10 +218,10 @@ const MocksTab: React.FC<Props> = ({
   const filterBar = (
     <div className="flex flex-wrap items-center gap-2">
       <Chip on={exam === 'all'} onClick={() => setPref({ exam: 'all' })} dark={dark}>All papers</Chip>
-      {examsPresent.map(e => (
-        <Chip key={e} on={exam === e} onClick={() => setPref({ exam: e })} dark={dark} color={examColor(e, dark)}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: examColor(e, dark) }} />
-          {EXAMS[e].label}
+      {papersPresent.map(p => (
+        <Chip key={p.key} on={exam === p.key} onClick={() => setPref({ exam: p.key })} dark={dark} color={examColor(p.exam, dark)}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: examColor(p.exam, dark) }} />
+          {p.label}
         </Chip>
       ))}
       {scopesPresent.length > 1 && (
@@ -311,7 +322,7 @@ const MocksTab: React.FC<Props> = ({
                   <div>
                     <Eyebrow dark={dark}>Trend</Eyebrow>
                     <p className={`text-[12px] font-ui mt-1 ${t.muted}`}>
-                      {exam === 'all' ? 'Each paper on its own line' : EXAMS[exam].label}{scope !== 'all' ? ` · ${SCOPES[scope].label.toLowerCase()}` : ''} · {series.length} {series.length === 1 ? 'mock' : 'mocks'}
+                      {exam === 'all' ? 'Each paper on its own line' : examLabel}{scope !== 'all' ? ` · ${SCOPES[scope].label.toLowerCase()}` : ''} · {series.length} {series.length === 1 ? 'mock' : 'mocks'}
                     </p>
                   </div>
                   {(hasAccuracy || hasPercentile) && (
@@ -374,6 +385,7 @@ const MocksTab: React.FC<Props> = ({
           onClose={() => setPlan(null)}
           onAddTopic={onAddTopic}
           onForgetTopic={onForgetTopic}
+          past={plan.past}
         />
       )}
       {resultFor && (

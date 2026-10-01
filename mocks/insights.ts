@@ -9,16 +9,17 @@ import { getChaptersFor } from '../constants';
 import { getWeight } from '../content';
 import { WeightTier } from '../content/types';
 import {
-  ChapterProgress, ErrorEntry, ExamPreference, MockExam, MockMistake, MockScope, MockTest,
+  ChapterProgress, ErrorEntry, ExamPreference, MockMistake, MockScope, MockTest,
   MockVerdict, Subject,
 } from '../types';
 import { addDays } from '../utils';
 import {
-  EXAMS, MISTAKE_ORDER, accuracy, isCleared, attemptRate, chapterKey, isTaken,
+  EXAMS, MISTAKE_ORDER, accuracy, isCleared, paperKey, paperShort, attemptRate, chapterKey, isTaken,
   parseKey, scorePct, subjectPct,
 } from './model';
 
-export type ExamFilter = MockExam | 'all';
+/** 'all', or a `paperKey` — a fixed exam, or one of the student's own named papers. */
+export type ExamFilter = string;
 export type ScopeFilter = MockScope | 'all';
 
 export interface TakenMock {
@@ -51,7 +52,7 @@ export const takenMocks = (tests: MockTest[]): TakenMock[] =>
   });
 
 export const applyFilter = (taken: TakenMock[], exam: ExamFilter, scope: ScopeFilter): TakenMock[] =>
-  taken.filter(t => (exam === 'all' || t.test.exam === exam) && (scope === 'all' || t.test.scope === scope));
+  taken.filter(t => (exam === 'all' || paperKey(t.test) === exam) && (scope === 'all' || t.test.scope === scope));
 
 /* ── Small statistics ── */
 
@@ -383,23 +384,25 @@ export const buildInsights = (input: InsightInput): Insight[] => {
 
   if (!series.length) return out.sort((a, b) => b.priority - a.priority);
 
-  // Momentum, only within one exam — slopes across papers mean nothing.
-  const exams = Array.from(new Set(series.map(t => t.test.exam)));
-  exams.forEach(exam => {
-    const ys = series.filter(t => t.test.exam === exam).map(t => t.pct);
+  // Momentum, only within one paper — slopes across papers mean nothing.
+  const papers = Array.from(new Set(series.map(t => paperKey(t.test))));
+  papers.forEach(key => {
+    const within = series.filter(t => paperKey(t.test) === key);
+    const ys = within.map(t => t.pct);
+    const name = paperShort(within[0].test);
     const k = slope(ys.slice(-6));
     if (k === null || ys.length < 4) return;
     const n = Math.min(6, ys.length);
     if (k >= 1.2) {
       out.push({
-        id: `climb-${exam}`, tone: 'up', priority: 75,
-        title: `Climbing ${signed(k)}% per ${EXAMS[exam].short} mock.`,
+        id: `climb-${key}`, tone: 'up', priority: 75,
+        title: `Climbing ${signed(k)}% per ${name} mock.`,
         body: `That’s the trend across your last ${n}. Whatever you changed, keep doing it.`,
       });
     } else if (k <= -1.2) {
       out.push({
-        id: `slide-${exam}`, tone: 'down', priority: 85,
-        title: `Sliding ${signed(k)}% per ${EXAMS[exam].short} mock.`,
+        id: `slide-${key}`, tone: 'down', priority: 85,
+        title: `Sliding ${signed(k)}% per ${name} mock.`,
         body: `Across your last ${n}. Stop taking new mocks for a week and fix the last three.`,
       });
     }

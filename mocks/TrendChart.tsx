@@ -14,8 +14,8 @@
    Hand-rolled SVG, measured to its container so text renders at 1:1. */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MockExam, Subject } from '../types';
-import { EXAMS, SCOPES, examColor, totals } from './model';
+import { MockExam, MockTest, Subject } from '../types';
+import { SCOPES, examColor, paperKey, paperLabel, paperShort, totals } from './model';
 import { TakenMock, formatDate, slope } from './insights';
 import { ExamBadge, ScopeBadge, ScopeGlyph, deltaTone, pct, signedPct, subjectDot, tokens } from './ui';
 
@@ -107,12 +107,18 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
   const stepTick = hi - lo > 60 ? 20 : 10;
   for (let v = lo; v <= hi + 0.001; v += stepTick) ticks.push(v);
 
-  const exams = Array.from(new Set(defined.map(p => p.s.test.exam))) as MockExam[];
+  /* Lines are per paper: a fixed exam, or a paper the student named. Colour
+     follows the exam, so two named papers share a hue — the legend and the
+     end labels carry their names. */
+  const papers = Array.from(new Map<string, MockTest>(defined.map(p => [paperKey(p.s.test), p.s.test])).values())
+    .map(t => ({ key: paperKey(t), exam: t.exam as MockExam, label: paperLabel(t), short: paperShort(t) }));
+  const exams = Array.from(new Set(papers.map(p => p.exam)));
+  const sharedHue = papers.length !== exams.length;
   const scopes = Array.from(new Set(defined.map(p => p.s.test.scope)));
 
-  const lines = exams.flatMap(exam => (['full', 'part'] as const).map(scope => {
-    const pts = defined.filter(p => p.s.test.exam === exam && p.s.test.scope === scope).map(p => ({ x: x(p.i), y: y(p.v), p }));
-    return { exam, scope, pts, d: monotonePath(pts) };
+  const lines = papers.flatMap(paper => (['full', 'part'] as const).map(scope => {
+    const pts = defined.filter(p => paperKey(p.s.test) === paper.key && p.s.test.scope === scope).map(p => ({ x: x(p.i), y: y(p.v), p }));
+    return { key: paper.key, exam: paper.exam, short: paper.short, scope, pts, d: monotonePath(pts) };
   })).filter(l => l.pts.length > 0);
   const singleLine = lines.length === 1 ? lines[0] : null;
 
@@ -151,7 +157,7 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
   }
 
   const hp = hover !== null ? points[hover] : null;
-  const prevSame = hp ? [...points.slice(0, hp.i)].reverse().find(p => p.s.test.exam === hp.s.test.exam && p.v !== null) : null;
+  const prevSame = hp ? [...points.slice(0, hp.i)].reverse().find(p => paperKey(p.s.test) === paperKey(hp.s.test) && p.v !== null) : null;
   /* Beside the point, never over it: to its left on the right half of the
      chart, to its right on the left half. Phones are too narrow for that, so
      there it sits above or below the point instead. */
@@ -213,7 +219,7 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
 
           {lines.map(l => l.pts.length > 1 && (
             <path
-              key={`${l.exam}-${l.scope}-${metric}`}
+              key={`${l.key}-${l.scope}-${metric}`}
               className="mk-draw"
               pathLength={1}
               style={{ ['--mk-len' as string]: 1 } as React.CSSProperties}
@@ -252,8 +258,8 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
             const last = l.pts[l.pts.length - 1];
             if (!last) return null;
             return (
-              <text key={`${l.exam}-${l.scope}`} x={last.x + 9} y={last.y} dy="0.32em" fontSize={11} fontWeight={700} fill={dark ? '#e4e4e7' : '#27272a'} className="font-ui tabular-nums mk-fade" style={{ animationDelay: '700ms' }}>
-                {Math.round(last.p.v)}%
+              <text key={`${l.key}-${l.scope}`} x={last.x + 9} y={last.y} dy="0.32em" fontSize={11} fontWeight={700} fill={dark ? '#e4e4e7' : '#27272a'} className="font-ui tabular-nums mk-fade" style={{ animationDelay: '700ms' }}>
+                {Math.round(last.p.v)}%{sharedHue && l.exam === 'other' ? ` ${l.short}` : ''}
               </text>
             );
           })}
@@ -266,14 +272,14 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
           >
             <p className={`text-[12px] font-ui font-bold truncate ${t.heading}`}>{hp.s.test.name}</p>
             <div className="flex items-center gap-1.5 mt-1.5">
-              <ExamBadge exam={hp.s.test.exam} dark={dark} />
+              <ExamBadge exam={hp.s.test.exam} paperName={hp.s.test.paperName} dark={dark} />
               <ScopeBadge scope={hp.s.test.scope} dark={dark} />
               <span className={`text-[10px] font-ui ${t.muted}`}>{formatDate(hp.s.test.date, today)}</span>
             </div>
             <div className="flex items-baseline gap-2 mt-2.5">
               <span className={`num-hero text-[28px] ${t.heading}`}>{pct(hp.v, metric === 'percentile' ? 1 : 0)}</span>
               {prevSame && prevSame.v !== null && (
-                <span className={`text-[11px] font-ui font-bold ${deltaTone(hp.v - prevSame.v, dark)}`}>{signedPct(hp.v - prevSame.v)} vs last {EXAMS[hp.s.test.exam].short}</span>
+                <span className={`text-[11px] font-ui font-bold ${deltaTone(hp.v - prevSame.v, dark)}`}>{signedPct(hp.v - prevSame.v)} vs last {paperShort(hp.s.test)}</span>
               )}
             </div>
             {metric === 'score' && (
@@ -300,10 +306,10 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
 
       {/* Legend: always for two or more lines; the scope shapes whenever more than one scope is in view. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
-        {exams.length > 1 && exams.map(e => (
-          <span key={e} className={`inline-flex items-center gap-1.5 text-[11px] font-ui font-semibold ${t.body}`}>
-            <span className="w-4 h-[3px] rounded-full" style={{ background: examColor(e, dark) }} />
-            {EXAMS[e].label}
+        {papers.length > 1 && papers.map(p => (
+          <span key={p.key} className={`inline-flex items-center gap-1.5 text-[11px] font-ui font-semibold ${t.body}`}>
+            <span className="w-4 h-[3px] rounded-full" style={{ background: examColor(p.exam, dark) }} />
+            {p.label}
           </span>
         ))}
         {scopes.length > 1 && scopes.map(s => (
@@ -327,7 +333,7 @@ const TrendChart: React.FC<Props> = ({ series, metric, dark, today, onOpen }) =>
         <tbody>
           {points.map(p => (
             <tr key={p.s.test.id}>
-              <td>{p.s.test.name}</td><td>{p.s.test.date}</td><td>{EXAMS[p.s.test.exam].label}</td><td>{SCOPES[p.s.test.scope].label}</td><td>{p.v === null ? '—' : `${Math.round(p.v)}%`}</td>
+              <td>{p.s.test.name}</td><td>{p.s.test.date}</td><td>{paperLabel(p.s.test)}</td><td>{SCOPES[p.s.test.scope].label}</td><td>{p.v === null ? '—' : `${Math.round(p.v)}%`}</td>
             </tr>
           ))}
         </tbody>

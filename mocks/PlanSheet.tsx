@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { ChapterProgress, ExamPreference, MockChapter, MockExam, MockScope, MockTest, Subject } from '../types';
 import { addDays } from '../utils';
 import { MultiChapterPicker } from './ChapterPicker';
-import { EXAMS, SCOPES, SCOPE_ORDER, examColor, examsFor, suggestName } from './model';
+import { DEFAULT_OTHER_MAX, EXAMS, SCOPES, SCOPE_ORDER, examColor, examsFor, paperTotal, suggestName } from './model';
 import { formatDate, nextSunday, relativeDay } from './insights';
 import { ExamBadge, Field, ScopeBadge, ScopeGlyph, Segmented, Sheet, btn, subjectDot, tokens } from './ui';
 
@@ -19,6 +19,9 @@ export interface PlanDraft {
   scope: MockScope;
   series: string;
   chapters: MockChapter[];
+  /* "Other" only. Strings, because they are input values; MocksTab parses them. */
+  paperName: string;
+  maxMarks: string;
 }
 
 interface Props {
@@ -35,48 +38,79 @@ interface Props {
   onClose: () => void;
   onAddTopic: (key: string, name: string) => void;
   onForgetTopic: (key: string, name: string) => void;
+  /** Logging a mock already taken: dates look backwards, and saving goes on to the scores. */
+  past?: boolean;
 }
 
-const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, library, today, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic }) => {
+const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, library, today, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic, past }) => {
   const t = tokens(dark);
   const exams = examsFor(pref);
   // The student's habit is the best default: the exam and scope of their last mock.
   const last = tests[tests.length - 1];
+  const lastOther = [...tests].reverse().find(x => x.exam === 'other');
   const [d, setD] = useState<PlanDraft>(() => initial
-    ? { id: initial.id, name: initial.name, date: initial.date, exam: initial.exam, scope: initial.scope, series: initial.series ?? '', chapters: initial.chapters }
+    ? {
+        id: initial.id, name: initial.name, date: initial.date, exam: initial.exam, scope: initial.scope,
+        series: initial.series ?? '', chapters: initial.chapters,
+        paperName: initial.paperName ?? '', maxMarks: initial.maxMarks ? String(initial.maxMarks) : '',
+      }
     : {
         name: '',
-        date: nextSunday(today),
+        date: past ? today : nextSunday(today),
         exam: last && exams.includes(last.exam) ? last.exam : exams[0],
         scope: last?.scope ?? 'full',
         series: last?.series ?? '',
         chapters: [],
+        paperName: lastOther?.paperName ?? '',
+        maxMarks: lastOther?.maxMarks ? String(lastOther.maxMarks) : '',
       });
+  // Typing marks by hand stops a paper name from overwriting them.
+  const [marksTouched, setMarksTouched] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (patch: Partial<PlanDraft>) => setD(prev => ({ ...prev, ...patch }));
 
-  const autoName = suggestName(tests, d.exam, d.scope, d.id);
+  const paper = { exam: d.exam, paperName: d.exam === 'other' ? d.paperName.trim() || undefined : undefined };
+  const autoName = suggestName(tests, paper, d.scope, d.id);
+  // The student's own papers, newest first, each with the marks it was last out of.
+  const ownPapers = Array.from(new Map(
+    [...tests].reverse().filter(x => x.exam === 'other' && x.paperName).map(x => [x.paperName!.toLowerCase(), x] as [string, MockTest]),
+  ).values()).slice(0, 8);
+  const pickPaperName = (paperName: string) => {
+    const known = ownPapers.find(x => x.paperName!.toLowerCase() === paperName.trim().toLowerCase());
+    set(known?.maxMarks && !marksTouched ? { paperName, maxMarks: String(known.maxMarks) } : { paperName });
+  };
+  const marksValue = Number(d.maxMarks);
+  const badMarks = d.exam === 'other' && d.maxMarks.trim() !== '' && !(Number.isFinite(marksValue) && marksValue >= 1 && marksValue <= 5000);
   const name = d.name.trim() || autoName;
   const seriesList = Array.from(new Set(tests.map(x => x.series).filter((x): x is string => !!x))).slice(-8);
   const needsChapters = d.scope !== 'full' && d.chapters.length === 0;
   const topicCount = d.chapters.reduce((a, c) => a + (c.topics?.length ?? 0), 0);
 
-  const dateChips = [
-    { label: 'Today', date: today },
-    { label: 'Tomorrow', date: addDays(today, 1) },
-    { label: 'This Sunday', date: nextSunday(today) },
-    { label: 'Next Sunday', date: addDays(nextSunday(today), 7) },
-  ].filter((c, i, all) => all.findIndex(o => o.date === c.date) === i);
+  // The most recent Sunday before today.
+  const lastSunday = addDays(nextSunday(today), -7);
+  const dateChips = (past
+    ? [
+        { label: 'Today', date: today },
+        { label: 'Yesterday', date: addDays(today, -1) },
+        { label: 'Last Sunday', date: lastSunday },
+      ]
+    : [
+        { label: 'Today', date: today },
+        { label: 'Tomorrow', date: addDays(today, 1) },
+        { label: 'This Sunday', date: nextSunday(today) },
+        { label: 'Next Sunday', date: addDays(nextSunday(today), 7) },
+      ]
+  ).filter((c, i, all) => all.findIndex(o => o.date === c.date) === i);
 
   const header = (
     <div className="px-5 md:px-7 pt-6 pb-5 relative overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-1" style={{ background: examColor(d.exam, dark) }} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>{initial ? 'Edit mock' : 'Plan a mock'}</p>
+          <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>{initial ? 'Edit mock' : past ? 'Log a mock you took' : 'Plan a mock'}</p>
           <p className={`font-display text-[22px] md:text-[26px] leading-tight mt-1.5 truncate ${t.heading}`}>{name}</p>
           <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-            <ExamBadge exam={d.exam} dark={dark} size="md" />
+            <ExamBadge exam={d.exam} paperName={paper.paperName} dark={dark} size="md" />
             <ScopeBadge scope={d.scope} dark={dark} size="md" />
             <span className={`text-[12px] font-ui font-semibold ${t.body}`}>{relativeDay(d.date, today)}{relativeDay(d.date, today) !== formatDate(d.date, today) ? ` · ${formatDate(d.date, today)}` : ''}</span>
             {d.scope !== 'full' && d.chapters.length > 0 && (
@@ -99,14 +133,14 @@ const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, 
         )
       )}
       <span className={`flex-1 text-[11px] font-ui ${t.muted} hidden sm:block`}>
-        {needsChapters ? 'Pick at least one chapter.' : d.scope === 'full' ? SCOPES.full.hint : ''}
+        {badMarks ? 'Total marks should be between 1 and 5000.' : needsChapters ? 'Pick at least one chapter.' : d.scope === 'full' ? SCOPES.full.hint : ''}
       </span>
       <button
         onClick={() => onSave({ ...d, name })}
-        disabled={needsChapters || !d.date}
+        disabled={needsChapters || !d.date || badMarks}
         className={`${btn} px-6 py-3.5 ml-auto ${t.primary}`}
       >
-        {initial ? 'Save' : 'Plan it'}
+        {initial ? 'Save' : past ? 'Next: scores' : 'Plan it'}
       </button>
     </div>
   );
@@ -129,12 +163,69 @@ const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, 
                   style={on ? { borderColor: c, background: `${c}14`, boxShadow: `0 0 0 1px ${c}` } : undefined}
                 >
                   <span className="block w-2 h-2 rounded-full mb-2" style={{ background: c }} />
-                  <span className={`block text-[13px] font-ui font-bold ${t.heading}`}>{EXAMS[e].label}</span>
-                  <span className={`block text-[10px] font-ui mt-0.5 ${t.muted}`}>{subjects.reduce((a, s) => a + EXAMS[e].max(s), 0)} marks</span>
+                  <span className={`block text-[13px] font-ui font-bold truncate ${t.heading}`}>
+                    {e === 'other' && d.exam === 'other' && d.paperName.trim() ? d.paperName.trim() : EXAMS[e].label}
+                  </span>
+                  <span className={`block text-[10px] font-ui mt-0.5 ${t.muted}`}>
+                    {e === 'other'
+                      ? d.exam === 'other' ? `${Number(d.maxMarks) || DEFAULT_OTHER_MAX} marks` : 'Name it, set marks'
+                      : `${paperTotal({ exam: e }, subjects)} marks`}
+                  </span>
                 </button>
               );
             })}
           </div>
+
+          {d.exam === 'other' && (
+            <div className={`mt-3 rounded-xl border p-4 grid sm:grid-cols-[1fr_150px] gap-4 mk-fade ${t.inset}`}>
+              <div>
+                <label htmlFor="mk-paper-name" className={`block text-[10px] font-ui font-bold uppercase tracking-[0.06em] mb-2 ${t.muted}`}>Paper name</label>
+                <input
+                  id="mk-paper-name"
+                  value={d.paperName}
+                  onChange={e => pickPaperName(e.target.value)}
+                  maxLength={30}
+                  list="mk-own-papers"
+                  placeholder="e.g. BITSAT, School pre-board"
+                  className={t.input}
+                />
+                <datalist id="mk-own-papers">{ownPapers.map(x => <option key={x.id} value={x.paperName} />)}</datalist>
+                {ownPapers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {ownPapers.map(x => (
+                      <button
+                        key={x.id}
+                        type="button"
+                        onClick={() => { setMarksTouched(false); set({ paperName: x.paperName!, maxMarks: x.maxMarks ? String(x.maxMarks) : d.maxMarks }); }}
+                        className={`px-2.5 py-1 rounded-full border text-[11px] font-ui font-semibold transition-colors ${
+                          d.paperName.trim().toLowerCase() === x.paperName!.toLowerCase()
+                            ? dark ? 'bg-white text-black border-white' : 'bg-zinc-900 text-white border-zinc-900'
+                            : dark ? 'border-white/[0.08] text-zinc-400 hover:text-zinc-200' : 'border-zinc-200 text-zinc-600 hover:text-zinc-900'
+                        }`}
+                      >
+                        {x.paperName}{x.maxMarks ? ` · ${x.maxMarks}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label htmlFor="mk-paper-marks" className={`block text-[10px] font-ui font-bold uppercase tracking-[0.06em] mb-2 ${t.muted}`}>Total marks</label>
+                <input
+                  id="mk-paper-marks"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={5000}
+                  value={d.maxMarks}
+                  onChange={e => { setMarksTouched(true); set({ maxMarks: e.target.value }); }}
+                  placeholder={String(DEFAULT_OTHER_MAX)}
+                  className={`mk-num ${t.input} tabular-nums ${badMarks ? '!border-[#E10600]' : ''}`}
+                />
+                <p className={`text-[11px] font-ui mt-2 ${t.faint}`}>Split across {subjects.length} subjects. Fix any one when you log the score.</p>
+              </div>
+            </div>
+          )}
         </Field>
 
         <Field label="Syllabus" dark={dark} hint={SCOPES[d.scope].hint}>
@@ -163,7 +254,7 @@ const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, 
                 {c.label}
               </button>
             ))}
-            <input type="date" value={d.date} onChange={e => e.target.value && set({ date: e.target.value })} className={`${t.input} !w-auto !py-1.5 text-[12px]`} aria-label="Date" />
+            <input type="date" value={d.date} max={past ? today : undefined} onChange={e => e.target.value && set({ date: e.target.value })} className={`${t.input} !w-auto !py-1.5 text-[12px]`} aria-label="Date" />
           </div>
         </Field>
 

@@ -655,6 +655,11 @@ export interface MockTest {
   scope: MockScope;
   /** Coaching / test series, free text, e.g. "Allen AITS". */
   series?: string;
+  /* `exam: 'other'` only — the student's own name for the paper ("BITSAT",
+     "School pre-board") and what it is out of. A named paper is its own
+     classification: its own filter chip, its own trend line. */
+  paperName?: string;
+  maxMarks?: number;
   /* Empty for a full-syllabus mock: "everything" is not a list. */
   chapters: MockChapter[];
   result?: MockResult;

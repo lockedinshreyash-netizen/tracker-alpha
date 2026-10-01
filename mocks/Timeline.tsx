@@ -6,7 +6,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { MockTest, MockVerdict, Subject } from '../types';
-import { MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, examColor, parseKey, scorePct, subjectPct, totals } from './model';
+import { MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, examColor, paperKey, parseKey, scorePct, subjectPct, totals } from './model';
 import { Readiness, daysBetween, formatDate, leakName, relativeDay } from './insights';
 import { Card, ExamBadge, Eyebrow, ScopeBadge, btn, deltaTone, pct, signedPct, subjectDot, tokens } from './ui';
 
@@ -71,7 +71,7 @@ export const NextUp: React.FC<{
             </div>
             <p className={`font-display text-[20px] md:text-[24px] leading-tight mt-2 ${t.heading}`}>{test.name}</p>
             <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-              <ExamBadge exam={test.exam} dark={dark} size="md" />
+              <ExamBadge exam={test.exam} paperName={test.paperName} dark={dark} size="md" />
               <ScopeBadge scope={test.scope} dark={dark} size="md" />
               <span className={`text-[12px] font-ui ${t.muted}`}>{formatDate(test.date, today)}{test.series ? ` · ${test.series}` : ''}</span>
             </div>
@@ -177,7 +177,7 @@ const HistoryRow: React.FC<RowProps> = ({ test, prevPct, open, today, dark, erro
         <div className="min-w-0 flex-1">
           <p className={`text-[14px] font-ui font-bold truncate ${t.heading}`}>{test.name}</p>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <ExamBadge exam={test.exam} dark={dark} />
+            <ExamBadge exam={test.exam} paperName={test.paperName} dark={dark} />
             <ScopeBadge scope={test.scope} dark={dark} />
             {test.series && <span className={`text-[11px] font-ui truncate ${t.muted}`}>{test.series}</span>}
             {planned && (
@@ -293,7 +293,7 @@ export const History: React.FC<{
   tests.forEach(x => {
     const p = scorePct(x.result);
     if (p === null) return;
-    const k = `${x.exam}|${x.scope}`;
+    const k = `${paperKey(x)}|${x.scope}`;
     prev.set(x.id, lastBy.has(k) ? (lastBy.get(k) as number) : null);
     lastBy.set(k, p);
   });
