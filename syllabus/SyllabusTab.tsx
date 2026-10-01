@@ -4,6 +4,8 @@ import { STATUS_COLORS, STATUS_LABELS, getChaptersFor } from '../constants';
 import { getWeight, TIER_LABELS, TIER_STYLES, TIER_ORDER, canShowPercent } from '../content';
 import ChapterTest from './ChapterTest';
 import { hasCompleteTest } from '../content/questions';
+import { SUBJECT_COLORS } from '../schedule/colors';
+import { Card, Chip, Eyebrow, Overlay, PageHeader, Segmented, btn, tokens } from '../ui/kit';
 
 interface Props {
   currentClass: 11 | 12;
@@ -89,134 +91,147 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
     return open[0];
   }, [chapters, examPreference, currentClass, activeSubject, progress]);
 
+  const t = tokens(dark);
+  /* STATUS_COLORS was tuned for the dark grid; on white its yellow and orange
+     text drop below legible contrast, so light mode gets its own ink. */
+  const LIGHT_STATUS_TEXT: Record<SyllabusStatus, string> = {
+    not_started: 'text-zinc-500', in_progress: 'text-amber-700', practice_pending: 'text-orange-700',
+    completed: 'text-emerald-700', revision_pending: 'text-blue-700',
+  };
+  const statusDot = (st: SyllabusStatus) => (st === 'not_started' ? (dark ? 'bg-zinc-700' : 'bg-zinc-200') : STATUS_COLORS[st].dot);
+  const dot = (sub: Subject) => (SUBJECT_COLORS[sub] ?? SUBJECT_COLORS.General).dot;
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-      <div className="flex justify-center gap-2 mb-6">
-        {activeSubjects.filter((s: Subject) => s !== 'General').map((s: Subject) => (
-          <button
-            key={s}
-            onClick={() => setActiveSubject(s)}
-            className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border transition-all rounded-md active:scale-97 ${activeSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300')}`}
-          >
-            {s}
-          </button>
-        ))}
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        dark={dark}
+        title="Syllabus"
+        subtitle={`Class ${currentClass} ${activeSubject} · ${stats.completed} of ${stats.total} chapters done`}
+        right={
+          <div className="flex flex-wrap gap-1.5">
+            {activeSubjects.filter((sub: Subject) => sub !== 'General').map((sub: Subject) => (
+              <Chip key={sub} on={activeSubject === sub} onClick={() => setActiveSubject(sub)} dark={dark} color={dot(sub)}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot(sub) }} />
+                {sub}
+              </Chip>
+            ))}
+          </div>
+        }
+      />
+
+      <div className={`grid gap-3 ${nextUp ? 'md:grid-cols-[1.2fr_1fr]' : ''}`}>
+        <Card dark={dark} delay={60} className="p-6 md:p-8">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <Eyebrow dark={dark}>Marks locked down</Eyebrow>
+              <p className={`num-hero text-[48px] md:text-[56px] mt-3 ${t.heading}`}>
+                {stats.securedPct}<span className={`font-ui font-bold text-[22px] ${t.muted}`}>%</span>
+              </p>
+            </div>
+            <div className="text-right shrink-0 pb-1">
+              <p className={`num-stat text-[22px] ${t.heading}`}>{stats.completed}<span className={`font-ui text-[13px] ${t.muted}`}> / {stats.total}</span></p>
+              <p className={`text-[11px] font-ui ${t.muted}`}>chapters done</p>
+            </div>
+          </div>
+          <div className={`w-full h-1.5 rounded-full overflow-hidden mt-5 ${dark ? 'bg-white/[0.06]' : 'bg-zinc-100'}`}>
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${stats.securedPct}%`, background: dot(activeSubject) }} />
+          </div>
+          <p className={`text-[12px] font-ui mt-3 leading-relaxed ${t.muted}`}>
+            Share of Class {currentClass} {activeSubject} weightage you’ve finished, not the chapter count. Heavy chapters move it faster.
+          </p>
+        </Card>
+
+        {nextUp && (
+          <Card dark={dark} delay={100} className="p-6 md:p-8 relative overflow-hidden flex flex-col">
+            <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(120% 90% at 100% 0%, rgba(225,6,0,${dark ? '0.14' : '0.07'}), transparent 60%)` }} />
+            <div className="relative flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui text-[#E10600]">Open this next</p>
+              <p className={`font-display text-[22px] md:text-[24px] leading-tight mt-3 ${t.heading}`}>{nextUp.chapter}</p>
+              <p className={`text-[12px] font-ui mt-2 ${t.muted}`}>
+                {nextUp.weight?.foundational
+                  ? 'Everything else in this subject leans on it.'
+                  : `The heaviest chapter you haven’t finished${nextUp.weight && canShowPercent(nextUp.weight) ? `, ${nextUp.weight.percent}% of ${activeSubject}` : ''}.`}
+              </p>
+            </div>
+            <button
+              onClick={() => onToggle(currentClass, activeSubject, nextUp.chapter)}
+              className={`${btn} relative self-start mt-5 px-5 py-3 ${t.primary}`}
+            >
+              Start it
+            </button>
+          </Card>
+        )}
       </div>
 
-      <div className={`mb-6 p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
-        <div className="flex justify-between items-end mb-4 gap-4">
-          <div className="min-w-0">
-            <h3 className="text-[10px] font-semibold uppercase text-zinc-500 tracking-[0.06em] mb-1 font-ui">Marks Locked Down</h3>
-            <p className="text-2xl font-black italic font-ui truncate">{activeSubject.toUpperCase()}</p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-3xl num-stat">{stats.securedPct}<span className="text-zinc-500 text-lg not-italic font-ui">%</span></p>
-            <p className="text-[9px] font-bold uppercase text-zinc-600 font-ui">{stats.completed} / {stats.total} chapters</p>
-          </div>
-        </div>
-        <div className={`w-full h-1.5 rounded-full overflow-hidden ${dark ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
-          <div className="h-full bg-[#E10600] transition-all duration-700" style={{ width: `${stats.securedPct}%` }} />
-        </div>
-        <p className="text-[9px] text-zinc-600 mt-3 font-ui leading-relaxed">
-          Share of Class {currentClass} {activeSubject} weightage you have finished — not the chapter count.
-          Finishing the heavy chapters moves this bar faster.
-        </p>
-      </div>
-
-      {nextUp && (
-        <div className={`mb-6 p-5 rounded-xl border flex items-center justify-between gap-4 ${dark ? 'bg-[#E10600]/[0.06] border-[#E10600]/25' : 'bg-red-50 border-red-200'}`}>
-          <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#E10600] mb-1.5 font-ui">Open this next</p>
-            <p className={`text-sm font-black uppercase leading-tight tracking-tight truncate ${dark ? 'text-white' : 'text-black'}`}>
-              {nextUp.chapter}
-            </p>
-            <p className="text-[10px] text-zinc-500 mt-1 font-ui">
-              {nextUp.weight?.foundational
-                ? 'Everything else in this subject leans on it.'
-                : `Heaviest chapter you have not finished${nextUp.weight && canShowPercent(nextUp.weight) ? ` — ${nextUp.weight.percent}% of ${activeSubject}` : ''}.`}
-            </p>
-          </div>
-          <button
-            onClick={() => onToggle(currentClass, activeSubject, nextUp.chapter)}
-            className="shrink-0 px-4 py-2.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97"
-          >
-            Start
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {(['damage', 'syllabus'] as SortMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => setSortMode(m)}
-            className={`px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-all active:scale-97 ${sortMode === m ? (dark ? 'border-white/25 text-white bg-white/[0.06]' : 'border-zinc-400 text-black bg-zinc-100') : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400')}`}
-          >
-            {m === 'damage' ? 'Max damage first' : 'Syllabus order'}
-          </button>
-        ))}
-        <button
-          onClick={() => setHideCompleted((v) => !v)}
-          className={`px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-all active:scale-97 ${hideCompleted ? (dark ? 'border-white/25 text-white bg-white/[0.06]' : 'border-zinc-400 text-black bg-zinc-100') : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-400')}`}
-        >
-          Hide finished
-        </button>
+      <div className="flex flex-wrap items-center gap-2 pt-2">
+        <Segmented
+          value={sortMode}
+          onChange={setSortMode}
+          dark={dark}
+          label="Order"
+          options={[{ value: 'damage', label: 'Heaviest first' }, { value: 'syllabus', label: 'Syllabus order' }]}
+        />
+        <Chip on={hideCompleted} onClick={() => setHideCompleted((v) => !v)} dark={dark}>Hide finished</Chip>
+        <span className={`ml-auto text-[11px] font-ui ${t.faint}`}>Tap a chapter to move it along</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {rows.map(({ chapter, weight, status, hasTest }) => {
+        {rows.map(({ chapter, weight, status, hasTest }, i) => {
           const colors = STATUS_COLORS[status];
           // Only genuinely low-yield chapters get de-emphasised. A foundational
           // chapter is never dimmed however light its weightage — dropping it
           // is exactly the mistake this grid must not encourage.
           const deEmphasise = weight?.tier === 'low' && !weight.foundational && status !== 'completed';
+          const done = status === 'completed';
 
           return (
             <div
               key={chapter}
+              role="button"
+              tabIndex={0}
               onClick={() => onToggle(currentClass, activeSubject, chapter)}
-              className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.98] flex flex-col justify-between min-h-[142px] card-interactive ${colors.border} ${colors.bg} ${dark ? '' : 'shadow-sm'} ${deEmphasise ? 'opacity-55 hover:opacity-100' : ''}`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(currentClass, activeSubject, chapter); } }}
+              className={`mk-rise group relative p-5 rounded-xl border cursor-pointer transition-all hover:-translate-y-0.5 active:scale-[0.99] flex flex-col justify-between min-h-[150px] overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]/40 ${t.card} ${deEmphasise ? 'opacity-55 hover:opacity-100' : ''}`}
+              style={{ animationDelay: `${Math.min(i, 14) * 25 + 120}ms` }}
             >
+              <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${statusDot(status)}`} aria-hidden="true" />
               <div>
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  <span className={`text-[8px] font-medium uppercase tracking-[0.06em] px-2 py-0.5 rounded border ${colors.label}`}>
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-ui font-bold px-2 py-0.5 rounded-full ${dark ? `bg-white/[0.05] ${colors.text}` : `bg-zinc-100 ${LIGHT_STATUS_TEXT[status]}`}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${status === 'not_started' ? (dark ? 'bg-zinc-600' : 'bg-zinc-400') : colors.dot}`} />
                     {STATUS_LABELS[status]}
                   </span>
-                  {weight && (
-                    <span className={`text-[8px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded border ${TIER_STYLES[weight.tier].chip}`}>
+                  {weight && (weight.tier === 'critical' || weight.tier === 'high') && (
+                    <span className={`text-[9px] font-ui font-black uppercase tracking-[0.06em] px-1.5 py-0.5 rounded border ${TIER_STYLES[weight.tier].chip}`}>
                       {TIER_LABELS[weight.tier]}
                     </span>
                   )}
                   {weight?.foundational && (
-                    <span className="text-[8px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded border border-blue-500/40 text-blue-400">
+                    <span className={`text-[9px] font-ui font-black uppercase tracking-[0.06em] px-1.5 py-0.5 rounded border ${dark ? 'border-sky-400/40 text-sky-300' : 'border-sky-300 text-sky-700'}`}>
                       Core
                     </span>
                   )}
                 </div>
-                <h4 className={`text-[11px] md:text-xs font-black uppercase leading-tight tracking-tight ${dark ? 'text-zinc-100' : 'text-black'}`}>
+                <h4 className={`text-[14px] font-ui font-bold leading-snug ${done ? t.muted : t.heading} ${done ? 'line-through decoration-1' : ''}`}>
                   {chapter}
                 </h4>
                 {weight && canShowPercent(weight) && (
-                  <p className="text-[9px] text-zinc-500 mt-1.5 font-ui tabular-nums">
-                    {weight.percent}% of {activeSubject}
-                  </p>
+                  <p className={`text-[11px] font-ui mt-1 tabular-nums ${t.muted}`}>{weight.percent}% of {activeSubject}</p>
                 )}
               </div>
 
-              <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 gap-2">
+              <div className={`flex justify-between items-center mt-4 pt-3 border-t gap-2 ${t.rule}`}>
                 {hasTest ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); setTestFor(chapter); }}
-                    className="text-[8px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border border-[#E10600]/50 text-[#E10600] hover:bg-[#E10600]/10 transition-colors"
+                    className="text-[11px] font-ui font-bold text-[#E10600] hover:underline"
                   >
-                    Test me
+                    Test me →
                   </button>
                 ) : (
-                  <span className="text-[8px] font-bold uppercase tracking-[0.06em] text-zinc-600">
-                    Test pending
-                  </span>
+                  <span className={`text-[11px] font-ui ${t.faint}`}>Test coming soon</span>
                 )}
-                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
+                <span className={`text-[10px] font-ui ${t.faint} opacity-0 group-hover:opacity-100 transition-opacity`}>Tap to update</span>
               </div>
             </div>
           );
@@ -224,20 +239,23 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
       </div>
 
       {rows.length === 0 && (
-        <p className="text-center text-[11px] text-zinc-500 font-ui py-12 uppercase tracking-[0.08em]">
-          Every chapter here is done. Switch subjects.
-        </p>
+        <Card dark={dark} className="py-14 text-center">
+          <p className={`text-[15px] font-ui font-bold ${t.heading}`}>Every chapter here is done.</p>
+          <p className={`text-[12px] font-ui mt-1 ${t.muted}`}>Switch subjects, or turn off “Hide finished”.</p>
+        </Card>
       )}
 
       {testFor && (
-        <ChapterTest
-          chapter={testFor}
-          classId={currentClass}
-          subject={activeSubject}
-          theme={theme}
-          onClose={() => setTestFor(null)}
-          onFinish={(results, allSolid) => onTestFinished(currentClass, activeSubject, testFor, results, allSolid)}
-        />
+        <Overlay>
+          <ChapterTest
+            chapter={testFor}
+            classId={currentClass}
+            subject={activeSubject}
+            theme={theme}
+            onClose={() => setTestFor(null)}
+            onFinish={(results, allSolid) => onTestFinished(currentClass, activeSubject, testFor, results, allSolid)}
+          />
+        </Overlay>
       )}
     </div>
   );

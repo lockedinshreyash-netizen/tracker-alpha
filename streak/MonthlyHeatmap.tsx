@@ -43,14 +43,14 @@ const MonthlyHeatmap: React.FC<Props> = ({ logs, dailyGoalHours, theme }) => {
   };
 
   return (
-    <div className={`p-8 md:p-10 rounded-xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    <div className={`mk-rise p-6 md:p-8 rounded-xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`} style={{ animationDelay: '160ms' }}>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-[10px] md:text-xs font-black uppercase tracking-[0.06em] text-zinc-500">
+        <h3 className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
           Monthly Heatmap
         </h3>
         <div className="flex items-center gap-4">
           <button onClick={prevMonth} className="text-zinc-500 hover:text-[#E10600] transition-colors p-1">&lt;</button>
-          <span className="text-xs md:text-sm font-black uppercase w-32 text-center">{monthName} {year}</span>
+          <span className={`text-[13px] font-ui font-bold w-32 text-center ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{monthName} {year}</span>
           <button onClick={nextMonth} className="text-zinc-500 hover:text-[#E10600] transition-colors p-1">&gt;</button>
         </div>
       </div>

@@ -15,6 +15,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChapterProgress, ErrorEntry, ExamPreference, MockChapter, MockResult, MockTest, MocksState, Subject } from '../types';
 import { generateId } from '../utils';
+import { pushToast } from '../notify/toastBus';
 import ErrorForm, { ErrorDraft, draftFrom, emptyDraft } from './ErrorForm';
 import ErrorNotebook from './ErrorNotebook';
 import ErrorQuiz from './ErrorQuiz';
@@ -40,7 +41,9 @@ interface Props {
   onUpsertMock: (test: MockTest) => void;
   onDeleteMock: (id: string) => void;
   onUpsertError: (e: ErrorEntry) => void;
-  onDeleteError: (id: string) => void;
+  onDeleteErrors: (ids: string[]) => void;
+  /** Undo: put deleted errors back as they were. */
+  onRestoreErrors: (entries: ErrorEntry[]) => void;
   onRecordAttempts: (answers: Record<string, boolean>) => void;
   onAddTopic: (key: string, name: string) => void;
   onForgetTopic: (key: string, name: string) => void;
@@ -64,7 +67,7 @@ type ErrorCtx = { draft: ErrorDraft; mock?: MockTest };
 
 const MocksTab: React.FC<Props> = ({
   mocks, progress, examPreference: pref, subjects, today, theme,
-  onUpsertMock, onDeleteMock, onUpsertError, onDeleteError, onRecordAttempts, onAddTopic, onForgetTopic,
+  onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -208,6 +211,24 @@ const MocksTab: React.FC<Props> = ({
     }).slice(0, 6);
   }, [errorCtx, errors]);
 
+  /* Deleting is instant and undoable rather than confirmed: a toast with Undo
+     costs one tap when it was meant and saves the question when it wasn't,
+     where a confirm dialog costs a tap every time. Undo restores the rows as
+     they were — attempts and streak included. */
+  const removeErrors = (ids: string[]) => {
+    const gone = errors.filter(e => ids.includes(e.id));
+    if (!gone.length) return;
+    onDeleteErrors(gone.map(e => e.id));
+    const excerpt = gone[0].question.replace(/\s+/g, ' ');
+    pushToast({
+      id: 'mk-errors-deleted',
+      title: gone.length === 1 ? 'Error deleted.' : `${gone.length} errors deleted.`,
+      body: gone.length === 1 ? (excerpt.length > 70 ? `${excerpt.slice(0, 70)}…` : excerpt) : undefined,
+      tone: 'neutral',
+      action: { label: 'Undo', run: () => onRestoreErrors(gone) },
+    });
+  };
+
   const quizErrors = useMemo(() => (quiz ? errors.filter(e => quiz.ids.includes(e.id)) : []), [quiz, errors]);
 
   // Opening a mock from the chart switches to its row.
@@ -269,6 +290,7 @@ const MocksTab: React.FC<Props> = ({
           dark={dark}
           onAdd={() => openErrorForm()}
           onEdit={e => openErrorForm(tests.find(x => x.id === e.mockId), e)}
+          onDelete={removeErrors}
           onTest={(title, ids) => setQuiz({ title, ids })}
         />
       ) : !tests.length ? (
@@ -412,7 +434,7 @@ const MocksTab: React.FC<Props> = ({
           mockName={errorCtx.mock?.name}
           dark={dark}
           onSave={saveError}
-          onDelete={id => { onDeleteError(id); setErrorCtx(null); }}
+          onDelete={id => { removeErrors([id]); setErrorCtx(null); }}
           onClose={() => setErrorCtx(null)}
           onAddTopic={onAddTopic}
           onForgetTopic={onForgetTopic}

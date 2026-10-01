@@ -89,9 +89,9 @@ const HideForm: React.FC<Props> = ({ name, onConfirm, onCancel, dark }) => {
   };
 
   const chip = (on: boolean) =>
-    `px-3 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-all font-ui ${on
+    `px-3 py-2 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-all font-ui ${on
       ? 'bg-[#E10600] border-[#E10600] text-white'
-      : dark ? 'border-white/[0.08] text-zinc-400 hover:border-white/[0.16]' : 'border-[#E3E0D9] text-[#6B675C] hover:border-[#D6D1C5]'}`;
+      : dark ? 'border-white/[0.08] text-zinc-400 hover:border-white/[0.16]' : 'border-zinc-200 text-zinc-600 hover:border-zinc-300'}`;
 
   return (
     <div className={`mt-3 p-4 rounded-lg border space-y-3 ${t.inset}`}>
@@ -100,7 +100,7 @@ const HideForm: React.FC<Props> = ({ name, onConfirm, onCancel, dark }) => {
       </p>
 
       <div>
-        <span className={`block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>Hide for</span>
+        <span className={`block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>Hide for</span>
         <div className="flex flex-wrap gap-2">
           {PRESETS.map(p => (
             <button key={p.id} type="button" onClick={() => setPreset(p.id)} className={chip(preset === p.id)}>
@@ -122,7 +122,7 @@ const HideForm: React.FC<Props> = ({ name, onConfirm, onCancel, dark }) => {
       </div>
 
       <label className="block">
-        <span className={`block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>
+        <span className={`block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>
           Note <span className="normal-case tracking-normal font-medium">(optional · only staff see this)</span>
         </span>
         <input

@@ -30,7 +30,7 @@ export const InitialsAvatar: React.FC<{ name: string; size: number; className?: 
   return (
     <div
       className={`flex items-center justify-center rounded-full flex-shrink-0 ${className}`}
-      style={{ width: size, height: size, background: tone, color: '#F2F0EC' }}
+      style={{ width: size, height: size, background: tone, color: '#fafafa' }}
     >
       <span className="font-ui font-black leading-none" style={{ fontSize: size * 0.42 }}>{letter}</span>
     </div>
@@ -105,7 +105,7 @@ export const UserChip: React.FC<UserChipProps> = ({
   userId, name, profile, onOpen, size = 28, theme, nameClassName, className = '',
 }) => {
   const dark = theme === 'dark';
-  const defaultNameClass = `truncate group-hover:text-[#E10600] transition-colors ${dark ? 'text-white' : 'text-[#17150F]'}`;
+  const defaultNameClass = `truncate group-hover:text-[#E10600] transition-colors ${dark ? 'text-white' : 'text-zinc-900'}`;
   return (
     <button
       type="button"

@@ -110,11 +110,11 @@ const AdminRoster: React.FC<Props> = ({ adminId, theme }) => {
 
   const card = `p-6 md:p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
   const muted = dark ? 'text-zinc-500' : 'text-zinc-400';
   const field = `w-full rounded-lg border px-3 py-2.5 text-[13px] font-ui outline-none transition-colors ${dark
     ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-600 focus:border-white/20'
-    : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0] focus:border-[#D6D1C5]'}`;
+    : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-300'}`;
 
   return (
     <section className={card}>
@@ -149,18 +149,18 @@ const AdminRoster: React.FC<Props> = ({ adminId, theme }) => {
         {rows?.map(r => (
           <div
             key={r.user_id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-[#E3E0D9]'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-zinc-200'}`}
           >
             <span className={`flex-1 min-w-0 text-[12.5px] font-ui truncate ${ink}`}>
               {r.email ?? r.user_id}
               {r.user_id === adminId && (
-                <span className={`ml-2 text-[9px] font-bold uppercase tracking-[0.08em] ${muted}`}>you</span>
+                <span className={`ml-2 text-[10px] font-bold uppercase tracking-[0.06em] ${muted}`}>you</span>
               )}
             </span>
             <button
               onClick={() => standDown(r)}
               disabled={busy}
-              className={`shrink-0 px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-red-500' : 'border-[#E3E0D9] text-zinc-500 hover:text-red-500'}`}
+              className={`shrink-0 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-red-500' : 'border-zinc-200 text-zinc-500 hover:text-red-500'}`}
             >
               Remove
             </button>

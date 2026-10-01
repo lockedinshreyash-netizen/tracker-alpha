@@ -43,7 +43,7 @@ const UnlockModal: React.FC<Props> = ({ def, theme, onDismiss, onOpen }) => {
               : 'radial-gradient(120% 90% at 50% 0%, rgba(225,6,0,0.10) 0%, transparent 65%)',
           }}
         >
-          <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#E10600] mb-6 font-ui">
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] mb-6 font-ui">
             Day {def.day} cleared
           </p>
 

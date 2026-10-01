@@ -98,7 +98,7 @@ const InvitePanel: React.FC<Props> = ({ code, user, onJoined, onDismiss, onOpenA
     return (
       <section className={frame} aria-busy="true">
         <Eyebrow dark={dark}>Checking invite…</Eyebrow>
-        <div className={`h-14 mt-4 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-[#F2F0EC]'}`} />
+        <div className={`h-14 mt-4 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-zinc-50'}`} />
       </section>
     );
   }

@@ -59,7 +59,7 @@ const PollResults: React.FC<Props> = ({ announcementId, live, theme }) => {
   const top = rows?.length ? Math.max(...rows.map(r => r.votes)) : 0;
 
   return (
-    <div className={`mt-3 pt-3 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+    <div className={`mt-3 pt-3 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
       {error && <p className="text-[11px] font-bold font-ui text-[#E10600]">{error}</p>}
       {rows === null && !error && <p className={`text-[11px] font-ui ${muted}`}>Loading…</p>}
 
@@ -77,7 +77,7 @@ const PollResults: React.FC<Props> = ({ announcementId, live, theme }) => {
           return (
             <div
               key={r.optionId}
-              className={`relative overflow-hidden rounded-md border px-3 py-2 ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}
+              className={`relative overflow-hidden rounded-md border px-3 py-2 ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}
             >
               <div
                 className="absolute inset-y-0 left-0 transition-[width] duration-500"
@@ -88,7 +88,7 @@ const PollResults: React.FC<Props> = ({ announcementId, live, theme }) => {
                 aria-hidden="true"
               />
               <div className="relative flex items-center gap-2">
-                <span className={`flex-1 min-w-0 text-[12px] font-ui truncate ${dark ? 'text-zinc-200' : 'text-[#17150F]'}`}>
+                <span className={`flex-1 min-w-0 text-[12px] font-ui truncate ${dark ? 'text-zinc-200' : 'text-zinc-900'}`}>
                   {r.label}
                 </span>
                 <span className={`text-[11px] font-ui tabular-nums ${muted}`}>

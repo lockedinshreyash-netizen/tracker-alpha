@@ -89,9 +89,9 @@ const InstallBanner: React.FC<Props> = ({ install, theme }) => {
     });
   };
 
-  const panel = dark ? 'bg-[#111114] border-white/[0.10]' : 'bg-white border-[#E3E0D9]';
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
-  const muted = dark ? 'text-zinc-400' : 'text-[#6B675C]';
+  const panel = dark ? 'bg-[#111114] border-white/[0.10]' : 'bg-white border-zinc-200';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
+  const muted = dark ? 'text-zinc-400' : 'text-zinc-600';
 
   return (
     <>
@@ -129,7 +129,7 @@ const InstallBanner: React.FC<Props> = ({ install, theme }) => {
             <button
               onClick={install.dismissBanner}
               aria-label="Not now"
-              className={`shrink-0 -mt-1 -mr-1 w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-60 ${dark ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}
+              className={`shrink-0 -mt-1 -mr-1 w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-60 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -164,7 +164,7 @@ const InstallBanner: React.FC<Props> = ({ install, theme }) => {
             className={`w-full max-w-md rounded-t-2xl border p-7 animate-in slide-in-from-bottom-4 duration-300 ${panel}`}
             style={{ paddingBottom: 'calc(1.75rem + env(safe-area-inset-bottom))' }}
           >
-            <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#E10600] font-ui">
+            <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] font-ui">
               Two taps
             </p>
             <h2 className={`mt-4 text-xl font-black uppercase tracking-tight leading-tight ${ink}`}>
@@ -178,7 +178,7 @@ const InstallBanner: React.FC<Props> = ({ install, theme }) => {
                 { n: 2, glyph: <PlusSquareGlyph />, label: 'Add to Home Screen', tail: 'then Add' },
               ].map(step => (
                 <li key={step.n} className="flex items-center gap-3.5">
-                  <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${dark ? 'bg-white/[0.06] text-white' : 'bg-[#F2F0EC] text-[#17150F]'}`}>
+                  <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${dark ? 'bg-white/[0.06] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
                     {step.glyph}
                   </span>
                   <span className={`text-[13px] font-ui leading-snug ${muted}`}>
@@ -188,7 +188,7 @@ const InstallBanner: React.FC<Props> = ({ install, theme }) => {
               ))}
             </ol>
 
-            <p className={`mt-6 text-[11px] font-ui leading-relaxed ${dark ? 'text-zinc-600' : 'text-[#8A8577]'}`}>
+            <p className={`mt-6 text-[11px] font-ui leading-relaxed ${dark ? 'text-zinc-600' : 'text-zinc-500'}`}>
               Apple gives websites no way to do this for you — on iPhone, every app
               that offers to install itself is showing you these same two steps.
             </p>

@@ -53,12 +53,12 @@ const RaceRecap: React.FC<Props> = ({ theme }) => {
     <section className={`rounded-xl border overflow-hidden ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className={`px-6 pt-5 pb-5 ${dark ? 'bg-[#E10600]/[0.05]' : 'bg-red-50/60'}`}>
         <div className="flex items-start justify-between gap-3 mb-3">
-          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#E10600] font-ui">
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] font-ui">
             {recap.when}’s race
           </p>
           <button
             onClick={dismiss}
-            className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded border transition-colors active:scale-97 shrink-0 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-zinc-300' : 'border-zinc-300 text-zinc-500 hover:text-zinc-700'}`}
+            className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2.5 py-1 rounded border transition-colors active:scale-97 shrink-0 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-zinc-300' : 'border-zinc-300 text-zinc-500 hover:text-zinc-700'}`}
           >
             Dismiss
           </button>
@@ -82,7 +82,7 @@ const RaceRecap: React.FC<Props> = ({ theme }) => {
             key={line.label}
             className={`px-4 py-3.5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'} border-r last:border-r-0`}
           >
-            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-zinc-600 mb-1 font-ui">
+            <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-600 mb-1 font-ui">
               {line.label}
             </p>
             <p className={`text-sm font-black tabular-nums ${TONE[line.tone]}`}>{line.value}</p>
@@ -94,13 +94,13 @@ const RaceRecap: React.FC<Props> = ({ theme }) => {
       {events.length > 0 && (
         <div className={`px-6 py-5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
           <div className="flex items-baseline justify-between gap-4 mb-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 font-ui">
+            <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-600 font-ui">
               How it happened
             </p>
             {allEvents.length > COLLAPSED && (
               <button
                 onClick={() => setShowAll((v) => !v)}
-                className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-500 hover:text-[#E10600] transition-colors font-ui"
+                className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-500 hover:text-[#E10600] transition-colors font-ui"
               >
                 {showAll ? 'Show less' : `All ${allEvents.length}`}
               </button>

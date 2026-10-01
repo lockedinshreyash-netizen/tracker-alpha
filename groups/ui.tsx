@@ -8,24 +8,25 @@ import React, { useEffect } from 'react';
 import { GroupRole } from './api';
 
 export const tokens = (dark: boolean) => ({
-  card: dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]',
-  inset: dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]',
-  muted: dark ? 'text-zinc-500' : 'text-[#8A8577]',
-  faint: dark ? 'text-zinc-700' : 'text-[#B5AFA0]',
-  heading: dark ? 'text-white' : 'text-[#17150F]',
-  body: dark ? 'text-zinc-200' : 'text-[#17150F]',
-  rule: dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]',
-  hover: dark ? 'hover:bg-white/[0.03]' : 'hover:bg-[#F2F0EC]',
-  input: `w-full px-4 py-3 rounded-lg border text-sm font-ui outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`,
-  primary: 'bg-[#E10600] text-white hover:bg-red-700',
-  secondary: dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-[#F2F0EC] hover:bg-[#2B2820]',
-  ghost: dark ? 'border border-white/[0.08] text-zinc-300 hover:bg-white/[0.04]' : 'border border-[#E3E0D9] text-[#17150F] hover:bg-[#F2F0EC]',
-  disabled: dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed',
+  card: dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm',
+  inset: dark ? 'bg-white/[0.025] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100',
+  muted: dark ? 'text-zinc-500' : 'text-zinc-500',
+  faint: dark ? 'text-zinc-600' : 'text-zinc-400',
+  heading: dark ? 'text-white' : 'text-zinc-900',
+  body: dark ? 'text-zinc-300' : 'text-zinc-700',
+  rule: dark ? 'border-white/[0.06]' : 'border-zinc-100',
+  hover: dark ? 'hover:bg-white/[0.03]' : 'hover:bg-zinc-50',
+  input: `w-full px-4 py-3 rounded-lg border text-sm font-ui outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0B0B0D] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-white border-zinc-200 text-zinc-900 placeholder:text-zinc-400'}`,
+  primary: 'bg-[#E10600] text-white hover:bg-[#c90500] shadow-[0_6px_20px_-8px_rgba(225,6,0,0.6)]',
+  secondary: dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-zinc-50 hover:bg-zinc-800',
+  ghost: dark ? 'border border-white/[0.1] text-zinc-200 hover:bg-white/[0.04]' : 'border border-zinc-200 text-zinc-800 hover:bg-zinc-50',
+  disabled: dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed',
 });
 
 export type Tokens = ReturnType<typeof tokens>;
 
-export const btn = 'rounded-lg font-black uppercase tracking-[0.16em] text-[10px] font-ui transition-all active:scale-[0.98]';
+/* Same button vocabulary as ui/kit.tsx. */
+export const btn = 'rounded-lg font-bold uppercase tracking-[0.12em] text-[10px] font-ui transition-all active:scale-[0.97]';
 
 export const Eyebrow: React.FC<{ children: React.ReactNode; dark: boolean; className?: string }> = ({ children, dark, className = '' }) => (
   <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'} ${className}`}>
@@ -72,7 +73,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={`flex p-1 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}
+      className={`flex p-1 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200'}`}
     >
       {options.map(o => {
         const active = o.value === value;
@@ -86,8 +87,8 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             className={`flex-1 min-w-0 ${size === 'sm' ? 'py-1.5 text-[9px]' : 'py-2 text-[10px]'} px-2 rounded-md font-black uppercase tracking-[0.1em] font-ui transition-all whitespace-nowrap disabled:opacity-40
               ${active
-                ? (dark ? 'bg-white/[0.08] text-white' : 'bg-white text-[#17150F] shadow-sm')
-                : (dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]')}`}
+                ? (dark ? 'bg-white/[0.08] text-white' : 'bg-white text-zinc-900 shadow-sm')
+                : (dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900')}`}
           >
             {o.label}
           </button>
@@ -102,9 +103,9 @@ export const RoleBadge: React.FC<{ role: GroupRole; dark: boolean }> = ({ role, 
   if (role === 'member') return null;
   return (
     <span
-      className={`text-[8px] font-black uppercase tracking-[0.12em] font-ui px-1.5 py-0.5 rounded flex-shrink-0 ${role === 'owner'
+      className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui px-1.5 py-0.5 rounded flex-shrink-0 ${role === 'owner'
         ? 'bg-[#E10600]/10 text-[#E10600]'
-        : dark ? 'bg-white/[0.06] text-zinc-400' : 'bg-[#F2F0EC] text-[#6B675C]'}`}
+        : dark ? 'bg-white/[0.06] text-zinc-400' : 'bg-zinc-50 text-zinc-600'}`}
     >
       {role}
     </span>
@@ -114,14 +115,14 @@ export const RoleBadge: React.FC<{ role: GroupRole; dark: boolean }> = ({ role, 
 /** The group's emoji on a tile, or its initial when it has none. */
 export const GroupIcon: React.FC<{ icon: string | null; name: string; size: number; dark: boolean }> = ({ icon, name, size, dark }) => (
   <div
-    className={`flex items-center justify-center rounded-xl flex-shrink-0 border ${dark ? 'bg-[#16161a] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}
+    className={`flex items-center justify-center rounded-xl flex-shrink-0 border ${dark ? 'bg-[#16161a] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200'}`}
     style={{ width: size, height: size, fontSize: size * 0.5 }}
     aria-hidden="true"
   >
     {icon ? (
       <span className="leading-none">{icon}</span>
     ) : (
-      <span className={`font-display leading-none ${dark ? 'text-white' : 'text-[#17150F]'}`} style={{ fontSize: size * 0.44 }}>
+      <span className={`font-display leading-none ${dark ? 'text-white' : 'text-zinc-900'}`} style={{ fontSize: size * 0.44 }}>
         {(name.trim()[0] || '?').toUpperCase()}
       </span>
     )}
@@ -152,15 +153,15 @@ export const Sheet: React.FC<{
         aria-modal="true"
         aria-label={title}
         onClick={e => e.stopPropagation()}
-        className={`w-full md:max-w-md max-h-[92vh] flex flex-col rounded-t-2xl md:rounded-xl border animate-in slide-in-from-bottom-4 fade-in duration-200 ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-[#E3E0D9]'}`}
+        className={`w-full md:max-w-md max-h-[92vh] flex flex-col rounded-t-2xl md:rounded-xl border animate-in slide-in-from-bottom-4 fade-in duration-200 ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'}`}
       >
-        <div className={`flex items-center justify-between px-6 pt-5 pb-4 border-b ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
-          <h2 className={`text-sm font-bold uppercase tracking-[0.16em] font-ui ${dark ? 'text-white' : 'text-[#17150F]'}`}>{title}</h2>
+        <div className={`flex items-center justify-between px-6 pt-5 pb-4 border-b ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
+          <h2 className={`text-sm font-bold uppercase tracking-[0.16em] font-ui ${dark ? 'text-white' : 'text-zinc-900'}`}>{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={`p-1.5 -mr-1.5 rounded-md ${dark ? 'text-zinc-500 hover:text-white hover:bg-white/[0.04]' : 'text-[#8A8577] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
+            className={`p-1.5 -mr-1.5 rounded-md ${dark ? 'text-zinc-500 hover:text-white hover:bg-white/[0.04]' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -169,7 +170,7 @@ export const Sheet: React.FC<{
         </div>
         <div className="px-6 py-5 overflow-y-auto space-y-5">{children}</div>
         {footer && (
-          <div className={`sticky bottom-0 px-6 py-4 border-t ${dark ? 'border-white/[0.06] bg-[#0B0B0D]' : 'border-[#E3E0D9] bg-white'}`}>
+          <div className={`sticky bottom-0 px-6 py-4 border-t ${dark ? 'border-white/[0.06] bg-[#0B0B0D]' : 'border-zinc-200 bg-white'}`}>
             {footer}
           </div>
         )}

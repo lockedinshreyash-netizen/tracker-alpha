@@ -157,11 +157,11 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
 
   const card = `p-6 md:p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
   const muted = dark ? 'text-zinc-500' : 'text-zinc-400';
   const field = `w-full rounded-lg border px-3 py-2.5 text-[13px] font-ui outline-none transition-colors ${dark
     ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-600 focus:border-white/20'
-    : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0] focus:border-[#D6D1C5]'}`;
+    : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-300'}`;
 
   return (
     <div className="space-y-6">
@@ -179,7 +179,7 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
               onClick={() => setType(t)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-[0.06em] font-ui transition-all active:scale-97 ${type === t
                 ? 'bg-[#E10600] border-[#E10600] text-white'
-                : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-[#E3E0D9] text-zinc-500 hover:border-[#D6D1C5]'}`}
+                : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300'}`}
             >
               <span aria-hidden="true">{TYPE_FACE[t].icon}</span>
               {TYPE_FACE[t].label}
@@ -292,7 +292,7 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
                       title={blurb}
                       className={`px-3.5 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-[0.06em] font-ui transition-all active:scale-97 ${pollVisibility === id
                         ? 'bg-[#E10600] border-[#E10600] text-white'
-                        : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-[#E3E0D9] text-zinc-500 hover:border-[#D6D1C5]'}`}
+                        : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300'}`}
                     >
                       {label}
                     </button>
@@ -371,10 +371,10 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
             return (
               <div
                 key={a.id}
-                className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-[#E3E0D9]'}`}
+                className={`p-4 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-zinc-200'}`}
               >
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className={`text-[9px] font-bold uppercase tracking-[0.1em] font-ui ${stage === 'live' ? 'text-[#E10600]' : muted}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${stage === 'live' ? 'text-[#E10600]' : muted}`}>
                     {LIFECYCLE_COPY[stage]}
                   </span>
                   <span className={`text-[9px] uppercase tracking-[0.06em] font-ui ${muted}`}>
@@ -413,9 +413,9 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
                     <button
                       onClick={() => setOpenResults(openResults === a.id ? null : a.id)}
                       aria-expanded={openResults === a.id}
-                      className={`px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui ${openResults === a.id
+                      className={`px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui ${openResults === a.id
                         ? 'bg-[#E10600] border-[#E10600] text-white'
-                        : dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-[#E3E0D9] text-zinc-500 hover:text-[#17150F]'}`}
+                        : dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                     >
                       {openResults === a.id ? 'Hide results' : 'Results'}
                     </button>
@@ -423,7 +423,7 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
                   <button
                     onClick={() => act(() => setPublished(a.id, stage === 'draft'))}
                     disabled={busy}
-                    className={`px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-[#E3E0D9] text-zinc-500 hover:text-[#17150F]'}`}
+                    className={`px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                   >
                     {stage === 'draft' ? 'Publish' : 'Unpublish'}
                   </button>
@@ -437,7 +437,7 @@ const AnnouncementsAdmin: React.FC<Props> = ({ theme }) => {
                       }
                     }}
                     disabled={busy}
-                    className="px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-colors active:scale-97 font-ui disabled:opacity-50"
+                    className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border border-red-900/40 text-red-500/70 hover:bg-red-900/10 hover:text-red-500 transition-colors active:scale-97 font-ui disabled:opacity-50"
                   >
                     Delete
                   </button>

@@ -28,9 +28,9 @@ const MAX_TEXTAREA_PX = 108;
 
 const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfile, theme }) => {
   const dark = theme === 'dark';
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
-  const heading = dark ? 'text-white' : 'text-[#17150F]';
-  const card = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
+  const heading = dark ? 'text-white' : 'text-zinc-900';
+  const card = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm';
 
   const chat = useRaceChat({ userId, displayName, raceDate, enabled: true });
   const [draft, setDraft] = useState('');
@@ -149,7 +149,7 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
         aria-expanded={!collapsed}
         className="w-full flex items-center justify-between gap-4 px-5 pt-5 pb-3"
       >
-        <h3 className={`text-[9px] font-black uppercase tracking-[0.18em] font-ui ${muted}`}>
+        <h3 className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>
           Race chat
         </h3>
         <span className="flex items-center gap-2">
@@ -214,7 +214,7 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
             <p className={`text-[9px] font-ui text-center px-5 pt-2 ${muted}`}>{chat.error}</p>
           )}
 
-          <div className={`flex items-end gap-2.5 p-3.5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+          <div className={`flex items-end gap-2.5 p-3.5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
             <textarea
               ref={textareaRef}
               value={draft}
@@ -224,7 +224,7 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
               maxLength={chat.maxLength}
               rows={1}
               placeholder="Write a message…"
-              className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`}
+              className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'}`}
             />
             <button
               onClick={() => void handleSend()}
@@ -232,7 +232,7 @@ const RaceChat: React.FC<Props> = ({ userId, displayName, raceDate, onOpenProfil
               aria-label="Send message"
               className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-black transition-all active:scale-[0.96] ${canSend
                 ? 'bg-[#E10600] text-white hover:bg-red-700'
-                : dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-[#E3E0D9] text-[#B5AFA0] cursor-not-allowed'}`}
+                : dark ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}
             >
               <span aria-hidden="true">➤</span>
             </button>
@@ -256,7 +256,7 @@ const ChatBubble: React.FC<{
 }> = ({ msg, isMe, profile, onOpenProfile, dark, muted, heading, theme, onDismiss }) => {
   const bubble = isMe
     ? 'bg-[#E10600]/10 border-[#E10600]/25'
-    : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]';
+    : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200';
 
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -273,7 +273,7 @@ const ChatBubble: React.FC<{
             nameClassName={`truncate text-[10px] font-bold font-ui ${heading}`}
           />
         )}
-        <p className={`text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${dark ? 'text-zinc-200' : 'text-[#17150F]'} ${msg.pending ? 'opacity-50' : ''}`}>
+        <p className={`text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${dark ? 'text-zinc-200' : 'text-zinc-900'} ${msg.pending ? 'opacity-50' : ''}`}>
           {msg.message}
         </p>
         <p className={`text-[9px] font-ui mt-1 ${isMe ? 'text-right' : ''} ${muted}`}>

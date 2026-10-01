@@ -236,7 +236,7 @@ const GroupPeople: React.FC<Props> = ({ group, userId, tasks, groups, onInvite, 
 
         {members === null ? (
           <div className="px-5 md:px-6 pb-5 space-y-2" aria-busy="true">
-            {[0, 1, 2].map(i => <div key={i} className={`h-12 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-[#F2F0EC]'}`} />)}
+            {[0, 1, 2].map(i => <div key={i} className={`h-12 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-zinc-50'}`} />)}
           </div>
         ) : (
           <ul className="pb-2">
@@ -381,8 +381,8 @@ export const PersonRow: React.FC<{
             {role && <RoleBadge role={role} dark={dark} />}
           </div>
           {today && (
-            <div className={`mt-2 ml-9 h-1 rounded-full overflow-hidden ${dark ? 'bg-white/[0.04]' : 'bg-[#E3E0D9]'}`}>
-              <div className={`h-full rounded-full transition-all duration-700 ${dark ? 'bg-zinc-500' : 'bg-[#8A8577]'}`} style={{ width: `${pct}%` }} />
+            <div className={`mt-2 ml-9 h-1 rounded-full overflow-hidden ${dark ? 'bg-white/[0.04]' : 'bg-zinc-200'}`}>
+              <div className={`h-full rounded-full transition-all duration-700 ${dark ? 'bg-zinc-500' : 'bg-zinc-500'}`} style={{ width: `${pct}%` }} />
             </div>
           )}
         </div>
@@ -413,7 +413,7 @@ export const PersonRow: React.FC<{
           {list!.map((task, i) => (
             <li key={i} className="flex items-start gap-2">
               <span
-                className={`mt-[3px] w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center text-[8px] ${task.done ? (dark ? 'bg-zinc-600 border-zinc-600 text-white' : 'bg-[#8A8577] border-[#8A8577] text-white') : t.rule}`}
+                className={`mt-[3px] w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center text-[8px] ${task.done ? (dark ? 'bg-zinc-600 border-zinc-600 text-white' : 'bg-zinc-500 border-zinc-400 text-white') : t.rule}`}
                 aria-hidden="true"
               >
                 {task.done ? '✓' : ''}

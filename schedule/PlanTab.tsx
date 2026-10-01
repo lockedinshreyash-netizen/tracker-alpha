@@ -11,11 +11,15 @@ import DayTimeline from './DayTimeline';
 import PaletteSection from './PaletteSection';
 import ScopePrompt from './ScopePrompt';
 import TemplateSection from './TemplateSection';
-import { ACTIVITIES, blockTitle, countsAsStudy } from './colors';
+import { ACTIVITIES, activityColor, blockTitle, countsAsStudy } from './colors';
+import { PageHeader, btn, tokens } from '../ui/kit';
 import {
-  RepeatMode, daysForRepeat, firstFreeSlot, isInstanceId, isOverridden,
+  RepeatMode, daysForRepeat, firstFreeSlot, formatSpan, isInstanceId, isOverridden,
   materializeDay, nowMinute, parseInstanceId, repeatOf, repeatSummary,
 } from './schedule';
+
+const dayName = (date: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date(date + 'T12:00:00'));
+const dayDate = (date: string) => new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long' }).format(new Date(date + 'T12:00:00'));
 
 interface Props {
   schedule: ScheduleState;
@@ -257,11 +261,12 @@ const PlanTab: React.FC<Props> = ({
         <button
           key={k}
           onClick={() => openNew(k)}
-          className={`px-3.5 py-2 text-[10px] font-medium uppercase tracking-[0.06em] border rounded-md transition-all active:scale-95 font-ui ${
-            dark ? 'border-white/[0.08] text-zinc-400 hover:text-white hover:border-white/20'
-                 : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300'
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold border rounded-full transition-all active:scale-95 font-ui ${
+            dark ? 'border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/20'
+                 : 'border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300'
           }`}
         >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: countsAsStudy(k) ? (dark ? '#d4d4d8' : '#3f3f46') : activityColor(k, schedule.colors) }} />
           {ACTIVITIES[k].label}
         </button>
       ))}
@@ -320,11 +325,18 @@ const PlanTab: React.FC<Props> = ({
   );
 
   return (
-    <div className="space-y-12 md:space-y-14 pb-16">
+    <div className="space-y-6 pb-16">
+      <PageHeader
+        dark={dark}
+        title="Plan"
+        subtitle={`${date === today ? 'Today' : dayName(date)}, ${dayDate(date)} · ${studyMins > 0 ? `${formatSpan(studyMins)} of study planned` : 'No study planned yet'}`}
+        right={date !== today ? (
+          <button onClick={() => setDate(today)} className={`${btn} px-4 py-2.5 ${tokens(dark).ghost}`}>Back to today</button>
+        ) : undefined}
+      />
       <DateStrip
         date={date}
         today={today}
-        studyMins={studyMins}
         theme={theme}
         onChange={setDate}
         onStep={delta => setDate(d => addDays(d, delta))}
@@ -334,7 +346,7 @@ const PlanTab: React.FC<Props> = ({
         {quickAdd && <div className="mb-6">{quickAdd}</div>}
 
         {blocks.length === 0 && (
-          <p className={`text-[10px] font-medium uppercase tracking-[0.06em] mb-5 font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          <p className={`text-[13px] font-ui mb-5 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
             Nothing scheduled. The competition has a plan.
           </p>
         )}

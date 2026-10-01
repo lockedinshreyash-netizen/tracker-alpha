@@ -96,10 +96,10 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
 
   const card = `p-6 md:p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
   const muted = dark ? 'text-zinc-500' : 'text-zinc-400';
-  const row = `px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-[#E3E0D9]'}`;
-  const smallBtn = `shrink-0 px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-red-500' : 'border-[#E3E0D9] text-zinc-500 hover:text-red-500'}`;
+  const row = `px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-zinc-200'}`;
+  const smallBtn = `shrink-0 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-red-500' : 'border-zinc-200 text-zinc-500 hover:text-red-500'}`;
 
   return (
     <div className="space-y-6">
@@ -109,7 +109,7 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
       <section className={card}>
         <div className="flex items-baseline justify-between gap-4">
           <p className={eyebrow}>Today’s race</p>
-          <button onClick={() => void load()} className={`text-[9px] font-bold uppercase tracking-[0.08em] font-ui ${muted} hover:text-[#E10600]`}>
+          <button onClick={() => void load()} className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted} hover:text-[#E10600]`}>
             Refresh
           </button>
         </div>
@@ -126,7 +126,7 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
                 <span className={`w-5 text-right text-[11px] font-ui tabular-nums ${muted}`}>{i + 1}</span>
                 <span className={`flex-1 min-w-0 text-[12.5px] font-ui truncate ${ink}`}>
                   {r.display_name}
-                  {r.user_id === adminId && <span className={`ml-2 text-[9px] font-bold uppercase tracking-[0.08em] ${muted}`}>you</span>}
+                  {r.user_id === adminId && <span className={`ml-2 text-[10px] font-bold uppercase tracking-[0.06em] ${muted}`}>you</span>}
                 </span>
                 <span className={`text-[12px] font-ui tabular-nums ${ink}`}>{Number(r.hours).toFixed(1)}h</span>
                 {r.user_id !== adminId && acting?.userId !== r.user_id && (

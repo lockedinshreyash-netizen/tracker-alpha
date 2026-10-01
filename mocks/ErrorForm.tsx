@@ -66,12 +66,11 @@ const Step: React.FC<{ n: number; title: string; hint?: string; done: boolean; d
 const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters, library, mockName, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic }) => {
   const t = tokens(dark);
   const [d, setD] = useState<ErrorDraft>(initial);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const qRef = useRef<HTMLTextAreaElement>(null);
   const optRefs = useRef<(HTMLInputElement | null)[]>([]);
   const set = (p: Partial<ErrorDraft>) => setD(prev => ({ ...prev, ...p }));
 
-  useEffect(() => { setD(initial); setConfirmDelete(false); qRef.current?.focus(); }, [initial]);
+  useEffect(() => { setD(initial); qRef.current?.focus(); }, [initial]);
   useEffect(() => {
     const el = qRef.current;
     if (!el) return;
@@ -108,10 +107,9 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
 
   const footer = (
     <div className="flex items-center gap-2.5">
+      {/* One tap: the notebook offers Undo afterwards. */}
       {d.id && onDelete && (
-        confirmDelete
-          ? <button onClick={() => onDelete(d.id!)} className={`${btn} px-3 py-3 text-[#E10600]`}>Delete for good</button>
-          : <button onClick={() => setConfirmDelete(true)} className={`${btn} px-3 py-3 ${t.muted} hover:text-[#E10600]`}>Delete</button>
+        <button onClick={() => onDelete(d.id!)} className={`${btn} px-3 py-3 ${t.muted} hover:text-[#E10600]`}>Delete</button>
       )}
       <span className={`flex-1 text-[11px] font-ui ${t.muted} hidden sm:block truncate`}>{missing}</span>
       {!d.id && (

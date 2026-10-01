@@ -34,7 +34,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
-        <h2 className={`text-2xl font-black uppercase tracking-tight ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+        <h2 className={`text-2xl font-black uppercase tracking-tight ${dark ? 'text-white' : 'text-zinc-900'}`}>
           Console
         </h2>
         <p className={`text-[11px] font-ui mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -42,14 +42,14 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
         </p>
       </div>
 
-      <div className={`inline-flex max-w-full overflow-x-auto p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-[#E3E0D9] bg-white'}`}>
+      <div className={`inline-flex max-w-full overflow-x-auto p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-zinc-200 bg-white'}`}>
         {SECTIONS.map(s => (
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
             className={`shrink-0 px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-all font-ui ${section === s.id
               ? 'bg-[#E10600] text-white'
-              : dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+              : dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             {s.label}
           </button>

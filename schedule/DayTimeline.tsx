@@ -290,7 +290,7 @@ const DayTimeline: React.FC<Props> = ({
               key={z}
               onClick={() => setPxPerHour(z)}
               aria-label={['Whole day', 'Normal', 'Detailed'][i]}
-              className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.06em] transition-colors font-ui ${
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.06em] transition-colors font-ui ${
                 pxPerHour === z
                   ? 'bg-[#E10600] text-white'
                   : dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-900'

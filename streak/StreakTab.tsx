@@ -7,6 +7,7 @@ import MonthlyHeatmap from './MonthlyHeatmap';
 import RewardsVault from '../rewards/RewardsVault';
 import { nextReward } from '../rewards/engine';
 import ShareButton from '../share/ShareButton';
+import { Card, Eyebrow, PageHeader, tokens } from '../ui/kit';
 
 interface Props {
   streak: number;
@@ -45,44 +46,59 @@ const StreakTab: React.FC<Props> = ({
   const maxHours = Math.max(1, ...days.map(d => d.hours || 0)); // avoid divide‑by‑zero
   const next = nextReward(rewards, streak, verifiedStreak);
 
-  return (
-    <div className="space-y-14 animate-in fade-in duration-500">
-      {/* Current streak card */}
-      <div className={`text-center py-16 md:py-24 rounded-xl border ${theme === 'dark' ? 'border-white/[0.06] bg-[#111114]' : 'border-zinc-200 bg-zinc-50'}`}>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-500 mb-6 font-ui">
-          Current Streak
-        </p>
-        <h2 className={`text-[120px] md:text-[160px] tracking-tighter num-hero ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-          {streak}
-        </h2>
-        <div className="accent-line mt-4 mb-6" />
-        <p className="text-sm font-medium tracking-wide text-zinc-600 mt-2 font-ui">
-          days of undivided focus
-        </p>
+  const dark = theme === 'dark';
+  const t = tokens(dark);
+  const weekTotal = days.reduce((a, d) => a + (d.hours || 0), 0);
+  const hitDays = days.filter(d => d.hours >= dailyGoalHours).length;
+  // Headroom over the taller of the best day and the goal, so neither touches the top.
+  const scaleMax = Math.max(maxHours, dailyGoalHours) * 1.12;
+  const goalPct = (dailyGoalHours / scaleMax) * 100;
 
-        {/* What the next day of this is actually worth. */}
-        {next && (
-          <div className="mt-10 max-w-xs mx-auto px-6">
-            <div className="flex items-baseline justify-between gap-3 mb-2">
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-600 font-ui">
-                Next: {next.def.title}
-              </span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#E10600] tabular-nums font-ui">
-                {next.daysLeft} to go
-              </span>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        dark={dark}
+        title="Streak"
+        subtitle={streak > 0 ? `${streak} ${streak === 1 ? 'day' : 'days'} in a row. Don’t be the one who breaks it.` : 'Log a session today to start a run.'}
+        right={<ShareButton onClick={onShare} theme={theme} />}
+      />
+
+      <Card dark={dark} delay={60} className="relative overflow-hidden">
+        {streak > 0 && (
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(90% 100% at 0% 0%, rgba(225,6,0,${dark ? '0.16' : '0.08'}), transparent 60%)` }} />
+        )}
+        <div className="relative p-6 md:p-10 grid md:grid-cols-[1fr_auto] gap-8 items-end">
+          <div>
+            <Eyebrow dark={dark}>Current streak</Eyebrow>
+            <div className="flex items-baseline gap-3 mt-3">
+              <span className={`num-hero text-[112px] md:text-[152px] leading-[0.85] ${t.heading}`}>{streak}</span>
+              <span className={`font-display text-[22px] ${t.muted}`}>{streak === 1 ? 'day' : 'days'}</span>
             </div>
-            <div className={`h-1 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-white/[0.06]' : 'bg-zinc-200'}`}>
-              <div className="h-full bg-[#E10600] transition-all duration-700" style={{ width: `${next.percent}%` }} />
+            <p className={`font-accent text-[17px] mt-3 ${t.muted}`}>of undivided focus.</p>
+          </div>
+          <div className="md:w-[260px] space-y-3">
+            {/* What the next day of this is actually worth. */}
+            {next && (
+              <div className={`rounded-xl border p-4 ${t.inset}`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className={`text-[12px] font-ui font-bold truncate ${t.heading}`}>Next: {next.def.title}</span>
+                  <span className="text-[11px] font-ui font-bold text-[#E10600] tabular-nums shrink-0">{next.daysLeft} to go</span>
+                </div>
+                <div className={`h-1.5 rounded-full overflow-hidden mt-3 ${dark ? 'bg-white/[0.06]' : 'bg-zinc-200/70'}`}>
+                  <div className="h-full rounded-full bg-[#E10600] transition-all duration-700" style={{ width: `${next.percent}%` }} />
+                </div>
+              </div>
+            )}
+            <div className={`rounded-xl border p-4 flex items-center justify-between ${t.inset}`}>
+              <div>
+                <p className={`text-[12px] font-ui font-bold ${t.heading}`}>Timed streak</p>
+                <p className={`text-[11px] font-ui ${t.muted}`}>Days the app clocked you</p>
+              </div>
+              <span className={`num-stat text-[24px] ${t.heading}`}>{verifiedStreak}</span>
             </div>
           </div>
-        )}
-
-        {/* Under the number it is about, above the vault. The run is the thing
-            worth showing someone. */}
-        <div className="mt-10">
-          <ShareButton onClick={onShare} theme={theme} />
         </div>
-      </div>
+      </Card>
 
       <RewardsVault
         rewards={rewards}
@@ -94,36 +110,44 @@ const StreakTab: React.FC<Props> = ({
         onClaimHamper={onClaimHamper}
       />
 
-      {/* 7‑day focus hours graph */}
-      <div
-        className={`p-8 md:p-10 rounded-xl border ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
-          }`}
-      >
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-500 mb-6 font-ui">
-          PAST 7 DAYS ACTIVITY
-        </h3>
-        <div className="flex items-end justify-between h-40 gap-2 md:gap-3">
-          {days.map((d, i) => {
-            const heightPct = Math.min(100, (d.hours / maxHours) * 100);
-            return (
-              <div key={i} className="flex flex-col items-center flex-1 gap-1 md:gap-2 h-full">
-                <div className="flex items-end h-full w-full">
-                  <div
-                    className="w-full rounded-t-md transition-all duration-700 bg-[#E10600]"
-                    style={{ height: `${heightPct}%` }}
-                  />
-                </div>
-                <span className="text-[9px] md:text-[10px] font-black uppercase text-zinc-500">
-                  {d.date}
-                </span>
-                <span className="text-[9px] font-black text-zinc-400">
-                  {d.hours.toFixed(1)}h
-                </span>
-              </div>
-            );
-          })}
+      {/* 7-day focus hours: one series in ink, the goal as one labelled hairline. */}
+      <Card dark={dark} delay={120} className="p-6 md:p-8">
+        <div className="flex items-baseline justify-between gap-3">
+          <Eyebrow dark={dark}>Last 7 days</Eyebrow>
+          <span className={`text-[11px] font-ui ${t.muted}`}>{weekTotal.toFixed(1)}h · goal hit {hitDays} of 7</span>
         </div>
-      </div>
+        {/* One plotting box for bars and goal line, so the line sits exactly where the bars are measured. */}
+        <div className="relative h-36 mt-8">
+          <div className="absolute left-0 right-0 border-t border-[#E10600]/50 z-10" style={{ bottom: `${goalPct}%` }}>
+            <span className={`absolute right-0 -top-[17px] text-[10px] font-ui font-bold text-[#E10600] px-1 ${dark ? 'bg-[#111114]' : 'bg-white'}`}>{dailyGoalHours}h goal</span>
+          </div>
+          <div className={`absolute inset-x-0 bottom-0 border-t ${t.rule}`} />
+          <div className="absolute inset-0 flex justify-between gap-2 md:gap-4">
+            {days.map((d, i) => {
+              const heightPct = Math.min(100, (d.hours / scaleMax) * 100);
+              const hit = d.hours >= dailyGoalHours;
+              return (
+                <div key={i} className="relative flex-1 flex justify-center">
+                  <div
+                    className={`absolute bottom-0 w-full max-w-[28px] rounded-t-[4px] transition-all duration-700 ${hit ? 'bg-[#E10600]' : dark ? 'bg-zinc-300' : 'bg-zinc-800'}`}
+                    style={{ height: `${d.hours ? Math.max(2, heightPct) : 0}%` }}
+                  />
+                  {d.hours > 0 && (
+                    <span className={`absolute text-[10px] font-ui font-bold tabular-nums ${t.body}`} style={{ bottom: `calc(${heightPct}% + 4px)` }}>
+                      {d.hours.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex justify-between gap-2 md:gap-4 mt-2">
+          {days.map((d, i) => (
+            <span key={i} className={`flex-1 text-center text-[10px] font-ui font-semibold ${t.muted}`}>{d.date}</span>
+          ))}
+        </div>
+      </Card>
 
       <MonthlyHeatmap logs={logs} dailyGoalHours={dailyGoalHours} theme={theme} />
 

@@ -52,7 +52,7 @@ const AuthModal: React.FC<Props> = ({
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 py-6">
       <div
-        className={`w-full max-w-sm rounded-xl border p-6 space-y-4 max-h-full overflow-y-auto ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-[#E3E0D9]'
+        className={`w-full max-w-sm rounded-xl border p-6 space-y-4 max-h-full overflow-y-auto ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'
           }`}
       >
         <div className="flex items-center justify-between">
@@ -61,7 +61,7 @@ const AuthModal: React.FC<Props> = ({
           </h2>
           <button
             onClick={onClose}
-            className={`text-xs font-black uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+            className={`text-xs font-black uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             Close
           </button>
@@ -76,8 +76,8 @@ const AuthModal: React.FC<Props> = ({
           disabled={googleLoading || loading}
           onClick={handleGoogleSignIn}
           className={`w-full py-3 rounded-md border flex items-center justify-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.12em] font-ui transition-all disabled:opacity-60 ${theme === 'dark'
-            ? 'bg-white text-[#17150F] border-transparent hover:bg-zinc-100'
-            : 'bg-white text-[#17150F] border-[#E3E0D9] hover:border-[#D6D1C5]'
+            ? 'bg-white text-zinc-900 border-transparent hover:bg-zinc-100'
+            : 'bg-white text-zinc-900 border-zinc-200 hover:border-zinc-300'
             }`}
         >
           <GoogleMark />
@@ -86,9 +86,9 @@ const AuthModal: React.FC<Props> = ({
 
         {/* Divider */}
         <div className="flex items-center gap-3">
-          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-[#E3E0D9]'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-[0.14em] ${theme === 'dark' ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}>or</span>
-          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-[#E3E0D9]'}`} />
+          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-zinc-200'}`} />
+          <span className={`text-[9px] font-bold uppercase tracking-[0.14em] ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>or</span>
+          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-zinc-200'}`} />
         </div>
 
         <div className="space-y-3">
@@ -99,7 +99,7 @@ const AuthModal: React.FC<Props> = ({
             onChange={e => setEmail(e.target.value)}
             className={`w-full rounded-md px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
               ? 'bg-[#18181b] border-[#27272a] text-white'
-              : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F]'
+              : 'bg-zinc-50 border-zinc-200 text-zinc-900'
               }`}
           />
           <input
@@ -109,7 +109,7 @@ const AuthModal: React.FC<Props> = ({
             onChange={e => setPassword(e.target.value)}
             className={`w-full rounded-md px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
               ? 'bg-[#18181b] border-[#27272a] text-white'
-              : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F]'
+              : 'bg-zinc-50 border-zinc-200 text-zinc-900'
               }`}
           />
         </div>
@@ -147,7 +147,7 @@ const AuthModal: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className={`text-[10px] font-medium uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+            className={`text-[10px] font-medium uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
           </button>

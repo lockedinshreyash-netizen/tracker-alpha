@@ -48,7 +48,7 @@ const RemoveForm: React.FC<Props> = ({ name, from, banMeans, onConfirm, onCancel
   return (
     <div className={`mt-3 p-4 rounded-lg border space-y-3 ${t.inset}`}>
       <label className="block">
-        <span className={`block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>
+        <span className={`block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>
           Reason <span className="normal-case tracking-normal font-medium">(optional · {name} will see this)</span>
         </span>
         <textarea

@@ -38,11 +38,11 @@ const RemovalNoticeModal: React.FC<Props> = ({ notice, total, theme, saving, err
       >
         <div className="px-8 pt-8 pb-7">
           <div className="flex items-baseline justify-between gap-4 mb-5">
-            <p className={`text-[9px] font-bold uppercase tracking-[0.24em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
               {copy.eyebrow}
             </p>
             {total > 1 && (
-              <p className={`text-[9px] font-bold uppercase tracking-[0.14em] font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
                 1 of {total}
               </p>
             )}
@@ -60,7 +60,7 @@ const RemovalNoticeModal: React.FC<Props> = ({ notice, total, theme, saving, err
 
           {notice.reason && (
             <div className={`mt-5 p-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200'}`}>
-              <p className={`text-[9px] font-bold uppercase tracking-[0.14em] font-ui mb-2 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui mb-2 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
                 Reason
               </p>
               <p className={`text-[13px] leading-relaxed font-ui whitespace-pre-wrap break-words ${dark ? 'text-zinc-200' : 'text-zinc-800'}`}>
@@ -80,7 +80,7 @@ const RemovalNoticeModal: React.FC<Props> = ({ notice, total, theme, saving, err
             onClick={onAcknowledge}
             disabled={saving}
             autoFocus
-            className={`w-full px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-white hover:bg-[#2B2820]'}`}
+            className={`w-full px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
           >
             {saving ? 'Saving…' : 'Got it'}
           </button>

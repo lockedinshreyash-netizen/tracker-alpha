@@ -160,9 +160,19 @@ const TaskBoard: React.FC<Props> = ({
        with high z-indexes that would then be trapped inside it — competing as
        z-10 against the voice control at the app root, which sits at z-40 and
        would draw straight over the Save button. */
-    <div className="space-y-4">
-      <div className="flex justify-between items-end mb-4 pb-2">
-        <h3 className={`text-xs font-bold tracking-tight font-ui ${dark ? 'text-zinc-500' : 'text-[#6B675C]'}`}>Focus Tasks</h3>
+    /* Card styling only — border and shadow open no stacking context, and no
+       entrance animation here: a transform on this element would become the
+       containing block of the `fixed` editor and drag overlay. */
+    <div className={`rounded-xl border p-4 md:p-6 space-y-4 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+      <div className="flex justify-between items-baseline gap-3">
+        <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus tasks</p>
+        <span className={`text-[11px] font-ui tabular-nums ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+          {(() => {
+            const open = tasks.filter(t => !t.completed).length;
+            const done = tasks.length - open;
+            return tasks.length ? `${open} open · ${done} done` : 'Add what today has to include';
+          })()}
+        </span>
       </div>
 
       {/* All three columns are on screen at every width, phones included.

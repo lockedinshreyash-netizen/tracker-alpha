@@ -26,7 +26,7 @@ const VideoBody: React.FC<Props> = ({ videoId, title, theme }) => {
   return (
     <div className="space-y-2.5">
       <div
-        className={`relative w-full overflow-hidden rounded-xl border ${dark ? 'border-white/[0.08] bg-black' : 'border-[#E3E0D9] bg-black'}`}
+        className={`relative w-full overflow-hidden rounded-xl border ${dark ? 'border-white/[0.08] bg-black' : 'border-zinc-200 bg-black'}`}
         style={{ aspectRatio: '16 / 9' }}
       >
         {playing ? (

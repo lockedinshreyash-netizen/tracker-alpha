@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Chip, btn } from '../ui/kit';
+import { SUBJECT_COLORS } from '../schedule/colors';
 import { PomodoroRuntime, PomodoroSettings, Subject } from '../types';
 import { requestNotificationPermission, notificationPermission } from '../notify/system';
 import {
@@ -22,6 +24,8 @@ interface Props {
   theme: 'dark' | 'light';
   onUpdateSettings: (next: Partial<PomodoroSettings>) => void;
 }
+
+const subjectDot = (s: Subject) => (SUBJECT_COLORS[s] ?? SUBJECT_COLORS.General).dot;
 
 const PomodoroTimer: React.FC<Props> = ({
   runtime,
@@ -83,7 +87,7 @@ const PomodoroTimer: React.FC<Props> = ({
   const perSet = Math.max(1, settings.blocksBeforeLongBreak);
   const dotsFilled = runtime.completedBlocks % perSet;
 
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
   const link = `text-[10px] uppercase font-bold tracking-[0.08em] font-ui ${muted} hover:text-[#E10600] transition-colors`;
 
   const toggleNotify = async (want: boolean) => {
@@ -123,7 +127,8 @@ const PomodoroTimer: React.FC<Props> = ({
   return (
     <section
       data-onboarding-target="session-timer"
-      className={`p-10 md:p-20 text-center rounded-xl border relative transition-all ${dark ? 'bg-[#111114]' : 'bg-white'} ${runtime.isRunning && isWork ? 'border-[#E10600]/30' : (dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]')}`}
+      className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative transition-all ${dark ? 'bg-[#111114]' : 'bg-white shadow-sm'} ${runtime.isRunning && isWork ? 'border-[#E10600]/30' : (dark ? 'border-white/[0.06]' : 'border-zinc-100')}`}
+      style={{ animationDelay: '120ms' }}
     >
       {runtime.isRunning && isWork && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
 
@@ -135,13 +140,13 @@ const PomodoroTimer: React.FC<Props> = ({
           {Array.from({ length: perSet }, (_, i) => (
             <div
               key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-all ${i < dotsFilled ? 'bg-[#E10600]' : dark ? 'bg-zinc-800' : 'bg-[#E3E0D9]'}`}
+              className={`w-1.5 h-1.5 rounded-full transition-all ${i < dotsFilled ? 'bg-[#E10600]' : dark ? 'bg-zinc-800' : 'bg-zinc-200'}`}
             />
           ))}
         </div>
       </div>
 
-      <p className={`text-[14vw] md:text-8xl tabular-nums leading-none num-timer transition-opacity ${paused ? 'opacity-40' : ''}`}>
+      <p className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer transition-opacity ${dark ? 'text-white' : 'text-zinc-900'} ${paused ? 'opacity-40' : ''}`}>
         {formatCountdown(left)}
       </p>
 
@@ -169,7 +174,7 @@ const PomodoroTimer: React.FC<Props> = ({
               <button
                 key={q}
                 onClick={() => api.rate(rating.logId, q)}
-                className={`w-9 h-9 rounded-md text-[10px] font-bold transition-all ${dark ? 'bg-zinc-800 text-zinc-400 hover:bg-[#E10600] hover:text-white' : 'bg-[#E3E0D9] text-[#6B675C] hover:bg-[#E10600] hover:text-white'}`}
+                className={`w-9 h-9 rounded-lg text-[12px] font-ui font-bold transition-all active:scale-90 ${dark ? 'bg-white/[0.05] text-zinc-400 hover:bg-[#E10600] hover:text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-[#E10600] hover:text-white'}`}
               >
                 {q}
               </button>
@@ -180,26 +185,22 @@ const PomodoroTimer: React.FC<Props> = ({
 
       {/* Only before a block starts — mid-block the choice is already made. */}
       {idle && isWork && (
-        <div className="flex flex-wrap justify-center gap-3 mt-14">
+        <div className="flex flex-wrap justify-center gap-2 mt-10">
           {activeSubjects.map(s => (
-            <button
-              key={s}
-              onClick={() => api.setSubject(s)}
-              className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border rounded-md transition-all ${runtime.subject === s
-                ? 'bg-[#E10600] border-[#E10600] text-white'
-                : dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-[#E3E0D9] text-[#8A8577] hover:border-[#D6D1C5]'
-                }`}
-            >
+            <Chip key={s} on={runtime.subject === s} onClick={() => api.setSubject(s)} dark={dark} color={subjectDot(s)} className="!px-4 !py-2">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: subjectDot(s) }} />
               {s}
-            </button>
+            </Chip>
           ))}
         </div>
       )}
 
-      <div className="flex flex-col items-center mt-12 gap-6">
+      <div className="flex flex-col items-center mt-10 gap-6">
         <button
           onClick={() => (runtime.isRunning ? api.pause() : api.start())}
-          className={`w-full max-sm:px-4 py-6 md:py-7 font-black uppercase tracking-[0.3em] md:tracking-[0.5em] transition-all active:scale-[0.98] rounded-xl font-ui ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-[#F2F0EC] hover:bg-[#2B2820]'}`}
+          className={`${btn} w-full max-w-md py-5 md:py-6 !text-[12px] !tracking-[0.3em] !rounded-xl ${runtime.isRunning
+            ? dark ? 'border border-white/[0.12] text-white hover:bg-white/[0.04]' : 'border border-zinc-300 text-zinc-900 hover:bg-zinc-50'
+            : 'bg-[#E10600] text-white hover:bg-[#c90500] shadow-[0_6px_20px_-8px_rgba(225,6,0,0.6)]'}`}
         >
           {primaryLabel}
         </button>
@@ -217,7 +218,7 @@ const PomodoroTimer: React.FC<Props> = ({
       </div>
 
       {showSettings && (
-        <div className={`mt-10 pt-8 border-t text-left ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+        <div className={`mt-10 pt-8 border-t text-left mk-fade ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {([
               ['workMinutes', 'Focus', 5, 90],
@@ -226,18 +227,20 @@ const PomodoroTimer: React.FC<Props> = ({
               ['blocksBeforeLongBreak', 'Blocks / set', 2, 8],
             ] as const).map(([key, label, min, max]) => (
               <div key={key}>
-                <p className={`text-[9px] uppercase font-bold tracking-[0.08em] font-ui mb-2 ${muted}`}>{label}</p>
-                <div className="flex items-center gap-2">
+                <p className={`text-[10px] uppercase font-bold tracking-[0.06em] font-ui mb-2 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>{label}</p>
+                <div className={`inline-flex items-center rounded-lg border ${dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}>
                   <button
+                    aria-label={`Less ${label}`}
                     onClick={() => onUpdateSettings({ [key]: Math.max(min, settings[key] - 1) } as Partial<PomodoroSettings>)}
-                    className={`w-7 h-7 rounded text-xs font-bold ${dark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E3E0D9] text-[#6B675C]'}`}
+                    className={`w-8 h-8 rounded-l-lg text-[15px] font-bold active:scale-90 ${dark ? 'text-zinc-300 hover:bg-white/[0.04]' : 'text-zinc-700 hover:bg-zinc-50'}`}
                   >
                     −
                   </button>
-                  <span className="num-stat text-base w-6 text-center">{settings[key]}</span>
+                  <span className={`num-stat text-[16px] w-8 text-center ${dark ? 'text-white' : 'text-zinc-900'}`}>{settings[key]}</span>
                   <button
+                    aria-label={`More ${label}`}
                     onClick={() => onUpdateSettings({ [key]: Math.min(max, settings[key] + 1) } as Partial<PomodoroSettings>)}
-                    className={`w-7 h-7 rounded text-xs font-bold ${dark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E3E0D9] text-[#6B675C]'}`}
+                    className={`w-8 h-8 rounded-r-lg text-[15px] font-bold active:scale-90 ${dark ? 'text-zinc-300 hover:bg-white/[0.04]' : 'text-zinc-700 hover:bg-zinc-50'}`}
                   >
                     +
                   </button>
@@ -259,7 +262,7 @@ const PomodoroTimer: React.FC<Props> = ({
                   onChange={e => (key === 'notify' ? toggleNotify(e.target.checked) : onUpdateSettings({ [key]: e.target.checked } as Partial<PomodoroSettings>))}
                   className="accent-[#E10600] w-4 h-4"
                 />
-                <span className={`text-[10px] uppercase font-bold tracking-[0.06em] font-ui ${muted}`}>{label}</span>
+                <span className={`text-[13px] font-ui ${dark ? 'text-zinc-300' : 'text-zinc-700'}`}>{label}</span>
                 {key === 'notify' && notifyNote && <span className={`text-[10px] font-ui ${muted}`}>— {notifyNote}</span>}
               </label>
             ))}

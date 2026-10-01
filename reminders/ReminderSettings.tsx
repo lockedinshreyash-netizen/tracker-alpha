@@ -101,9 +101,10 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
     if (!ok) setPermission(notificationPermission());
   };
 
-  const card = `p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100'}`;
+  const card = `mk-rise p-6 md:p-7 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
+  const title = `text-[15px] font-bold font-ui ${dark ? 'text-white' : 'text-zinc-900'}`;
   const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
-  const rowNote = `text-[9px] uppercase font-medium mt-1 ${dark ? 'text-zinc-600' : 'text-zinc-500'}`;
+  const rowNote = `text-[12px] font-ui mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`;
 
   const Switch: React.FC<{ on: boolean; disabled?: boolean; onToggle: (v: boolean) => void; label: string }> =
     ({ on, disabled, onToggle, label }) => (
@@ -139,8 +140,8 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
           hear nothing, which is exactly the report this answers. */}
       <div className="flex justify-between items-start gap-6">
         <div className="flex-1">
-          <h4 className="text-sm font-bold uppercase font-ui">Notifications</h4>
-          <p className={`text-[11px] font-bold mt-1 uppercase ${permission === 'granted' ? 'text-zinc-500' : 'text-[#E10600]'}`}>
+          <h4 className={title}>Notifications</h4>
+          <p className={`text-[13px] font-ui font-semibold mt-1 ${permission === 'granted' ? 'text-zinc-500' : 'text-[#E10600]'}`}>
             {permission === 'granted' ? 'Allowed' : permission === 'denied' ? 'Blocked by your browser' : permission === 'unsupported' ? 'Unsupported' : 'Not enabled'}
           </p>
           <p className={rowNote}>{stateCopy[permission]}</p>
@@ -177,8 +178,8 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
 
       <div className="flex justify-between items-start gap-6">
         <div className="flex-1">
-          <h4 className="text-sm font-bold uppercase font-ui">Deadline Reminders</h4>
-          <p className={`text-[11px] font-bold mt-1 uppercase ${muted}`}>
+          <h4 className={title}>Deadline reminders</h4>
+          <p className={`text-[13px] font-ui font-semibold mt-1 ${muted}`}>
             Only for tasks you gave a date
           </p>
           {/* The boundary, said out loud where the switch is. */}
@@ -206,7 +207,7 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
                 if (m !== null) onChange({ defaultMinute: m });
               }}
               aria-label="Default reminder time"
-              className={`text-[12px] font-bold p-2.5 rounded-lg border focus:outline-none font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-[#F2F0EC] border-zinc-200 text-[#17150F]'}`}
+              className={`text-[12px] font-bold p-2.5 rounded-lg border focus:outline-none font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'}`}
             />
           </div>
 

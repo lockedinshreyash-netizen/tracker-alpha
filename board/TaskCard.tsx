@@ -95,7 +95,7 @@ const TaskCard: React.FC<Props> = ({
             and where it does not (Chromium often declines on uppercased text)
             nothing changes and break-words still holds the layout. It costs one
             class and is never worse. */}
-        <p className={`text-[10px] md:text-[11px] leading-snug font-bold uppercase tracking-tight break-words hyphens-auto font-ui ${done ? 'line-through' : ''} ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+        <p className={`text-[10px] md:text-[11px] leading-snug font-bold uppercase tracking-tight break-words hyphens-auto font-ui ${done ? 'line-through' : ''} ${dark ? 'text-white' : 'text-zinc-900'}`}>
           {task.text}
         </p>
 
@@ -119,7 +119,7 @@ const TaskCard: React.FC<Props> = ({
               style={{
                 /* The only escalation on the card, and only once it is true.
                    Everything else stays a calm label. */
-                color: overdue ? '#E10600' : dark ? '#71717a' : '#8A8577',
+                color: overdue ? '#E10600' : dark ? '#71717a' : '#71717a',
               }}
             >
               {due}
@@ -140,7 +140,7 @@ const TaskCard: React.FC<Props> = ({
           {showHint && (
             <p
               aria-hidden="true"
-              className={`ml-auto text-[7px] md:text-[8px] font-medium uppercase tracking-[0.08em] font-ui transition-opacity opacity-45 md:group-hover:opacity-80 ${dark ? 'text-zinc-400' : 'text-[#8A8577]'}`}
+              className={`ml-auto text-[7px] md:text-[8px] font-medium uppercase tracking-[0.08em] font-ui transition-opacity opacity-45 md:group-hover:opacity-80 ${dark ? 'text-zinc-400' : 'text-zinc-500'}`}
             >
               <span className="md:hidden">Tap to edit</span>
               <span className="hidden md:inline">Click to edit</span>

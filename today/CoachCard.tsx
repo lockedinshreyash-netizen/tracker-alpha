@@ -37,10 +37,10 @@ const CoachCard: React.FC<Props> = ({ state, exam, activeSubjects, theme, onEnga
   if (muted) {
     return (
       <div className={`mb-6 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border ${dark ? 'border-white/[0.06] text-zinc-600' : 'border-zinc-200 text-zinc-400'}`}>
-        <span className="text-[9px] font-bold uppercase tracking-[0.14em] font-ui">Coach muted</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui">Coach muted</span>
         <button
           onClick={() => onSetMuted(false)}
-          className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded border transition-colors active:scale-97 ${dark ? 'border-white/[0.1] hover:text-zinc-300 hover:border-white/25' : 'border-zinc-300 hover:text-zinc-600'}`}
+          className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2.5 py-1 rounded border transition-colors active:scale-97 ${dark ? 'border-white/[0.1] hover:text-zinc-300 hover:border-white/25' : 'border-zinc-300 hover:text-zinc-600'}`}
         >
           Wake it
         </button>
@@ -55,10 +55,10 @@ const CoachCard: React.FC<Props> = ({ state, exam, activeSubjects, theme, onEnga
     <div className={`mb-6 rounded-xl border overflow-hidden ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className={`px-6 pt-5 pb-5 ${dark ? 'bg-[#E10600]/[0.05]' : 'bg-red-50/60'}`}>
         <div className="flex items-center justify-between gap-3 mb-3">
-          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#E10600] font-ui">
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] font-ui">
             No idea what to do?
           </p>
-          <span className={`text-[9px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded border tabular-nums ${dark ? 'border-white/[0.12] text-zinc-400' : 'border-zinc-300 text-zinc-500'}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border tabular-nums ${dark ? 'border-white/[0.12] text-zinc-400' : 'border-zinc-300 text-zinc-500'}`}>
             {top.minutes} min · {ACTION_LABEL[top.action]}
           </span>
         </div>
@@ -98,7 +98,7 @@ const CoachCard: React.FC<Props> = ({ state, exam, activeSubjects, theme, onEnga
 
       {rest.length > 0 && (
         <div className={`px-6 py-3 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600 mb-2 font-ui">Or</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-600 mb-2 font-ui">Or</p>
           <div className="space-y-1.5">
             {rest.map((r) => (
               <button

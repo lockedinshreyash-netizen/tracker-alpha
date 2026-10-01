@@ -50,9 +50,9 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
     });
   };
 
-  const panel = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]';
+  const panel = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm';
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
-  const field = `w-full text-[12px] font-bold uppercase tracking-tight p-3 rounded-lg border focus:outline-none focus:ring-1 focus:ring-white/20 font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F]'}`;
+  const field = `w-full text-[12px] font-bold uppercase tracking-tight p-3 rounded-lg border focus:outline-none focus:ring-1 focus:ring-white/20 font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'}`;
 
   return (
     <div
@@ -79,7 +79,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
           <p className="text-[9px] font-medium uppercase tracking-[0.06em] font-ui" style={{ color: dark ? preview.text : preview.textLight }}>
             {subject}
           </p>
-          <p className={`text-[13px] font-bold uppercase tracking-tight mt-1 font-ui ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+          <p className={`text-[13px] font-bold uppercase tracking-tight mt-1 font-ui ${dark ? 'text-white' : 'text-zinc-900'}`}>
             {text.trim() || 'Untitled task'}
           </p>
         </div>
@@ -111,7 +111,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
                       ? { background: dark ? c.bg : c.bgLight, borderColor: c.dot, color: dark ? c.text : c.textLight }
                       : on
                         ? { background: '#E10600', borderColor: '#E10600', color: '#fff' }
-                        : { borderColor: dark ? 'rgba(255,255,255,0.06)' : '#E3E0D9', color: dark ? '#71717a' : '#8A8577' }}
+                        : { borderColor: dark ? 'rgba(255,255,255,0.06)' : '#e4e4e7', color: dark ? '#71717a' : '#71717a' }}
                   >
                     {s}
                   </button>
@@ -128,7 +128,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
                   so it has to be easy to undo. */}
               <button
                 onClick={() => setColor(undefined)}
-                className={`text-[9px] px-3 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${!color ? 'border-[#E10600] text-[#E10600]' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-[#E3E0D9] text-[#8A8577]'}`}
+                className={`text-[9px] px-3 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${!color ? 'border-[#E10600] text-[#E10600]' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-zinc-200 text-zinc-500'}`}
               >
                 Subject
               </button>
@@ -141,7 +141,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
                   style={{
                     background: derive(hex).dot,
                     borderColor: color?.toLowerCase() === hex.toLowerCase()
-                      ? (dark ? '#fff' : '#17150F')
+                      ? (dark ? '#fff' : '#18181b')
                       : 'transparent',
                   }}
                 />
@@ -161,7 +161,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
             <div className="flex flex-wrap gap-2 mb-3">
               <button
                 onClick={() => { setDueAt(undefined); setDueMinute(undefined); }}
-                className={`text-[9px] px-4 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${!dueAt ? 'bg-[#E10600] border-[#E10600] text-white' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-[#E3E0D9] text-[#8A8577]'}`}
+                className={`text-[9px] px-4 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${!dueAt ? 'bg-[#E10600] border-[#E10600] text-white' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-zinc-200 text-zinc-500'}`}
               >
                 None
               </button>
@@ -169,7 +169,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
                 <button
                   key={c.date}
                   onClick={() => setDueAt(c.date)}
-                  className={`text-[9px] px-4 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${dueAt === c.date ? 'bg-[#E10600] border-[#E10600] text-white' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-[#E3E0D9] text-[#8A8577]'}`}
+                  className={`text-[9px] px-4 py-2 font-bold uppercase tracking-[0.06em] border rounded-md font-ui ${dueAt === c.date ? 'bg-[#E10600] border-[#E10600] text-white' : dark ? 'border-white/[0.06] text-zinc-600' : 'border-zinc-200 text-zinc-500'}`}
                 >
                   {c.label}
                 </button>
@@ -208,13 +208,13 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
         <div className={`sticky bottom-0 flex gap-2 p-4 border-t ${panel}`}>
           <button
             onClick={() => window.confirm('Discard task?') && onDelete()}
-            className={`text-[10px] font-bold uppercase tracking-[0.06em] px-4 py-3 rounded-md border font-ui ${dark ? 'border-white/[0.06] text-zinc-500 hover:text-[#E10600]' : 'border-[#E3E0D9] text-[#8A8577] hover:text-[#E10600]'}`}
+            className={`text-[10px] font-bold uppercase tracking-[0.06em] px-4 py-3 rounded-md border font-ui ${dark ? 'border-white/[0.06] text-zinc-500 hover:text-[#E10600]' : 'border-zinc-200 text-zinc-500 hover:text-[#E10600]'}`}
           >
             Delete
           </button>
           <button
             onClick={onClose}
-            className={`flex-1 text-[10px] font-bold uppercase tracking-[0.06em] px-4 py-3 rounded-md border font-ui ${dark ? 'border-white/[0.06] text-zinc-400' : 'border-[#E3E0D9] text-[#6B675C]'}`}
+            className={`flex-1 text-[10px] font-bold uppercase tracking-[0.06em] px-4 py-3 rounded-md border font-ui ${dark ? 'border-white/[0.06] text-zinc-400' : 'border-zinc-200 text-zinc-600'}`}
           >
             Cancel
           </button>

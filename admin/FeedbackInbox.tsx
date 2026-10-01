@@ -71,15 +71,15 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
 
   const card = `p-6 md:p-8 rounded-xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
   const muted = dark ? 'text-zinc-500' : 'text-zinc-400';
   const field = `w-full rounded-lg border px-3 py-2.5 text-[13px] font-ui outline-none transition-colors ${dark
     ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-600 focus:border-white/20'
-    : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0] focus:border-[#D6D1C5]'}`;
+    : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-300'}`;
   const chip = (on: boolean) =>
     `px-3.5 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-[0.06em] font-ui transition-all active:scale-97 ${on
       ? 'bg-[#E10600] border-[#E10600] text-white'
-      : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-[#E3E0D9] text-zinc-500 hover:border-[#D6D1C5]'}`;
+      : dark ? 'border-white/[0.08] text-zinc-500 hover:border-white/[0.16]' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300'}`;
 
   return (
     <section className={card}>
@@ -113,7 +113,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
           return (
             <div
               key={t.id}
-              className={`rounded-xl border overflow-hidden ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-[#E3E0D9]'}`}
+              className={`rounded-xl border overflow-hidden ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-zinc-200'}`}
             >
               <button
                 onClick={() => { setOpenId(expanded ? null : t.id); setReply(t.admin_response ?? ''); }}
@@ -121,7 +121,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
                 aria-expanded={expanded}
               >
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className={`text-[9px] font-bold uppercase tracking-[0.1em] font-ui ${t.status === 'open' ? 'text-[#E10600]' : muted}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${t.status === 'open' ? 'text-[#E10600]' : muted}`}>
                     {STATUS_LABEL[t.status]}
                   </span>
                   <span className={`text-[9px] uppercase tracking-[0.06em] font-ui ${t.category === 'abuse' ? 'text-[#E10600]' : muted}`}>
@@ -134,7 +134,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
               </button>
 
               {expanded && (
-                <div className={`px-4 pb-4 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+                <div className={`px-4 pb-4 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
                   <p className={`mt-3 text-[12px] font-ui leading-relaxed whitespace-pre-wrap ${dark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                     {t.message}
                   </p>
@@ -165,7 +165,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
                     <button
                       onClick={() => act(() => respond(t.id, adminId, reply, 'resolved'))}
                       disabled={busy}
-                      className="px-4 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97 font-ui disabled:opacity-50"
+                      className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md bg-[#E10600] text-white hover:bg-[#c40500] transition-colors active:scale-97 font-ui disabled:opacity-50"
                     >
                       {reply.trim() ? 'Reply & resolve' : 'Resolve'}
                     </button>
@@ -173,7 +173,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
                       <button
                         onClick={() => act(() => setStatus(t.id, 'in_progress'))}
                         disabled={busy}
-                        className={`px-4 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-[#E3E0D9] text-zinc-500 hover:text-[#17150F]'}`}
+                        className={`px-4 py-2 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                       >
                         In progress
                       </button>
@@ -182,7 +182,7 @@ const FeedbackInbox: React.FC<Props> = ({ adminId, theme }) => {
                       <button
                         onClick={() => act(() => setStatus(t.id, 'open'))}
                         disabled={busy}
-                        className={`px-4 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-[#E3E0D9] text-zinc-500 hover:text-[#17150F]'}`}
+                        className={`px-4 py-2 text-[10px] font-bold uppercase tracking-[0.06em] rounded-md border transition-colors active:scale-97 font-ui disabled:opacity-50 ${dark ? 'border-white/[0.12] text-zinc-400 hover:text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                       >
                         Reopen
                       </button>

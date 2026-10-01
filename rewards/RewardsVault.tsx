@@ -73,20 +73,20 @@ const RewardsVault: React.FC<Props> = ({
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`text-[9px] font-bold uppercase tracking-[0.14em] font-ui ${p.unlocked ? 'text-[#E10600]' : 'text-zinc-600'}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${p.unlocked ? 'text-[#E10600]' : 'text-zinc-600'}`}>
                       Day {def.day}
                     </span>
                     {!p.unlocked && <LockIcon className="text-zinc-600" />}
                     {def.requiresVerified && (
                       <span
                         title="Only days the app timed itself count towards this one."
-                        className={`text-[8px] font-bold uppercase tracking-[0.1em] px-1.5 py-0.5 rounded border font-ui ${dark ? 'border-white/[0.1] text-zinc-600' : 'border-zinc-200 text-zinc-400'}`}
+                        className={`text-[10px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded border font-ui ${dark ? 'border-white/[0.1] text-zinc-600' : 'border-zinc-200 text-zinc-400'}`}
                       >
                         Timed days only
                       </span>
                     )}
                   </div>
-                  <h4 className={`text-lg font-black uppercase tracking-tight leading-tight ${p.unlocked ? heading : 'text-zinc-500'}`}>
+                  <h4 className={`font-display text-[20px] leading-tight ${p.unlocked ? heading : dark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                     {def.title}
                   </h4>
                   <p className={`text-[11px] leading-relaxed font-ui mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
@@ -95,7 +95,7 @@ const RewardsVault: React.FC<Props> = ({
                 </div>
 
                 {p.unlocked ? (
-                  <span className={`shrink-0 text-[8px] font-bold uppercase tracking-[0.12em] px-2 py-1 rounded border font-ui border-[#E10600]/50 text-[#E10600] bg-[#E10600]/10`}>
+                  <span className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border font-ui border-[#E10600]/50 text-[#E10600] bg-[#E10600]/10`}>
                     Yours
                   </span>
                 ) : (
@@ -120,7 +120,7 @@ const RewardsVault: React.FC<Props> = ({
               )}
 
               {p.unlocked && (
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-600 font-ui">
+                <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-600 font-ui">
                   {open ? 'Close' : def.kind === 'wallpaper' ? 'Pick one' : def.kind === 'book' ? 'Open it' : 'Claim it'}
                 </p>
               )}
@@ -133,8 +133,8 @@ const RewardsVault: React.FC<Props> = ({
                     onClick={() => onSelectWallpaper(null)}
                     className={`rounded-lg border overflow-hidden text-left transition-all active:scale-97 ${!rewards.wallpaper ? 'border-[#E10600]' : dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}
                   >
-                    <div className={`h-16 ${dark ? 'bg-[#0B0B0D]' : 'bg-[#F2F0EC]'}`} />
-                    <p className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2 py-2 font-ui ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    <div className={`h-16 ${dark ? 'bg-[#0B0B0D]' : 'bg-zinc-50'}`} />
+                    <p className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-2 font-ui ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                       None
                     </p>
                   </button>
@@ -147,7 +147,7 @@ const RewardsVault: React.FC<Props> = ({
                       className={`rounded-lg border overflow-hidden text-left transition-all active:scale-97 ${rewards.wallpaper === w.id ? 'border-[#E10600]' : dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}
                     >
                       <WallpaperLayer wallpaper={w} dark={dark} className="h-16 relative" preview />
-                      <p className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2 py-2 font-ui ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-2 font-ui ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                         {w.name}
                       </p>
                     </button>

@@ -246,14 +246,22 @@ Landing page (`LandingPage.tsx` + `landing/*`) pitches the app as "free JEE stud
 
 `OnboardingTour.tsx` runs a short spotlight-based tour (modal → highlight session timer → highlight daily target → highlight Syllabus/Streak nav → closing modal) on first visit to the app proper, tracked separately via the `onboarding_complete` localStorage key. Spotlight targets are located via `data-onboarding-target` attributes on the actual UI elements (see `Sidebar.tsx`), not hardcoded coordinates — new nav items must carry this attribute to stay tour-compatible.
 
-### Design system (`index.css`)
+### Design system (`index.css`, `ui/kit.tsx`)
 
-Dark-first "premium" aesthetic: near-black gradient background (`--bg-base #0B0B0D`), a single accent red (`--accent #E10600`) used for progress/action elements, and a light theme variant toggled via `state.theme`. Four fonts are combined intentionally, each scoped to a class:
-- `font-display` (Anton, uppercase-only, weight 400) — logo, hero numbers, timers, key stats. Never for body text.
+Dark-first, with a light theme toggled via `state.theme`. One accent red (`#E10600`) for actions, progress and the now-line, and nowhere else. Fonts (see `index.css`; the display face is **Satoshi heavy**, not Anton):
+- `font-display` / `num-hero` / `num-stat` (Satoshi 800/700, tabular) — page titles, hero numbers, key stats.
 - `font-ui` (Satoshi) — all body/labels/buttons/nav/inputs.
-- `font-accent` (Playfair Display) — sparse brand/tagline moments.
-- `num-timer` (Averia Serif Libre) — the countdown/session timer specifically, distinct from other stat numbers (`num-stat`, `num-hero` use Anton).
-Buttons/cards get a small `active:scale-97` press effect and `.card-interactive` hover-lift globally; the active timer view uses a grain+red-glow "premium" background (`.timer-active-bg`) rather than a flat card.
+- `font-accent` (Playfair Display italic) — one short phrase per moment, never chrome.
+- `num-timer` — the session/countdown timer.
+
+**`ui/kit.tsx` is the visual vocabulary of every tab.** It was first written for Mocks and then adopted app-wide, so a new screen should start from it rather than restating a ternary on `dark`. It provides `tokens(dark)`, `btn`, `PageHeader`, `Card`, `StatTile`, `Eyebrow`, `Chip`, `Segmented`, `Field`, `Sheet` and `Overlay`. The rules it encodes:
+- **Every tab opens with `PageHeader`**: a display title, one muted line saying where things stand, and the tab's single control on the right. Mid-session Today hides it, because the clock is the page then. Observatory is deliberately exempt (its own "room", see `analysis/`), and so is the landing page.
+- **Cards** are `rounded-xl border`. Dark is `bg-[#111114] border-white/[0.06]`; light is `bg-white border-zinc-100 shadow-sm` on the page's paper (`#F2F0EC`, set in App/Header/Sidebar only). Insets are `bg-zinc-50 border-zinc-100` / `bg-white/[0.025]`.
+- **Light-mode ink is the zinc scale**, never the old warm hexes (`#E3E0D9`, `#8A8577`, `#17150F`, `#B5AFA0`…), which were migrated out of every tab component. They survive only in the app chrome and the landing page.
+- **Labels** are eyebrows: 10px, bold, uppercase, `tracking-[0.06em]`, zinc-400/500. Headings are sentence case. No 8–9px `font-black` labels with wide tracking, except inside genuinely tight boxes (the timeline's "Moved" badge, the condensed phone task cards).
+- **Selection is ink, not red.** A selected chip, day or segment is zinc-900/white. A data-coloured selection wears its own colour (a subject, an exam). Red is the primary button (`tokens().primary`, which carries a soft red glow) and progress.
+- **Motion** is `mk-rise` with a small staggered `animationDelay`, plus `mk-fade`/`mk-draw`/`mk-grow-x`/`mk-ring`, all disabled under `prefers-reduced-motion`. **Never put `mk-rise` (a transform) on an ancestor of `fixed` UI.** It becomes the containing block: the task board deliberately has the card styling but no animation for this reason.
+- **Overlays render through `Overlay` (a portal).** `<main>` is `relative z-20`, so a fixed modal inside a tab paints under the z-50 rail and the phone top bar.
 
 ## Domain model / usage flow
 

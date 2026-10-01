@@ -92,7 +92,7 @@ const ToastCard: React.FC<CardProps> = ({ toast, theme }) => {
 
   const shell = alert
     ? dark ? 'bg-[#1A0605]/95 border-[#E10600]/40' : 'bg-white/95 border-[#E10600]/40'
-    : dark ? 'bg-[#111114]/95 border-white/[0.10]' : 'bg-white/95 border-[#E3E0D9]';
+    : dark ? 'bg-[#111114]/95 border-white/[0.10]' : 'bg-white/95 border-zinc-200';
 
   return (
     <div className={`toast-in pointer-events-auto w-full rounded-xl border shadow-2xl backdrop-blur-xl ${shell}`}>
@@ -104,16 +104,16 @@ const ToastCard: React.FC<CardProps> = ({ toast, theme }) => {
           <span className="text-lg leading-none mt-0.5 select-none" aria-hidden="true">{toast.icon}</span>
         )}
         <span className="flex-1 min-w-0">
-          <span className={`block text-[13px] font-bold font-ui leading-snug ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+          <span className={`block text-[13px] font-bold font-ui leading-snug ${dark ? 'text-white' : 'text-zinc-900'}`}>
             {toast.title}
           </span>
           {toast.body && (
-            <span className={`block text-[11px] font-ui mt-1 ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
+            <span className={`block text-[11px] font-ui mt-1 ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
               {toast.body}
             </span>
           )}
         </span>
-        <span className={`text-[9px] font-bold uppercase tracking-[0.1em] font-ui flex-shrink-0 ${dark ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui flex-shrink-0 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
           Dismiss
         </span>
       </button>

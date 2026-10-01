@@ -160,7 +160,7 @@ const ExploreGroups: React.FC<Props> = ({ onOpenGroup, onJoined, isStaff, userId
                   </p>
                 </div>
                 <span
-                  className={`flex-shrink-0 text-[9px] font-black uppercase tracking-[0.12em] font-ui px-2.5 py-1.5 rounded-md ${
+                  className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-[0.06em] font-ui px-2.5 py-1.5 rounded-md ${
                     g.my_status === 'member' ? `${t.ghost}`
                       : g.my_status ? `${t.inset} ${t.muted} border`
                       : 'bg-[#E10600]/10 text-[#E10600]'
@@ -281,7 +281,7 @@ const PublicGroupSheet: React.FC<{
         <>
           {!open && (
             <div>
-              <label htmlFor="request-message" className={`block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>
+              <label htmlFor="request-message" className={`block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>
                 Note to the admins <span className="normal-case tracking-normal font-medium">(optional)</span>
               </label>
               <textarea

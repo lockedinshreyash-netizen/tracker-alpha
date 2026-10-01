@@ -198,7 +198,7 @@ const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Pr
           return (
             <div
               key={option.id}
-              className={`relative overflow-hidden rounded-lg border px-3.5 py-2.5 ${dark ? 'border-white/[0.08]' : 'border-[#E3E0D9]'}`}
+              className={`relative overflow-hidden rounded-lg border px-3.5 py-2.5 ${dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}
             >
               <div
                 className="absolute inset-y-0 left-0 transition-[width] duration-500"
@@ -209,9 +209,9 @@ const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Pr
                 aria-hidden="true"
               />
               <div className="relative flex items-center gap-2">
-                <span className={`flex-1 min-w-0 text-[12.5px] font-ui truncate ${mine ? 'font-bold' : ''} ${dark ? 'text-zinc-200' : 'text-[#17150F]'}`}>
+                <span className={`flex-1 min-w-0 text-[12.5px] font-ui truncate ${mine ? 'font-bold' : ''} ${dark ? 'text-zinc-200' : 'text-zinc-900'}`}>
                   {option.label}
-                  {mine && <span className="ml-2 text-[9px] font-bold uppercase tracking-[0.08em] text-[#E10600]">Yours</span>}
+                  {mine && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600]">Yours</span>}
                 </span>
                 <span className={`text-[11px] font-bold font-ui tabular-nums ${muted}`}>{pct}%</span>
               </div>
@@ -228,14 +228,14 @@ const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Pr
             <div
               key={option.id}
               className={`${rowBase} flex items-center gap-2 ${mine
-                ? 'border-[#E10600]/45 ' + (dark ? 'bg-[#E10600]/[0.10] text-white' : 'bg-[#E10600]/[0.06] text-[#17150F]')
-                : (dark ? 'border-white/[0.06] text-zinc-600' : 'border-[#E3E0D9] text-[#A8A396]')}`}
+                ? 'border-[#E10600]/45 ' + (dark ? 'bg-[#E10600]/[0.10] text-white' : 'bg-[#E10600]/[0.06] text-zinc-900')
+                : (dark ? 'border-white/[0.06] text-zinc-600' : 'border-zinc-200 text-[#A8A396]')}`}
             >
               <span className="flex-1 min-w-0 truncate">{option.label}</span>
               {mine && (
                 <span className="flex items-center gap-1.5 text-[#E10600] flex-shrink-0">
                   <CheckGlyph />
-                  <span className="text-[9px] font-bold uppercase tracking-[0.08em]">Yours</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.06em]">Yours</span>
                 </span>
               )}
             </div>
@@ -251,10 +251,10 @@ const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Pr
             disabled={pending !== null}
             aria-pressed={picked}
             className={`${rowBase} flex items-center gap-2.5 transition-all active:scale-97 disabled:cursor-default ${picked
-              ? 'border-[#E10600]/45 ' + (dark ? 'bg-[#E10600]/[0.10] text-white' : 'bg-[#E10600]/[0.06] text-[#17150F]')
+              ? 'border-[#E10600]/45 ' + (dark ? 'bg-[#E10600]/[0.10] text-white' : 'bg-[#E10600]/[0.06] text-zinc-900')
               : dark
                 ? 'bg-[#0D0D10] border-white/[0.08] text-zinc-200 hover:border-white/[0.18]'
-                : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] hover:border-[#D6D1C5]'} ${pending && !saving ? 'opacity-40' : ''}`}
+                : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 hover:border-zinc-300'} ${pending && !saving ? 'opacity-40' : ''}`}
           >
             <span
               aria-hidden="true"
@@ -266,12 +266,12 @@ const PollBody = React.forwardRef(({ announcement, userId, theme, onStatus }: Pr
             </span>
             <span className="flex-1 min-w-0 truncate">{option.label}</span>
             {saving && (
-              <span className={`text-[9px] font-bold uppercase tracking-[0.08em] flex-shrink-0 ${muted}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-[0.06em] flex-shrink-0 ${muted}`}>
                 Saving…
               </span>
             )}
             {!saving && mine && (
-              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#E10600] flex-shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] flex-shrink-0">
                 Current
               </span>
             )}

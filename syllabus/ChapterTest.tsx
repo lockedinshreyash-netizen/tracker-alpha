@@ -79,14 +79,14 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
       <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-2xl my-4 border rounded-xl ${panel} animate-in fade-in zoom-in-95 duration-200`}>
         <div className={`flex items-start justify-between gap-4 p-6 border-b ${rule}`}>
           <div className="min-w-0">
-            <p className={`text-[9px] font-bold uppercase tracking-[0.16em] mb-2 ${muted}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 ${muted}`}>
               Mastery test · Class {classId} · {subject}
             </p>
             <h2 className={`text-lg md:text-xl font-black uppercase leading-none tracking-tight ${dark ? 'text-white' : 'text-black'}`}>
               {chapter}
             </h2>
           </div>
-          <button onClick={onClose} className={`shrink-0 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.08em] rounded border transition-colors ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-zinc-300' : 'border-zinc-300 text-zinc-500'}`}>
+          <button onClick={onClose} className={`shrink-0 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.06em] rounded border transition-colors ${dark ? 'border-white/[0.12] text-zinc-500 hover:text-zinc-300' : 'border-zinc-300 text-zinc-500'}`}>
             Close
           </button>
         </div>
@@ -97,12 +97,12 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
               <div className={`flex-1 h-1 rounded-full overflow-hidden ${dark ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
                 <div className="h-full bg-[#E10600] transition-all duration-300" style={{ width: `${((index + (revealed ? 1 : 0)) / items.length) * 100}%` }} />
               </div>
-              <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-500 tabular-nums shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-500 tabular-nums shrink-0">
                 {index + 1} / {items.length}
               </span>
             </div>
 
-            <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-600 mb-2 font-ui">{current.topic.name}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-600 mb-2 font-ui">{current.topic.name}</p>
             <p className={`text-[14px] leading-relaxed font-ui mb-5 ${dark ? 'text-zinc-100' : 'text-black'}`}>
               {current.question.question}
             </p>
@@ -149,7 +149,7 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
             ) : (
               <div>
                 <div className={`p-4 rounded-lg border mb-4 ${rule} ${dark ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
-                  <p className={`text-[9px] font-bold uppercase tracking-[0.1em] mb-1.5 ${VERDICT[verdict!].cls.split(' ')[0]}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-1.5 ${VERDICT[verdict!].cls.split(' ')[0]}`}>
                     {VERDICT[verdict!].label}
                   </p>
                   <p className={`text-[12px] leading-relaxed font-ui ${dark ? 'text-zinc-300' : 'text-zinc-700'}`}>
@@ -179,7 +179,7 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
                 return (
                   <div key={it.topic.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border ${rule}`}>
                     <span className={`text-[11px] font-ui truncate ${dark ? 'text-zinc-300' : 'text-zinc-700'}`}>{it.topic.name}</span>
-                    <span className={`text-[8px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded border shrink-0 ${VERDICT[r].cls}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded border shrink-0 ${VERDICT[r].cls}`}>
                       {VERDICT[r].label}
                     </span>
                   </div>

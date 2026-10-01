@@ -128,7 +128,7 @@ const GroupSettingsSheet: React.FC<Props> = ({ group, userId, tasks, groups, onC
           disabled={saving}
         />
         <div className={`mt-5 rounded-lg border px-4 pt-3 pb-4 ${t.inset}`}>
-          <p className={`text-[9px] font-black uppercase tracking-[0.12em] font-ui mb-3 ${t.muted}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui mb-3 ${t.muted}`}>
             Preview · how you appear to other members
           </p>
           <PersonRow
@@ -158,7 +158,7 @@ const GroupSettingsSheet: React.FC<Props> = ({ group, userId, tasks, groups, onC
 
         {isAdmin && bans.length > 0 && (
           <div className={`rounded-lg border ${t.inset}`}>
-            <p className={`px-4 pt-3 text-[9px] font-black uppercase tracking-[0.12em] font-ui ${t.muted}`}>Banned</p>
+            <p className={`px-4 pt-3 text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${t.muted}`}>Banned</p>
             <ul className="py-1">
               {bans.map(b => (
                 <li key={b.user_id} className="px-4 py-2 flex items-center gap-3">

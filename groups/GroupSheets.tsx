@@ -50,7 +50,7 @@ const AccessFields: React.FC<{
   dark: boolean;
 }> = ({ value, onChange, dark }) => {
   const t = tokens(dark);
-  const label = `block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`;
+  const label = `block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`;
   const isPublic = value.visibility === 'discoverable';
   return (
     <div className="space-y-4">
@@ -101,7 +101,7 @@ const GroupFields: React.FC<{
   dark: boolean;
 }> = ({ value, onChange, dark }) => {
   const t = tokens(dark);
-  const label = `block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`;
+  const label = `block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`;
   return (
     <>
       <div>
@@ -339,7 +339,7 @@ export const JoinCodeSheet: React.FC<{
           onSubmit={e => { e.preventDefault(); if (ready) setCode(normalizeInviteCode(draft)); }}
           className="space-y-4"
         >
-          <label htmlFor="invite-code" className={`block text-[9px] font-black uppercase tracking-[0.14em] font-ui ${t.muted}`}>
+          <label htmlFor="invite-code" className={`block text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${t.muted}`}>
             Invite code
           </label>
           <input

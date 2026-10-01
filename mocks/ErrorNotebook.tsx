@@ -15,6 +15,8 @@ interface Props {
   dark: boolean;
   onAdd: () => void;
   onEdit: (e: ErrorEntry) => void;
+  /** Instant; the container offers Undo. */
+  onDelete: (ids: string[]) => void;
   onTest: (title: string, ids: string[]) => void;
 }
 
@@ -54,7 +56,7 @@ const PileCard: React.FC<{ p: ErrorPile; dark: boolean; onTest: () => void; i: n
   );
 };
 
-const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void }> = ({ e, dark, onEdit }) => {
+const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; onDelete: () => void }> = ({ e, dark, onEdit, onDelete }) => {
   const t = tokens(dark);
   const [open, setOpen] = useState(false);
   return (
@@ -85,14 +87,22 @@ const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void }> 
             ))}
           </div>
           {e.why && <p className={`font-accent text-[15px] mt-3 ${t.heading}`}>“{e.why}”</p>}
-          <button onClick={onEdit} className={`${btn} mt-4 px-4 py-2.5 ${t.ghost}`}>Edit</button>
+          <div className="flex items-center gap-2 mt-4">
+            <button onClick={onEdit} className={`${btn} px-4 py-2.5 ${t.ghost}`}>Edit</button>
+            <button onClick={onDelete} aria-label="Delete this error" className={`${btn} px-4 py-2.5 ${t.muted} hover:text-[#E10600]`}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+              </svg>
+              Delete
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit, onTest }) => {
+const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit, onDelete, onTest }) => {
   const t = tokens(dark);
   const [subject, setSubject] = useState<Subject | 'all'>('all');
   const [status, setStatus] = useState<Status>('open');
@@ -203,7 +213,15 @@ const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit,
         <div className="px-5 md:px-6 pt-6 pb-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <Eyebrow dark={dark}>All errors</Eyebrow>
-            <span className={`text-[11px] font-ui ${t.faint}`}>{filtered.length} shown</span>
+            <div className="flex items-center gap-3">
+              {/* Mastered errors are the ones worth clearing out; offered only where you are looking at them. */}
+              {status === 'cleared' && filtered.length > 0 && (
+                <button onClick={() => onDelete(filtered.map(e => e.id))} className={`text-[11px] font-ui font-bold ${t.muted} hover:text-[#E10600]`}>
+                  Delete {filtered.length === 1 ? 'this one' : `all ${filtered.length}`}
+                </button>
+              )}
+              <span className={`text-[11px] font-ui ${t.faint}`}>{filtered.length} shown</span>
+            </div>
           </div>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search questions, chapters, topics…" className={t.input} />
           <div className="flex items-center gap-1.5 overflow-x-auto mk-scroll-x pb-1">
@@ -223,7 +241,7 @@ const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit,
           </div>
         </div>
         <div className={`divide-y border-t ${dark ? 'divide-white/[0.05] border-white/[0.05]' : 'divide-zinc-100 border-zinc-100'}`}>
-          {filtered.slice(0, limit).map(e => <ErrorCard key={e.id} e={e} dark={dark} onEdit={() => onEdit(e)} />)}
+          {filtered.slice(0, limit).map(e => <ErrorCard key={e.id} e={e} dark={dark} onEdit={() => onEdit(e)} onDelete={() => onDelete([e.id])} />)}
           {!filtered.length && <p className={`px-6 py-8 text-center text-[13px] font-ui ${t.muted}`}>{status === 'open' && !q ? 'Nothing unresolved here. Clean.' : 'No errors match.'}</p>}
         </div>
         {filtered.length > limit && (

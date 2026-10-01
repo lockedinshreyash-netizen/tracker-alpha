@@ -28,7 +28,7 @@ const toneClass = (tone: StatusTone, dark: boolean): string => {
     case 'lead':
       return `${base} border-[#E10600]/20 race-crown`;
     default:
-      return `${base} ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`;
+      return `${base} ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`;
   }
 };
 
@@ -36,23 +36,23 @@ const toneClass = (tone: StatusTone, dark: boolean): string => {
 const Metric: React.FC<{ label: string; value: string; sub?: string; dark: boolean; accent?: boolean }> = ({
   label, value, sub, dark, accent,
 }) => (
-  <div className={`px-3 py-3 md:px-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}>
-    <p className={`text-[8px] md:text-[9px] font-bold uppercase tracking-[0.12em] font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>
+  <div className={`px-3 py-3 md:px-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-200'}`}>
+    <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
       {label}
     </p>
-    <p className={`text-base md:text-xl num-stat mt-1.5 ${accent ? 'text-[#E10600]' : dark ? 'text-white' : 'text-[#17150F]'}`}>
+    <p className={`text-base md:text-xl num-stat mt-1.5 ${accent ? 'text-[#E10600]' : dark ? 'text-white' : 'text-zinc-900'}`}>
       {value}
     </p>
     {sub && (
-      <p className={`text-[9px] font-ui mt-0.5 truncate ${dark ? 'text-zinc-600' : 'text-[#B5AFA0]'}`}>{sub}</p>
+      <p className={`text-[9px] font-ui mt-0.5 truncate ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>{sub}</p>
     )}
   </div>
 );
 
 const RaceStatusCard: React.FC<Props> = ({ status, race, day, theme }) => {
   const dark = theme === 'dark';
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
-  const heading = dark ? 'text-white' : 'text-[#17150F]';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
+  const heading = dark ? 'text-white' : 'text-zinc-900';
 
   /* Second metric changes with the situation: someone leading cares about the
      size of their cushion, everyone else cares about the climb. */
@@ -68,13 +68,13 @@ const RaceStatusCard: React.FC<Props> = ({ status, race, day, theme }) => {
     <section className={`rounded-xl border overflow-hidden transition-all ${toneClass(status.tone, dark)}`}>
       <div className="p-6 md:p-8">
         <div className="flex items-center justify-between gap-4">
-          <p className={`text-[9px] font-black uppercase tracking-[0.18em] font-ui ${muted}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>
             Race control · Today
           </p>
           {race.studyingNow > 0 && (
             <span className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] race-live-dot" />
-              <span className={`text-[9px] font-bold uppercase tracking-[0.1em] font-ui ${muted}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>
                 {race.studyingNow} in a session
               </span>
             </span>
@@ -87,7 +87,7 @@ const RaceStatusCard: React.FC<Props> = ({ status, race, day, theme }) => {
             <h2 className={`text-xl md:text-3xl font-display leading-[1.1] ${heading}`}>
               {status.headline}
             </h2>
-            <p className={`text-[12px] md:text-sm font-ui mt-2.5 leading-relaxed ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
+            <p className={`text-[12px] md:text-sm font-ui mt-2.5 leading-relaxed ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
               {status.line}
             </p>
             {status.cta && (
@@ -99,7 +99,7 @@ const RaceStatusCard: React.FC<Props> = ({ status, race, day, theme }) => {
         </div>
       </div>
 
-      <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 p-3 md:p-4 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 p-3 md:p-4 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
         <Metric
           dark={dark}
           label="Position"

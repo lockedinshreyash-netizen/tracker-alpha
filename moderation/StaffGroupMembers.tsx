@@ -52,7 +52,7 @@ const StaffGroupMembers: React.FC<Props> = ({ groupId, selfId, dark, onChanged }
       ) : !members.length ? (
         !error && <p className={`text-[11px] font-ui ${t.muted}`}>Nobody is in this group.</p>
       ) : (
-        <ul className={`divide-y ${dark ? 'divide-white/[0.06]' : 'divide-[#E3E0D9]'}`}>
+        <ul className={`divide-y ${dark ? 'divide-white/[0.06]' : 'divide-zinc-100'}`}>
           {members.map(m => (
             <li key={m.user_id} className="py-2.5">
               <div className="flex items-center gap-2">

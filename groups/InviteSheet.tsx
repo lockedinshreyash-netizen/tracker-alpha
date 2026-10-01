@@ -164,7 +164,7 @@ const InviteSheet: React.FC<Props> = ({ group, userId, groups, onClose, theme })
           {showOptions && (
             <div className="mt-4 space-y-4">
               <div>
-                <p className={`text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>Expires</p>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>Expires</p>
                 <Segmented<Expiry>
                   value={expiry}
                   onChange={setExpiry}
@@ -179,7 +179,7 @@ const InviteSheet: React.FC<Props> = ({ group, userId, groups, onClose, theme })
                 />
               </div>
               <div>
-                <p className={`text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${t.muted}`}>Uses</p>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${t.muted}`}>Uses</p>
                 <Segmented<Uses>
                   value={uses}
                   onChange={setUses}

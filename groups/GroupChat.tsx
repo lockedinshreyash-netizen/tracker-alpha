@@ -319,7 +319,7 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
             <div className="space-y-3 pt-2" aria-busy="true">
               {[60, 40, 72, 50].map((w, i) => (
                 <div key={i} className={`flex ${i % 2 ? 'justify-end' : ''}`}>
-                  <div className={`h-10 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-[#F2F0EC]'}`} style={{ width: `${w}%` }} />
+                  <div className={`h-10 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-zinc-50'}`} style={{ width: `${w}%` }} />
                 </div>
               ))}
             </div>
@@ -354,9 +354,9 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
                 if (item.kind === 'day') {
                   return (
                     <div key={item.key} className="flex items-center gap-3 my-4" role="separator">
-                      <div className={`flex-1 h-px ${dark ? 'bg-white/[0.06]' : 'bg-[#E3E0D9]'}`} />
-                      <span className={`text-[9px] font-black uppercase tracking-[0.14em] font-ui ${t.muted}`}>{item.label}</span>
-                      <div className={`flex-1 h-px ${dark ? 'bg-white/[0.06]' : 'bg-[#E3E0D9]'}`} />
+                      <div className={`flex-1 h-px ${dark ? 'bg-white/[0.06]' : 'bg-zinc-200'}`} />
+                      <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${t.muted}`}>{item.label}</span>
+                      <div className={`flex-1 h-px ${dark ? 'bg-white/[0.06]' : 'bg-zinc-200'}`} />
                     </div>
                   );
                 }
@@ -454,7 +454,7 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
           maxLength={MAX_MESSAGE}
           rows={1}
           placeholder={replyQuote ? 'Write your reply…' : 'Type a message…'}
-          className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`}
+          className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'}`}
         />
         <button
           onClick={handleSend}
@@ -536,7 +536,7 @@ const QuoteBlock: React.FC<{
 }> = ({ quote, dark, label, onJump }) => {
   const t = tokens(dark);
   const mine = quote.state !== 'missing' && quote.mine;
-  const rail = mine ? 'border-[#E10600]/60' : dark ? 'border-zinc-500' : 'border-[#8A8577]';
+  const rail = mine ? 'border-[#E10600]/60' : dark ? 'border-zinc-500' : 'border-zinc-400';
   const fill = dark ? 'bg-white/[0.04]' : 'bg-black/[0.04]';
   const jumpable = !!onJump && quote.state !== 'missing' && quote.onScreen;
   const who = quote.state === 'missing' ? '' : label && quote.mine ? 'yourself' : quote.name;
@@ -590,7 +590,7 @@ const ReactionChips: React.FC<{
           className={`h-6 px-1.5 rounded-full border flex items-center gap-1 text-[12px] leading-none shadow-sm transition-transform active:scale-[0.94] ${
             g.mine
               ? 'border-[#E10600]/50 bg-[#E10600]/15'
-              : dark ? 'border-white/[0.08] bg-[#17171B]' : 'border-[#E3E0D9] bg-white'
+              : dark ? 'border-white/[0.08] bg-[#17171B]' : 'border-zinc-200 bg-white'
           } ${busy ? 'opacity-70' : ''}`}
         >
           <span aria-hidden="true">{g.emoji}</span>
@@ -631,7 +631,7 @@ const MessageBubble: React.FC<{
   const interactive = extras && !deleted;
   const bubble = mine
     ? 'bg-[#E10600]/10 border-[#E10600]/25'
-    : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]';
+    : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200';
   const myEmoji = reactions.find(g => g.mine)?.emoji ?? null;
 
   /* Double tap = ❤️, as on Instagram. The first tap still opens the actions
@@ -761,7 +761,7 @@ const MessageBubble: React.FC<{
               <div
                 role="group"
                 aria-label="React"
-                className={`flex items-center gap-0.5 p-1 rounded-full border shadow-sm ${dark ? 'bg-[#17171B] border-white/[0.08]' : 'bg-white border-[#E3E0D9]'}`}
+                className={`flex items-center gap-0.5 p-1 rounded-full border shadow-sm ${dark ? 'bg-[#17171B] border-white/[0.08]' : 'bg-white border-zinc-200'}`}
               >
                 {REACTIONS.map(emoji => (
                   <button

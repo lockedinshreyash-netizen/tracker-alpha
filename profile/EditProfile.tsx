@@ -42,9 +42,9 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
-  const heading = dark ? 'text-white' : 'text-[#17150F]';
-  const inputClass = `w-full rounded-md px-3 py-2.5 text-sm font-ui border outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#18181b] border-[#27272a] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`;
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
+  const heading = dark ? 'text-white' : 'text-zinc-900';
+  const inputClass = `w-full rounded-md px-3 py-2.5 text-sm font-ui border outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#18181b] border-[#27272a] text-white placeholder:text-zinc-700' : 'bg-zinc-50 border-zinc-200 text-zinc-900 placeholder:text-zinc-400'}`;
 
   const draftPreview: Profile = {
     ...profile,
@@ -103,12 +103,12 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
 
   return (
     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 py-6">
-      <div className={`w-full max-w-sm rounded-xl border p-6 space-y-5 max-h-full overflow-y-auto ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-[#E3E0D9]'}`}>
+      <div className={`w-full max-w-sm rounded-xl border p-6 space-y-5 max-h-full overflow-y-auto ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'}`}>
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-[0.2em] font-ui">Account</h2>
           <button
             onClick={onClose}
-            className={`text-xs font-black uppercase tracking-[0.06em] ${dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+            className={`text-xs font-black uppercase tracking-[0.06em] ${dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             Close
           </button>
@@ -123,15 +123,15 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
         {/* Static for now — there's no billing system yet, so this is a
             placeholder every account reads as "Free member" until a real
             premium tier exists to check. */}
-        <div className={`flex items-center justify-between px-3.5 py-2.5 rounded-md border ${dark ? 'bg-[#18181b] border-[#27272a]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}>
-          <span className={`text-[9px] font-black uppercase tracking-[0.14em] font-ui ${muted}`}>Membership</span>
-          <span className={`text-[9px] font-black uppercase tracking-[0.12em] font-ui px-2.5 py-1 rounded ${dark ? 'bg-zinc-800 text-zinc-300' : 'bg-white text-[#6B675C]'}`}>
+        <div className={`flex items-center justify-between px-3.5 py-2.5 rounded-md border ${dark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>Membership</span>
+          <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui px-2.5 py-1 rounded ${dark ? 'bg-zinc-800 text-zinc-300' : 'bg-white text-zinc-600'}`}>
             Free member
           </span>
         </div>
 
         <div>
-          <p className={`text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${muted}`}>Profile picture</p>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${muted}`}>Profile picture</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -144,12 +144,12 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
             onClick={() => fileInputRef.current?.click()}
             className={`w-full py-2.5 rounded-md border text-[10px] font-bold uppercase tracking-[0.1em] font-ui transition-all ${avatarType === 'upload'
               ? 'border-[#E10600] text-[#E10600]'
-              : dark ? 'border-[#27272a] text-zinc-400 hover:text-white' : 'border-[#E3E0D9] text-[#6B675C] hover:text-[#17150F]'}`}
+              : dark ? 'border-[#27272a] text-zinc-400 hover:text-white' : 'border-zinc-200 text-zinc-600 hover:text-zinc-900'}`}
           >
             {avatarType === 'upload' ? 'Photo selected · Change' : 'Upload a photo'}
           </button>
 
-          <p className={`text-[9px] font-bold uppercase tracking-[0.14em] mt-4 mb-2 font-ui ${muted}`}>Or choose an Alpha Avatar</p>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mt-4 mb-2 font-ui ${muted}`}>Or choose an Alpha Avatar</p>
           <div className="grid grid-cols-4 gap-2.5">
             {ALPHA_AVATARS.map(a => {
               const selected = avatarType === 'alpha' && avatarId === a.id;
@@ -169,7 +169,7 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
         </div>
 
         <div>
-          <label className={`block text-[9px] font-black uppercase tracking-[0.14em] mb-2 font-ui ${muted}`}>Display name</label>
+          <label className={`block text-[10px] font-bold uppercase tracking-[0.06em] mb-2 font-ui ${muted}`}>Display name</label>
           <input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
@@ -181,7 +181,7 @@ const EditProfile: React.FC<Props> = ({ profile, onClose, onSaved, theme }) => {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className={`text-[9px] font-black uppercase tracking-[0.14em] font-ui ${muted}`}>Bio</label>
+            <label className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>Bio</label>
             <span className={`text-[9px] font-ui ${muted}`}>{bio.length}/{MAX_BIO}</span>
           </div>
           <textarea

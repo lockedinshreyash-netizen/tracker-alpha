@@ -55,10 +55,10 @@ const BoardColumn: React.FC<Props> = ({
       <header className="flex items-center justify-between gap-1 mb-2 md:mb-3 px-0.5 md:px-1">
         {/* `truncate` so a column header can never be the thing that widens a
             column past its share. */}
-        <h4 className={`text-[9px] md:text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>
+        <h4 className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui truncate ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
           {COLUMN_LABEL[column]}
         </h4>
-        <span className={`text-[9px] md:text-[10px] font-bold font-ui tabular-nums flex-shrink-0 ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
+        <span className={`text-[9px] md:text-[10px] font-bold font-ui tabular-nums flex-shrink-0 ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>
           {tasks.length}
         </span>
       </header>
@@ -69,7 +69,7 @@ const BoardColumn: React.FC<Props> = ({
         style={{
           borderColor: active
             ? '#E1060055'
-            : dark ? 'rgba(255,255,255,0.06)' : '#E3E0D9',
+            : dark ? 'rgba(255,255,255,0.06)' : '#e4e4e7',
           background: active ? (dark ? 'rgba(225,6,0,0.04)' : 'rgba(225,6,0,0.02)') : 'transparent',
         }}
       >
@@ -100,7 +100,7 @@ const BoardColumn: React.FC<Props> = ({
         )}
 
         {!visible.length && !active && (
-          <p className={`text-[9px] md:text-[10px] font-medium uppercase tracking-[0.06em] italic text-center py-4 md:py-6 px-1 font-ui ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
+          <p className={`text-[9px] md:text-[10px] font-medium uppercase tracking-[0.06em] italic text-center py-4 md:py-6 px-1 font-ui ${dark ? 'text-zinc-700' : 'text-zinc-400'}`}>
             {/* Shorter on a phone, where the column is about ninety pixels wide
                 and "Nothing in progress" would set as four ragged lines. */}
             <span className="md:hidden">{column === 'todo' ? 'Empty' : column === 'doing' ? 'Nothing on' : 'Nothing done'}</span>
@@ -111,7 +111,7 @@ const BoardColumn: React.FC<Props> = ({
         {isDone && hidden > 0 && (
           <button
             onClick={() => setShowAllDone(true)}
-            className={`text-[8px] md:text-[9px] font-bold uppercase tracking-[0.06em] py-1.5 md:py-2 font-ui ${dark ? 'text-zinc-600 hover:text-zinc-400' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+            className={`text-[10px] font-bold uppercase tracking-[0.06em] py-1.5 md:py-2 font-ui ${dark ? 'text-zinc-600 hover:text-zinc-400' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             + {hidden} earlier
           </button>
@@ -129,12 +129,12 @@ const BoardColumn: React.FC<Props> = ({
               if (e.key === 'Escape') { setText(''); setComposing(false); }
             }}
             placeholder="WHAT NEEDS DOING?"
-            className={`text-[10px] md:text-[11px] font-bold uppercase tracking-tight p-2 md:p-3 rounded-lg border focus:outline-none focus:ring-1 focus:ring-white/20 font-ui min-w-0 ${dark ? 'bg-[#111114] border-white/[0.06] text-white' : 'bg-white border-[#E3E0D9] text-[#17150F]'}`}
+            className={`text-[10px] md:text-[11px] font-bold uppercase tracking-tight p-2 md:p-3 rounded-lg border focus:outline-none focus:ring-1 focus:ring-white/20 font-ui min-w-0 ${dark ? 'bg-[#111114] border-white/[0.06] text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}
           />
         ) : (
           <button
             onClick={() => setComposing(true)}
-            className={`text-[9px] md:text-[10px] font-bold uppercase tracking-[0.06em] py-2 md:py-2.5 rounded-lg border border-dashed transition-colors font-ui ${dark ? 'border-white/[0.06] text-zinc-600 hover:text-zinc-400 hover:border-white/[0.12]' : 'border-[#E3E0D9] text-[#8A8577] hover:text-[#17150F] hover:border-[#D6D1C5]'}`}
+            className={`text-[10px] font-bold uppercase tracking-[0.06em] py-2 md:py-2.5 rounded-lg border border-dashed transition-colors font-ui ${dark ? 'border-white/[0.06] text-zinc-600 hover:text-zinc-400 hover:border-white/[0.12]' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-300'}`}
           >
             + Add
           </button>

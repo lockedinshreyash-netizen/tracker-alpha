@@ -13,6 +13,8 @@ import { ExperimentState } from '../insight/observe';
 import NextUpStrip from '../schedule/NextUpStrip';
 import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
+import { SUBJECT_COLORS } from '../schedule/colors';
+import { Card, Chip, Eyebrow, PageHeader, Segmented, btn, tokens } from '../ui/kit';
 
 interface Props {
   state: AppState;
@@ -173,10 +175,29 @@ const TodayTab: React.FC<Props> = ({
   const subjectDist = getSubjectDistribution(logs, activeSubjects);
 
   const dark = theme === 'dark';
+  const t = tokens(dark);
   const isPomodoro = timerMode === 'pomodoro';
+  const dot = (s: Subject) => (SUBJECT_COLORS[s] ?? SUBJECT_COLORS.General).dot;
+  const todayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
+  const remaining = Math.max(0, dailyGoalHours - totalToday);
+  const busy = timer.isRunning || pomodoroBusy;
 
   return (
-    <div className="space-y-10 md:space-y-14 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-6">
+      {/* Mid-session the clock is the page; the header would only push it down. */}
+      {!busy && (
+        <PageHeader
+          dark={dark}
+          title="Today"
+          subtitle={
+            totalToday === 0
+              ? `${todayLabel}. Nothing logged yet. The clock is waiting.`
+              : remaining > 0
+                ? `${todayLabel}. ${totalToday.toFixed(1)}h done, ${remaining.toFixed(1)}h to go.`
+                : `${todayLabel}. Target hit. Everything now is extra.`
+          }
+        />
+      )}
       {/* Only while idle — mid-session the last thing anyone needs is a second
           opinion about what they should be doing. */}
       {!timer.isRunning && !pomodoroBusy && state.schedule && (
@@ -229,26 +250,30 @@ const TodayTab: React.FC<Props> = ({
         />
       )}
       {!timer.isRunning && (
-        <section className={`p-6 md:p-10 rounded-xl border flex flex-col gap-8 md:gap-10 transition-all ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
+        <Card dark={dark} delay={60} className="p-6 md:p-8">
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full" data-onboarding-target="daily-target">
-            <div className="relative w-20 h-20 md:w-32 md:h-32 flex-shrink-0">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="transparent" className={dark ? 'text-zinc-900' : 'text-[#F2F0EC]'} />
-                <circle cx="50" cy="50" r="42" stroke="#E10600" strokeWidth="8" fill="transparent" strokeDasharray="264" strokeDashoffset={264 - (264 * progressPercent) / 100} strokeLinecap="round" className="transition-all duration-1000" />
+            <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="43" stroke={dark ? 'rgba(255,255,255,0.06)' : '#f4f4f5'} strokeWidth="7" fill="transparent" />
+                <circle cx="50" cy="50" r="43" stroke="#E10600" strokeWidth="7" fill="transparent" strokeDasharray="270" strokeDashoffset={270 - (270 * progressPercent) / 100} strokeLinecap="round" className="transition-all duration-1000" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-base md:text-xl leading-none num-stat">{Math.round(progressPercent)}%</span>
-                <span className={`text-[8px] md:text-[10px] font-bold uppercase mt-1 font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Goal</span>
+                <span className={`num-hero text-[22px] md:text-[28px] ${t.heading}`}>{Math.round(progressPercent)}%</span>
+                <span className={`text-[9px] font-ui font-bold uppercase tracking-[0.1em] mt-1 ${t.faint}`}>of goal</span>
               </div>
             </div>
-            <div className="flex flex-col justify-center flex-1">
-              <p className="text-2xl md:text-4xl tracking-tighter leading-none num-stat">{totalToday.toFixed(1)}<span className={`text-sm md:text-lg ml-2 font-ui font-bold ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>/ {dailyGoalHours}H</span></p>
-              <div className="flex gap-2 mt-4 items-center">
-                <div className="flex gap-1">
-                  <button onClick={() => onUpdateDailyGoal(Math.max(1, dailyGoalHours - 1))} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">-</button>
-                  <button onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className="w-7 h-7 rounded bg-[#E10600]/10 text-[#E10600] text-xs font-bold flex items-center justify-center hover:bg-[#E10600]/20 active:scale-90 transition-all">+</button>
+            <div className="flex flex-col justify-center flex-1 min-w-0">
+              <Eyebrow dark={dark}>Today’s target</Eyebrow>
+              <p className={`num-hero text-[44px] md:text-[56px] mt-2 ${t.heading}`}>
+                {totalToday.toFixed(1)}
+                <span className={`font-ui font-bold text-[16px] md:text-[20px] ml-2 ${t.muted}`}>/ {dailyGoalHours}h</span>
+              </p>
+              <div className="flex gap-2 mt-3 items-center">
+                <div className={`inline-flex items-center rounded-lg border ${dark ? 'border-white/[0.08]' : 'border-zinc-200'}`}>
+                  <button aria-label="Lower daily target" onClick={() => onUpdateDailyGoal(Math.max(1, dailyGoalHours - 1))} className={`w-8 h-8 text-[15px] font-bold ${t.body} ${t.hover} rounded-l-lg active:scale-90 transition-all`}>−</button>
+                  <span className={`px-2 text-[11px] font-ui font-bold tabular-nums ${t.heading}`}>{dailyGoalHours}h</span>
+                  <button aria-label="Raise daily target" onClick={() => onUpdateDailyGoal(dailyGoalHours + 1)} className={`w-8 h-8 text-[15px] font-bold ${t.body} ${t.hover} rounded-r-lg active:scale-90 transition-all`}>+</button>
                 </div>
-                <span className={`text-[10px] uppercase font-bold tracking-wider font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Daily Target</span>
                 {/* Beside the hours it would show. Hidden mid-session with the
                     rest of this card — a day is shared once it is done. */}
                 <span className="ml-auto">
@@ -258,37 +283,35 @@ const TodayTab: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-            {activeSubjects.map((s: Subject) => (
-              <div key={s} className={`p-3 md:p-4 rounded-lg border ${dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-[#F2F0EC] border-[#E3E0D9]'}`}>
-                <p className={`text-[8px] md:text-[10px] font-bold uppercase mb-1 font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>{s.substring(0, 3)}</p>
-                <p className="text-sm md:text-base num-stat">{(subjectDist[s] || 0).toFixed(1)}h</p>
-              </div>
-            ))}
+          <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-7">
+            {activeSubjects.map((s: Subject, i) => {
+              const h = subjectDist[s] || 0;
+              return (
+                <div key={s} className={`mk-rise p-4 rounded-xl border ${t.inset}`} style={{ animationDelay: `${120 + i * 40}ms` }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot(s) }} />
+                    <span className={`text-[11px] font-ui font-semibold ${t.muted}`}>{s}</span>
+                  </div>
+                  <p className={`num-stat text-[22px] mt-2 ${h ? t.heading : t.faint}`}>{h.toFixed(1)}<span className={`text-[12px] font-ui ml-0.5 ${t.muted}`}>h</span></p>
+                </div>
+              );
+            })}
           </div>
-        </section>
+        </Card>
       )}
 
       {/* Mode switch — hidden mid-stopwatch so a running session can't be orphaned.
           A part-served Pomodoro block isn't orphaned by it: switching away banks
           the time first (see setTimerMode). */}
       {!timer.isRunning && (
-        <div className="flex justify-center">
-          <div className={`inline-flex p-1 rounded-lg border ${dark ? 'border-white/[0.06] bg-[#111114]' : 'border-[#E3E0D9] bg-white'}`}>
-            {([['stopwatch', 'Stopwatch'], ['pomodoro', 'Pomodoro']] as const).map(([mode, label]) => (
-              <button
-                key={mode}
-                onClick={() => onSetTimerMode(mode)}
-                disabled={pomodoro.isRunning}
-                className={`px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] rounded-md transition-all font-ui disabled:opacity-40 ${timerMode === mode
-                  ? 'bg-[#E10600] text-white'
-                  : dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'
-                  }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className={`flex justify-center ${pomodoro.isRunning ? 'opacity-40 pointer-events-none' : ''}`}>
+          <Segmented
+            value={timerMode}
+            onChange={mode => onSetTimerMode(mode)}
+            dark={dark}
+            label="Timer mode"
+            options={[{ value: 'stopwatch', label: 'Stopwatch' }, { value: 'pomodoro', label: 'Pomodoro' }]}
+          />
         </div>
       )}
 
@@ -304,52 +327,60 @@ const TodayTab: React.FC<Props> = ({
       ) : (
         <section
           data-onboarding-target="session-timer"
-          className={`p-10 md:p-20 text-center rounded-xl border relative overflow-hidden transition-all ${dark ? 'bg-[#111114]' : 'bg-white'} ${timer.isRunning ? 'border-[#E10600]/30' : (dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]')}`}
+          className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative overflow-hidden transition-all ${timer.isRunning ? (dark ? 'bg-[#111114] border-[#E10600]/30' : 'bg-white border-[#E10600]/25 shadow-sm') : t.card}`}
+          style={{ animationDelay: '120ms' }}
         >
-          {timer.isRunning && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
-          <p className={`text-[10px] uppercase font-bold tracking-[0.06em] mb-10 font-ui relative z-10 ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>{timer.isRunning ? `FOCUSED ON: ${timer.subject}` : 'CHOOSE SUBJECT TO BEGIN'}</p>
-          <p className="text-[14vw] md:text-8xl tabular-nums leading-none num-timer relative z-10">{formatTime(currentDisplayMs)}</p>
+          {/* A soft wash of the chosen subject's colour — the card previews the session it will start. */}
+          <div
+            className="absolute inset-0 pointer-events-none transition-[background] duration-500"
+            style={{ background: `radial-gradient(80% 60% at 50% 0%, ${timer.isRunning ? 'rgba(225,6,0,0.10)' : `${dot(manualSubject)}${dark ? '1f' : '14'}`}, transparent 70%)` }}
+          />
+          {timer.isRunning && <div className="absolute top-5 right-5 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
+          <div className="relative z-10">
+            <Eyebrow dark={dark}>{timer.isRunning ? `Focused on ${timer.subject}` : 'Pick a subject, then start'}</Eyebrow>
+            <p className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer mt-8 ${t.heading}`}>{formatTime(currentDisplayMs)}</p>
 
-          {!timer.isRunning ? (
-            <>
-              <div className="flex flex-wrap justify-center gap-3 mt-14">
-                {activeSubjects.map((s: Subject) => (
-                  <button
-                    key={s}
-                    onClick={() => setManualSubject(s)}
-                    className={`px-5 md:px-8 py-2.5 text-[10px] font-bold uppercase tracking-[0.08em] border rounded-md transition-all ${manualSubject === s ? 'bg-[#E10600] border-[#E10600] text-white' : (dark ? 'border-white/[0.06] text-zinc-500 hover:border-white/[0.12]' : 'border-[#E3E0D9] text-[#8A8577] hover:border-[#D6D1C5]')}`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col items-center mt-12 gap-6">
-                <button
-                  onClick={handleStartTimer}
-                  className={`w-full max-sm:px-4 py-6 md:py-7 font-black uppercase tracking-[0.3em] md:tracking-[0.5em] transition-all active:scale-[0.98] rounded-xl font-ui ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-[#F2F0EC] hover:bg-[#2B2820]'}`}
-                >
-                  START SESSION
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="mt-12 flex flex-col items-center gap-6 relative z-10">
-              <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
-                <span className={`text-[10px] font-black uppercase ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Focus Quality:</span>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map(v => (
-                    <button key={v} onClick={() => setQuality(v)} className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${quality >= v ? 'bg-[#E10600] text-white' : (dark ? 'bg-zinc-800 text-zinc-500' : 'bg-[#E3E0D9] text-[#8A8577]')}`}>{v}</button>
+            {!timer.isRunning ? (
+              <>
+                <div className="flex flex-wrap justify-center gap-2 mt-10">
+                  {activeSubjects.map((s: Subject) => (
+                    <Chip key={s} on={manualSubject === s} onClick={() => setManualSubject(s)} dark={dark} color={dot(s)} className="!px-4 !py-2">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot(s) }} />
+                      {s}
+                    </Chip>
                   ))}
                 </div>
+                <button
+                  onClick={handleStartTimer}
+                  className={`${btn} w-full max-w-md mx-auto mt-10 py-5 md:py-6 !text-[12px] !tracking-[0.3em] !rounded-xl ${t.primary}`}
+                >
+                  Start session
+                </button>
+              </>
+            ) : (
+              <div className="mt-10 flex flex-col items-center gap-6">
+                <div className="flex flex-col md:flex-row gap-3 items-center">
+                  <Eyebrow dark={dark}>Focus quality</Eyebrow>
+                  <div className="flex gap-1.5" role="radiogroup" aria-label="Focus quality">
+                    {[1, 2, 3, 4, 5].map(v => (
+                      <button
+                        key={v}
+                        role="radio"
+                        aria-checked={quality === v}
+                        onClick={() => setQuality(v)}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-ui font-bold transition-all active:scale-90 ${quality >= v ? 'bg-[#E10600] text-white' : dark ? 'bg-white/[0.05] text-zinc-500' : 'bg-zinc-100 text-zinc-500'}`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={handleStopTimer} className={`${btn} w-full max-w-xs py-5 !text-[12px] !tracking-[0.3em] !rounded-xl ${t.primary}`}>
+                  End session
+                </button>
               </div>
-              <button
-                onClick={handleStopTimer}
-                className="w-full max-w-xs py-6 font-black uppercase tracking-[0.4em] transition-all active:scale-[0.98] rounded-xl font-ui bg-[#E10600] text-white hover:bg-red-700"
-              >
-                END SESSION
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       )}
 
@@ -372,52 +403,51 @@ const TodayTab: React.FC<Props> = ({
           in AppState it would write localStorage and fire a Supabase upsert
           every time someone opened it, the same reason `lastUsedTab` and
           `theme` are held out of the sync merges. */}
-      <section className="space-y-4">
+      <Card dark={dark} delay={200} className="overflow-hidden">
         <button
           onClick={() => setHistoryOpen(o => !o)}
-          className="w-full flex justify-between items-center pb-2 group"
+          className={`w-full flex justify-between items-center px-5 md:px-6 py-4 ${t.hover} transition-colors`}
           aria-expanded={historyOpen}
         >
           <span className="flex items-baseline gap-3">
-            <h3 className={`text-xs font-bold tracking-tight font-ui ${dark ? 'text-zinc-500' : 'text-[#6B675C]'}`}>Session History (Today)</h3>
-            {todayLogs.length > 0 && (
-              <span className={`text-[10px] font-bold font-ui tabular-nums ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
-                {todayLogs.length} {todayLogs.length === 1 ? 'session' : 'sessions'} · {todayHours}h
-              </span>
-            )}
+            <Eyebrow dark={dark}>Today’s sessions</Eyebrow>
+            <span className={`text-[11px] font-ui tabular-nums ${t.faint}`}>
+              {todayLogs.length ? `${todayLogs.length} ${todayLogs.length === 1 ? 'session' : 'sessions'} · ${todayHours}h` : 'None yet'}
+            </span>
           </span>
-          <span
-            className={`text-[10px] font-bold font-ui transition-transform ${historyOpen ? 'rotate-180' : ''} ${dark ? 'text-zinc-600' : 'text-[#8A8577]'}`}
-            aria-hidden="true"
-          >
-            ▾
-          </span>
+          <svg className={`transition-transform ${historyOpen ? 'rotate-180' : ''} ${t.faint}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         </button>
         {/* Conditionally rendered rather than hidden with the `hidden`
             attribute: Tailwind's `.grid { display: grid }` overrides the
             browser's `[hidden] { display: none }`, so the attribute is set and
             the list stays on screen. */}
-        {historyOpen && <div className="grid gap-3">
+        {historyOpen && <div className={`border-t divide-y ${dark ? 'border-white/[0.05] divide-white/[0.05]' : 'border-zinc-100 divide-zinc-100'}`}>
           {todayLogs.length === 0 ? (
-            <p className={`text-[10px] font-black uppercase py-4 text-center italic ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>No sessions recorded today.</p>
+            <p className={`text-[13px] font-ui py-8 text-center ${t.muted}`}>No sessions yet. Start the clock.</p>
           ) : (
             todayLogs.map((l) => (
-              <div key={l.id} className={`flex justify-between items-center p-4 rounded-xl border transition-all group card-interactive ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
-                <div>
-                  <p className="text-[8px] font-black text-[#E10600] uppercase mb-0.5">{l.subject}</p>
-                  <p className={`text-base font-black italic ${dark ? '' : 'text-[#17150F]'}`}>{l.hours}h <span className={`text-[10px] not-italic font-bold ml-2 ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>Q: {l.quality}/5</span></p>
+              <div key={l.id} className="flex justify-between items-center gap-4 px-5 md:px-6 py-3.5 group mk-fade">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dot(l.subject) }} />
+                  <div className="min-w-0">
+                    <p className={`text-[13px] font-ui font-bold ${t.heading}`}>{l.subject}{l.chapter ? <span className={`font-normal ${t.muted}`}> · {l.chapter}</span> : null}</p>
+                    <p className={`text-[11px] font-ui ${t.muted}`}>Focus {l.quality}/5{l.source === 'manual' ? ' · added by hand' : ''}</p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => onDeleteLog(l.id)}
-                  className={`text-[10px] font-black uppercase px-3 py-1 border rounded opacity-40 group-hover:opacity-100 transition-all ${dark ? 'text-zinc-600 hover:text-red-500 border-zinc-800' : 'text-[#8A8577] hover:text-red-500 border-[#E3E0D9]'}`}
-                >
-                  WIPE
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`num-stat text-[18px] ${t.heading}`}>{l.hours.toFixed(1)}<span className={`text-[11px] font-ui ml-0.5 ${t.muted}`}>h</span></span>
+                  <button
+                    onClick={() => onDeleteLog(l.id)}
+                    className={`${btn} px-2.5 py-1.5 opacity-40 group-hover:opacity-100 focus:opacity-100 ${t.muted} hover:text-[#E10600]`}
+                  >
+                    Wipe
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>}
-      </section>
+      </Card>
     </div>
   );
 };

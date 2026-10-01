@@ -1558,7 +1558,17 @@ const App: React.FC = () => {
     }));
   const upsertError = (entry: ErrorEntry) =>
     withMocks(m => ({ ...m, errors: m.errors.some(e => e.id === entry.id) ? m.errors.map(e => (e.id === entry.id ? entry : e)) : [...m.errors, entry] }));
-  const deleteError = (id: string) => withMocks(m => ({ ...m, errors: m.errors.filter(e => e.id !== id) }));
+  /* One write for any number of errors, so "delete all cleared" is one sync,
+     and Undo puts every row back exactly as it was (stats included). */
+  const deleteErrors = (ids: string[]) => {
+    const gone = new Set(ids);
+    withMocks(m => ({ ...m, errors: m.errors.filter(e => !gone.has(e.id)) }));
+  };
+  const restoreErrors = (entries: ErrorEntry[]) =>
+    withMocks(m => {
+      const have = new Set(m.errors.map(e => e.id));
+      return { ...m, errors: [...m.errors, ...entries.filter(e => !have.has(e.id))] };
+    });
   const recordAttempts = (answers: Record<string, boolean>) =>
     withMocks(m => ({ ...m, errors: applyAttempts(m.errors, answers, Date.now()) }));
   const addMockTopic = (key: string, name: string) =>
@@ -2229,7 +2239,8 @@ const App: React.FC = () => {
               onUpsertMock={upsertMock}
               onDeleteMock={deleteMock}
               onUpsertError={upsertError}
-              onDeleteError={deleteError}
+              onDeleteErrors={deleteErrors}
+              onRestoreErrors={restoreErrors}
               onRecordAttempts={recordAttempts}
               onAddTopic={addMockTopic}
               onForgetTopic={forgetMockTopic}

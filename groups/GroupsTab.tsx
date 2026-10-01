@@ -24,6 +24,7 @@ import { Task } from '../types';
 import { MyGroup } from './api';
 import { GroupsState } from './useGroups';
 import { Eyebrow, GroupIcon, Segmented, btn, tokens } from './ui';
+import { PageHeader } from '../ui/kit';
 import InvitePanel from './InvitePanel';
 import { CreateGroupSheet, EditGroupSheet, JoinCodeSheet } from './GroupSheets';
 import GroupBoard from './GroupBoard';
@@ -129,16 +130,18 @@ const GroupsTab: React.FC<Props> = ({
         {pendingInvite && (
           <InvitePanel code={pendingInvite} user={null} onJoined={afterJoin} onDismiss={onInviteHandled} onOpenAuth={onOpenAuth} theme={theme} />
         )}
-        <section className={`p-8 md:p-12 rounded-xl border text-center ${t.card}`}>
-          <h2 className={`text-xl md:text-2xl font-black uppercase tracking-tight font-ui ${t.heading}`}>
-            Study with people who actually show up
+        <PageHeader dark={dark} title="Groups" subtitle="Your batch, your friends, the board between you." />
+        <section className={`mk-rise p-8 md:p-14 rounded-xl border text-center relative overflow-hidden ${t.card}`}>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(70% 80% at 50% 0%, rgba(225,6,0,${dark ? '0.12' : '0.06'}), transparent 70%)` }} />
+          <h2 className={`relative font-display text-[28px] md:text-[36px] leading-[1.05] ${t.heading}`}>
+            Study with people who actually show up.
           </h2>
-          <p className={`text-[11px] font-ui mt-3 max-w-md mx-auto leading-relaxed ${t.muted}`}>
+          <p className={`relative text-[14px] font-ui mt-4 max-w-md mx-auto leading-relaxed ${t.muted}`}>
             Your batch, your coaching class, the three friends who keep you honest. See who put the hours
             in today, talk between sessions, and let the board settle the argument. Sign in to create or
             join a group.
           </p>
-          <button onClick={onOpenAuth} className={`mt-8 px-10 py-4 ${btn} ${t.secondary}`}>Sign in</button>
+          <button onClick={onOpenAuth} className={`relative mt-8 px-10 py-4 ${btn} ${t.primary}`}>Sign in</button>
         </section>
       </div>
     );
@@ -155,7 +158,7 @@ const GroupsTab: React.FC<Props> = ({
         label: open.pending_requests ? `Members · ${open.pending_requests > 99 ? '99+' : open.pending_requests}` : 'Members',
       },
     ];
-    const headerBtn = `h-9 inline-flex items-center gap-2 rounded-lg px-3 text-[10px] font-black uppercase tracking-[0.12em] font-ui transition-all active:scale-[0.97] ${t.ghost}`;
+    const headerBtn = `h-9 inline-flex items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.12em] font-ui transition-all active:scale-[0.97] ${t.ghost}`;
 
     return (
       <div className="animate-in fade-in duration-300 space-y-5">
@@ -182,7 +185,7 @@ const GroupsTab: React.FC<Props> = ({
         <header className="flex items-center gap-4">
           <GroupIcon icon={open.icon} name={open.name} size={52} dark={dark} />
           <div className="min-w-0 flex-1">
-            <h1 className={`text-xl md:text-2xl font-black uppercase tracking-tight font-ui truncate ${t.heading}`}>{open.name}</h1>
+            <h1 className={`font-display text-[26px] md:text-[32px] leading-none truncate ${t.heading}`}>{open.name}</h1>
             <p className={`text-[11px] font-ui mt-0.5 truncate ${t.muted}`}>
               <button onClick={() => setSection('members')} className="hover:text-[#E10600] transition-colors">
                 {open.member_count} {open.member_count === 1 ? 'member' : 'members'}
@@ -280,19 +283,16 @@ const GroupsTab: React.FC<Props> = ({
         <InvitePanel code={pendingInvite} user={user} onJoined={afterJoin} onDismiss={onInviteHandled} onOpenAuth={onOpenAuth} theme={theme} />
       )}
 
-      <div className="flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <Eyebrow dark={dark}>Groups</Eyebrow>
-          <h1 className={`text-xl md:text-2xl font-black uppercase tracking-tight font-ui mt-1 ${t.heading}`}>
-            Who are you racing?
-          </h1>
-        </div>
-        {!empty && (
-          <button onClick={() => setCreating(true)} className={`flex-shrink-0 px-4 py-3 ${btn} ${t.primary}`}>
+      <PageHeader
+        dark={dark}
+        title="Groups"
+        subtitle="Who are you racing?"
+        right={!empty ? (
+          <button onClick={() => setCreating(true)} className={`flex-shrink-0 px-5 py-3 ${btn} ${t.primary}`}>
             <span aria-hidden="true">+ </span>New group
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <div className="md:max-w-xs">
         <Segmented<View>

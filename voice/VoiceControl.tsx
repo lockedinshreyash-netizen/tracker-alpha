@@ -321,8 +321,8 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
   };
 
 
-  const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-[#E3E0D9]';
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
+  const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-zinc-200';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
 
   return (
     <>
@@ -345,7 +345,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
         {micOn && (
           <button
             onClick={() => setShowHelp(true)}
-            className={`px-3 py-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-[0.08em] font-ui transition-all active:scale-95 pointer-events-auto ${panel} ${muted}`}
+            className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-[0.06em] font-ui transition-all active:scale-95 pointer-events-auto ${panel} ${muted}`}
           >
             {speaking ? 'Speaking…' : 'Commands'}
           </button>
@@ -357,7 +357,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
           aria-label={micOn ? 'Stop voice commands' : 'Start voice commands'}
           className={`relative w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 shadow-lg pointer-events-auto ${micOn
             ? 'bg-[#E10600] border-[#E10600] text-white'
-            : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-[#6B675C] hover:text-[#17150F]'}`
+            : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'}`
             }`}
         >
           {micOn && (
@@ -376,7 +376,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             onClick={(e) => e.stopPropagation()}
             className={`w-full max-w-md max-h-[85vh] overflow-y-auto rounded-xl border p-6 md:p-8 animate-slide-up ${panel}`}
           >
-            <p className={`text-xs font-black uppercase tracking-[0.1em] font-ui ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+            <p className={`text-xs font-black uppercase tracking-[0.1em] font-ui ${dark ? 'text-white' : 'text-zinc-900'}`}>
               Say it, don't click it
             </p>
             <p className={`text-[10px] font-ui mt-1 ${muted}`}>
@@ -386,7 +386,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             <div className="mt-6 space-y-5">
               {COMMAND_HELP.map(({ group, examples }) => (
                 <div key={group}>
-                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#E10600] font-ui">{group}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] font-ui">{group}</p>
                   <ul className="mt-2 space-y-1.5">
                     {examples.map(example => (
                       <li key={example} className={`text-[11px] font-ui ${dark ? 'text-zinc-300' : 'text-[#3A362C]'}`}>
@@ -399,7 +399,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
             </div>
 
             {isSpeechOutSupported() && (
-              <div className={`mt-6 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+              <div className={`mt-6 pt-5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -416,7 +416,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
                   <div className="mt-4 space-y-2">
                     <button
                       onClick={() => preview('SESSION LIVE: PHYSICS.')}
-                      className={`w-full px-4 py-2 rounded-lg border text-[9px] font-bold uppercase tracking-[0.08em] font-ui transition-all active:scale-95 ${dark ? 'border-white/[0.06] text-zinc-300' : 'border-[#E3E0D9] text-[#3A362C]'}`}
+                      className={`w-full px-4 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-[0.06em] font-ui transition-all active:scale-95 ${dark ? 'border-white/[0.06] text-zinc-300' : 'border-zinc-200 text-[#3A362C]'}`}
                     >
                       Hear it
                     </button>
@@ -429,7 +429,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
                       <select
                         value={systemVoice}
                         onChange={(e) => { setSystemVoice(e.target.value); setPreferredVoiceName(e.target.value); }}
-                        className={`w-full mt-2 px-3 py-2 rounded-lg border text-[10px] font-ui ${dark ? 'bg-[#0D0D10] border-white/[0.06] text-zinc-300' : 'bg-white border-[#E3E0D9] text-[#3A362C]'}`}
+                        className={`w-full mt-2 px-3 py-2 rounded-lg border text-[10px] font-ui ${dark ? 'bg-[#0D0D10] border-white/[0.06] text-zinc-300' : 'bg-white border-zinc-200 text-[#3A362C]'}`}
                       >
                         {systemVoices.map(v => <option key={v.name} value={v.name}>{v.name} — {v.lang}</option>)}
                       </select>
@@ -453,7 +453,7 @@ const VoiceControl: React.FC<Props> = ({ theme, onCommand }) => {
 
             <button
               onClick={() => setShowHelp(false)}
-              className={`w-full mt-6 py-3.5 rounded-lg font-black uppercase tracking-[0.2em] text-[10px] font-ui transition-all active:scale-[0.98] ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-[#F2F0EC] hover:bg-[#2B2820]'}`}
+              className={`w-full mt-6 py-3.5 rounded-lg font-black uppercase tracking-[0.2em] text-[10px] font-ui transition-all active:scale-[0.98] ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-zinc-50 hover:bg-zinc-800'}`}
             >
               Back to work
             </button>

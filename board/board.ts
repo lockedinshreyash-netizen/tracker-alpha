@@ -18,7 +18,7 @@ export const COLUMN_LABEL: Record<TaskColumn, string> = {
 /* A card with no subject, and no colour of its own, still has to be visible.
    Deliberately a grey rather than the accent: #E10600 belongs to actions and to
    the now-line, the same reservation schedule/colors.ts makes. */
-const NEUTRAL_TASK_HEX = '#8a8577';
+const NEUTRAL_TASK_HEX = '#71717a';
 
 /* The Done column stops here, with the rest behind an expander. A Done column
    with two hundred cards in it is a wall, and arriving in it is the whole point

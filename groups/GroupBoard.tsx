@@ -140,7 +140,7 @@ const GroupBoard: React.FC<Props> = ({ group, userId, onOpenProfile, onInvite, o
 
         {rows === null ? (
           <div className="px-5 md:px-6 pb-5 space-y-2" aria-busy="true">
-            {[0, 1, 2].map(i => <div key={i} className={`h-12 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-[#F2F0EC]'}`} />)}
+            {[0, 1, 2].map(i => <div key={i} className={`h-12 rounded-lg animate-pulse ${dark ? 'bg-white/[0.03]' : 'bg-zinc-50'}`} />)}
           </div>
         ) : (
           <ol className="pb-2">
@@ -169,9 +169,9 @@ const GroupBoard: React.FC<Props> = ({ group, userId, onOpenProfile, onInvite, o
                       />
                       <RoleBadge role={r.role} dark={dark} />
                     </div>
-                    <div className={`mt-2 h-1 rounded-full overflow-hidden ${dark ? 'bg-white/[0.04]' : 'bg-[#F2F0EC]'}`}>
+                    <div className={`mt-2 h-1 rounded-full overflow-hidden ${dark ? 'bg-white/[0.04]' : 'bg-zinc-50'}`}>
                       <div
-                        className={`h-full rounded-full transition-all duration-700 ${isMe ? 'bg-[#E10600]' : dark ? 'bg-zinc-500' : 'bg-[#8A8577]'}`}
+                        className={`h-full rounded-full transition-all duration-700 ${isMe ? 'bg-[#E10600]' : dark ? 'bg-zinc-500' : 'bg-zinc-500'}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>

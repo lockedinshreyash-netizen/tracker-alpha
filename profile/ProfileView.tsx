@@ -81,9 +81,9 @@ interface CardProps {
 
 export const ProfileCard: React.FC<CardProps> = ({ profile, totalHours, isOwn, onEdit, theme, compact }) => {
   const dark = theme === 'dark';
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
-  const heading = dark ? 'text-white' : 'text-[#17150F]';
-  const inset = dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-[#F2F0EC] border-[#E3E0D9]';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
+  const heading = dark ? 'text-white' : 'text-zinc-900';
+  const inset = dark ? 'bg-[#0D0D10] border-white/[0.04]' : 'bg-zinc-50 border-zinc-200';
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -91,20 +91,20 @@ export const ProfileCard: React.FC<CardProps> = ({ profile, totalHours, isOwn, o
       <h2 className={`mt-4 text-xl md:text-2xl font-black font-ui ${heading}`}>{profile.display_name}</h2>
 
       {profile.bio && (
-        <p className={`mt-2 text-[12px] font-ui italic leading-relaxed max-w-xs ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
+        <p className={`mt-2 text-[12px] font-ui italic leading-relaxed max-w-xs ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
           &ldquo;{profile.bio}&rdquo;
         </p>
       )}
 
       <div className="grid grid-cols-2 gap-2 w-full mt-6">
         <div className={`px-3 py-3 rounded-lg border ${inset}`}>
-          <p className={`text-[8px] font-bold uppercase tracking-[0.12em] font-ui ${muted}`}>Total studied</p>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>Total studied</p>
           <p className={`num-stat text-base mt-1 ${heading}`}>
             {totalHours === null ? '—' : formatGap(Math.round(totalHours * 60))}
           </p>
         </div>
         <div className={`px-3 py-3 rounded-lg border ${inset}`}>
-          <p className={`text-[8px] font-bold uppercase tracking-[0.12em] font-ui ${muted}`}>Member since</p>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>Member since</p>
           <p className={`text-[11px] font-bold font-ui mt-1.5 ${heading}`}>{formatMemberSince(profile.created_at)}</p>
         </div>
       </div>
@@ -112,7 +112,7 @@ export const ProfileCard: React.FC<CardProps> = ({ profile, totalHours, isOwn, o
       {isOwn && onEdit && (
         <button
           onClick={onEdit}
-          className={`mt-6 w-full py-3 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] font-ui transition-all active:scale-[0.98] ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-[#17150F] text-[#F2F0EC] hover:bg-[#2B2820]'}`}
+          className={`mt-6 w-full py-3 rounded-lg font-black uppercase tracking-[0.14em] text-[10px] font-ui transition-all active:scale-[0.98] ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-zinc-50 hover:bg-zinc-800'}`}
         >
           Edit profile
         </button>
@@ -127,7 +127,7 @@ const LookupStatus: React.FC<{ loading: boolean; error: string | null; found: bo
   if (loading || error || !found) {
     const dark = theme === 'dark';
     return (
-      <p className={`text-[11px] font-ui text-center ${padY} ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>
+      <p className={`text-[11px] font-ui text-center ${padY} ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
         {loading ? 'Loading…' : error ?? 'This profile isn’t available.'}
       </p>
     );
@@ -166,15 +166,15 @@ export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull
     >
       <div
         onClick={e => e.stopPropagation()}
-        className={`w-full max-w-sm rounded-xl border p-6 max-h-full overflow-y-auto ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-[#E3E0D9]'}`}
+        className={`w-full max-w-sm rounded-xl border p-6 max-h-full overflow-y-auto ${dark ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'}`}
       >
         <div className="flex items-center justify-between mb-5">
-          <span className={`text-[10px] font-black uppercase tracking-[0.18em] font-ui ${dark ? 'text-zinc-500' : 'text-[#8A8577]'}`}>
+          <span className={`text-[10px] font-black uppercase tracking-[0.18em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>
             Profile
           </span>
           <button
             onClick={onClose}
-            className={`text-xs font-black uppercase tracking-[0.06em] ${dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+            className={`text-xs font-black uppercase tracking-[0.06em] ${dark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             Close
           </button>
@@ -194,7 +194,7 @@ export const ProfileModal: React.FC<ModalProps> = ({ userId, onClose, onViewFull
             />
             <button
               onClick={() => onViewFull(profile.handle)}
-              className={`w-full mt-4 text-[10px] font-bold uppercase tracking-[0.1em] font-ui ${dark ? 'text-zinc-500 hover:text-white' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+              className={`w-full mt-4 text-[10px] font-bold uppercase tracking-[0.1em] font-ui ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
             >
               View full profile →
             </button>
@@ -230,12 +230,12 @@ export const ProfilePage: React.FC<PageProps> = ({ handle, currentUserId, ownTot
     <div className="max-w-sm mx-auto px-4 py-10 md:py-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <button
         onClick={onBack}
-        className={`text-[10px] font-black uppercase tracking-[0.14em] font-ui mb-6 ${dark ? 'text-zinc-500 hover:text-white' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+        className={`text-[10px] font-black uppercase tracking-[0.14em] font-ui mb-6 ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
       >
         ← Back
       </button>
 
-      <div className={`rounded-xl border p-8 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-[#E3E0D9]'}`}>
+      <div className={`rounded-xl border p-8 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
         <LookupStatus loading={loading} error={error} found={Boolean(profile)} theme={theme} padY="py-16" />
         {!loading && profile && (
           <ProfileCard

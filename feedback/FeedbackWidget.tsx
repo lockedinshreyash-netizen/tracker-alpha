@@ -144,12 +144,12 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
   /* ── Shared skin ──
      Lifted from the app's existing panels rather than invented: same surface,
      same hairline, same muted zinc as every card in `mocks/`. */
-  const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-[#E3E0D9]';
-  const ink = dark ? 'text-white' : 'text-[#17150F]';
-  const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';
+  const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-zinc-200';
+  const ink = dark ? 'text-white' : 'text-zinc-900';
+  const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
   const field = `w-full rounded-lg border px-3 py-2.5 text-[13px] font-ui outline-none transition-colors ${dark
     ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-600 focus:border-white/20'
-    : 'bg-[#F7F6F3] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0] focus:border-[#D6D1C5]'}`;
+    : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-300'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`;
 
   return (
@@ -163,7 +163,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
           aria-label={open ? 'Close feedback' : 'Send feedback'}
           className={`w-12 h-12 rounded-full border flex items-center justify-center shadow-lg transition-all active:scale-95 ${open
             ? 'bg-[#E10600] border-[#E10600] text-white'
-            : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-[#6B675C] hover:text-[#17150F]'}`}`}
+            : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'}`}`}
         >
           {open ? (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -190,12 +190,12 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
             className={`fb-panel fb-pop rounded-2xl border shadow-2xl overflow-hidden outline-none ${panel}`}
           >
             {/* ── Header ── */}
-            <div className={`flex items-center gap-3 px-5 py-4 border-b flex-shrink-0 ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+            <div className={`flex items-center gap-3 px-5 py-4 border-b flex-shrink-0 ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
               {view !== 'menu' && (
                 <button
                   onClick={() => (view === 'sent' ? reset() : setView('menu'))}
                   aria-label="Back"
-                  className={`-ml-1 p-1 rounded-md transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-[#8A8577] hover:text-[#17150F]'}`}
+                  className={`-ml-1 p-1 rounded-md transition-colors ${dark ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="15 18 9 12 15 6" />
@@ -222,7 +222,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {!user ? (
                 <div className="py-4 text-center">
-                  <p className={`text-[13px] font-ui leading-relaxed ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
+                  <p className={`text-[13px] font-ui leading-relaxed ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                     Sign in and we can answer you. Without an account there is nowhere
                     to send the reply.
                   </p>
@@ -241,7 +241,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                       onClick={() => choose(c)}
                       className={`text-left px-4 py-3 rounded-xl border transition-all active:scale-97 ${dark
                         ? 'bg-[#0D0D10] border-white/[0.06] hover:border-white/[0.14]'
-                        : 'bg-[#F7F6F3] border-[#E3E0D9] hover:border-[#D6D1C5]'}`}
+                        : 'bg-[#F7F6F3] border-zinc-200 hover:border-zinc-300'}`}
                     >
                       <span className={`block text-[13px] font-bold font-ui ${ink}`}>{c.label}</span>
                       <span className={`block text-[11px] font-ui mt-0.5 leading-snug ${muted}`}>{c.blurb}</span>
@@ -339,10 +339,10 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                   {mine?.map(t => (
                     <div
                       key={t.id}
-                      className={`px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-[#E3E0D9]'}`}
+                      className={`px-4 py-3 rounded-xl border ${dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F7F6F3] border-zinc-200'}`}
                     >
                       <div className="flex items-baseline gap-2">
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.08em] font-ui ${t.status === 'resolved' ? muted : 'text-[#E10600]'}`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${t.status === 'resolved' ? muted : 'text-[#E10600]'}`}>
                           {STATUS_LABEL[t.status]}
                         </span>
                         <span className={`text-[9px] font-ui uppercase tracking-[0.06em] ${muted}`}>
@@ -351,7 +351,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                       </div>
                       <p className={`mt-1 text-[12.5px] font-bold font-ui leading-snug ${ink}`}>{t.subject}</p>
                       {t.admin_response && (
-                        <p className={`mt-2 pt-2 border-t text-[11.5px] font-ui leading-relaxed ${dark ? 'border-white/[0.06] text-zinc-400' : 'border-[#E3E0D9] text-[#6B675C]'}`}>
+                        <p className={`mt-2 pt-2 border-t text-[11.5px] font-ui leading-relaxed ${dark ? 'border-white/[0.06] text-zinc-400' : 'border-zinc-200 text-zinc-600'}`}>
                           <span className="font-bold text-[#E10600]">Reply · </span>
                           {t.admin_response}
                         </p>
@@ -364,7 +364,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
 
             {/* ── Footer ── Only the form has anything to commit. */}
             {user && view === 'form' && (
-              <div className={`px-5 py-4 border-t flex-shrink-0 ${dark ? 'border-white/[0.06]' : 'border-[#E3E0D9]'}`}>
+              <div className={`px-5 py-4 border-t flex-shrink-0 ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
                 <button
                   onClick={send}
                   disabled={sending}

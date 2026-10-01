@@ -100,11 +100,11 @@ const AnnouncementModal: React.FC<Props> = ({
         >
           <div className="flex items-center gap-2">
             <span className={eyebrow} aria-hidden="true">{face.icon}</span>
-            <p className={`text-[9px] font-bold uppercase tracking-[0.24em] font-ui ${eyebrow}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${eyebrow}`}>
               {face.label}
             </p>
             {total > 1 && (
-              <span className={`ml-auto text-[9px] font-bold uppercase tracking-[0.14em] font-ui tabular-nums ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
+              <span className={`ml-auto text-[10px] font-bold uppercase tracking-[0.06em] font-ui tabular-nums ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
                 {index + 1} of {total}
               </span>
             )}
