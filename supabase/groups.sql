@@ -255,6 +255,46 @@ create index if not exists group_messages_by_group on public.group_messages (gro
 -- 30 seconds".
 create index if not exists group_messages_by_sender_time on public.group_messages (sender_id, created_at);
 
+-- ── Replies ──
+-- Added after chat first shipped, so an alteration. A reply points at the
+-- message it quotes; the quote itself is never copied onto the reply, so
+-- deleting the original blanks every quote of it too — copying the text would
+-- let a deleted message live on inside everybody's replies. The insert
+-- trigger refuses a parent from another group. Set null, not cascade: a reply
+-- outlives the account it quoted, it just stops quoting it.
+alter table public.group_messages
+  add column if not exists reply_to bigint references public.group_messages (id) on delete set null;
+-- Without it, every cascaded message delete (an account going away) scans the
+-- whole table to find the replies it has to un-point.
+create index if not exists group_messages_reply_to on public.group_messages (reply_to) where reply_to is not null;
+
+-- ── Reactions ──
+-- One reaction per person per message, as in WhatsApp; the primary key is the
+-- deduplication strategy — a double tap, a retry and a second device all land
+-- on the same row. A fixed set of emoji, not free text: a free-text reaction
+-- is a second message channel with no flood guard and no deletion.
+--
+-- Taking a reaction back sets `emoji` to null instead of deleting the row.
+-- Realtime cannot filter DELETE events and does not apply RLS to them, so a
+-- delete would be broadcast (as its primary key) to every subscriber of the
+-- table in every group. An UPDATE is filtered by group and checked against the
+-- SELECT policy like any message. `updated_at` lets the client merge a stale
+-- page and a fresh realtime event in either order and keep the newer one.
+--
+-- `group_id` is copied from the message by react_to_group_message(), never
+-- sent by a client; it exists so the SELECT policy and the realtime filter can
+-- name the group without a join.
+create table if not exists public.group_message_reactions (
+  message_id bigint      not null references public.group_messages (id) on delete cascade,
+  user_id    uuid        not null references auth.users (id) on delete cascade,
+  group_id   uuid        not null references public.groups (id) on delete cascade,
+  emoji      text,
+  updated_at timestamptz not null default now(),
+  primary key (message_id, user_id),
+  -- Mirrors REACTIONS in groups/chatApi.ts, byte for byte (❤️ carries U+FE0F).
+  constraint reaction_emoji check (emoji is null or emoji in ('👍', '❤️', '😂', '😮', '😢', '🔥'))
+);
+
 -- One row per user per IST study day. See the header for why this exists.
 create table if not exists public.study_days (
   user_id       uuid          not null references auth.users (id) on delete cascade,
@@ -419,6 +459,16 @@ create policy "members post as themselves"
 -- No UPDATE or DELETE policy. Deletion is delete_group_message(), which is
 -- the only way `deleted_at` is ever set and never lets a body be rewritten.
 
+-- group_message_reactions: members read their group's reactions. No write
+-- policy at all — react_to_group_message() is the only writer, because the
+-- row's group has to come from the message, not from the request.
+alter table public.group_message_reactions enable row level security;
+drop policy if exists "members read reactions" on public.group_message_reactions;
+create policy "members read reactions"
+  on public.group_message_reactions for select
+  to authenticated
+  using (public.is_group_member(group_id));
+
 -- study_days / task_shares: your own rows, all operations. Other members read
 -- them only through group_leaderboard() / group_task_progress(), which apply
 -- the per-group sharing switches. A date more than a day ahead of IST is
@@ -477,6 +527,18 @@ begin
        where sender_id = new.sender_id
          and created_at > now() - interval '30 seconds') >= 15 then
     raise exception 'slow down' using errcode = 'P0001', hint = 'rate_limited';
+  end if;
+
+  -- A reply may only quote a message from its own group. Without this a
+  -- member could point a reply at any id and have the client fetch it — the
+  -- SELECT policy would still refuse the text, but the reply would claim a
+  -- relationship that does not exist. A deleted parent is allowed: it may
+  -- have been deleted while the reply was being typed.
+  if new.reply_to is not null and not exists (
+    select 1 from public.group_messages p
+     where p.id = new.reply_to and p.group_id = new.group_id
+  ) then
+    raise exception 'reply target not in this group' using errcode = '42501';
   end if;
 
   return new;
@@ -1306,6 +1368,58 @@ begin
   update public.group_messages
      set body = '', deleted_at = now(), deleted_by = auth.uid()
    where id = p_message;
+  -- A deleted message keeps no reactions. Cleared as UPDATEs, not deleted,
+  -- for the realtime reason given on the table.
+  update public.group_message_reactions
+     set emoji = null, updated_at = now()
+   where message_id = p_message and emoji is not null;
+end;
+$$;
+
+
+-- React, change your reaction, or take it back (p_emoji null). Returns the
+-- row as stored so the client can merge it by `updated_at` like any realtime
+-- event. A deleted message cannot be reacted to.
+create or replace function public.react_to_group_message(p_message bigint, p_emoji text)
+returns public.group_message_reactions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  msg public.group_messages;
+  r   public.group_message_reactions;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+  select * into msg from public.group_messages where id = p_message;
+  if not found or not public.is_group_member(msg.group_id) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if msg.deleted_at is not null then
+    raise exception 'message deleted' using errcode = 'P0001', hint = 'message_deleted';
+  end if;
+
+  -- Every change is a realtime event for every member online. A floor per
+  -- row stops a script toggling one reaction in a loop; no person taps that
+  -- fast, and the client holds the chip while a change is in flight.
+  select * into r from public.group_message_reactions
+   where message_id = p_message and user_id = auth.uid();
+  if found and r.updated_at > now() - interval '300 milliseconds' then
+    raise exception 'slow down' using errcode = 'P0001', hint = 'rate_limited';
+  end if;
+  -- Nothing to take back.
+  if p_emoji is null and (not found or r.emoji is null) then
+    return r;
+  end if;
+
+  insert into public.group_message_reactions (message_id, user_id, group_id, emoji, updated_at)
+  values (p_message, auth.uid(), msg.group_id, p_emoji, now())
+  on conflict (message_id, user_id)
+  do update set emoji = excluded.emoji, updated_at = now()
+  returning * into r;
+  return r;
 end;
 $$;
 
@@ -1548,7 +1662,8 @@ begin
     'public.group_members_list(uuid)',
     'public.group_leaderboard(uuid, date, date)',
     'public.group_task_progress(uuid)',
-    'public.delete_group_message(bigint)'
+    'public.delete_group_message(bigint)',
+    'public.react_to_group_message(bigint, text)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);
@@ -1571,7 +1686,7 @@ end $$;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 7. Realtime
 --
--- Chat messages only. Realtime is the doorbell, not the mailbox: the client
+-- Chat messages and their reactions. Realtime is the doorbell, not the mailbox: the client
 -- treats every event as a hint, fetches history from the table, and
 -- reconciles after any reconnect — see groups/useGroupChat.ts. Guarded so the
 -- file stays re-runnable (a bare ADD TABLE errors the second time).
@@ -1584,6 +1699,18 @@ begin
      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'group_messages'
   ) then
     alter publication supabase_realtime add table public.group_messages;
+  end if;
+end $$;
+
+-- Reactions ride the same channel. INSERT and UPDATE only — see the table for
+-- why a reaction is never deleted while its message exists.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'group_message_reactions'
+  ) then
+    alter publication supabase_realtime add table public.group_message_reactions;
   end if;
 end $$;
 

@@ -1,8 +1,9 @@
 /* ── Group chat ──
    A view over useGroupChat, which owns every guarantee (no gaps, no
    duplicates, sends that survive a dropped connection). This file owns only
-   what a person sees: where the scroll sits, which messages carry a name, and
-   what "deleted" looks like.
+   what a person sees: where the scroll sits, which messages carry a name,
+   what "deleted" looks like, and the WhatsApp-shaped gestures — tap a message
+   for its reactions and Reply, double-tap to ❤️, swipe right to reply.
 
    Mounted keyed by group id, so switching groups is a fresh subscription and
    a fresh scroll position rather than one group's history flashing under
@@ -13,8 +14,8 @@ import { UserChip } from '../profile/Avatar';
 import { useProfiles } from '../profile/profileCache';
 import { ProfileSummary } from '../profile/profileApi';
 import { MyGroup } from './api';
-import { GroupMessage, MAX_MESSAGE, validateMessage } from './chatApi';
-import { Connection, OutboxEntry, useGroupChat } from './useGroupChat';
+import { GroupMessage, MAX_MESSAGE, QUICK_REACTION, REACTIONS, validateMessage } from './chatApi';
+import { Connection, OutboxEntry, QuoteMap, ReactionMap, useGroupChat } from './useGroupChat';
 import { clock12, istDay, tokens } from './ui';
 
 interface Props {
@@ -46,6 +47,18 @@ const dayLabel = (day: string): string => {
     .format(new Date(Date.UTC(y, m - 1, d)));
 };
 
+/** What a reply shows of the message it answers. */
+type Quote =
+  | { state: 'ok'; id: number; mine: boolean; name: string; body: string; onScreen: boolean }
+  | { state: 'deleted'; id: number; mine: boolean; name: string; onScreen: boolean }
+  | { state: 'missing' };
+
+/** One chip under a bubble: an emoji, how many, whether it is yours, and who. */
+interface ReactionGroup { emoji: string; count: number; mine: boolean; names: string[] }
+
+const nameList = (names: string[]): string =>
+  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
 const CONNECTION_LABEL: Record<Connection, string | null> = {
   connecting: 'Connecting…',
   live: null,
@@ -60,6 +73,8 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   const chat = useGroupChat({ groupId: group.id, userId, active: visible, onRead });
   const [draft, setDraft] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [flash, setFlash] = useState<number | null>(null);
   const [newCount, setNewCount] = useState(0);
   const canModerate = group.role === 'owner' || group.role === 'admin';
 
@@ -69,11 +84,32 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
-  const senderIds = useMemo(
-    () => Array.from(new Set(chat.messages.map(m => m.sender_id).filter(id => id !== userId))),
-    [chat.messages, userId]
-  );
+  /* Everyone whose name might be drawn: senders, people who reacted, and the
+     authors of quoted messages above the window. */
+  const senderIds = useMemo(() => {
+    const ids = new Set<string>();
+    chat.messages.forEach(m => ids.add(m.sender_id));
+    Object.values(chat.reactions).forEach(byUser => Object.keys(byUser).forEach(id => ids.add(id)));
+    Object.values(chat.quotes).forEach(q => { if (q) ids.add(q.sender_id); });
+    ids.delete(userId);
+    return Array.from(ids);
+  }, [chat.messages, chat.reactions, chat.quotes, userId]);
   const profiles = useProfiles(senderIds);
+  const nameOf = useCallback(
+    (id: string) => (id === userId ? 'You' : profiles[id]?.display_name ?? 'Member'),
+    [profiles, userId]
+  );
+
+  const byId = useMemo(() => new Map(chat.messages.map(m => [m.id, m])), [chat.messages]);
+  const quoteFor = useCallback((id: number | null | undefined): Quote | null => {
+    if (!id) return null;
+    return resolveQuote(id, byId, chat.quotes, userId, nameOf);
+  }, [byId, chat.quotes, userId, nameOf]);
+
+  const reactionsFor = useCallback(
+    (messageId: number): ReactionGroup[] => groupReactions(chat.reactions, chat.pending, messageId, userId, nameOf),
+    [chat.reactions, chat.pending, userId, nameOf]
+  );
 
   /* ── Items: day dividers, runs, then whatever is still in the outbox ── */
   const items = useMemo<Item[]>(() => {
@@ -216,11 +252,43 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   const canSend = Boolean(validateMessage(draft));
   const handleSend = () => {
     if (!canSend) return;
-    chat.send(draft);
+    chat.send(draft, replyTo);
     setDraft('');
+    setReplyTo(null);
     nearBottomRef.current = true;
     textareaRef.current?.focus();
   };
+
+  const startReply = useCallback((id: number) => {
+    setReplyTo(id);
+    setSelected(null);
+    textareaRef.current?.focus();
+  }, []);
+
+  /* Tapping a quote goes to the original, if it is loaded, and flashes it so
+     the eye lands on the right bubble. Scrolling up there clears "stick to
+     bottom" through the normal onScroll path. */
+  const flashTimer = useRef<number | undefined>(undefined);
+  const jumpTo = useCallback((id: number) => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-msg-id="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setFlash(id);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(null), 1600);
+  }, []);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+
+  /* Mine: tap the same emoji to take it back, another to switch — one
+     reaction per person, as in WhatsApp. */
+  const toggleReaction = useCallback((messageId: number, emoji: string) => {
+    const current = chat.pending[messageId] !== undefined
+      ? chat.pending[messageId]
+      : chat.reactions[messageId]?.[userId]?.emoji ?? null;
+    chat.react(messageId, current === emoji ? null : emoji);
+  }, [chat.pending, chat.reactions, chat.react, userId]);
+
+  const replyQuote = quoteFor(replyTo);
 
   const connectionNote = CONNECTION_LABEL[chat.connection];
 
@@ -293,7 +361,16 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
                   );
                 }
                 if (item.kind === 'out') {
-                  return <OutboxBubble key={item.key} entry={item.entry} dark={dark} onRetry={chat.retry} onDiscard={chat.discard} />;
+                  return (
+                    <OutboxBubble
+                      key={item.key}
+                      entry={item.entry}
+                      quote={quoteFor(item.entry.reply_to)}
+                      dark={dark}
+                      onRetry={chat.retry}
+                      onDiscard={chat.discard}
+                    />
+                  );
                 }
                 const { msg, first } = item;
                 const mine = msg.sender_id === userId;
@@ -305,8 +382,17 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
                     first={first}
                     profile={profiles[msg.sender_id]}
                     selected={selected === msg.id}
+                    flash={flash === msg.id}
+                    extras={chat.extras}
+                    quote={quoteFor(msg.reply_to)}
+                    reactions={chat.extras ? reactionsFor(msg.id) : []}
+                    reactionBusy={chat.pending[msg.id] !== undefined}
                     canDelete={!msg.deleted_at && (mine || canModerate)}
                     onSelect={() => setSelected(s => (s === msg.id ? null : msg.id))}
+                    onReact={emoji => toggleReaction(msg.id, emoji)}
+                    onDoubleTap={() => { setSelected(null); toggleReaction(msg.id, QUICK_REACTION); }}
+                    onReply={() => startReply(msg.id)}
+                    onJump={jumpTo}
                     onDelete={() => {
                       const who = mine ? 'your message' : 'this message for everyone';
                       if (window.confirm(`Delete ${who}? This can’t be undone.`)) {
@@ -337,7 +423,22 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
         <p className={`text-[10px] font-ui text-center px-5 pt-2 ${t.muted}`}>{chat.error}</p>
       )}
 
-      <div className={`flex items-end gap-2.5 p-3 border-t ${t.rule}`}>
+      {replyQuote && (
+        <div className={`flex items-center gap-3 px-4 pt-2.5 border-t ${t.rule}`}>
+          <div className="flex-1 min-w-0">
+            <QuoteBlock quote={replyQuote} dark={dark} label="Replying to" />
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            aria-label="Cancel reply"
+            className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm ${t.muted} ${t.hover}`}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div className={`flex items-end gap-2.5 p-3 ${replyQuote ? '' : `border-t ${t.rule}`}`}>
         <label htmlFor={`chat-input-${group.id}`} className="sr-only">Message {group.name}</label>
         <textarea
           id={`chat-input-${group.id}`}
@@ -345,13 +446,14 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => {
+            if (e.key === 'Escape' && replyTo) { e.preventDefault(); setReplyTo(null); return; }
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
             e.preventDefault();
             handleSend();
           }}
           maxLength={MAX_MESSAGE}
           rows={1}
-          placeholder="Type a message…"
+          placeholder={replyQuote ? 'Write your reply…' : 'Type a message…'}
           className={`flex-1 min-w-0 resize-none px-3.5 py-2.5 rounded-lg border text-sm font-ui leading-snug outline-none transition-colors focus:border-[#E10600] ${dark ? 'bg-[#0D0D10] border-white/[0.08] text-white placeholder:text-zinc-700' : 'bg-[#F2F0EC] border-[#E3E0D9] text-[#17150F] placeholder:text-[#B5AFA0]'}`}
         />
         <button
@@ -370,27 +472,206 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   );
 };
 
+/* ── Pure helpers for the view ── */
+
+const resolveQuote = (
+  id: number,
+  byId: Map<number, GroupMessage>,
+  quotes: QuoteMap,
+  userId: string,
+  nameOf: (id: string) => string
+): Quote => {
+  const onScreen = byId.get(id);
+  const q = onScreen ?? quotes[id];
+  if (!q) return { state: 'missing' };
+  const mine = q.sender_id === userId;
+  const name = nameOf(q.sender_id);
+  if (q.deleted_at) return { state: 'deleted', id, mine, name, onScreen: !!onScreen };
+  return { state: 'ok', id, mine, name, body: q.body, onScreen: !!onScreen };
+};
+
+/* Chips in the order of the picker, so a message's reactions do not reshuffle
+   every time somebody adds one. An in-flight change of yours is drawn as if
+   it had landed. */
+const groupReactions = (
+  reactions: ReactionMap,
+  pending: Record<number, string | null>,
+  messageId: number,
+  userId: string,
+  nameOf: (id: string) => string
+): ReactionGroup[] => {
+  const byUser = reactions[messageId] ?? {};
+  const picks: Array<[string, string]> = [];
+  Object.entries(byUser).forEach(([uid, r]) => {
+    if (uid !== userId && r.emoji) picks.push([uid, r.emoji]);
+  });
+  const mineNow = pending[messageId] !== undefined ? pending[messageId] : byUser[userId]?.emoji ?? null;
+  if (mineNow) picks.push([userId, mineNow]);
+  if (!picks.length) return [];
+
+  const order = (REACTIONS as readonly string[]);
+  const groups = new Map<string, ReactionGroup>();
+  picks.forEach(([uid, emoji]) => {
+    const g = groups.get(emoji) ?? { emoji, count: 0, mine: false, names: [] };
+    g.count += 1;
+    if (uid === userId) g.mine = true;
+    else g.names.push(nameOf(uid));
+    groups.set(emoji, g);
+  });
+  groups.forEach(g => { if (g.mine) g.names.push('You'); });
+  return Array.from(groups.values()).sort((a, b) => order.indexOf(a.emoji) - order.indexOf(b.emoji));
+};
+
+const SWIPE_TRIGGER_PX = 56;
+const SWIPE_MAX_PX = 80;
+const DOUBLE_TAP_MS = 300;
+
+/* ── Pieces ── */
+
+const QuoteBlock: React.FC<{
+  quote: Quote;
+  dark: boolean;
+  label?: string;
+  onJump?: (id: number) => void;
+}> = ({ quote, dark, label, onJump }) => {
+  const t = tokens(dark);
+  const mine = quote.state !== 'missing' && quote.mine;
+  const rail = mine ? 'border-[#E10600]/60' : dark ? 'border-zinc-500' : 'border-[#8A8577]';
+  const fill = dark ? 'bg-white/[0.04]' : 'bg-black/[0.04]';
+  const jumpable = !!onJump && quote.state !== 'missing' && quote.onScreen;
+  const who = quote.state === 'missing' ? '' : label && quote.mine ? 'yourself' : quote.name;
+  const heading = [label, who].filter(Boolean).join(' ');
+  const inner = (
+    <>
+      {heading && (
+        <span className={`block text-[10px] font-bold font-ui truncate ${mine ? 'text-[#E10600]' : t.heading}`}>{heading}</span>
+      )}
+      {quote.state === 'ok' && (
+        <span className={`block text-[11px] font-ui truncate ${t.muted}`}>{quote.body.replace(/\s+/g, ' ')}</span>
+      )}
+      {quote.state === 'deleted' && <span className={`block text-[11px] font-ui italic ${t.muted}`}>Message deleted</span>}
+      {quote.state === 'missing' && <span className={`block text-[11px] font-ui italic ${t.muted}`}>Original message unavailable</span>}
+    </>
+  );
+  const cls = `block w-full text-left min-w-0 pl-2.5 pr-3 py-1.5 rounded-md border-l-2 ${rail} ${fill}`;
+  if (!jumpable) return <div className={cls}>{inner}</div>;
+  return (
+    <button
+      type="button"
+      onClick={e => { e.stopPropagation(); onJump!(quote.id); }}
+      className={`${cls} hover:opacity-80`}
+      aria-label={`Go to the message from ${quote.name}`}
+    >
+      {inner}
+    </button>
+  );
+};
+
+const ReactionChips: React.FC<{
+  groups: ReactionGroup[];
+  mine: boolean;
+  busy: boolean;
+  dark: boolean;
+  onReact: (emoji: string) => void;
+}> = ({ groups, mine, busy, dark, onReact }) => {
+  const t = tokens(dark);
+  if (!groups.length) return null;
+  return (
+    <div className={`flex flex-wrap gap-1 -mt-2 px-2 relative ${mine ? 'justify-end' : 'justify-start'}`}>
+      {groups.map(g => (
+        <button
+          key={g.emoji}
+          type="button"
+          disabled={busy}
+          onClick={() => onReact(g.emoji)}
+          title={nameList(g.names)}
+          aria-label={`${g.emoji} ${g.count}: ${nameList(g.names)}. ${g.mine ? 'Tap to remove yours.' : 'Tap to react with this.'}`}
+          aria-pressed={g.mine}
+          className={`h-6 px-1.5 rounded-full border flex items-center gap-1 text-[12px] leading-none shadow-sm transition-transform active:scale-[0.94] ${
+            g.mine
+              ? 'border-[#E10600]/50 bg-[#E10600]/15'
+              : dark ? 'border-white/[0.08] bg-[#17171B]' : 'border-[#E3E0D9] bg-white'
+          } ${busy ? 'opacity-70' : ''}`}
+        >
+          <span aria-hidden="true">{g.emoji}</span>
+          {g.count > 1 && <span className={`text-[10px] font-bold font-ui ${g.mine ? 'text-[#E10600]' : t.muted}`}>{g.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const MessageBubble: React.FC<{
   msg: GroupMessage;
   mine: boolean;
   first: boolean;
   profile: ProfileSummary | undefined;
   selected: boolean;
+  flash: boolean;
+  extras: boolean;
+  quote: Quote | null;
+  reactions: ReactionGroup[];
+  reactionBusy: boolean;
   canDelete: boolean;
   onSelect: () => void;
+  onReact: (emoji: string) => void;
+  onDoubleTap: () => void;
+  onReply: () => void;
+  onJump: (id: number) => void;
   onDelete: () => void;
   onOpenProfile: (userId: string) => void;
   theme: 'dark' | 'light';
-}> = ({ msg, mine, first, profile, selected, canDelete, onSelect, onDelete, onOpenProfile, theme }) => {
+}> = ({
+  msg, mine, first, profile, selected, flash, extras, quote, reactions, reactionBusy, canDelete,
+  onSelect, onReact, onDoubleTap, onReply, onJump, onDelete, onOpenProfile, theme,
+}) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   const deleted = !!msg.deleted_at;
+  const interactive = extras && !deleted;
   const bubble = mine
     ? 'bg-[#E10600]/10 border-[#E10600]/25'
     : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-[#F2F0EC] border-[#E3E0D9]';
+  const myEmoji = reactions.find(g => g.mine)?.emoji ?? null;
+
+  /* Double tap = ❤️, as on Instagram. The first tap still opens the actions
+     immediately — waiting 300ms to find out whether a second is coming would
+     make every single tap feel broken. */
+  const swipeRef = useRef<{ x: number; y: number; id: number; active: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const [dx, setDx] = useState(0);
+  const lastTapRef = useRef(0);
+  const handleTap = () => {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+    const now = Date.now();
+    if (interactive && now - lastTapRef.current < DOUBLE_TAP_MS) {
+      lastTapRef.current = 0;
+      onDoubleTap();
+      return;
+    }
+    lastTapRef.current = now;
+    onSelect();
+  };
+
+  /* Swipe right to reply, as in WhatsApp — touch only; a mouse has the Reply
+     button. `touch-action: pan-y` leaves vertical scrolling to the browser
+     (which cancels the pointer the moment it starts panning) and hands the
+     horizontal movement to us. Geometry is local state on this one bubble. */
+  const endSwipe = (commit: boolean) => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (s?.active) {
+      suppressClickRef.current = true;
+      if (commit && dx >= SWIPE_TRIGGER_PX) onReply();
+    }
+    setDx(0);
+  };
 
   return (
-    <div className={`flex ${mine ? 'justify-end' : 'justify-start'} ${first ? 'mt-3' : 'mt-1'}`}>
+    <div
+      data-msg-id={msg.id}
+      className={`flex ${mine ? 'justify-end' : 'justify-start'} ${first ? 'mt-3' : 'mt-1'} ${reactions.length ? 'mb-2' : ''}`}
+    >
       <div className={`max-w-[85%] md:max-w-[70%] min-w-0 flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
         {first && !mine && (
           <div className="flex items-baseline gap-2 mb-1 px-1">
@@ -407,26 +688,110 @@ const MessageBubble: React.FC<{
           </div>
         )}
         {first && mine && <span className={`text-[9px] font-ui mb-1 px-1 ${t.muted}`}>{clock12(msg.created_at)}</span>}
-        <button
-          type="button"
-          onClick={onSelect}
-          disabled={deleted}
-          className={`text-left px-3.5 py-2 rounded-lg border ${bubble} ${deleted ? 'opacity-60' : ''}`}
-          aria-label={deleted ? 'Deleted message' : undefined}
-          title={clock12(msg.created_at)}
-        >
-          {deleted ? (
-            <span className={`text-[12px] font-ui italic ${t.muted}`}>Message deleted</span>
-          ) : (
-            <span className={`block text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${t.body}`}>{msg.body}</span>
+
+        <div className="relative max-w-full">
+          {dx > 0 && (
+            <span
+              aria-hidden="true"
+              className={`absolute top-1/2 -translate-y-1/2 text-sm ${dx >= SWIPE_TRIGGER_PX ? 'text-[#E10600]' : t.muted}`}
+              style={{ left: -26, opacity: Math.min(1, dx / SWIPE_TRIGGER_PX) }}
+            >
+              ↩
+            </span>
           )}
-        </button>
-        {selected && !deleted && (
-          <div className={`flex items-center gap-3 mt-1 px-1 text-[9px] font-ui ${t.muted}`}>
-            <span>{clock12(msg.created_at)}</span>
-            {canDelete && (
-              <button onClick={onDelete} className="font-black uppercase tracking-[0.1em] text-[#E10600]">Delete</button>
+          <div
+            role="button"
+            tabIndex={deleted ? -1 : 0}
+            aria-disabled={deleted || undefined}
+            aria-expanded={!deleted ? selected : undefined}
+            onClick={deleted ? undefined : handleTap}
+            // A double click would also select a word; drag-to-select still works.
+            onMouseDown={e => { if (interactive && e.detail > 1) e.preventDefault(); }}
+            onKeyDown={e => {
+              if (deleted || (e.key !== 'Enter' && e.key !== ' ')) return;
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              onSelect();
+            }}
+            onPointerDown={e => {
+              if (!interactive || e.pointerType !== 'touch') return;
+              swipeRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false };
+            }}
+            onPointerMove={e => {
+              const s = swipeRef.current;
+              if (!s || e.pointerId !== s.id) return;
+              const mx = e.clientX - s.x;
+              const my = e.clientY - s.y;
+              if (!s.active) {
+                if (Math.abs(my) > 10 || mx < -10) { swipeRef.current = null; return; }
+                if (mx < 12) return;
+                s.active = true;
+              }
+              setDx(Math.max(0, Math.min(mx - 12, SWIPE_MAX_PX)));
+            }}
+            onPointerUp={() => endSwipe(true)}
+            onPointerCancel={() => endSwipe(false)}
+            className={`text-left px-3.5 py-2 rounded-lg border outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]/40 ${bubble} ${deleted ? 'opacity-60' : 'cursor-pointer'} ${flash ? 'ring-2 ring-[#E10600]/50' : ''}`}
+            style={{
+              transform: dx ? `translateX(${dx}px)` : undefined,
+              transition: dx ? 'none' : 'transform 160ms ease-out, box-shadow 300ms',
+              touchAction: interactive ? 'pan-y' : undefined,
+            }}
+            aria-label={deleted ? 'Deleted message' : undefined}
+            title={clock12(msg.created_at)}
+          >
+            {quote && !deleted && (
+              <div className="mb-1.5 -mx-1">
+                <QuoteBlock quote={quote} dark={dark} onJump={onJump} />
+              </div>
             )}
+            {deleted ? (
+              <span className={`text-[12px] font-ui italic ${t.muted}`}>Message deleted</span>
+            ) : (
+              <span className={`block text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${t.body}`}>{msg.body}</span>
+            )}
+          </div>
+        </div>
+
+        {!deleted && <ReactionChips groups={reactions} mine={mine} busy={reactionBusy} dark={dark} onReact={onReact} />}
+
+        {selected && !deleted && (
+          <div className={`flex flex-col gap-1.5 mt-1.5 ${mine ? 'items-end' : 'items-start'}`}>
+            {extras && (
+              <div
+                role="group"
+                aria-label="React"
+                className={`flex items-center gap-0.5 p-1 rounded-full border shadow-sm ${dark ? 'bg-[#17171B] border-white/[0.08]' : 'bg-white border-[#E3E0D9]'}`}
+              >
+                {REACTIONS.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    disabled={reactionBusy}
+                    onClick={() => onReact(emoji)}
+                    aria-label={myEmoji === emoji ? `Remove ${emoji}` : `React ${emoji}`}
+                    aria-pressed={myEmoji === emoji}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[17px] leading-none transition-transform active:scale-[0.85] hover:scale-110 ${myEmoji === emoji ? 'bg-[#E10600]/15' : ''}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+            {reactions.length > 0 && (
+              <p className={`text-[10px] font-ui px-1 ${t.muted}`}>
+                {reactions.map(g => `${g.emoji} ${nameList(g.names)}`).join(' · ')}
+              </p>
+            )}
+            <div className={`flex items-center gap-3 px-1 text-[9px] font-ui ${t.muted}`}>
+              <span>{clock12(msg.created_at)}</span>
+              {extras && (
+                <button onClick={onReply} className={`font-black uppercase tracking-[0.1em] ${t.heading}`}>Reply</button>
+              )}
+              {canDelete && (
+                <button onClick={onDelete} className="font-black uppercase tracking-[0.1em] text-[#E10600]">Delete</button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -436,16 +801,22 @@ const MessageBubble: React.FC<{
 
 const OutboxBubble: React.FC<{
   entry: OutboxEntry;
+  quote: Quote | null;
   dark: boolean;
   onRetry: (clientId: string) => void;
   onDiscard: (clientId: string) => void;
-}> = ({ entry, dark, onRetry, onDiscard }) => {
+}> = ({ entry, quote, dark, onRetry, onDiscard }) => {
   const t = tokens(dark);
   const failed = entry.status === 'failed';
   return (
     <div className="flex justify-end mt-1">
       <div className="max-w-[85%] md:max-w-[70%] min-w-0 flex flex-col items-end">
         <div className={`px-3.5 py-2 rounded-lg border bg-[#E10600]/10 ${failed ? 'border-[#E10600]/60' : 'border-[#E10600]/25 opacity-60'}`}>
+          {quote && (
+            <div className="mb-1.5 -mx-1">
+              <QuoteBlock quote={quote} dark={dark} />
+            </div>
+          )}
           <span className={`block text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${t.body}`}>{entry.body}</span>
         </div>
         <p className={`text-[9px] font-ui mt-1 px-1 ${t.muted}`}>

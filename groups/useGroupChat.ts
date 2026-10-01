@@ -33,18 +33,40 @@
      stores under a unique constraint. The same uuid is reused on retry, so a
      send whose response was lost cannot land twice, and the realtime echo of
      our own message is matched to its bubble by that uuid, not by guessing.
-     Unsent messages survive a reload in localStorage and retry on reconnect. */
+     Unsent messages survive a reload in localStorage and retry on reconnect.
+
+   · Reactions follow the same rule with a different key. They are stored per
+     (message, person), and every copy — embedded in a page, a realtime event,
+     the RPC's own response — carries the server's `updated_at`; the merge
+     keeps the newer one, so a page fetched before a change cannot undo it.
+     Taking a reaction back is a row with a null emoji, never a missing row,
+     so "gone" is something a merge can see rather than infer. While a change
+     is in flight its emoji is drawn from `pending`, which only the RPC's
+     answer clears — a server timestamp is never compared with this clock.
+
+   · A reply's quote is read from the window when its parent is there, and
+     otherwise looked up once by id and cached. Anything that ingests a
+     message also refreshes that cache, so deleting the original blanks
+     every quote of it. */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   GroupMessage,
+  MessagePage,
   PAGE_SIZE,
+  QuotedMessage,
+  Reaction,
+  chatExtrasAvailable,
   deleteMessage,
   fetchLatest,
   fetchOlder,
+  fetchQuotes,
   insertMessage,
   newClientId,
+  normalize,
+  normalizeReaction,
+  reactToMessage,
   validateMessage,
 } from './chatApi';
 import { humanError, markRead } from './api';
@@ -55,7 +77,14 @@ export interface OutboxEntry {
   created_at: string;
   status: 'sending' | 'failed';
   error?: string;
+  /** The message this one answers; travels with the entry so a retry keeps it. */
+  reply_to?: number | null;
 }
+
+/** message id → user id → that person's reaction. */
+export type ReactionMap = Record<number, Record<string, Reaction>>;
+/** Quoted parents outside the window. null = looked up, not visible to us. */
+export type QuoteMap = Record<number, QuotedMessage | null>;
 
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
@@ -70,13 +99,17 @@ interface ChatState {
   /** Bumped whenever the window is reset across a gap. */
   generation: number;
   loaded: boolean;
+  reactions: ReactionMap;
+  quotes: QuoteMap;
 }
 
 type Action =
   | { type: 'reset'; group: string; outbox: OutboxEntry[] }
-  | { type: 'latest'; page: GroupMessage[] }
+  | { type: 'latest'; page: MessagePage }
   | { type: 'ingest'; rows: GroupMessage[] }
-  | { type: 'older'; page: GroupMessage[]; generation: number }
+  | { type: 'older'; page: MessagePage; generation: number }
+  | { type: 'reactions'; rows: Reaction[] }
+  | { type: 'quotes'; found: QuotedMessage[]; asked: number[] }
   | { type: 'queue'; entry: OutboxEntry }
   | { type: 'outbox'; clientId: string; patch: Partial<OutboxEntry> }
   | { type: 'drop'; clientId: string };
@@ -93,6 +126,46 @@ const merge = (prev: GroupMessage[], rows: GroupMessage[]): GroupMessage[] => {
   return Array.from(byId.values()).sort((a, b) => a.id - b.id);
 };
 
+/* Compared as instants, not strings: PostgREST and Realtime do not promise
+   the same text for one timestamptz ("T" vs space, "+00:00" vs "+00"), and
+   Safari's Date.parse accepts only the ISO shape. Millisecond precision is
+   plenty — the RPC refuses two changes to one row inside 300ms. */
+const stamp = (s: string): number => {
+  const t = Date.parse(s.replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/([+-]\d\d)$/, '$1:00'));
+  return Number.isNaN(t) ? 0 : t;
+};
+
+/** Newer `updated_at` wins; a tie goes to the incoming copy. */
+const mergeReactions = (prev: ReactionMap, rows: Reaction[]): ReactionMap => {
+  if (!rows.length) return prev;
+  let next = prev;
+  for (const r of rows) {
+    const existing = next[r.message_id]?.[r.user_id];
+    if (existing) {
+      const was = stamp(existing.updated_at);
+      const now = stamp(r.updated_at);
+      if (was > now || (was === now && existing.emoji === r.emoji)) continue;
+    }
+    if (next === prev) next = { ...prev };
+    next[r.message_id] = { ...next[r.message_id], [r.user_id]: r };
+  }
+  return next;
+};
+
+/* Keep cached quotes in step with any copy of the message that arrives —
+   above all its deletion. */
+const refreshQuotes = (quotes: QuoteMap, rows: GroupMessage[]): QuoteMap => {
+  let next = quotes;
+  for (const r of rows) {
+    if (!(r.id in quotes)) continue;
+    const cached = quotes[r.id];
+    if (cached?.deleted_at && !r.deleted_at) continue;
+    if (next === quotes) next = { ...quotes };
+    next[r.id] = { id: r.id, sender_id: r.sender_id, body: r.body, deleted_at: r.deleted_at };
+  }
+  return next;
+};
+
 const settleOutbox = (outbox: OutboxEntry[], rows: GroupMessage[]): OutboxEntry[] => {
   if (!outbox.length) return outbox;
   const landed = new Set(rows.map(r => r.client_id));
@@ -103,13 +176,18 @@ const settleOutbox = (outbox: OutboxEntry[], rows: GroupMessage[]): OutboxEntry[
 const reducer = (state: ChatState, action: Action): ChatState => {
   switch (action.type) {
     case 'reset':
-      return { group: action.group, messages: [], outbox: action.outbox, hasOlder: false, generation: state.generation + 1, loaded: false };
+      return {
+        group: action.group, messages: [], outbox: action.outbox, hasOlder: false,
+        generation: state.generation + 1, loaded: false, reactions: {}, quotes: {},
+      };
 
     case 'latest': {
-      const { page } = action;
+      const page = action.page.messages;
       const outbox = settleOutbox(state.outbox, page);
+      const reactions = mergeReactions(state.reactions, action.page.reactions);
+      const quotes = refreshQuotes(state.quotes, page);
       if (!state.loaded || !state.messages.length) {
-        return { ...state, messages: page, outbox, hasOlder: page.length === PAGE_SIZE, loaded: true };
+        return { ...state, messages: page, outbox, reactions, quotes, hasOlder: page.length === PAGE_SIZE, loaded: true };
       }
       const newest = state.messages[state.messages.length - 1].id;
       const pageOldest = page.length ? page[0].id : Infinity;
@@ -121,24 +199,43 @@ const reducer = (state: ChatState, action: Action): ChatState => {
           ...state,
           messages: merge(state.messages.filter(m => m.id >= pageOldest), page),
           outbox,
+          reactions,
+          quotes,
           hasOlder: true,
           generation: state.generation + 1,
           loaded: true,
         };
       }
-      return { ...state, messages: merge(state.messages, page), outbox, loaded: true };
+      return { ...state, messages: merge(state.messages, page), outbox, reactions, quotes, loaded: true };
     }
 
     case 'ingest':
-      return { ...state, messages: merge(state.messages, action.rows), outbox: settleOutbox(state.outbox, action.rows) };
+      return {
+        ...state,
+        messages: merge(state.messages, action.rows),
+        outbox: settleOutbox(state.outbox, action.rows),
+        quotes: refreshQuotes(state.quotes, action.rows),
+      };
+
+    case 'reactions':
+      return { ...state, reactions: mergeReactions(state.reactions, action.rows) };
+
+    case 'quotes': {
+      const quotes = { ...state.quotes };
+      action.asked.forEach(id => { if (!(id in quotes)) quotes[id] = null; });
+      action.found.forEach(q => { quotes[q.id] = q; });
+      return { ...state, quotes };
+    }
 
     case 'older':
       if (action.generation !== state.generation) return state;
       return {
         ...state,
-        messages: merge(state.messages, action.page),
-        outbox: settleOutbox(state.outbox, action.page),
-        hasOlder: action.page.length === PAGE_SIZE,
+        messages: merge(state.messages, action.page.messages),
+        outbox: settleOutbox(state.outbox, action.page.messages),
+        reactions: mergeReactions(state.reactions, action.page.reactions),
+        quotes: refreshQuotes(state.quotes, action.page.messages),
+        hasOlder: action.page.messages.length === PAGE_SIZE,
       };
 
     case 'queue':
@@ -188,12 +285,19 @@ const MARK_READ_DEBOUNCE_MS = 1_200;
 export interface GroupChatView {
   messages: GroupMessage[];
   outbox: OutboxEntry[];
+  reactions: ReactionMap;
+  /** Reactions whose change is in flight: message id → the emoji being set (null = taking it back). */
+  pending: Record<number, string | null>;
+  quotes: QuoteMap;
+  /** False until supabase/groups.sql has been re-run with replies and reactions. */
+  extras: boolean;
   loading: boolean;
   hasOlder: boolean;
   loadingOlder: boolean;
   connection: Connection;
   error: string | null;
-  send: (text: string) => void;
+  send: (text: string, replyTo?: number | null) => void;
+  react: (messageId: number, emoji: string | null) => void;
   retry: (clientId: string) => void;
   discard: (clientId: string) => void;
   remove: (messageId: number) => Promise<void>;
@@ -216,7 +320,10 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
     hasOlder: false,
     generation: 0,
     loaded: false,
+    reactions: {},
+    quotes: {},
   }));
+  const [pending, setPending] = useState<Record<number, string | null>>({});
   const [connection, setConnection] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -242,7 +349,7 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
       if (groupRef.current !== gid) return;
       setError(humanError(e));
       // An empty, failed first load is still "loaded" — show the error, not a spinner forever.
-      if (!stateRef.current.loaded) dispatch({ type: 'latest', page: [] });
+      if (!stateRef.current.loaded) dispatch({ type: 'latest', page: { messages: [], reactions: [] } });
     }
   }, []);
 
@@ -257,7 +364,7 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
     inFlightRef.current.add(entry.client_id);
     dispatch({ type: 'outbox', clientId: entry.client_id, patch: { status: 'sending', error: undefined } });
     try {
-      const row = await insertMessage(gid, userId, entry.client_id, entry.body);
+      const row = await insertMessage(gid, userId, entry.client_id, entry.body, entry.reply_to ?? null);
       if (groupRef.current === gid) dispatch({ type: 'ingest', rows: [row] });
     } catch (e) {
       if (groupRef.current === gid) {
@@ -275,6 +382,7 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
   /* ── Subscribe first, then fetch on every SUBSCRIBED ── */
   useEffect(() => {
     dispatch({ type: 'reset', group: groupId, outbox: loadOutbox(userId, groupId) });
+    setPending({});
     setError(null);
     setConnection(navigator.onLine === false ? 'offline' : 'connecting');
     let alive = true;
@@ -283,13 +391,23 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
     const ingest = (payload: { new: unknown }) => {
       const row = payload.new as GroupMessage;
       if (!row || row.group_id !== groupId) return;
-      dispatch({ type: 'ingest', rows: [{ ...row, id: Number(row.id) }] });
+      dispatch({ type: 'ingest', rows: [normalize(row)] });
+    };
+
+    const ingestReaction = (payload: { new: unknown }) => {
+      const row = payload.new as Reaction & { group_id?: string };
+      if (!row || row.group_id !== groupId) return;
+      dispatch({ type: 'reactions', rows: [normalizeReaction(row)] });
     };
 
     const channel = supabase
       .channel(`group_chat_${groupId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` }, ingest)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` }, ingest)
+      /* INSERT and UPDATE only. A reaction is never deleted while its message
+         exists (see supabase/groups.sql), and Realtime cannot filter DELETEs. */
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_message_reactions', filter: `group_id=eq.${groupId}` }, ingestReaction)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_message_reactions', filter: `group_id=eq.${groupId}` }, ingestReaction)
       .subscribe(status => {
         if (!alive) return;
         if (status === 'SUBSCRIBED') {
@@ -363,7 +481,28 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
     return () => window.clearTimeout(t);
   }, [active, newestId, groupId]);
 
-  const send = useCallback((text: string) => {
+  /* ── Quotes outside the window ── each id is asked for once per group. */
+  const askedRef = useRef(new Set<number>());
+  useEffect(() => { askedRef.current = new Set(); }, [groupId]);
+  useEffect(() => {
+    const onScreen = new Set(state.messages.map(m => m.id));
+    const missing = new Set<number>();
+    const consider = (id: number | null | undefined) => {
+      if (id && !onScreen.has(id) && !(id in state.quotes) && !askedRef.current.has(id)) missing.add(id);
+    };
+    state.messages.forEach(m => consider(m.reply_to));
+    state.outbox.forEach(o => consider(o.reply_to));
+    if (!missing.size) return;
+    const ids = Array.from(missing);
+    ids.forEach(id => askedRef.current.add(id));
+    const gid = groupId;
+    fetchQuotes(ids)
+      .then(found => { if (groupRef.current === gid) dispatch({ type: 'quotes', found, asked: ids }); })
+      // Asked again on the next change, rather than never.
+      .catch(() => ids.forEach(id => askedRef.current.delete(id)));
+  }, [state.messages, state.outbox, state.quotes, groupId]);
+
+  const send = useCallback((text: string, replyTo: number | null = null) => {
     const body = validateMessage(text);
     if (!body) return;
     const entry: OutboxEntry = {
@@ -371,6 +510,7 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
       body,
       created_at: new Date().toISOString(),
       status: 'sending',
+      ...(replyTo ? { reply_to: replyTo } : {}),
     };
     dispatch({ type: 'queue', entry });
     void attempt(entry);
@@ -394,6 +534,28 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
     }
   }, []);
 
+  // A ref, not `pending`: two taps inside one render must not both get through.
+  const reactingRef = useRef(new Set<number>());
+  const react = useCallback((messageId: number, emoji: string | null) => {
+    // One change per message at a time; the chip is held until it answers.
+    if (reactingRef.current.has(messageId)) return;
+    reactingRef.current.add(messageId);
+    const gid = groupRef.current;
+    setPending(p => ({ ...p, [messageId]: emoji }));
+    reactToMessage(messageId, emoji)
+      .then(row => { if (row && groupRef.current === gid) dispatch({ type: 'reactions', rows: [row] }); })
+      .catch(e => { if (groupRef.current === gid) setError(humanError(e)); })
+      .finally(() => {
+        reactingRef.current.delete(messageId);
+        setPending(p => {
+          if (!(messageId in p)) return p;
+          const next = { ...p };
+          delete next[messageId];
+          return next;
+        });
+      });
+  }, []);
+
   const loadOlder = useCallback(async () => {
     const s = stateRef.current;
     if (!s.hasOlder || loadingOlder || !s.messages.length) return;
@@ -413,12 +575,17 @@ export const useGroupChat = ({ groupId, userId, active, onRead }: Options): Grou
   return {
     messages: state.messages,
     outbox: state.outbox,
+    reactions: state.reactions,
+    pending,
+    quotes: state.quotes,
+    extras: state.loaded && chatExtrasAvailable(),
     loading: !state.loaded,
     hasOlder: state.hasOlder,
     loadingOlder,
     connection,
     error,
     send,
+    react,
     retry,
     discard,
     remove,

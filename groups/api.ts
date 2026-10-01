@@ -183,6 +183,7 @@ export const humanError = (error: unknown): string => {
     return 'GROUPS AREN’T SET UP YET — RUN supabase/groups.sql.';
   }
   if (hint === 'rate_limited' || /slow down/i.test(message)) return 'Slow down — too many messages at once.';
+  if (hint === 'message_deleted') return 'That message was deleted.';
   if (hint === 'group_limit') return 'You’re in 30 groups already. Leave one first.';
   if (hint === 'owned_limit') return 'You own 10 groups already.';
   if (hint === 'invite_limit') return 'Too many live invites. Revoke one first.';
