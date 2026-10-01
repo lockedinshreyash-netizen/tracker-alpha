@@ -143,7 +143,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
 
   /* ── Shared skin ──
      Lifted from the app's existing panels rather than invented: same surface,
-     same hairline, same muted zinc as every card in `questions/`. */
+     same hairline, same muted zinc as every card in `mocks/`. */
   const panel = dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-[#E3E0D9]';
   const ink = dark ? 'text-white' : 'text-[#17150F]';
   const muted = dark ? 'text-zinc-500' : 'text-[#8A8577]';

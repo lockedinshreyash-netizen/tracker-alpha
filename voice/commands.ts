@@ -98,7 +98,7 @@ const TAB_ALIASES: [TabType, string[]][] = [
   ['Syllabus', ['syllabus', 'silabus', 'syllabi', 'chapters', 'chapter']],
   // "strike" is what en-IN most often hears for "streak".
   ['Streak', ['streak', 'streaks', 'strike', 'strick']],
-  ['Questions', ['questions', 'question', 'practice', 'pyq', 'pyqs']],
+  ['Mocks', ['mocks', 'mock', 'test', 'tests', 'errors', 'error', 'notebook']],
   ['Ranks', ['ranks', 'rank', 'leaderboard', 'ranking', 'rankings', 'board']],
   ['Review', ['review', 'reviews', 'score', 'progress', 'stats']],
   ['Groups', ['groups', 'group', 'friends', 'batch', 'squad']],

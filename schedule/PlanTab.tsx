@@ -57,7 +57,7 @@ interface PendingMove {
 /**
  * The Plan tab.
  *
- * Zero logic, like QuestionsTab — the day is derived by `materializeDay`, the
+ * Zero logic, like mocks/MocksTab — the day is derived by `materializeDay`, the
  * verdict by `computeAdherence`, and every mutation is a callback from App.
  * The only state that belongs here is which day you are looking at.
  */

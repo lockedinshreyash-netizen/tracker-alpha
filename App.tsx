@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AiInsight, AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, QuestionTrackingState, ExamPreference, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
+import { AiInsight, AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, ExamPreference, ErrorEntry, MockTest, MocksState, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
 import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
@@ -16,7 +16,8 @@ import WallpaperLayer from './rewards/WallpaperLayer';
 import UnlockModal from './rewards/UnlockModal';
 import BookReader from './rewards/BookReader';
 import { Recommendation } from './today/recommend';
-import QuestionsTab from './questions/QuestionsTab';
+import MocksTab from './mocks/MocksTab';
+import { applyAttempts, mergeMocks, normalizeMocks } from './mocks/model';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
 import AuthModal from './AuthModal';
@@ -180,6 +181,9 @@ const App: React.FC = () => {
       merged.sleep = normalizeSleep(parsed.sleep);
       merged.analysis = normalizeAnalysis(parsed.analysis);
       merged.ai = normalizeAi(parsed.ai);
+      merged.mocks = normalizeMocks(parsed.mocks);
+      /* The Questions tab became Mocks and took its slot in the rail. */
+      if ((parsed.lastUsedTab as string) === 'Questions') merged.lastUsedTab = 'Mocks';
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -481,6 +485,11 @@ const App: React.FC = () => {
               normalizeAnalysis(remoteState.analysis),
             ),
             ai: mergeAi(normalizeAi(localState.ai), normalizeAi(remoteState.ai)),
+            /* Union by id with the later `updatedAt` winning, in this branch
+               only — the same rule as logs, tasks and the schedule above. A
+               result logged on the phone must survive; a mock deleted on the
+               phone must still be able to reach the laptop. */
+            mocks: mergeMocks(normalizeMocks(localState.mocks), normalizeMocks(remoteState.mocks)),
           };
         });
       }
@@ -1527,17 +1536,39 @@ const App: React.FC = () => {
     });
   };
 
-  const updateQuestionTracking = (update: Partial<QuestionTrackingState>) => {
+  /* ── Mocks ─────────────────────────────────────────────────────────
+     One helper, like withSchedule: every mutator is handed a slice that
+     definitely exists and has been through the normalizer. */
+  const withMocks = (fn: (m: MocksState) => MocksState) => {
     setState(prev => {
-      const nextState = {
-        ...prev,
-        questionTracking: { ...prev.questionTracking, ...update },
-        lastUpdated: Date.now()
-      };
+      const nextState: AppState = { ...prev, mocks: normalizeMocks(fn(normalizeMocks(prev.mocks))), lastUpdated: Date.now() };
       stateRef.current = nextState;
       return nextState;
     });
   };
+  const upsertMock = (test: MockTest) =>
+    withMocks(m => ({ ...m, tests: m.tests.some(x => x.id === test.id) ? m.tests.map(x => (x.id === test.id ? test : x)) : [...m.tests, test] }));
+  /* Errors logged from a deleted mock stay in the notebook — the question was
+     still got wrong — and lose only the pointer. */
+  const deleteMock = (id: string) =>
+    withMocks(m => ({
+      ...m,
+      tests: m.tests.filter(x => x.id !== id),
+      errors: m.errors.map(e => (e.mockId === id ? { ...e, mockId: undefined, updatedAt: Date.now() } : e)),
+    }));
+  const upsertError = (entry: ErrorEntry) =>
+    withMocks(m => ({ ...m, errors: m.errors.some(e => e.id === entry.id) ? m.errors.map(e => (e.id === entry.id ? entry : e)) : [...m.errors, entry] }));
+  const deleteError = (id: string) => withMocks(m => ({ ...m, errors: m.errors.filter(e => e.id !== id) }));
+  const recordAttempts = (answers: Record<string, boolean>) =>
+    withMocks(m => ({ ...m, errors: applyAttempts(m.errors, answers, Date.now()) }));
+  const addMockTopic = (key: string, name: string) =>
+    withMocks(m => {
+      const list = m.topics[key] ?? [];
+      if (list.some(x => x.toLowerCase() === name.toLowerCase())) return m;
+      return { ...m, topics: { ...m.topics, [key]: [...list, name] } };
+    });
+  const forgetMockTopic = (key: string, name: string) =>
+    withMocks(m => ({ ...m, topics: { ...m.topics, [key]: (m.topics[key] ?? []).filter(x => x !== name) } }));
 
   const logQuestions = (subject: QSubject, count: number) => {
     const today = getISTDateString();
@@ -1972,6 +2003,9 @@ const App: React.FC = () => {
     () => normalizeSchedule(state.schedule, new Set(state.tasks.map(t => t.id))),
     [state.schedule, state.tasks],
   );
+  /* Same reason as `schedule`: the realtime path can spread a blob with no
+     `mocks` in it, or one shaped by an older build. */
+  const mocks = useMemo(() => normalizeMocks(state.mocks), [state.mocks]);
   /* Oldest un-shown tier first, so someone returning after a long absence is
      walked up their unlocks one at a time instead of seeing only the last. */
   const celebration = pendingCelebrations(rewards)[0];
@@ -2184,13 +2218,21 @@ const App: React.FC = () => {
               onShare={() => setSharePeriod('weekly')}
             />
           )}
-          {activeTab === 'Questions' && (
-            <QuestionsTab
-              questionTracking={state.questionTracking}
-              onUpdateTracking={updateQuestionTracking}
-              onLogQuestions={logQuestions}
+          {activeTab === 'Mocks' && (
+            <MocksTab
+              mocks={mocks}
+              progress={state.progress}
+              examPreference={state.examPreference || 'JEE'}
+              subjects={getCoreSubjects(state.examPreference || 'JEE')}
+              today={getISTDateString()}
               theme={theme}
-              coreSubjects={coreQSubjects}
+              onUpsertMock={upsertMock}
+              onDeleteMock={deleteMock}
+              onUpsertError={upsertError}
+              onDeleteError={deleteError}
+              onRecordAttempts={recordAttempts}
+              onAddTopic={addMockTopic}
+              onForgetTopic={forgetMockTopic}
             />
           )}
           {activeTab === 'Ranks' && (

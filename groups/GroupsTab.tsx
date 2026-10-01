@@ -12,7 +12,7 @@
    leaving — is a sheet opened from the two buttons in the group's header, so it
    is one tap away without being on the page.
 
-   A zero-logic container in the same sense as questions/QuestionsTab.tsx: it
+   A zero-logic container in the same sense as schedule/PlanTab.tsx: it
    holds which group, which section and which sheet are open, and passes
    narrow slices down. It never sees AppState. Which group was open last is a
    per-device convenience in localStorage — in AppState it would fire a

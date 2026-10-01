@@ -63,11 +63,13 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </svg>
       );
-    case 'Questions':
+    /* A paper with a tick and a trend — a test, and what came of it. */
+    case 'Mocks':
       return (
         <svg {...props}>
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
+          <path d="M8.5 16l2.5-2.5 2 2 3-3.5" />
         </svg>
       );
     case 'Ranks':
@@ -133,7 +135,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
      because it is a place you go to do something, but below everything that
      was already there. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Questions', 'Ranks', 'Review', 'Groups', 'Observatory',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Observatory',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';

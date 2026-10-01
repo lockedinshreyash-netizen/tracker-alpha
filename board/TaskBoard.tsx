@@ -58,7 +58,7 @@ interface Props {
 /**
  * The board.
  *
- * A container in the shape questions/QuestionsTab.tsx established: one narrow
+ * A container in the shape schedule/PlanTab.tsx keeps: one narrow
  * slice in, narrow named callbacks out, all mutation in App.tsx and all
  * arithmetic in board.ts. That shape is also what makes the memoised children
  * below actually memoise — a component handed the whole `state` would re-render

@@ -187,7 +187,9 @@ export interface ChapterProgress {
    falls back to Today; see App. */
 /* `Groups` is server state end to end — nothing about a group lives in
    AppState, so nothing about it rides the synced blob. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Questions' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin';
+/* `Mocks` took the Questions tab's slot in the rail. A saved `lastUsedTab` of
+   'Questions' is mapped to it on load (App.tsx). */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -582,6 +584,127 @@ export interface ReminderPrefs {
   planBlocks: boolean;
 }
 
+/* ────────────────────────────────────────────────────────────────
+   MOCK TESTS — the Mocks tab
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Which paper a mock imitates. The first axis of classification, and the one
+ * every trend line is split by: a 55% in Advanced and a 55% in Mains are not
+ * the same performance and must never share a line.
+ */
+export type MockExam = 'mains' | 'advanced' | 'neet' | 'other';
+
+/** How much of the syllabus it covers. The second axis. */
+export type MockScope = 'full' | 'part' | 'chapter';
+
+/** Where a lost question went. Counted in questions, not marks. */
+export type MockMistake = 'silly' | 'concept' | 'time' | 'unstudied';
+
+/** How a chapter (or one topic in it) went in a taken mock. */
+export type MockVerdict = 'strong' | 'okay' | 'weak';
+
+/**
+ * One chapter in a mock's syllabus.
+ *
+ * `topics` are names, not ids — a custom topic is whatever the student typed
+ * ("Moment of inertia"), and an authored one (content/topics.ts) is matched
+ * by name too, so both live in one list.
+ */
+export interface MockChapter {
+  classId: 11 | 12;
+  subject: Subject;
+  chapter: string;
+  topics?: string[];
+}
+
+export interface MockSubjectScore {
+  subject: Subject;
+  marks: number;
+  max: number;
+  /* Optional question breakdown. Accuracy and attempt rate exist only for the
+     mocks that carry it; nothing is inferred for the ones that don't. */
+  correct?: number;
+  incorrect?: number;
+  unattempted?: number;
+}
+
+export interface MockResult {
+  scores: MockSubjectScore[];
+  percentile?: number;
+  rank?: number;
+  mistakes?: Partial<Record<MockMistake, number>>;
+  /* Keyed by `mockKey(...)` (mocks/model.ts): a chapter, or a topic within
+     one. Only what the student actually marked — absence is "no opinion", not
+     "fine". */
+  verdicts?: Record<string, MockVerdict>;
+  /** The one thing to fix before the next mock. */
+  note?: string;
+}
+
+/**
+ * A mock, planned or taken. Planned is simply "no result yet" — one row for
+ * both, so logging a result is filling in the row the plan already made, and
+ * the chapters picked while planning are the chapters reviewed afterwards.
+ */
+export interface MockTest {
+  id: string;
+  name: string;
+  date: string; // YYYY-MM-DD (IST study day) — planned, then taken
+  exam: MockExam;
+  scope: MockScope;
+  /** Coaching / test series, free text, e.g. "Allen AITS". */
+  series?: string;
+  /* Empty for a full-syllabus mock: "everything" is not a list. */
+  chapters: MockChapter[];
+  result?: MockResult;
+  /** Epoch ms; decides which copy wins when two devices edited one mock. */
+  updatedAt: number;
+}
+
+/** Why a question went wrong — the error notebook's one required judgement. */
+export type ErrorReason = 'concept' | 'silly' | 'calculation' | 'misread' | 'time' | 'unstudied';
+
+/**
+ * One question the student got wrong, kept to be re-attempted.
+ *
+ * Text only. Most JEE questions have a figure, and an image in the synced
+ * jsonb blob would make every keystroke upload it again; the student types
+ * what matters ("block on incline, μ = 0.2") and the figure stays in the book.
+ */
+export interface ErrorEntry {
+  id: string;
+  question: string;
+  options: [string, string, string, string];
+  correct: 0 | 1 | 2 | 3;
+  reason: ErrorReason;
+  /** In the student's own words: what to remember next time. */
+  why?: string;
+  classId: 11 | 12;
+  subject: Subject;
+  chapter: string;
+  topic?: string;
+  /** The mock it came from, if it was logged from one. */
+  mockId?: string;
+  createdAt: number;
+  updatedAt: number;
+  /* Re-attempt history. Two right in a row clears it — once can be luck. */
+  attempts: number;
+  streak: number;
+  lastResult?: 'right' | 'wrong';
+  lastAttemptAt?: number;
+}
+
+export interface MocksState {
+  tests: MockTest[];
+  errors: ErrorEntry[];
+  /**
+   * The student's own topics, per chapter, remembered so the next mock offers
+   * them back. Keyed `${classId}|${subject}|${chapter}`.
+   */
+  topics: Record<string, string[]>;
+}
+
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
@@ -614,4 +737,6 @@ export interface AppState {
   sleep?: SleepState;
   analysis?: AnalysisState;
   ai?: AiPrefs;
+  /* Optional for the same reason as `schedule`; `normalizeMocks` fills it. */
+  mocks?: MocksState;
 }

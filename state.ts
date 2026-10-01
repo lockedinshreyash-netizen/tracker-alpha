@@ -1,3 +1,4 @@
+import { DEFAULT_MOCKS } from './mocks/model';
 import { AiInsight, AiPrefs, AnalysisState, AppState, BlockKind, BlockOverride, CoachState, LeaderboardPrefs, PomodoroRuntime, PomodoroSettings, QSubject, QuestionEntry, ReminderPrefs, RewardsState, ScheduleBlock, ScheduleState, SleepLog, SleepState, Subject, Task, TaskColumn, TemplateRule } from './types';
 import { HEX_RE, RECOLOURABLE } from './schedule/colors';
 
@@ -542,4 +543,5 @@ export const DEFAULT_STATE: AppState = {
   sleep: DEFAULT_SLEEP,
   analysis: DEFAULT_ANALYSIS,
   ai: DEFAULT_AI,
+  mocks: DEFAULT_MOCKS,
 };
