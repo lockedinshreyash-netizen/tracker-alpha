@@ -327,13 +327,19 @@ const TodayTab: React.FC<Props> = ({
       ) : (
         <section
           data-onboarding-target="session-timer"
-          className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative overflow-hidden transition-all ${timer.isRunning ? (dark ? 'bg-[#111114] border-[#E10600]/30' : 'bg-white border-[#E10600]/25 shadow-sm') : t.card}`}
-          style={{ animationDelay: '120ms' }}
+          className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative overflow-hidden transition-all duration-500 ${t.card}`}
+          style={{ animationDelay: '120ms', ...(timer.isRunning ? { borderColor: `${dot(timer.subject)}66` } : {}) }}
         >
-          {/* A soft wash of the chosen subject's colour — the card previews the session it will start. */}
+          {/* The subject's colour, always. Before a session it previews the
+              subject picked; once running it is the session's own subject,
+              deeper and wider, so a live clock reads as live. */}
           <div
-            className="absolute inset-0 pointer-events-none transition-[background] duration-500"
-            style={{ background: `radial-gradient(80% 60% at 50% 0%, ${timer.isRunning ? 'rgba(225,6,0,0.10)' : `${dot(manualSubject)}${dark ? '1f' : '14'}`}, transparent 70%)` }}
+            className="absolute inset-0 pointer-events-none transition-[background] duration-700"
+            style={{
+              background: timer.isRunning
+                ? `radial-gradient(95% 75% at 50% 0%, ${dot(timer.subject)}${dark ? '3d' : '29'}, transparent 72%)`
+                : `radial-gradient(80% 60% at 50% 0%, ${dot(manualSubject)}${dark ? '1f' : '14'}, transparent 70%)`,
+            }}
           />
           {timer.isRunning && <div className="absolute top-5 right-5 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
           <div className="relative z-10">

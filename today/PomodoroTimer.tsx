@@ -127,9 +127,24 @@ const PomodoroTimer: React.FC<Props> = ({
   return (
     <section
       data-onboarding-target="session-timer"
-      className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative transition-all ${dark ? 'bg-[#111114]' : 'bg-white shadow-sm'} ${runtime.isRunning && isWork ? 'border-[#E10600]/30' : (dark ? 'border-white/[0.06]' : 'border-zinc-100')}`}
-      style={{ animationDelay: '120ms' }}
+      className={`mk-rise isolate overflow-hidden px-6 py-10 md:p-16 text-center rounded-xl border relative transition-all duration-500 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white shadow-sm border-zinc-100'}`}
+      style={{ animationDelay: '120ms', ...(runtime.isRunning && isWork ? { borderColor: `${subjectDot(runtime.subject)}66` } : {}) }}
     >
+      {/* Same glow as the stopwatch: the subject's colour, deeper while a
+          focus block runs. Breaks stay neutral — nothing is being studied.
+          `-z-10` inside an isolated card paints over the card's own
+          background and under every line of content. */}
+      {isWork && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 pointer-events-none transition-[background] duration-700"
+          style={{
+            background: runtime.isRunning
+              ? `radial-gradient(95% 75% at 50% 0%, ${subjectDot(runtime.subject)}${dark ? '3d' : '29'}, transparent 72%)`
+              : `radial-gradient(80% 60% at 50% 0%, ${subjectDot(runtime.subject)}${dark ? '1f' : '14'}, transparent 70%)`,
+          }}
+        />
+      )}
       {runtime.isRunning && isWork && <div className="absolute top-4 right-4 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
 
       <div className="flex items-center justify-center gap-3 mb-10">

@@ -117,19 +117,21 @@ const StreakTab: React.FC<Props> = ({
           <span className={`text-[11px] font-ui ${t.muted}`}>{weekTotal.toFixed(1)}h · goal hit {hitDays} of 7</span>
         </div>
         {/* One plotting box for bars and goal line, so the line sits exactly where the bars are measured. */}
-        <div className="relative h-36 mt-8">
-          <div className="absolute left-0 right-0 border-t border-[#E10600]/50 z-10" style={{ bottom: `${goalPct}%` }}>
-            <span className={`absolute right-0 -top-[17px] text-[10px] font-ui font-bold text-[#E10600] px-1 ${dark ? 'bg-[#111114]' : 'bg-white'}`}>{dailyGoalHours}h goal</span>
+        {/* The bars are red, so the goal line is ink — a red line over red bars disappears where it matters. */}
+        <div className="relative h-44 mt-8">
+          <div className={`absolute left-0 right-0 border-t z-10 ${dark ? 'border-white/40' : 'border-zinc-900/40'}`} style={{ bottom: `${goalPct}%` }}>
+            <span className={`absolute right-0 -top-[17px] text-[10px] font-ui font-bold px-1 rounded ${dark ? 'bg-[#111114] text-zinc-300' : 'bg-white text-zinc-700'}`}>{dailyGoalHours}h goal</span>
           </div>
           <div className={`absolute inset-x-0 bottom-0 border-t ${t.rule}`} />
-          <div className="absolute inset-0 flex justify-between gap-2 md:gap-4">
+          <div className="absolute inset-0 flex gap-1.5 md:gap-2.5">
             {days.map((d, i) => {
               const heightPct = Math.min(100, (d.hours / scaleMax) * 100);
               const hit = d.hours >= dailyGoalHours;
               return (
                 <div key={i} className="relative flex-1 flex justify-center">
+                  {/* Full width of the day's column. A day that cleared the goal is solid; one that fell short is the same red, lighter. */}
                   <div
-                    className={`absolute bottom-0 w-full max-w-[28px] rounded-t-[4px] transition-all duration-700 ${hit ? 'bg-[#E10600]' : dark ? 'bg-zinc-300' : 'bg-zinc-800'}`}
+                    className={`absolute bottom-0 inset-x-0 rounded-t-md bg-[#E10600] transition-all duration-700 ${hit ? '' : 'opacity-60'}`}
                     style={{ height: `${d.hours ? Math.max(2, heightPct) : 0}%` }}
                   />
                   {d.hours > 0 && (
@@ -142,7 +144,7 @@ const StreakTab: React.FC<Props> = ({
             })}
           </div>
         </div>
-        <div className="flex justify-between gap-2 md:gap-4 mt-2">
+        <div className="flex gap-1.5 md:gap-2.5 mt-2">
           {days.map((d, i) => (
             <span key={i} className={`flex-1 text-center text-[10px] font-ui font-semibold ${t.muted}`}>{d.date}</span>
           ))}
