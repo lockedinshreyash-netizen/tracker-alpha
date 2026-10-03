@@ -33,6 +33,11 @@ const toLocalInput = (d: Date): string => {
 
 interface Props {
   name: string;
+  /**
+   * What the hide does, after "{name} won't be told and will still see
+   * themselves". Defaults to the race; a group hide says where instead.
+   */
+  means?: string;
   onConfirm: (until: Date, note: string) => Promise<void>;
   onCancel: () => void;
   dark: boolean;
@@ -46,7 +51,7 @@ interface Props {
  * tells the person. The note is for staff; the form says so, since the
  * Remove form right beside it says the opposite about its reason box.
  */
-const HideForm: React.FC<Props> = ({ name, onConfirm, onCancel, dark }) => {
+const HideForm: React.FC<Props> = ({ name, means, onConfirm, onCancel, dark }) => {
   const t = tokens(dark);
   const [preset, setPreset] = useState<Preset>('rollover');
   const [custom, setCustom] = useState(() => toLocalInput(new Date(Date.now() + 2 * HOUR)));
@@ -96,7 +101,7 @@ const HideForm: React.FC<Props> = ({ name, onConfirm, onCancel, dark }) => {
   return (
     <div className={`mt-3 p-4 rounded-lg border space-y-3 ${t.inset}`}>
       <p className={`text-[11px] font-ui leading-relaxed ${t.muted}`}>
-        {name} won’t be told and will still see themselves on the board. Everyone else won’t see them, or their race chat, until the time runs out.
+        {name} won’t be told and will still see themselves as normal. {means ?? 'Everyone else won’t see them on the board, or their race chat, until the time runs out.'}
       </p>
 
       <div>

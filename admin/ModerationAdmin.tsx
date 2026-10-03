@@ -1,17 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LeaderboardRow, fetchBoard } from '../leaderboard/api';
 import { getISTDateString } from '../utils';
+import { useProfiles } from '../profile/profileCache';
 import RemoveForm from '../moderation/RemoveForm';
 import HideForm, { formatUntil } from '../moderation/HideForm';
+import StaffFinder from '../moderation/StaffFinder';
 import {
+  GroupHide,
   LeaderboardBan,
   LeaderboardHide,
+  fetchGroupHides,
   fetchLeaderboardBans,
   fetchLeaderboardHides,
   humanError,
   staffHideFromLeaderboard,
   staffRemoveFromLeaderboard,
   staffUnbanLeaderboard,
+  staffUnhideInGroups,
   staffUnhideLeaderboard,
 } from '../moderation/api';
 
@@ -24,7 +29,13 @@ interface Props {
 type Acting = { userId: string; mode: 'remove' | 'hide' } | null;
 
 /**
- * Taking someone off the race, and letting them back on.
+ * Taking someone off the race or out of a group, and letting them back on.
+ *
+ * "Find someone" at the top reaches anybody, anywhere: a person's panel lists
+ * the race and every group they are in, private ones included, each with its
+ * own Hide and Remove, plus Hide everywhere. Searching groups opens any
+ * group's roster. Staff see names and roles in a private group, never its
+ * chat, hours or tasks.
  *
  * Two different tools. Remove tells the person, with your reason, and turns
  * their race off. Hide tells nobody: for a set time the person drops out of
@@ -33,15 +44,15 @@ type Acting = { userId: string; mode: 'remove' | 'hide' } | null;
  * staff read the board through the same policies as everyone — and is listed
  * under "Hidden" instead.
  *
- * Groups are not moderated from here. A public group's roster is reached from
- * its own Explore sheet, beside the takedown button already there, and a
- * private group is its own admins' to run — staff cannot see inside one.
+ * A public group's roster is also reachable from its own Explore sheet,
+ * beside the takedown button already there.
  */
 const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
   const dark = theme === 'dark';
   const [board, setBoard] = useState<LeaderboardRow[] | null>(null);
   const [bans, setBans] = useState<LeaderboardBan[] | null>(null);
   const [hides, setHides] = useState<LeaderboardHide[] | null>(null);
+  const [groupHides, setGroupHides] = useState<GroupHide[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [acting, setActing] = useState<Acting>(null);
@@ -51,16 +62,47 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
     const result = await fetchBoard();
     setBoard(result.rows);
     if (result.error) setError(result.error);
-    try {
-      const [b, h] = await Promise.all([fetchLeaderboardBans(), fetchLeaderboardHides()]);
-      setBans(b);
-      setHides(h);
-    } catch (e) {
+    // Separately, so a project that has not re-run moderation.sql since group
+    // hides arrived still gets its race lists.
+    const [race, groupResult] = await Promise.allSettled([
+      Promise.all([fetchLeaderboardBans(), fetchLeaderboardHides()]),
+      fetchGroupHides(),
+    ]);
+    if (race.status === 'fulfilled') {
+      setBans(race.value[0]);
+      setHides(race.value[1]);
+    } else {
       setBans(prev => prev ?? []);
       setHides(prev => prev ?? []);
-      setError(humanError(e));
+      setError(humanError(race.reason));
+    }
+    if (groupResult.status === 'fulfilled') {
+      setGroupHides(groupResult.value);
+    } else {
+      setGroupHides(prev => prev ?? []);
+      setError(humanError(groupResult.reason));
     }
   }, []);
+
+  const hiddenIds = useMemo(() => [...new Set((groupHides ?? []).map(h => h.user_id))], [groupHides]);
+  const hiddenProfiles = useProfiles(hiddenIds);
+
+  const unhideGroup = async (hide: GroupHide) => {
+    const key = `${hide.user_id}|${hide.group_id ?? ''}`;
+    const who = hiddenProfiles[hide.user_id]?.display_name ?? 'They';
+    setBusy(key);
+    setError(null);
+    setNote(null);
+    try {
+      await staffUnhideInGroups(hide.user_id, hide.group_id);
+      setNote(`${who} ${hide.group_name ? `is visible in ${hide.group_name}` : 'is visible in their groups'} again.`);
+      await load();
+    } catch (e) {
+      setError(humanError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const unhide = async (hide: LeaderboardHide) => {
     setBusy(hide.user_id);
@@ -105,6 +147,14 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
     <div className="space-y-6">
       {error && <p className="text-[11px] font-bold font-ui text-[#E10600]">{error}</p>}
       {note && <p className={`text-[11px] font-bold font-ui ${muted}`}>{note}</p>}
+
+      <section className={card}>
+        <p className={eyebrow}>Find someone</p>
+        <p className={`text-[11px] font-ui mt-1 mb-5 ${muted}`}>
+          Anyone, in the race or in any group — private ones too. You see names and roles, never a private group’s chat.
+        </p>
+        <StaffFinder adminId={adminId} dark={dark} onChanged={() => void load()} />
+      </section>
 
       <section className={card}>
         <div className="flex items-baseline justify-between gap-4">
@@ -206,6 +256,36 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
       </section>
 
       <section className={card}>
+        <p className={eyebrow}>Hidden in groups</p>
+        <p className={`text-[11px] font-ui mt-1 ${muted}`}>
+          They don’t know. Each hide ends by itself at the time shown.
+        </p>
+        <div className="mt-5 space-y-2">
+          {groupHides === null && <p className={`text-[11px] font-ui ${muted}`}>Loading…</p>}
+          {groupHides?.length === 0 && <p className={`text-[11px] font-ui ${muted}`}>Nobody is hidden.</p>}
+          {groupHides?.map(h => {
+            const key = `${h.user_id}|${h.group_id ?? ''}`;
+            return (
+              <div key={key} className={`${row} flex items-start gap-3`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[12.5px] font-ui truncate ${ink}`}>
+                    {hiddenProfiles[h.user_id]?.display_name ?? 'Member'}
+                    <span className={muted}> · {h.group_name ?? 'every group'}</span>
+                  </p>
+                  <p className={`text-[11px] font-ui mt-0.5 break-words ${muted}`}>
+                    Until {formatUntil(h.hidden_until)}{h.note ? ` · ${h.note}` : ''}
+                  </p>
+                </div>
+                <button onClick={() => void unhideGroup(h)} disabled={busy === key} className={smallBtn}>
+                  Unhide
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className={card}>
         <p className={eyebrow}>Banned from the race</p>
         <div className="mt-5 space-y-2">
           {bans === null && <p className={`text-[11px] font-ui ${muted}`}>Loading…</p>}
@@ -228,7 +308,7 @@ const ModerationAdmin: React.FC<Props> = ({ adminId, theme }) => {
       </section>
 
       <p className={`text-[11px] font-ui leading-relaxed px-1 ${muted}`}>
-        To remove someone from a public group, open the group from Groups → Explore. Private groups are run by their own admins.
+        Group bans are lifted by that group’s own admins, from its settings.
       </p>
     </div>
   );

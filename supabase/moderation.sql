@@ -3,29 +3,34 @@
 -- Re-running the whole file is safe.
 --
 -- Needs admin.sql (is_admin), groups.sql and leaderboard.sql to have been run
--- first. Run order for this change: groups.sql (remove_member gained a reason),
--- then this file, then deploy the client. The previous client keeps working in
--- between — the new argument defaults.
+-- first. Run order for any change here: groups.sql (it owns group_hides and
+-- every read that respects it), then this file, then deploy the client. The
+-- previous client keeps working in between.
 --
 -- Two kinds of person can remove somebody:
 --
 --   a group's owner/admin  — from their own group, through remove_member() in
 --                            groups.sql, exactly as before; it now also writes
 --                            a notice.
---   app staff (is_admin)   — from any PUBLIC group, and from the Ranks race.
---                            Private groups stay out of staff's reach, for the
---                            reason delete_group() gives: staff cannot see
---                            them, and a moderation power over something you
---                            cannot see is surveillance with extra steps.
+--   app staff (is_admin)   — from ANY group, public or private, and from the
+--                            Ranks race. Private groups used to be out of
+--                            reach; that left a student being harassed in a
+--                            private group with nobody to turn to but the
+--                            group's own admins, who may be the problem.
+--                            Staff still cannot READ a private group — its
+--                            chat, hours and tasks stay members-only. What
+--                            staff get is the roster (§2) and the power to
+--                            take one person out or hide them (§2b).
 --
 -- Every removal writes one row to `moderation_notices`, which is how the
 -- person learns it happened and why. The reason is optional — a removal with
 -- no reason still tells them they were removed, because finding a group gone
 -- from your list with no explanation reads as the app being broken.
 --
--- The one exception is a HIDE (§3b): staff taking somebody off everyone
--- else's view of the race for a set time, without telling them. That writes
--- no notice at all — being silent is the whole of what it is for.
+-- The one exception is a HIDE (§2b, §3b): staff taking somebody off everyone
+-- else's view of a group or of the race for a set time, without telling
+-- them. That writes no notice at all — being silent is the whole of what it
+-- is for.
 --
 -- What a notice never says: WHO did it. A group notice says "an admin of X";
 -- a staff notice says "Tracker Alpha". Most users are minors, and naming the
@@ -117,36 +122,106 @@ $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 2. Staff, in public groups
+-- 2. Staff, in any group
+--
+-- Finding a group, finding a person's groups, and the roster. Names, icons,
+-- roles and counts only — never what a membership would reveal (hours, tasks,
+-- chat). Names of people come from `profiles`, already readable by any
+-- signed-in user.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Who is in a public group. Ids and roles only; names come from `profiles`,
--- which is already readable by any signed-in user. Nothing a membership would
--- reveal — hours, tasks, chat — is returned here.
-create or replace function public.staff_group_members(p_group uuid)
-returns table (user_id uuid, role text, joined_at timestamptz)
+-- Any group by name, private ones included — a report usually names the group
+-- and nothing else. `%` and `_` are escaped so a search is literal.
+create or replace function public.staff_search_groups(p_query text)
+returns table (id uuid, name text, icon text, visibility text, member_count int)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  q text := trim(coalesce(p_query, ''));
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if char_length(q) < 2 then
+    return;
+  end if;
+  q := replace(replace(replace(q, '\', '\\'), '%', '\%'), '_', '\_');
+  return query
+    select g.id, g.name, g.icon, g.visibility,
+           (select count(*) from public.group_members c where c.group_id = g.id)::int
+      from public.groups g
+     where g.name ilike '%' || q || '%'
+     order by g.name
+     limit 30;
+end;
+$$;
+
+-- Every group one person is in.
+create or replace function public.staff_user_groups(p_user uuid)
+returns table (id uuid, name text, icon text, visibility text, role text, member_count int, joined_at timestamptz)
 language plpgsql
 stable
 security definer
 set search_path = public
 as $$
 begin
-  if not public.is_admin()
-     or not exists (select 1 from public.groups where id = p_group and visibility = 'discoverable') then
+  if not public.is_admin() then
     raise exception 'not authorized' using errcode = '42501';
   end if;
   return query
-    select m.user_id, m.role, m.joined_at
+    select g.id, g.name, g.icon, g.visibility, m.role,
+           (select count(*) from public.group_members c where c.group_id = g.id)::int,
+           m.joined_at
+      from public.group_members m
+      join public.groups g on g.id = m.group_id
+     where m.user_id = p_user
+     order by g.name;
+end;
+$$;
+
+-- Who is in a group, and until when each is hidden: by a hide on this group
+-- (`hidden_until`), and by one on every group (`hidden_everywhere_until`).
+-- Two columns because they are lifted in two different places — the roster's
+-- Unhide lifts this group's alone.
+-- Dropped first: it used to be public groups only and returned neither, and
+-- a changed return type cannot be `create or replace`d.
+drop function if exists public.staff_group_members(uuid);
+create or replace function public.staff_group_members(p_group uuid)
+returns table (
+  user_id                 uuid,
+  role                    text,
+  joined_at               timestamptz,
+  hidden_until            timestamptz,
+  hidden_everywhere_until timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  return query
+    select m.user_id, m.role, m.joined_at,
+           (select h.hidden_until from public.group_hides h
+             where h.user_id = m.user_id and h.group_id = p_group and h.hidden_until > now()),
+           (select h.hidden_until from public.group_hides h
+             where h.user_id = m.user_id and h.group_id is null and h.hidden_until > now())
       from public.group_members m
      where m.group_id = p_group
      order by public.role_rank(m.role) desc, m.joined_at;
 end;
 $$;
 
--- Staff may remove anyone from a public group, owner included — the
--- succession trigger in groups.sql hands the group on, and deletes it if
--- nobody is left. A ban is a group ban like any other; the group's own admins
--- can lift it from their settings.
+-- Staff may remove anyone from any group, owner included — the succession
+-- trigger in groups.sql hands the group on, and deletes it if nobody is
+-- left. A ban is a group ban like any other; the group's own admins can lift
+-- it from their settings.
 create or replace function public.staff_remove_group_member(
   p_group  uuid,
   p_user   uuid,
@@ -164,9 +239,9 @@ begin
   if not public.is_admin() or p_user = auth.uid() then
     raise exception 'not authorized' using errcode = '42501';
   end if;
-  select name into group_name from public.groups where id = p_group and visibility = 'discoverable';
+  select name into group_name from public.groups where id = p_group;
   if group_name is null then
-    raise exception 'not authorized' using errcode = '42501';
+    return;
   end if;
   if not exists (select 1 from public.group_members where group_id = p_group and user_id = p_user) then
     return;
@@ -182,6 +257,95 @@ begin
   perform public.record_moderation_notice(
     p_user, case when p_ban then 'group_banned' else 'group_removed' end, group_name, p_reason, true
   );
+end;
+$$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 2b. Staff, hiding a member in a group — silently, for a set time
+--
+-- The group counterpart of §3b, and the same tool: the person is not told,
+-- their own screen does not change, and everybody else stops seeing their
+-- messages, reactions, hours and tasks from the hide's first day on. They
+-- stay on the roster — dropping them from it would be a membership change
+-- with no notice, and a member count that disagrees with the list.
+--
+-- `p_group` null hides them in every group, including any they join while it
+-- runs. The table and every read that respects it live in groups.sql
+-- (group_hides, group_row_visible); only the writes are here, because only
+-- the writes need is_admin().
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Hide, or change a running hide's end. Re-hiding someone already hidden
+-- keeps the earlier start, so extending a hide never un-hides a day.
+create or replace function public.staff_hide_in_groups(
+  p_user  uuid,
+  p_group uuid,
+  p_from  date,
+  p_until timestamptz,
+  p_note  text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() or p_user = auth.uid() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if p_until <= now() or p_until > now() + interval '30 days' then
+    raise exception 'hide must end within 30 days' using errcode = '22023';
+  end if;
+
+  update public.group_hides
+     set from_date    = case when hidden_until > now() then least(from_date, p_from) else p_from end,
+         hidden_until = p_until,
+         note         = left(nullif(trim(p_note), ''), 500),
+         hidden_by    = auth.uid(),
+         hidden_at    = now()
+   where user_id = p_user and group_id is not distinct from p_group;
+
+  if not found then
+    insert into public.group_hides (user_id, group_id, from_date, hidden_until, note, hidden_by)
+    values (p_user, p_group, p_from, p_until, left(nullif(trim(p_note), ''), 500), auth.uid());
+  end if;
+end;
+$$;
+
+-- `p_group` null lifts the every-group hide; a group id lifts that group's.
+create or replace function public.staff_unhide_in_groups(p_user uuid, p_group uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  delete from public.group_hides where user_id = p_user and group_id is not distinct from p_group;
+end;
+$$;
+
+-- Hides still running. `group_name` is null for an every-group hide.
+create or replace function public.staff_group_hides()
+returns table (user_id uuid, group_id uuid, group_name text, hidden_until timestamptz, note text)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  return query
+    select h.user_id, h.group_id, g.name, h.hidden_until, h.note
+      from public.group_hides h
+      left join public.groups g on g.id = h.group_id
+     where h.hidden_until > now()
+     order by h.hidden_until;
 end;
 $$;
 
@@ -524,6 +688,11 @@ begin
   foreach fn in array array[
     'public.ack_moderation_notice(uuid)',
     'public.staff_group_members(uuid)',
+    'public.staff_search_groups(text)',
+    'public.staff_user_groups(uuid)',
+    'public.staff_hide_in_groups(uuid, uuid, date, timestamptz, text)',
+    'public.staff_unhide_in_groups(uuid, uuid)',
+    'public.staff_group_hides()',
     'public.staff_remove_group_member(uuid, uuid, boolean, text)',
     'public.staff_remove_from_leaderboard(uuid, date, boolean, text)',
     'public.staff_unban_leaderboard(uuid)',

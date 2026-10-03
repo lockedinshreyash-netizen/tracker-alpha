@@ -4,8 +4,20 @@
     {
       "name": "tracker-alpha-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "score-film",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd film && exec npx remotion studio --no-open --port 3123"
+      ],
+      "port": 3123
     }
   ]
 }

@@ -295,6 +295,42 @@ create table if not exists public.group_message_reactions (
   constraint reaction_emoji check (emoji is null or emoji in ('👍', '❤️', '😂', '😮', '😢', '🔥'))
 );
 
+-- App staff hiding a member from everyone else in a group, for a set time,
+-- without telling them — the group counterpart of moderation.sql's
+-- leaderboard_hides, with the same rules: always timed (30 days at most),
+-- lapses by itself, and only rows from `from_date` (a study day) on are
+-- hidden, so earlier days stay where everybody already saw them.
+--
+-- `group_id` null is a hide in EVERY group the person is in, including any
+-- they join while it runs — otherwise a hidden person could walk into a new
+-- public group and be heard there.
+--
+-- Written only by moderation.sql's staff functions (they need is_admin()).
+-- The table lives here because every read in this file has to respect it, and
+-- this file must still install without moderation.sql: with no rows, nothing
+-- below changes behaviour. No client may read it — not even its subject,
+-- which is the whole of a hide (see §3).
+create table if not exists public.group_hides (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references auth.users (id) on delete cascade,
+  group_id     uuid        references public.groups (id) on delete cascade,
+  from_date    date        not null,
+  hidden_until timestamptz not null,
+  -- Staff's own note. Never shown to the person.
+  note         text,
+  hidden_by    uuid        references auth.users (id) on delete set null,
+  hidden_at    timestamptz not null default now(),
+
+  constraint group_hide_note_length check (note is null or char_length(note) <= 500),
+  constraint group_hide_window check (hidden_until > hidden_at and hidden_until <= hidden_at + interval '30 days')
+);
+
+-- One hide per person per group, and one "every group" hide per person.
+create unique index if not exists group_hides_per_group
+  on public.group_hides (user_id, group_id) where group_id is not null;
+create unique index if not exists group_hides_everywhere
+  on public.group_hides (user_id) where group_id is null;
+
 -- One row per user per IST study day. See the header for why this exists.
 create table if not exists public.study_days (
   user_id       uuid          not null references auth.users (id) on delete cascade,
@@ -374,6 +410,53 @@ as $$
   );
 $$;
 
+-- The IST study day a moment falls on. The day rolls over at 04:00, the same
+-- rule as utils.ts's getISTDateString; IST has no daylight saving.
+create or replace function public.ist_study_day(p_at timestamptz)
+returns date
+language sql
+immutable
+as $$
+  select ((p_at at time zone 'Asia/Kolkata') - interval '4 hours')::date;
+$$;
+
+-- The first study day on which `p_user` is hidden from the caller in
+-- `p_group`, or null when they are not hidden. Never hidden from themselves:
+-- a hidden person's own screen must not change, or the hide tells them.
+-- The earliest start of any running hide (this group's, or an every-group
+-- one) is exactly the line "is any running hide covering this day".
+--
+-- Answers null to anybody outside the group. Policies need this callable by
+-- every signed-in user, and without that clause anyone could probe any
+-- user id against any group and learn who staff have hidden. A member could
+-- only learn what their own screen already shows them.
+create or replace function public.group_hidden_from(p_group uuid, p_user uuid)
+returns date
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select min(h.from_date)
+    from public.group_hides h
+   where p_user is distinct from auth.uid()
+     and public.is_group_member(p_group)
+     and h.user_id = p_user
+     and (h.group_id = p_group or h.group_id is null)
+     and h.hidden_until > now();
+$$;
+
+-- Whether the caller may see one of `p_user`'s rows dated `p_date` in a group.
+create or replace function public.group_row_visible(p_group uuid, p_user uuid, p_date date)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(p_date < public.group_hidden_from(p_group, p_user), true);
+$$;
+
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 3. Row-level security
@@ -397,6 +480,9 @@ alter table public.group_join_requests   enable row level security;
 alter table public.group_messages        enable row level security;
 alter table public.study_days            enable row level security;
 alter table public.task_shares           enable row level security;
+-- No policies at all: no client reads or writes a hide. Staff list them
+-- through staff_group_hides() in moderation.sql.
+alter table public.group_hides           enable row level security;
 
 -- groups: members see their group; anybody signed in sees a discoverable one.
 drop policy if exists "members read their groups" on public.groups;
@@ -459,6 +545,17 @@ create policy "members post as themselves"
 -- No UPDATE or DELETE policy. Deletion is delete_group_message(), which is
 -- the only way `deleted_at` is ever set and never lets a body be rewritten.
 
+-- A member staff have hidden (group_hides) is not heard: their messages from
+-- the hide's first day on are invisible to everyone but themselves while it
+-- runs. RESTRICTIVE, so it ANDs with the member policy above, and under its
+-- own name. Realtime applies SELECT policies to what it broadcasts, so the
+-- messages are not pushed to anybody else either.
+drop policy if exists "hidden members are not heard" on public.group_messages;
+create policy "hidden members are not heard"
+  on public.group_messages as restrictive for select
+  to authenticated
+  using (public.group_row_visible(group_id, sender_id, public.ist_study_day(created_at)));
+
 -- group_message_reactions: members read their group's reactions. No write
 -- policy at all — react_to_group_message() is the only writer, because the
 -- row's group has to come from the message, not from the request.
@@ -468,6 +565,13 @@ create policy "members read reactions"
   on public.group_message_reactions for select
   to authenticated
   using (public.is_group_member(group_id));
+
+-- A hidden member's reactions go with their messages.
+drop policy if exists "hidden members' reactions are not shown" on public.group_message_reactions;
+create policy "hidden members' reactions are not shown"
+  on public.group_message_reactions as restrictive for select
+  to authenticated
+  using (public.group_row_visible(group_id, user_id, public.ist_study_day(updated_at)));
 
 -- study_days / task_shares: your own rows, all operations. Other members read
 -- them only through group_leaderboard() / group_task_progress(), which apply
@@ -1239,10 +1343,13 @@ as $$
             select 1 from public.group_messages x
              where x.group_id = g.id and x.id > m.last_read_id
                and x.sender_id <> m.user_id and x.deleted_at is null
+               and public.group_row_visible(g.id, x.sender_id, public.ist_study_day(x.created_at))
              limit 100
           ) u)::int,
          (select x.created_at from public.group_messages x
-           where x.group_id = g.id order by x.id desc limit 1),
+           where x.group_id = g.id
+             and public.group_row_visible(g.id, x.sender_id, public.ist_study_day(x.created_at))
+           order by x.id desc limit 1),
          case when public.role_rank(m.role) >= 2
               then (select count(*) from public.group_join_requests r where r.group_id = g.id)::int
               else 0 end
@@ -1280,6 +1387,10 @@ $$;
 -- can say "keeps hours private" instead of silently dropping them. The caller
 -- always sees their own figure, flagged, since it is theirs.
 --
+-- A member staff have hidden keeps their row but counts nothing from the
+-- hide's first day on, for everyone but themselves — the same line the race
+-- draws. Their earlier days stay, so an all-time total never visibly drops.
+--
 -- This is also the building block for group events: a challenge between
 -- groups is this, summed per group, over the event's date range.
 create or replace function public.group_leaderboard(p_group uuid, p_from date default null, p_to date default null)
@@ -1306,13 +1417,15 @@ begin
            case when v.visible then coalesce(s.tracked, 0) end,
            case when v.visible then coalesce(s.days, 0)::int end
       from public.group_members m
-      cross join lateral (select (m.share_hours or m.user_id = auth.uid()) as visible) v
+      cross join lateral (select (m.share_hours or m.user_id = auth.uid()) as visible,
+                                 public.group_hidden_from(p_group, m.user_id) as hidden_from) v
       left join lateral (
         select sum(d.hours) as hours, sum(d.tracked_hours) as tracked,
                count(*) filter (where d.tracked_hours > 0) as days
           from public.study_days d
          where v.visible
            and d.user_id = m.user_id
+           and (v.hidden_from is null or d.date < v.hidden_from)
            and (p_from is null or d.date >= p_from)
            and (p_to   is null or d.date <= p_to)
       ) s on true
@@ -1323,7 +1436,8 @@ $$;
 -- Task progress of the members who share it, at the level each chose FOR THIS
 -- GROUP: a member sharing their list with friends and a summary with their
 -- coaching batch is shown exactly that in each. Members at 'private' are not
--- returned at all. `tasks` is non-null only at 'tasks'.
+-- returned at all. `tasks` is non-null only at 'tasks'. A member staff have
+-- hidden is not returned either, exactly as if they had chosen 'private'.
 create or replace function public.group_task_progress(p_group uuid)
 returns table (user_id uuid, share_tasks text, date date, done int, total int, tasks jsonb, updated_at timestamptz)
 language plpgsql
@@ -1341,7 +1455,8 @@ begin
            t.updated_at
       from public.group_members m
       join public.task_shares t on t.user_id = m.user_id
-     where m.group_id = p_group and m.share_tasks <> 'private';
+     where m.group_id = p_group and m.share_tasks <> 'private'
+       and public.group_row_visible(p_group, m.user_id, t.date);
 end;
 $$;
 
@@ -1639,6 +1754,9 @@ begin
     'public.role_rank(text)',
     'public.group_role(uuid)',
     'public.is_group_member(uuid)',
+    'public.ist_study_day(timestamptz)',
+    'public.group_hidden_from(uuid, uuid)',
+    'public.group_row_visible(uuid, uuid, date)',
     'public.create_group(text, text, text, text, boolean, text, text)',
     'public.update_group(uuid, text, text, text, text, text, text)',
     'public.explore_groups(text, int, int)',

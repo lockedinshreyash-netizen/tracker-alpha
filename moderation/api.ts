@@ -10,6 +10,7 @@
 
 import { supabase } from '../supabaseClient';
 import { DAY_START_HOUR, getISTDateString } from '../utils';
+import { ProfileSummary } from '../profile/profileApi';
 
 /** Mirrors the CHECK constraint on moderation_notices.reason. */
 export const MAX_REASON = 500;
@@ -152,7 +153,69 @@ export interface StaffMember {
   user_id: string;
   role: 'owner' | 'admin' | 'member';
   joined_at: string;
+  /** When a hide on this group ends. Null if there is none. */
+  hidden_until?: string | null;
+  /** When a hide on every group ends. Null if there is none. */
+  hidden_everywhere_until?: string | null;
 }
+
+/* ── Staff: any group, public or private ──
+   Names, icons, roles and counts only. A private group's chat, hours and
+   tasks stay members-only — staff_* functions never return them. */
+
+export interface StaffGroup {
+  id: string;
+  name: string;
+  icon: string | null;
+  visibility: 'private' | 'discoverable';
+  member_count: number;
+}
+
+export interface StaffUserGroup extends StaffGroup {
+  role: 'owner' | 'admin' | 'member';
+  joined_at: string;
+}
+
+export const searchStaffGroups = (query: string): Promise<StaffGroup[]> =>
+  rpc<StaffGroup[] | null>('staff_search_groups', { p_query: query.trim() }).then(rows => rows ?? []);
+
+export const fetchStaffUserGroups = (userId: string): Promise<StaffUserGroup[]> =>
+  rpc<StaffUserGroup[] | null>('staff_user_groups', { p_user: userId }).then(rows => rows ?? []);
+
+/**
+ * Anyone by name or handle. `profiles` is readable by every signed-in user,
+ * so this is a plain select; the staff part is what happens next. The query
+ * is cut down to letters, digits, spaces and hyphens because it is spliced
+ * into a PostgREST `or=(…)` filter, where a comma or a bracket is syntax.
+ */
+export const searchPeople = async (query: string): Promise<ProfileSummary[]> => {
+  const q = query.replace(/[^\p{L}\p{N}\s-]/gu, '').trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, handle, display_name, avatar_type, avatar_id, avatar_url')
+    .or(`display_name.ilike.*${q}*,handle.ilike.*${q.toLowerCase()}*`)
+    .order('display_name')
+    .limit(20);
+  if (error) throw error;
+  return (data as ProfileSummary[]) ?? [];
+};
+
+/**
+ * Their hours on today's race, or null if they have no row. Staff read the
+ * board through the same hide policy as everyone, so a racer staff have
+ * hidden reads as null here too — the caller checks the hide list for that.
+ */
+export const fetchRaceToday = async (userId: string): Promise<number | null> => {
+  const { data, error } = await supabase
+    .from('leaderboard_entries')
+    .select('hours')
+    .eq('user_id', userId)
+    .eq('date', getISTDateString())
+    .maybeSingle();
+  if (error) throw error;
+  return data ? Number((data as { hours: number }).hours) : null;
+};
 
 export const fetchStaffGroupMembers = (groupId: string): Promise<StaffMember[]> =>
   rpc<StaffMember[] | null>('staff_group_members', { p_group: groupId }).then(rows => rows ?? []);
@@ -218,6 +281,34 @@ export const staffHideFromLeaderboard = (userId: string, until: Date, note: stri
 
 export const staffUnhideLeaderboard = (userId: string): Promise<void> =>
   rpc('staff_unhide_leaderboard', { p_user: userId });
+
+/* ── Staff: hiding a member in groups ──
+   The group counterpart (supabase/moderation.sql §2b). `groupId` null is a
+   hide in every group they are in, including any they join while it runs. */
+
+export interface GroupHide {
+  user_id: string;
+  /** Null for an every-group hide. */
+  group_id: string | null;
+  group_name: string | null;
+  hidden_until: string;
+  note: string | null;
+}
+
+export const staffHideInGroups = (userId: string, groupId: string | null, until: Date, note: string): Promise<void> =>
+  rpc('staff_hide_in_groups', {
+    p_user: userId,
+    p_group: groupId,
+    p_from: getISTDateString(),
+    p_until: until.toISOString(),
+    ...(note.trim() ? { p_note: note.trim().slice(0, MAX_REASON) } : {}),
+  });
+
+export const staffUnhideInGroups = (userId: string, groupId: string | null): Promise<void> =>
+  rpc('staff_unhide_in_groups', { p_user: userId, p_group: groupId });
+
+export const fetchGroupHides = (): Promise<GroupHide[]> =>
+  rpc<GroupHide[] | null>('staff_group_hides').then(rows => rows ?? []);
 
 /** Hides still running. Lapsed rows stay in the table but no longer do anything. */
 export const fetchLeaderboardHides = async (): Promise<LeaderboardHide[]> => {
