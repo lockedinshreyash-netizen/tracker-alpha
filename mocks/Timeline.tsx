@@ -151,9 +151,11 @@ interface RowProps {
   onLog: () => void;
   onEdit: () => void;
   onLogError: () => void;
+  /** Mocks taken as a CBT paper in the app open their own review. */
+  onReviewPaper?: () => void;
 }
 
-const HistoryRow: React.FC<RowProps> = ({ test, prevPct, open, today, dark, errorCount, onToggle, onLog, onEdit, onLogError }) => {
+const HistoryRow: React.FC<RowProps> = ({ test, prevPct, open, today, dark, errorCount, onToggle, onLog, onEdit, onLogError, onReviewPaper }) => {
   const t = tokens(dark);
   const ref = useRef<HTMLDivElement>(null);
   const p = scorePct(test.result);
@@ -261,6 +263,9 @@ const HistoryRow: React.FC<RowProps> = ({ test, prevPct, open, today, dark, erro
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2 mt-4 md:pl-[60px]">
+            {test.cbtPaperId && onReviewPaper && (
+              <button onClick={onReviewPaper} className={`${btn} px-4 py-2.5 ${t.primary}`}>Review paper</button>
+            )}
             <button onClick={onLog} className={`${btn} px-4 py-2.5 ${planned ? t.primary : t.ghost}`}>{planned ? 'Log result' : 'Edit result'}</button>
             <button onClick={onEdit} className={`${btn} px-4 py-2.5 ${t.ghost}`}>Edit plan</button>
             {!planned && (
@@ -283,8 +288,9 @@ export const History: React.FC<{
   onLog: (t: MockTest) => void;
   onEdit: (t: MockTest) => void;
   onLogError: (t: MockTest) => void;
+  onReviewPaper?: (t: MockTest) => void;
   delay?: number;
-}> = ({ tests, openId, today, dark, errorCounts, onToggle, onLog, onEdit, onLogError, delay = 0 }) => {
+}> = ({ tests, openId, today, dark, errorCounts, onToggle, onLog, onEdit, onLogError, onReviewPaper, delay = 0 }) => {
   const t = tokens(dark);
   const newestFirst = [...tests].reverse();
   // Delta against the previous taken mock of the same exam and scope.
@@ -317,6 +323,7 @@ export const History: React.FC<{
             onLog={() => onLog(x)}
             onEdit={() => onEdit(x)}
             onLogError={() => onLogError(x)}
+            onReviewPaper={onReviewPaper ? () => onReviewPaper(x) : undefined}
           />
         ))}
       </div>

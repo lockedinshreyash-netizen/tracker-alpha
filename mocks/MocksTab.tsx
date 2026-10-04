@@ -12,7 +12,7 @@
    it. It is remembered per device in localStorage: a view preference, not
    data, and in AppState it would sync on every tap. */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ChapterProgress, ErrorEntry, ExamPreference, MockChapter, MockResult, MockTest, MocksState, Subject } from '../types';
 import { generateId } from '../utils';
 import { pushToast } from '../notify/toastBus';
@@ -31,6 +31,12 @@ import {
 import { SCOPES, SCOPE_ORDER, chapterKey, examColor, isCleared, paperKey, paperLabel } from './model';
 import { Card, Chip, Eyebrow, ScopeGlyph, Segmented, btn, tokens } from './ui';
 
+/* The CBT is a private feature (supabase/cbt.sql): both halves are loaded
+   only for an account that holds it, so KaTeX and the exam never reach
+   anybody else's bundle. */
+const BankView = React.lazy(() => import('../cbt/BankView'));
+const PaperViewer = React.lazy(() => import('../cbt/PaperViewer'));
+
 interface Props {
   mocks: MocksState;
   progress: ChapterProgress[];
@@ -47,9 +53,15 @@ interface Props {
   onRecordAttempts: (answers: Record<string, boolean>) => void;
   onAddTopic: (key: string, name: string) => void;
   onForgetTopic: (key: string, name: string) => void;
+  /** Present only for an account holding the `cbt` feature. */
+  cbt?: {
+    userId: string;
+    /** One write: the paper's MockTest and its notebook entries together. */
+    onSaved: (mock: MockTest, errors: ErrorEntry[]) => void;
+  };
 }
 
-type View = 'mocks' | 'errors';
+type View = 'mocks' | 'errors' | 'bank';
 /* `scope` absent means "the sensible default": full-syllabus mocks when there
    are any, because a full paper is the benchmark and a chapter test averaged
    into it inflates every number on the page. */
@@ -67,7 +79,7 @@ type ErrorCtx = { draft: ErrorDraft; mock?: MockTest };
 
 const MocksTab: React.FC<Props> = ({
   mocks, progress, examPreference: pref, subjects, today, theme,
-  onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic,
+  onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic, cbt,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -83,6 +95,12 @@ const MocksTab: React.FC<Props> = ({
   const [errorCtx, setErrorCtx] = useState<ErrorCtx | null>(null);
   const [quiz, setQuiz] = useState<{ title: string; ids: string[] } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [startGenerating, setStartGenerating] = useState(false);
+  const [reviewPaper, setReviewPaper] = useState<string | null>(null);
+  const closeReview = useCallback(() => setReviewPaper(null), []);
+  const doneGenerating = useCallback(() => setStartGenerating(false), []);
+  // A remembered "bank" view on an account without the feature is just Mocks.
+  const view: View = prefs.view === 'bank' && !cbt ? 'mocks' : prefs.view;
 
   const { tests, errors } = mocks;
 
@@ -168,6 +186,8 @@ const MocksTab: React.FC<Props> = ({
     const now = Date.now();
     const existing = d.id ? errors.find(e => e.id === d.id) : undefined;
     const entry: ErrorEntry = {
+      // An error from a CBT paper keeps its link to the bank: the figures, the numerical answer.
+      ...(existing?.qbankId ? { qbankId: existing.qbankId, figures: existing.figures, numeric: existing.numeric } : {}),
       id: d.id ?? generateId(),
       question: d.question.trim(),
       options: d.options.map(o => o.trim()) as ErrorEntry['options'],
@@ -233,7 +253,7 @@ const MocksTab: React.FC<Props> = ({
 
   // Opening a mock from the chart switches to its row.
   const openFromChart = (id: string) => { setOpenId(id); };
-  useEffect(() => { if (prefs.view === 'errors') setOpenId(null); }, [prefs.view]);
+  useEffect(() => { if (view !== 'mocks') setOpenId(null); }, [view]);
 
   /* ── Render ── */
   const filterBar = (
@@ -266,24 +286,40 @@ const MocksTab: React.FC<Props> = ({
         <div>
           <h1 className={`font-display text-[32px] md:text-[40px] leading-none ${t.heading}`}>Mock tests</h1>
           <p className={`text-[13px] font-ui mt-2 ${t.muted}`}>
-            {prefs.view === 'mocks'
+            {view === 'mocks'
               ? everything.length ? `${everything.length} taken${upcoming.length ? ` · ${upcoming.length} planned` : ''}. Every one makes the next one count.` : 'Plan them. Take them. Learn from every one.'
-              : `${errors.length} saved · ${openErrors} still to beat.`}
+              : view === 'bank' ? 'Your PYQs, as real CBT papers.'
+                : `${errors.length} saved · ${openErrors} still to beat.`}
           </p>
         </div>
         <Segmented
-          value={prefs.view}
-          onChange={view => setPref({ view })}
+          value={view}
+          onChange={v => setPref({ view: v })}
           dark={dark}
           label="View"
           options={[
             { value: 'mocks', label: 'Mocks' },
             { value: 'errors', label: <>Error notebook{openErrors ? <span className="ml-1 px-1.5 rounded-full bg-[#E10600] text-white text-[10px] leading-[16px]">{openErrors}</span> : null}</> },
+            ...(cbt ? [{ value: 'bank' as View, label: 'Question bank' }] : []),
           ]}
         />
       </div>
 
-      {prefs.view === 'errors' ? (
+      {view === 'bank' && cbt ? (
+        <Suspense fallback={<Card dark={dark} className="p-10 text-center"><p className={`text-[13px] font-ui ${t.muted}`}>Opening your question bank…</p></Card>}>
+          <BankView
+            userId={cbt.userId}
+            tests={tests}
+            errors={errors}
+            progress={progress}
+            today={today}
+            dark={dark}
+            startGenerating={startGenerating}
+            onGeneratingHandled={doneGenerating}
+            onCbtSaved={cbt.onSaved}
+          />
+        </Suspense>
+      ) : view === 'errors' ? (
         <ErrorNotebook
           errors={errors}
           subjects={subjects}
@@ -312,6 +348,7 @@ const MocksTab: React.FC<Props> = ({
             <div className="flex flex-wrap gap-2.5 mt-8">
               <button onClick={() => setPlan({ test: null, past: false })} className={`${btn} px-6 py-4 ${t.primary}`}>Plan a mock</button>
               <button onClick={() => setPlan({ test: null, past: true })} className={`${btn} px-5 py-4 ${t.ghost}`}>Log one you took</button>
+              {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank' }); }} className={`${btn} px-5 py-4 ${t.ghost}`}>Take a CBT paper</button>}
             </div>
           </div>
         </Card>
@@ -320,6 +357,7 @@ const MocksTab: React.FC<Props> = ({
           <div className="flex flex-wrap gap-2.5">
             <button onClick={() => setPlan({ test: null, past: false })} className={`${btn} px-5 py-3 ${t.primary}`}>+ Plan a mock</button>
             <button onClick={() => setPlan({ test: null, past: true })} className={`${btn} px-4 py-3 ${t.ghost}`}>Log one you took</button>
+            {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank' }); }} className={`${btn} px-4 py-3 ${t.ghost}`}>Take a CBT paper</button>}
           </div>
 
           {next && nextReadiness ? (
@@ -387,6 +425,7 @@ const MocksTab: React.FC<Props> = ({
             onLog={x => setResultFor(x)}
             onEdit={x => setPlan({ test: x, past: false })}
             onLogError={x => openErrorForm(x)}
+            onReviewPaper={cbt ? x => x.cbtPaperId && setReviewPaper(x.cbtPaperId) : undefined}
             delay={360}
           />
         </>
@@ -439,6 +478,11 @@ const MocksTab: React.FC<Props> = ({
           onAddTopic={onAddTopic}
           onForgetTopic={onForgetTopic}
         />
+      )}
+      {reviewPaper && cbt && (
+        <Suspense fallback={null}>
+          <PaperViewer paperId={reviewPaper} dark={dark} tests={tests} errors={errors} today={today} onClose={closeReview} />
+        </Suspense>
       )}
       {quiz && (
         <ErrorQuiz

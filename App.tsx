@@ -48,6 +48,7 @@ import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
 import { useAdmin } from './admin/useAdmin';
+import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
 import { useAnnouncements } from './announce/useAnnouncements';
 import AnnouncementModal from './announce/AnnouncementModal';
@@ -245,6 +246,12 @@ const App: React.FC = () => {
      grant itself. This only decides whether the console is drawn; every query
      it makes is re-authorized in the database. See admin/useAdmin. */
   const { isAdmin, checked: adminChecked } = useAdmin(user);
+
+  /* ── The private CBT ──
+     Same stance as the console: asked of the server (`has_feature('cbt')`),
+     decides only whether the Question bank is drawn, and every query behind it
+     is re-checked by RLS. See supabase/cbt.sql. */
+  const cbtEnabled = useFeature(user, 'cbt');
 
   /* ── App-wide announcements ──
      Checked on the way into Today and nowhere else, which is the whole
@@ -1571,6 +1578,19 @@ const App: React.FC = () => {
     });
   const recordAttempts = (answers: Record<string, boolean>) =>
     withMocks(m => ({ ...m, errors: applyAttempts(m.errors, answers, Date.now()) }));
+  /* A finished CBT paper: its MockTest and its notebook entries in one write,
+     so one sync. An entry for a question already in the notebook arrives as
+     an update of that entry (same id), never a second copy. */
+  const saveCbtResult = (test: MockTest, entries: ErrorEntry[]) =>
+    withMocks(m => {
+      const byId = new Map(m.errors.map(e => [e.id, e]));
+      entries.forEach(e => byId.set(e.id, e));
+      return {
+        ...m,
+        tests: m.tests.some(x => x.id === test.id) ? m.tests.map(x => (x.id === test.id ? test : x)) : [...m.tests, test],
+        errors: Array.from(byId.values()),
+      };
+    });
   const addMockTopic = (key: string, name: string) =>
     withMocks(m => {
       const list = m.topics[key] ?? [];
@@ -2244,6 +2264,7 @@ const App: React.FC = () => {
               onRecordAttempts={recordAttempts}
               onAddTopic={addMockTopic}
               onForgetTopic={forgetMockTopic}
+              cbt={cbtEnabled && user ? { userId: user.id, onSaved: saveCbtResult } : undefined}
             />
           )}
           {activeTab === 'Ranks' && (

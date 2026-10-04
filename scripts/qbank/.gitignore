@@ -1,0 +1,6 @@
+# Per-page model responses, keyed by PDF hash. Never commit: it is a cache, and it holds the PDF's text.
+.qbank-cache/
+.venv/
+*.qbank.json
+# Source PDFs and the bundles made from them. Coaching material: never commit.
+pdfs/

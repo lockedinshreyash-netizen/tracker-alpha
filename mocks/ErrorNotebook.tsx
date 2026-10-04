@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { ErrorEntry, ErrorReason, Subject } from '../types';
 import { CLEAR_STREAK, OPTION_LETTERS, REASONS, REASON_ORDER, isCleared } from './model';
+import { QFigures, QText } from './QText';
 import { ErrorPile, errorPiles } from './insights';
 import { Card, Chip, Eyebrow, btn, subjectDot, tokens } from './ui';
 
@@ -64,7 +65,7 @@ const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; on
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className={`w-full text-left px-5 md:px-6 py-4 flex items-start gap-3 ${t.hover}`}>
         <span className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: subjectDot(e.subject) }} />
         <div className="min-w-0 flex-1">
-          <p className={`text-[14px] font-ui leading-relaxed whitespace-pre-wrap ${open ? '' : 'line-clamp-2'} ${t.heading}`}>{e.question}</p>
+          <p className={`text-[14px] font-ui leading-relaxed whitespace-pre-wrap ${open ? '' : 'line-clamp-2'} ${t.heading}`}><QText e={e} text={e.question} /></p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className={`text-[11px] font-ui ${t.muted}`}>{e.chapter}{e.topic ? ` · ${e.topic}` : ''}</span>
             <span className={`text-[10px] font-ui font-bold px-1.5 py-0.5 rounded ${dark ? 'bg-white/[0.05] text-zinc-400' : 'bg-zinc-100 text-zinc-600'}`}>{REASONS[e.reason].label}</span>
@@ -79,13 +80,18 @@ const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; on
       </button>
       {open && (
         <div className="px-5 md:px-6 pb-5 pl-[38px] md:pl-[42px] mk-fade">
-          <div className="grid sm:grid-cols-2 gap-2">
-            {e.options.map((o, i) => (
-              <div key={i} className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border text-[13px] font-ui ${i === e.correct ? (dark ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200' : 'border-emerald-300 bg-emerald-50 text-emerald-900') : dark ? 'border-white/[0.06] text-zinc-400' : 'border-zinc-100 text-zinc-600'}`}>
-                <b className="shrink-0">{OPTION_LETTERS[i]}</b><span className="whitespace-pre-wrap">{o}</span>
-              </div>
-            ))}
-          </div>
+          <QFigures e={e} />
+          {e.numeric !== undefined ? (
+            <p className={`text-[13px] font-ui mt-1 ${t.body}`}>Answer: <b className={dark ? 'text-emerald-300' : 'text-emerald-700'}>{e.numeric}</b></p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-2">
+              {e.options.map((o, i) => (
+                <div key={i} className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border text-[13px] font-ui ${i === e.correct ? (dark ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200' : 'border-emerald-300 bg-emerald-50 text-emerald-900') : dark ? 'border-white/[0.06] text-zinc-400' : 'border-zinc-100 text-zinc-600'}`}>
+                  <b className="shrink-0">{OPTION_LETTERS[i]}</b><QText e={e} text={o} compact />
+                </div>
+              ))}
+            </div>
+          )}
           {e.why && <p className={`font-accent text-[15px] mt-3 ${t.heading}`}>“{e.why}”</p>}
           <div className="flex items-center gap-2 mt-4">
             <button onClick={onEdit} className={`${btn} px-4 py-2.5 ${t.ghost}`}>Edit</button>

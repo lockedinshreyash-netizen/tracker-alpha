@@ -1,0 +1,96 @@
+{
+  "Physics": {
+    "11": [
+      "Units & Measurements",
+      "Motion in a Straight Line",
+      "Motion in a Plane",
+      "Laws of Motion",
+      "Work, Energy & Power",
+      "System of Particles & Rotational Motion",
+      "Gravitation",
+      "Mechanical Properties of Solids",
+      "Mechanical Properties of Fluids",
+      "Thermal Properties of Matter",
+      "Thermodynamics",
+      "Kinetic Theory",
+      "Oscillations",
+      "Waves"
+    ],
+    "12": [
+      "Electric Charges & Fields",
+      "Electrostatic Potential & Capacitance",
+      "Current Electricity",
+      "Moving Charges & Magnetism",
+      "Magnetism & Matter",
+      "Electromagnetic Induction",
+      "Alternating Current",
+      "Electromagnetic Waves",
+      "Ray Optics & Optical Instruments",
+      "Wave Optics",
+      "Dual Nature of Radiation & Matter",
+      "Atoms",
+      "Nuclei",
+      "Semiconductor Electronics"
+    ]
+  },
+  "Chemistry": {
+    "11": [
+      "Some Basic Concepts of Chemistry",
+      "Structure of Atom",
+      "Classification of Elements & Periodicity",
+      "Chemical Bonding & Molecular Structure",
+      "Thermodynamics",
+      "Equilibrium",
+      "Redox Reactions",
+      "Organic Chemistry: Basic Principles & Techniques",
+      "Hydrocarbons",
+      "Purification & Characterisation of Organic Compounds"
+    ],
+    "12": [
+      "Solutions",
+      "Electrochemistry",
+      "Chemical Kinetics",
+      "d- & f-Block Elements",
+      "Coordination Compounds",
+      "Haloalkanes & Haloarenes",
+      "Alcohols, Phenols & Ethers",
+      "Aldehydes, Ketones & Carboxylic Acids",
+      "Amines",
+      "Biomolecules",
+      "The p-Block Elements (Groups 15-18)"
+    ]
+  },
+  "Maths": {
+    "11": [
+      "Sets",
+      "Relations & Functions",
+      "Trigonometric Functions",
+      "Complex Numbers & Quadratic Equations",
+      "Linear Inequalities",
+      "Permutations & Combinations",
+      "Binomial Theorem",
+      "Sequences & Series",
+      "Straight Lines",
+      "Conic Sections",
+      "Introduction to 3D Geometry",
+      "Limits & Derivatives",
+      "Statistics",
+      "Probability"
+    ],
+    "12": [
+      "Relations & Functions",
+      "Inverse Trigonometric Functions",
+      "Matrices",
+      "Determinants",
+      "Continuity & Differentiability",
+      "Applications of Derivatives",
+      "Integrals",
+      "Applications of Integrals",
+      "Differential Equations",
+      "Vector Algebra",
+      "Three Dimensional Geometry",
+      "Linear Programming",
+      "Probability"
+    ]
+  }
+}

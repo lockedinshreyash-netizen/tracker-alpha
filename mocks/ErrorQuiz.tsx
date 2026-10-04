@@ -14,6 +14,13 @@ import { ErrorEntry } from '../types';
 import { CLEAR_STREAK, OPTION_LETTERS, REASONS, isCleared } from './model';
 import { practiceOrder } from './insights';
 import { Overlay, btn, subjectDot, tokens } from './ui';
+import { QFigures, QText, answerOf } from './QText';
+
+/* Numerical answers match to two decimals, the way NTA rounds them. */
+const numericRight = (typed: string, value: number): boolean => {
+  const n = Number(typed.trim());
+  return typed.trim() !== '' && Number.isFinite(n) && Math.abs(n - value) < 0.01 + 1e-9;
+};
 
 interface Props {
   title: string;
@@ -43,6 +50,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
   const [picked, setPicked] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [committed, setCommitted] = useState(false);
+  const [typed, setTyped] = useState('');
 
   const pool = useMemo(() => (skipCleared ? errors.filter(e => !isCleared(e)) : errors), [errors, skipCleared]);
 
@@ -50,6 +58,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
     setQs(build(list));
     setI(0);
     setPicked(null);
+    setTyped('');
     setAnswers({});
     setCommitted(false);
     setPhase('run');
@@ -64,15 +73,23 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
   const close = () => { commit(); onClose(); };
 
   const q = qs[i];
+  const isNumeric = q?.e.numeric !== undefined;
   const choose = (slot: number) => {
-    if (picked !== null || !q) return;
+    if (picked !== null || !q || isNumeric) return;
     setPicked(slot);
     setAnswers(a => ({ ...a, [q.e.id]: q.order[slot] === q.e.correct }));
+  };
+  // A numerical question is "picked" once its typed answer is checked.
+  const check = () => {
+    if (picked !== null || !q || q.e.numeric === undefined || !typed.trim()) return;
+    setPicked(0);
+    setAnswers(a => ({ ...a, [q.e.id]: numericRight(typed, q.e.numeric as number) }));
   };
   const next = () => {
     if (i + 1 >= qs.length) { setPhase('done'); return; }
     setI(i + 1);
     setPicked(null);
+    setTyped('');
   };
 
   useEffect(() => { if (phase === 'done') commit(); }, [phase, commit]);
@@ -81,6 +98,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape') { close(); return; }
       if (phase !== 'run') return;
+      if (isNumeric && picked === null) { if (ev.key === 'Enter') { ev.preventDefault(); check(); } return; }
       const k = ev.key.toLowerCase();
       const idx = ['1', '2', '3', '4'].indexOf(k) >= 0 ? ['1', '2', '3', '4'].indexOf(k) : ['a', 'b', 'c', 'd'].indexOf(k);
       if (idx >= 0 && picked === null) choose(idx);
@@ -167,8 +185,8 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
             <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.06em] ${t.muted}`}>Still wrong</p>
             {missed.map(e => (
               <div key={e.id} className={`rounded-xl border p-4 ${t.card}`}>
-                <p className={`text-[13px] font-ui leading-relaxed line-clamp-3 whitespace-pre-wrap ${t.heading}`}>{e.question}</p>
-                <p className={`text-[12px] font-ui mt-2 ${dark ? 'text-emerald-400' : 'text-emerald-700'}`}>✓ {e.options[e.correct]}</p>
+                <p className={`text-[13px] font-ui leading-relaxed line-clamp-3 whitespace-pre-wrap ${t.heading}`}><QText e={e} text={e.question} /></p>
+                <p className={`text-[12px] font-ui mt-2 ${dark ? 'text-emerald-400' : 'text-emerald-700'}`}>✓ <QText e={e} text={answerOf(e)} compact /></p>
                 {e.why && <p className={`text-[12px] font-ui mt-1 ${t.muted}`}>{e.why}</p>}
               </div>
             ))}
@@ -183,7 +201,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
   }
 
   if (!q) return null;
-  const wasRight = picked !== null && q.order[picked] === q.e.correct;
+  const wasRight = picked !== null && (isNumeric ? !!answers[q.e.id] : q.order[picked] === q.e.correct);
   return shell(
     <div key={q.e.id} className="mk-rise">
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -195,8 +213,28 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
           <span className={`text-[11px] font-ui ${t.faint}`}>Attempt {q.e.attempts + 1}{q.e.lastResult === 'wrong' ? ' · missed last time' : ''}</span>
         )}
       </div>
-      <p className={`text-[18px] md:text-[21px] font-ui font-semibold leading-relaxed whitespace-pre-wrap ${t.heading}`}>{q.e.question}</p>
+      <p className={`text-[18px] md:text-[21px] font-ui font-semibold leading-relaxed whitespace-pre-wrap ${t.heading}`}><QText e={q.e} text={q.e.question} /></p>
+      <QFigures e={q.e} />
 
+      {isNumeric ? (
+        <div className="mt-7 max-w-sm">
+          <div className="flex gap-2">
+            <input
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              inputMode="decimal"
+              disabled={picked !== null}
+              autoFocus
+              placeholder="Your answer"
+              className={`${t.input} text-[17px] py-3`}
+            />
+            {picked === null && <button onClick={check} disabled={!typed.trim()} className={`${btn} px-5 ${t.primary}`}>Check</button>}
+          </div>
+          {picked !== null && !wasRight && (
+            <p className={`text-[13px] font-ui mt-3 ${t.body}`}>Correct answer: <b className={dark ? 'text-emerald-300' : 'text-emerald-700'}>{q.e.numeric}</b></p>
+          )}
+        </div>
+      ) : (
       <div className="mt-7 space-y-2.5">
         {q.order.map((orig, slot) => {
           const isRight = orig === q.e.correct;
@@ -221,11 +259,12 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
               }`}>
                 {state === 'right' ? '✓' : state === 'wrong' ? '✕' : OPTION_LETTERS[slot]}
               </span>
-              <span className={`text-[15px] font-ui whitespace-pre-wrap ${t.heading}`}>{q.e.options[orig]}</span>
+              <span className={`text-[15px] font-ui whitespace-pre-wrap ${t.heading}`}><QText e={q.e} text={q.e.options[orig]} compact /></span>
             </button>
           );
         })}
       </div>
+      )}
 
       {picked !== null && (
         <div className="mk-rise mt-6">

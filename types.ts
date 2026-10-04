@@ -663,6 +663,8 @@ export interface MockTest {
   /* Empty for a full-syllabus mock: "everything" is not a list. */
   chapters: MockChapter[];
   result?: MockResult;
+  /** The CBT sitting this mock came from (`cbt_papers.id`), when it was taken in the app. */
+  cbtPaperId?: string;
   /** Epoch ms; decides which copy wins when two devices edited one mock. */
   updatedAt: number;
 }
@@ -691,6 +693,13 @@ export interface ErrorEntry {
   topic?: string;
   /** The mock it came from, if it was logged from one. */
   mockId?: string;
+  /* Set when the error came from a CBT paper. The text then carries LaTeX
+     ($…$) and figure tokens ([[fig:N]] → figures[N]); the figures stay in the
+     private `qbank` bucket and only their paths ride in the blob. */
+  qbankId?: string;
+  figures?: string[];
+  /** A numerical-answer question. `options` are then four empty strings and `correct` is 0. */
+  numeric?: number;
   createdAt: number;
   updatedAt: number;
   /* Re-attempt history. Two right in a row clears it — once can be luck. */

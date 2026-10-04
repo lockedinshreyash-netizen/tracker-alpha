@@ -15,6 +15,9 @@ const root = ReactDOM.createRoot(rootElement);
    harness is not sitting behind the landing page and the onboarding tour. */
 if (import.meta.env.DEV && new URLSearchParams(location.search).get('share') === 'debug') {
   import('./share/DebugCards').then(({ default: DebugCards }) => root.render(<DebugCards />));
+} else if (import.meta.env.DEV && new URLSearchParams(location.search).get('cbt') === 'debug') {
+  // The CBT exam, review and error test on a fixture bank, no database.
+  import('./cbt/DebugCbt').then(({ default: DebugCbt }) => root.render(<DebugCbt />));
 } else {
   root.render(
     <React.StrictMode>

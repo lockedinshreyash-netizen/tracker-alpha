@@ -10,6 +10,7 @@ import { ErrorEntry, ErrorReason, ExamPreference, MockChapter, Subject } from '.
 import { SingleChapterPicker, TopicChips } from './ChapterPicker';
 import { OPTION_LETTERS, REASONS, REASON_ORDER } from './model';
 import { Sheet, btn, subjectDot, tokens } from './ui';
+import { QFigures, QText, answerOf } from './QText';
 
 export interface ErrorDraft {
   id?: string;
@@ -21,6 +22,9 @@ export interface ErrorDraft {
   chapter: Pick<MockChapter, 'classId' | 'subject' | 'chapter'> | null;
   topic: string;
   mockId?: string;
+  /* An error from a CBT paper: its question and answer come from the bank and
+     are shown, not edited — retyping LaTeX by hand would only break it. */
+  bank?: Pick<ErrorEntry, 'qbankId' | 'figures' | 'numeric'>;
 }
 
 export const emptyDraft = (seed?: Partial<ErrorDraft>): ErrorDraft => ({
@@ -30,6 +34,7 @@ export const emptyDraft = (seed?: Partial<ErrorDraft>): ErrorDraft => ({
 export const draftFrom = (e: ErrorEntry): ErrorDraft => ({
   id: e.id, question: e.question, options: [...e.options] as ErrorDraft['options'], correct: e.correct, reason: e.reason,
   why: e.why ?? '', chapter: { classId: e.classId, subject: e.subject, chapter: e.chapter }, topic: e.topic ?? '', mockId: e.mockId,
+  ...(e.qbankId ? { bank: { qbankId: e.qbankId, figures: e.figures, numeric: e.numeric } } : {}),
 });
 
 interface Props {
@@ -80,7 +85,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
 
   const filled = {
     question: d.question.trim().length > 0,
-    options: d.options.every(o => o.trim()),
+    options: d.bank?.numeric !== undefined || d.options.every(o => o.trim()),
     correct: d.correct !== null,
     reason: d.reason !== null,
     chapter: d.chapter !== null,
@@ -122,6 +127,19 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
   return (
     <Sheet dark={dark} onClose={onClose} label={d.id ? 'Edit error' : 'Add an error'} header={header} footer={footer} width="md:w-[580px]">
       <div className="px-5 md:px-7 py-6 space-y-8">
+        {d.bank ? (
+          <Step n={1} title="Question" hint="From a CBT paper" done dark={dark}>
+            <div className={`rounded-xl border p-4 text-[14px] leading-relaxed ${t.heading} ${dark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-zinc-100 bg-zinc-50'}`}>
+              <QText e={d.bank} text={d.question} />
+              <QFigures e={{ ...d.bank, question: d.question, options: d.options }} />
+              <p className={`text-[12px] font-ui mt-3 ${t.muted}`}>
+                Answer: <b className={dark ? 'text-emerald-300' : 'text-emerald-700'}>
+                  {d.bank.numeric !== undefined ? d.bank.numeric : <>{OPTION_LETTERS[d.correct ?? 0]} · <QText e={d.bank} text={answerOf({ numeric: undefined, options: d.options, correct: d.correct ?? 0 })} compact /></>}
+                </b>
+              </p>
+            </div>
+          </Step>
+        ) : (<>
         <Step n={1} title="Question" done={filled.question} dark={dark}>
           <textarea
             ref={qRef}
@@ -174,8 +192,9 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
             <p className={`text-[12px] font-ui mt-2 truncate ${t.muted}`}>Answer: <span className={t.heading}>{d.options[d.correct]}</span></p>
           )}
         </Step>
+        </>)}
 
-        <Step n={4} title="Why did I get it wrong?" done={filled.reason} dark={dark}>
+        <Step n={d.bank ? 2 : 4} title="Why did I get it wrong?" done={filled.reason} dark={dark}>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {REASON_ORDER.map(r => {
               const on = d.reason === r;
@@ -203,7 +222,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
           />
         </Step>
 
-        <Step n={5} title="Chapter" done={filled.chapter} dark={dark}>
+        <Step n={d.bank ? 3 : 5} title="Chapter" done={filled.chapter} dark={dark}>
           <SingleChapterPicker
             subjects={subjects}
             pref={pref}
@@ -214,7 +233,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
           />
         </Step>
 
-        <Step n={6} title="Topic" hint="Optional" done={!!d.topic} dark={dark}>
+        <Step n={d.bank ? 4 : 6} title="Topic" hint="Optional" done={!!d.topic} dark={dark}>
           {d.chapter ? (
             <TopicChips
               single
