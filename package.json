@@ -10,13 +10,15 @@
     "voice:generate": "node scripts/generate-voice.ts",
     "voice:check": "node scripts/check-voice.ts",
     "assets:generate": "node scripts/generate-assets.mjs public",
-    "qbank:chapters": "esbuild scripts/qbank/export-chapters.ts --bundle --platform=node --log-level=warning | node > scripts/qbank/chapters.json"
+    "qbank:chapters": "esbuild scripts/qbank/export-chapters.ts --bundle --platform=node --log-level=warning | node > scripts/qbank/chapters.json",
+    "test:decks": "node scripts/test-decks.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.0",
     "katex": "^0.16.47",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "ts-fsrs": "5.4.2"
   },
   "devDependencies": {
     "@types/katex": "^0.16.8",

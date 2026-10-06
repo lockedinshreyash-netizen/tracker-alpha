@@ -241,7 +241,9 @@ def to_answer(kind: str, raw) -> dict | None:
         return None
 
 
-FIGURE_WORDS = re.compile(r"\b(figure|fig\.|shown|diagram|graph|circuit|as given)\b", re.I)
+# Words that point at a picture. Not "circuit" or "graph" alone: half of a current-electricity
+# chapter says "circuit" with no figure in sight, and flagging all of it buries the real misses.
+FIGURE_WORDS = re.compile(r"\b(figure|fig\.|shown|diagram)\b", re.I)
 
 
 @dataclass

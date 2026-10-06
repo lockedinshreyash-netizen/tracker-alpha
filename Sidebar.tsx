@@ -100,6 +100,16 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <path d="M18 14.4c1.8.9 3 2.9 3 5.6" />
         </svg>
       );
+    /* Two cards, one squared on the other — a deck, not a single page. */
+    case 'Decks':
+      return (
+        <svg {...props}>
+          <rect x="7" y="3" width="13" height="16" rx="2.2" />
+          <path d="M4.5 7.5v10.8A2.7 2.7 0 0 0 7.2 21h9.3" />
+          <line x1="10.5" y1="9" x2="16.5" y2="9" />
+          <line x1="10.5" y1="12.5" x2="14.5" y2="12.5" />
+        </svg>
+      );
     /* A subject inscribed in a circle with the construction lines left in —
        the Vitruvian method rather than the picture, and the only icon here
        that is a diagram rather than a pictogram. It should not look like the
@@ -133,9 +143,9 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
      their muscle memory knows, and the console arrives at the bottom. Groups
      went in after Review for the same reason — above the Observatory's rule,
      because it is a place you go to do something, but below everything that
-     was already there. */
+     was already there. Decks followed Groups the same way. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Observatory',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Decks', 'Observatory',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';

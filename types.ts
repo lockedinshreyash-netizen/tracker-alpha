@@ -189,7 +189,10 @@ export interface ChapterProgress {
    AppState, so nothing about it rides the synced blob. */
 /* `Mocks` took the Questions tab's slot in the rail. A saved `lastUsedTab` of
    'Questions' is mapped to it on load (App.tsx). */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Observatory' | 'Admin';
+/* `Decks` (spaced-repetition flashcards) is server state end to end, like
+   Groups: decks, cards and review history live in supabase/decks.sql, never in
+   AppState. */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Decks' | 'Observatory' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {

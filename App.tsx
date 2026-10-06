@@ -24,10 +24,11 @@ import AuthModal from './AuthModal';
 import Header from './Header';
 import TodayTab from './today/TodayTab';
 import { CardPeriod } from './share/types';
-/* The only lazy boundary in the app. The card renderer, its three compositions
-   and the format specs are a chunk that a user who never shares never pays
-   for — and it is fetched on the click, not on the tab. */
+/* Lazy boundaries. The share renderer is fetched on the click, not on the tab:
+   a user who never shares never pays for it. Decks (the scheduler, the deck
+   file reader, the editor) is fetched when the tab is first opened. */
 const ShareModal = React.lazy(() => import('./share/ShareModal'));
+const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
@@ -62,6 +63,7 @@ import GroupsTab from './groups/GroupsTab';
 import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
 import { forgetGroupsOnDevice } from './groups/publish';
+import { forgetDecksOnDevice } from './decks/forget';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -560,6 +562,7 @@ const App: React.FC = () => {
         });
         localStorage.removeItem('locked_in_state_v2');
         forgetGroupsOnDevice();
+        forgetDecksOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -576,6 +579,10 @@ const App: React.FC = () => {
     document.body.style.backgroundColor = theme === 'dark' ? '#0B0B0D' : '#F2F0EC';
     document.body.style.color = theme === 'dark' ? '#FFFFFF' : '#17150F';
   }, [theme]);
+
+  /* A deck the admin console asked to open; DecksTab takes it and clears it. */
+  const [deckToOpen, setDeckToOpen] = useState<string | null>(null);
+  const clearDeckToOpen = useCallback(() => setDeckToOpen(null), []);
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -2293,6 +2300,21 @@ const App: React.FC = () => {
               theme={theme}
             />
           )}
+          {/* Lazy: the scheduler, the deck file reader and the editor arrive
+              with the tab. Nothing in it reads or writes AppState. */}
+          {activeTab === 'Decks' && (
+            <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+              <DecksTab
+                user={user}
+                isAdmin={isAdmin}
+                theme={theme}
+                examPreference={state.examPreference || 'JEE'}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+                openDeckId={deckToOpen}
+                onOpenedDeck={clearDeckToOpen}
+              />
+            </React.Suspense>
+          )}
           {activeTab === 'Review' && (
             <ReviewTab
               logs={state.logs}
@@ -2316,7 +2338,7 @@ const App: React.FC = () => {
               Hiding it is not the control; every query inside it is refused by
               row-level security for anybody else. */}
           {activeTab === 'Admin' && isAdmin && user && (
-            <AdminTab adminId={user.id} theme={theme} />
+            <AdminTab adminId={user.id} theme={theme} onOpenDeck={id => { if (id) setDeckToOpen(id); handleTabChange('Decks'); }} />
           )}
           {activeTab === 'Observatory' && (
             <ObservatoryTab

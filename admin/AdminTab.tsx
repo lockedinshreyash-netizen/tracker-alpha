@@ -1,33 +1,39 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import AnnouncementsAdmin from './AnnouncementsAdmin';
 import FeedbackInbox from './FeedbackInbox';
 import AdminRoster from './AdminRoster';
 import ModerationAdmin from './ModerationAdmin';
 
+/* Lazy so the Decks data layer stays out of the main bundle. */
+const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
+
 interface Props {
   adminId: string;
   theme: 'dark' | 'light';
+  /** Open an Alpha deck in the Decks tab (null: just go there). */
+  onOpenDeck: (id: string | null) => void;
 }
 
-type Section = 'announce' | 'inbox' | 'moderation' | 'people';
+type Section = 'announce' | 'inbox' | 'moderation' | 'decks' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'announce', label: 'Announcements' },
   { id: 'inbox', label: 'Feedback' },
   { id: 'moderation', label: 'Moderation' },
+  { id: 'decks', label: 'Decks' },
   { id: 'people', label: 'Administrators' },
 ];
 
 /**
  * The console.
  *
- * Four sections behind one switch rather than three tabs in the rail: the rail
+ * Five sections behind one switch rather than three tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
  * is here.
  */
-const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
+const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
   const dark = theme === 'dark';
   const [section, setSection] = useState<Section>('announce');
 
@@ -59,6 +65,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme }) => {
       {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}
+      {section === 'decks' && <Suspense fallback={null}><DecksAdmin theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
       {section === 'people' && <AdminRoster adminId={adminId} theme={theme} />}
     </div>
   );

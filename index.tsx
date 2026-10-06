@@ -18,6 +18,9 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).get('share') ===
 } else if (import.meta.env.DEV && new URLSearchParams(location.search).get('cbt') === 'debug') {
   // The CBT exam, review and error test on a fixture bank, no database.
   import('./cbt/DebugCbt').then(({ default: DebugCbt }) => root.render(<DebugCbt />));
+} else if (import.meta.env.DEV && new URLSearchParams(location.search).get('decks') === 'debug') {
+  // Alpha Decks' review, editor and import preview on fixture cards, no database.
+  import('./decks/DebugDecks').then(({ default: DebugDecks }) => root.render(<DebugDecks />));
 } else {
   root.render(
     <React.StrictMode>
