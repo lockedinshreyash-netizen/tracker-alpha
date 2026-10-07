@@ -12,8 +12,18 @@
    hook, and the decay is re-timed to land on it exactly. So the rack slows into
    place rather than stopping and then snapping. Anything a glide cannot
    express exactly falls back to a critically damped spring: no bounce, nothing
-   wobbles. That covers a release past an end, a release with no speed, and a
-   rounded point that sits behind the direction of travel.
+   wobbles. That covers a release with no speed, and a rounded point that sits
+   behind the direction of travel.
+
+   The ends are firm, like a rail meeting its end bracket. Pulling past one
+   gives at most MAX_OVER pixels, whatever the screen size. A throw that
+   would run off the end glides until it reaches the end (`edgeHit`), then
+   takes one short, stiff bump: its speed is capped at EDGE_SPEED, which is
+   about 13px of overshoot, settled in under 200ms. Letting go past an end
+   springs back on the same stiff spring. The first version used the screen
+   width for the give and a soft spring for the return. A fast flick then
+   carried the rack about 60px past the end and drifted back over a third of
+   a second, which read as loose rather than heavy.
 
    Packs hang, so they sway. Each one is a damped pendulum driven by the rack's
    acceleration: the rack speeds up left and the pack's foot lags right, then
@@ -36,10 +46,15 @@ export const MIN_THROW = 0.08;
 
 export const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
-/** Past an end, the rack follows less and less, never all the way. */
-export const rubber = (x: number, b: Bounds, dim: number): number => {
-  if (x > b.max) return b.max + dim * (1 - 1 / (((x - b.max) * 0.55) / dim + 1));
-  if (x < b.min) return b.min - dim * (1 - 1 / (((b.min - x) * 0.55) / dim + 1));
+/** The most the rack can be pulled past an end, px. */
+export const MAX_OVER = 64;
+/** The fastest the rack may arrive at an end; what it has left becomes a short bump (px/ms). */
+export const EDGE_SPEED = 0.8;
+
+/** Past an end, the rack follows less and less, and never more than MAX_OVER. */
+export const rubber = (x: number, b: Bounds): number => {
+  if (x > b.max) return b.max + MAX_OVER * (1 - 1 / (((x - b.max) * 0.5) / MAX_OVER + 1));
+  if (x < b.min) return b.min - MAX_OVER * (1 - 1 / (((b.min - x) * 0.5) / MAX_OVER + 1));
   return x;
 };
 
@@ -65,13 +80,29 @@ export const releaseVelocity = (samples: Sample[], now: number): number => {
 
 export type Motion =
   | { kind: 'glide'; from: number; to: number; tau: number; t0: number }
-  | { kind: 'spring'; to: number; v: number };
+  | { kind: 'spring'; to: number; v: number; stiff?: boolean };
+
+/** The rack reaches an end at speed v: one stiff, short bump, never a long overshoot. */
+export const edgeHit = (b: Bounds, v: number): Motion => ({
+  kind: 'spring',
+  to: v > 0 ? b.max : b.min,
+  v: clamp(v, -EDGE_SPEED, EDGE_SPEED),
+  stiff: true,
+});
 
 /** What the rack does once it is let go. */
 export const planRelease = (x: number, v: number, spacing: number, b: Bounds, now: number): Motion => {
-  if (x > b.max || x < b.min) return { kind: 'spring', to: clamp(x, b.min, b.max), v };
+  if (x > b.max || x < b.min) {
+    // Back from past the end, firmly. A fling further out is not honoured.
+    const outward = x > b.max ? v > 0 : v < 0;
+    return { kind: 'spring', to: clamp(x, b.min, b.max), v: outward ? 0 : v, stiff: true };
+  }
   if (Math.abs(v) < MIN_THROW) return { kind: 'spring', to: snap(x, spacing, b), v };
-  const to = snap(x + v * TAU, spacing, b);
+  const raw = x + v * TAU;
+  // Heading off the end: glide naturally until the end is reached, then bump
+  // (the loop switches to `edgeHit` at the moment of contact).
+  if (raw > b.max || raw < b.min) return { kind: 'glide', from: x, to: raw, tau: TAU, t0: now };
+  const to = snap(raw, spacing, b);
   const dist = to - x;
   if (dist === 0 || Math.sign(dist) !== Math.sign(v)) return { kind: 'spring', to, v };
   const tau = dist / v;
@@ -86,9 +117,12 @@ export const glideAt = (m: { from: number; to: number; tau: number; t0: number }
 /** Critically damped: arrives, does not bounce. ω ≈ 0.0126/ms, settled in ~320ms. */
 const K = 0.00016;
 const C = 2 * Math.sqrt(K);
+/** The end bracket: also critically damped, about 1.8× quicker. ω ≈ 0.0224/ms. */
+const K_EDGE = 0.0005;
+const C_EDGE = 2 * Math.sqrt(K_EDGE);
 
-export const springStep = (x: number, v: number, to: number, dt: number): { x: number; v: number } => {
-  const a = -K * (x - to) - C * v;
+export const springStep = (x: number, v: number, to: number, dt: number, stiff = false): { x: number; v: number } => {
+  const a = -(stiff ? K_EDGE : K) * (x - to) - (stiff ? C_EDGE : C) * v;
   const nv = v + a * dt;
   return { x: x + nv * dt, v: nv };
 };

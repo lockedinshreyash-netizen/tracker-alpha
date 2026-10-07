@@ -35,8 +35,8 @@ import { PackRail } from './PackRail';
 import { PackSoon } from './PackSoon';
 import { geometry, type RackSize } from './geometry';
 import {
-  type Bounds, type Motion, type Sample, atRest, clamp, glideAt, omegaFor, planRelease, releaseVelocity, rubber,
-  smoothAccel, snap, springStep, swayStep, swaying,
+  type Bounds, type Motion, type Sample, atRest, clamp, edgeHit, glideAt, omegaFor, planRelease, releaseVelocity, rubber,
+  MAX_OVER, smoothAccel, snap, springStep, swayStep, swaying,
 } from './physics';
 import type { Pack } from '../types';
 
@@ -89,6 +89,10 @@ interface Phys {
   springV: number;
   dragX: number;
   wheelRaw: number;
+  /** The last push past an end from the wheel, to tell a push from a dying momentum tail. */
+  wheelPush: number;
+  /** Until when outward wheel deltas are ignored, after an end has sprung back. */
+  wheelLock: number;
   lastT: number;
   raf: number;
   theta: number[];
@@ -104,7 +108,7 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
   const [vw, setVw] = useState(0);
   const [dragging, setDragging] = useState(false);
   const suppressClick = useRef(false);
-  const phys = useRef<Phys>({ x: 0, v: 0, accel: 0, mode: 'idle', motion: null, springV: 0, dragX: 0, wheelRaw: 0, lastT: 0, raf: 0, theta: [], w: [] });
+  const phys = useRef<Phys>({ x: 0, v: 0, accel: 0, mode: 'idle', motion: null, springV: 0, dragX: 0, wheelRaw: 0, wheelPush: 0, wheelLock: 0, lastT: 0, raf: 0, theta: [], w: [] });
 
   const g0 = useMemo(() => geometry(size.w, size.h, 1), [size.w, size.h]);
   const n = items.length || emptyHooks;
@@ -139,12 +143,19 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
     s.lastT = now;
     let x = s.x;
     if (s.mode === 'drag') x = s.dragX;
-    else if (s.mode === 'wheel') x = rubber(s.wheelRaw, L.bounds, L.vw || 1);
+    else if (s.mode === 'wheel') x = rubber(s.wheelRaw, L.bounds);
     else if (s.mode === 'glide' && s.motion?.kind === 'glide') {
       x = glideAt(s.motion, now);
-      if (Math.abs(s.motion.to - x) < 0.35) { x = s.motion.to; s.mode = 'idle'; }
-    } else if (s.mode === 'spring' && s.motion) {
-      const r = springStep(x, s.springV, s.motion.to, dt);
+      if (x > L.bounds.max || x < L.bounds.min) {
+        // Reached an end mid-glide: one short, firm bump instead of sailing on.
+        const v = (x - s.x) / dt;
+        x = clamp(x, L.bounds.min, L.bounds.max);
+        s.motion = edgeHit(L.bounds, v);
+        s.springV = s.motion.v;
+        s.mode = 'spring';
+      } else if (Math.abs(s.motion.to - x) < 0.35) { x = s.motion.to; s.mode = 'idle'; }
+    } else if (s.mode === 'spring' && s.motion?.kind === 'spring') {
+      const r = springStep(x, s.springV, s.motion.to, dt, s.motion.stiff);
       x = r.x;
       s.springV = r.v;
       if (atRest(x, s.springV, s.motion.to)) { x = s.motion.to; s.mode = 'idle'; }
@@ -182,9 +193,9 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
 
   useEffect(() => () => { if (phys.current.raf) cancelAnimationFrame(phys.current.raf); }, []);
 
-  const springTo = useCallback((to: number) => {
+  const springTo = useCallback((to: number, stiff = false) => {
     const s = phys.current;
-    s.motion = { kind: 'spring', to: clamp(to, live.current.bounds.min, live.current.bounds.max), v: s.v };
+    s.motion = { kind: 'spring', to: clamp(to, live.current.bounds.min, live.current.bounds.max), v: s.v, stiff };
     s.springV = s.v;
     s.mode = 'spring';
     kick();
@@ -260,7 +271,7 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
         setDragging(true);
       }
       const L = live.current;
-      s.dragX = rubber(offset + dx, L.bounds, L.vw || 1);
+      s.dragX = rubber(offset + dx, L.bounds);
       samples.push({ t: performance.now(), x: s.dragX });
       if (samples.length > 10) samples.shift();
       kick();
@@ -278,7 +289,7 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
       const L = live.current;
       s.motion = planRelease(s.x, v, L.spacing, L.bounds, now);
       if (s.motion.kind === 'glide') s.mode = 'glide';
-      else { s.mode = 'spring'; s.springV = v; }
+      else { s.mode = 'spring'; s.springV = s.motion.v; }
       kick();
     };
     const up = (ev: PointerEvent) => done(ev);
@@ -308,15 +319,32 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
       const s = phys.current;
       const L = live.current;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? L.vw : 1;
+      const step = -d * unit;
+      const now = performance.now();
+      const pastEnd = s.x > L.bounds.max || s.x < L.bounds.min;
+      const outward = s.x >= L.bounds.max - 0.5 ? step > 0 : s.x <= L.bounds.min + 0.5 ? step < 0 : false;
+      // An end has just sprung back: the momentum still arriving cannot push it out again.
+      if (outward && now < s.wheelLock) return;
+      // Past an end and the push is fading: that is momentum, not a hand. Spring back now.
+      if (pastEnd && outward && Math.abs(step) < s.wheelPush) {
+        s.wheelPush = 0;
+        s.wheelLock = now + 450;
+        springTo(clamp(s.x, L.bounds.min, L.bounds.max), true);
+        return;
+      }
       if (s.mode !== 'wheel') s.wheelRaw = s.x;
-      s.wheelRaw = clamp(s.wheelRaw - d * unit, L.bounds.min - L.vw * 0.4, L.bounds.max + L.vw * 0.4);
+      s.wheelPush = pastEnd && outward ? Math.abs(step) : 0;
+      s.wheelRaw = clamp(s.wheelRaw + step, L.bounds.min - MAX_OVER * 4, L.bounds.max + MAX_OVER * 4);
       s.mode = 'wheel';
       kick();
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        if (phys.current.mode !== 'wheel') return;
-        springTo(snap(phys.current.x, live.current.spacing, live.current.bounds));
-      }, 140);
+        const p = phys.current;
+        if (p.mode !== 'wheel') return;
+        const B = live.current.bounds;
+        const over = p.x > B.max || p.x < B.min;
+        springTo(over ? clamp(p.x, B.min, B.max) : snap(p.x, live.current.spacing, B), over);
+      }, 100);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => { el.removeEventListener('wheel', onWheel); window.clearTimeout(timer); };
