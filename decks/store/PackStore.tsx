@@ -43,6 +43,19 @@ interface Props {
 }
 
 
+/**
+ * A rack's hooks: its packs, then "coming soon" slots. Only a rack with at
+ * least one published pack gets them. It fills to MIN_HOOKS, and there is
+ * always at least one at the end, to say more is on the way.
+ */
+const MIN_HOOKS = 4;
+const hooksFor = (list: Pack[]): RackItem[] => {
+  const items: RackItem[] = list.map(p => ({ pack: p, taken: p.inLibrary }));
+  if (!list.some(p => p.status === 'published')) return items;
+  const soon = Math.max(1, MIN_HOOKS - list.length);
+  return [...items, ...Array.from({ length: soon }, () => ({ pack: null, taken: false }))];
+};
+
 /** The rack's own order: as placed, then oldest pack first. */
 const order = (a: Pack, b: Pack) => a.sortOrder - b.sortOrder || a.packNo - b.packNo;
 
@@ -66,10 +79,10 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
     const out: { key: string; title: string; items: RackItem[] }[] = [];
     subjects.forEach(s => {
       const list = visible.filter(p => p.subject === s).sort(order);
-      if (list.length) out.push({ key: s, title: rackName(s), items: list.map(p => ({ pack: p, taken: p.inLibrary })) });
+      if (list.length) out.push({ key: s, title: rackName(s), items: hooksFor(list) });
     });
     const rest = visible.filter(p => !p.subject).sort(order);
-    if (rest.length) out.push({ key: 'more', title: rackName(null), items: rest.map(p => ({ pack: p, taken: p.inLibrary })) });
+    if (rest.length) out.push({ key: 'more', title: rackName(null), items: hooksFor(rest) });
     return out;
   }, [visible, examPreference]);
 
@@ -168,7 +181,7 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
       ) : (
         <div className="space-y-14 md:space-y-16">
           {categories.map((cat, i) => {
-            const mine = !!selected && cat.items.some(it => it.pack.id === selected.id);
+            const mine = !!selected && cat.items.some(it => it.pack?.id === selected.id);
             return (
               <PackCategory
                 key={cat.key}

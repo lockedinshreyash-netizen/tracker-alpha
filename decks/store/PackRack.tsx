@@ -16,13 +16,23 @@
    - A trackpad's horizontal wheel moves it directly (the OS supplies the
      momentum), then it settles onto a hook. Vertical wheel is left alone.
 
+   What a hook holds: a stack. A pack you can take hangs at the front, with
+   two more copies peeking out behind it (PackStackEdges), so it is plain that
+   the hook does not empty when one is taken. A pack you already have is not
+   removed either. You took the front one, so the next copy shows, further back
+   on the rod, darkened and slightly out of focus, with a crisp "In My Alpha"
+   badge that opens it, and the last copy still peeks out behind that. A rack never empties as its
+   owner fills My Alpha. The same copy appears the moment a pack is taken and
+   flies off. A slot with no pack is "coming soon" (PackSoon).
+
    The arithmetic is in ./physics.ts; this file is only the hand. All
    geometry is inline style: CDN Tailwind cannot see computed classes. */
 
 import React, { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { PackCard, priceLabel } from './PackCard';
+import { PackCard, PackStackEdges, priceLabel } from './PackCard';
 import { HookBack, HookFront } from './PackHook';
 import { PackRail } from './PackRail';
+import { PackSoon } from './PackSoon';
 import { geometry, type RackSize } from './geometry';
 import {
   type Bounds, type Motion, type Sample, atRest, clamp, glideAt, omegaFor, planRelease, releaseVelocity, rubber,
@@ -30,7 +40,12 @@ import {
 } from './physics';
 import type { Pack } from '../types';
 
-export interface RackItem { pack: Pack; taken: boolean }
+/** One hook. `pack: null` is a "coming soon" slot. `taken`: the pack is in My Alpha. */
+export interface RackItem { pack: Pack | null; taken: boolean }
+
+/** How far back along the rod the copy behind a taken pack hangs, and how much smaller it looks there. */
+const REAR = 9;
+const REAR_SCALE = 0.965;
 
 export interface RackHandle {
   /** Push the rack a page left (-1) or right (1). */
@@ -52,6 +67,8 @@ interface Props {
   reduced: boolean;
   /** Bare hooks to draw when there is nothing to hang. */
   emptyHooks?: number;
+  /** The line on a "coming soon" slot, e.g. "More Physics packs". */
+  soonLabel?: string;
   onSelect: (pack: Pack) => void;
   onOpenTaken: (pack: Pack) => void;
   /** Every painted frame: the rack's offset and where its first hook sits. */
@@ -79,7 +96,7 @@ interface Phys {
 }
 
 export const PackRack = React.forwardRef<RackHandle, Props>(({
-  items, size, dark, label, selectedId, hiddenId, reduced, emptyHooks = 0, onSelect, onOpenTaken, onFrame, packRef, onEnds,
+  items, size, dark, label, selectedId, hiddenId, reduced, emptyHooks = 0, soonLabel = 'More packs', onSelect, onOpenTaken, onFrame, packRef, onEnds,
 }, ref) => {
   const viewRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -340,6 +357,9 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
         WebkitMaskImage: 'linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%)',
         maskImage: 'linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%)',
         ['--pk-shadow-o' as string]: dark ? 0.62 : 0.2,
+        // The copy behind a taken pack: in the shadow of the one that was in front of it.
+        ['--pk-rear' as string]: dark ? 'brightness(0.3) saturate(0.5) blur(1.6px)' : 'brightness(0.62) saturate(0.5) blur(1.6px)',
+        ['--pk-rear-hover' as string]: dark ? 'brightness(0.42) saturate(0.6) blur(1.2px)' : 'brightness(0.74) saturate(0.6) blur(1.2px)',
       }}
     >
       <div ref={trackRef} className="absolute left-0 top-0" style={{ width: trackW, height, willChange: 'transform' }}>
@@ -347,19 +367,51 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
         {slots.map((it, i) => {
           const hx = lead + i * size.spacing + size.w / 2;
           const pack = it?.pack ?? null;
+          const soon = !!it && !pack;
           const hanging = !!pack && !it?.taken && pack.id !== hiddenId;
+          // Taken (or being taken right now): the copy behind it shows.
+          const behind = !!pack && !hanging;
           const selected = !!pack && pack.id === selectedId;
           const cards = pack ? pack.decks.reduce((m, d) => m + d.cards, 0) : 0;
+          const d = REAR * k;
           return (
-            <React.Fragment key={pack?.id ?? `hook-${i}`}>
+            <React.Fragment key={pack?.id ?? `${soon ? 'soon' : 'hook'}-${i}`}>
               <HookBack x={hx} pivotY={size.pivotY} dark={dark} scale={k} />
-              {hanging && pack && (
+              {pack && (
                 <div
                   ref={el => { swayEls.current[i] = el; }}
                   className="absolute"
                   style={{ left: hx - size.w / 2, top: packTop, width: size.w, height: size.h, transformOrigin: `${g0.pivot.x}px ${g0.pivot.y}px`, willChange: 'transform' }}
                 >
-                  <button
+                  {/* The copies further back: two behind a pack you can take, one behind the dark copy of a taken one. */}
+                  <PackStackEdges g={g0} finish={pack.finish} dark={dark} depths={hanging ? [1, 2] : [2]} step={d} />
+                  {behind && (
+                    <button
+                      type="button"
+                      data-pack={it?.taken ? pack.id : undefined}
+                      disabled={!it?.taken}
+                      onClick={() => onOpenTaken(pack)}
+                      aria-label={`${pack.title} is in My Alpha. Open it.`}
+                      className="pk-rear-btn absolute left-0 top-0 block rounded-[14px] outline-none disabled:cursor-default"
+                      style={{ transform: `translateY(${-d}px) scale(${REAR_SCALE})`, transformOrigin: `${g0.pivot.x}px ${g0.pivot.y}px` }}
+                    >
+                      <PackCard pack={pack} w={size.w} h={size.h} className="pk-rear" />
+                      {it?.taken && (
+                        <span
+                          className={`absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 h-8 pl-2 pr-3.5 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] font-ui whitespace-nowrap shadow-[0_8px_20px_-8px_rgba(0,0,0,0.6)] ${
+                            dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'}`}
+                          style={{ top: g0.perf + (size.h - g0.perf) * 0.38 }}
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>
+                          </span>
+                          In My Alpha
+                        </span>
+                      )}
+                      <span aria-hidden className="pk-focus absolute pointer-events-none" style={{ left: -5, right: -5, top: g0.perf - 5, bottom: -5, borderRadius: 18 * k }} />
+                    </button>
+                  )}
+                  {hanging && <button
                     ref={el => packRef?.(pack.id, el)}
                     type="button"
                     data-pack={pack.id}
@@ -373,22 +425,15 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
                   >
                     <PackCard pack={pack} w={size.w} h={size.h} />
                     <span aria-hidden className="pk-focus absolute pointer-events-none" style={{ left: -5, right: -5, top: g0.perf - 5, bottom: -5, borderRadius: 18 * k }} />
-                  </button>
+                  </button>}
                 </div>
               )}
-              <HookFront x={hx} pivotY={size.pivotY} dark={dark} scale={k} bare={!hanging} />
-              {pack && it?.taken && (
-                <button
-                  type="button"
-                  onClick={() => onOpenTaken(pack)}
-                  className={`absolute -translate-x-1/2 inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] font-ui whitespace-nowrap transition-colors ${
-                    dark ? 'bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1] ring-1 ring-inset ring-white/[0.08]' : 'bg-white text-zinc-700 hover:bg-zinc-50 shadow-sm ring-1 ring-inset ring-zinc-200'}`}
-                  style={{ left: hx, top: size.pivotY + 44 * k }}
-                  aria-label={`${pack.title} is in My Alpha. Open it.`}
-                >
-                  In My Alpha <span aria-hidden>→</span>
-                </button>
+              {soon && (
+                <div className="absolute pointer-events-none" style={{ left: hx - size.w / 2, top: packTop }}>
+                  <PackSoon w={size.w} h={size.h} dark={dark} label={soonLabel} />
+                </div>
               )}
+              <HookFront x={hx} pivotY={size.pivotY} dark={dark} scale={k} bare={!hanging && !behind} reach={behind ? d : 0} />
             </React.Fragment>
           );
         })}

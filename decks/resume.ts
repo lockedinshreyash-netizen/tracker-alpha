@@ -16,7 +16,8 @@ import { SESSION_PREFIX } from './forget';
 import { remaining, type Session } from './session';
 
 export interface Snapshot {
-  v: 1;
+  /** 2: one card per note. A session saved under 1 holds per-blank cards that no longer exist. */
+  v: 2;
   day: string;
   savedAt: number;
   startedAt: number;
@@ -33,7 +34,7 @@ export const loadSnapshot = (uid: string, scope: string, day: string): Snapshot 
     const raw = localStorage.getItem(key(uid, scope));
     if (!raw) return null;
     const s = JSON.parse(raw) as Snapshot;
-    const fresh = s?.v === 1 && s.day === day && Date.now() - s.savedAt < MAX_AGE_MS;
+    const fresh = s?.v === 2 && s.day === day && Date.now() - s.savedAt < MAX_AGE_MS;
     if (!fresh || !s.session || !Array.isArray(s.session.queue) || !Array.isArray(s.session.learning) || remaining(s.session) === 0) {
       localStorage.removeItem(key(uid, scope));
       return null;
@@ -46,7 +47,7 @@ export const loadSnapshot = (uid: string, scope: string, day: string): Snapshot 
 
 export const saveSnapshot = (uid: string, scope: string, snap: Omit<Snapshot, 'v' | 'savedAt'>): void => {
   try {
-    const raw = JSON.stringify({ v: 1, savedAt: Date.now(), ...snap });
+    const raw = JSON.stringify({ v: 2, savedAt: Date.now(), ...snap });
     if (raw.length > MAX_BYTES) { localStorage.removeItem(key(uid, scope)); return; }
     localStorage.setItem(key(uid, scope), raw);
   } catch { /* storage full or blocked: the outbox still holds every answer */ }

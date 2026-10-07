@@ -1,7 +1,10 @@
 /* ── Cloze ──
    Anki's syntax, read the way Anki reads it: {{c1::answer}} and
-   {{c1::answer::hint}}. One note with c1 and c2 is two cards; on card N, cloze
-   N is hidden and every other cloze shows its answer as plain text.
+   {{c1::answer::hint}}. Unlike Anki, a note is ONE card however many blanks
+   it has: the card is `ord` 0 and every blank is hidden at once. The numbers
+   only tell blanks apart (and keep exports readable by Anki). Rendering one
+   number on its own (`ord` N) still works, for the editor and for anything
+   saved before the change.
 
    One deliberate improvement: matching is brace-aware. Anki ends a cloze at
    the first "}}", so {{c1::\frac{a}{b}}} closes one brace early and leaves a
@@ -10,9 +13,15 @@
    where it looks like it should. When the braces inside do not balance, the
    reader falls back to Anki's rule, so anything Anki accepts reads the same.
 
-   The database decides which cards a note makes from a plain regex on
-   `{{cN::` (supabase/decks.sql, deck_note_ordinals). Any note this file calls
-   valid makes the same set there. */
+   The database refuses a fill-the-blank note with no blank using a plain
+   regex on `{{cN::` (supabase/decks.sql, deck_note_ordinals). Any note this
+   file calls valid passes there too. */
+
+/** The one card a note makes: every blank hidden together. */
+export const ALL_BLANKS = 0;
+
+/** How many blanks a note has — what a student is asked on its one card. */
+export const blankCount = (src: string): number => parseCloze(src).segs.filter(s => s.t === 'cloze').length;
 
 export type ClozeSeg =
   | { t: 'text'; v: string }
@@ -130,7 +139,7 @@ const escapeAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 export const renderCloze = (src: string, ord: number, revealed: boolean): string =>
   parseCloze(src).segs.map(s => {
     if (s.t === 'text') return s.v;
-    if (s.n !== ord) return s.answer;
+    if (ord !== ALL_BLANKS && s.n !== ord) return s.answer;
     if (revealed) return `<span data-cloze="shown">${s.answer}</span>`;
     if (s.hint) return `<span data-cloze="hidden" data-hint="${escapeAttr(s.hint)}">${escapeAttr(s.hint)}</span>`;
     return `<span data-cloze="hidden" data-size="${blankSize(s.answer)}"><span data-sr>blank</span></span>`;
@@ -149,5 +158,5 @@ export const renderAllAnswers = (src: string): string =>
 
 /** The answers a card asks for, as text — for the screen reader's announcement. */
 export const answersFor = (src: string, ord: number): string[] =>
-  parseCloze(src).segs.flatMap(s => (s.t === 'cloze' && s.n === ord ? [s.answer] : []));
+  parseCloze(src).segs.flatMap(s => (s.t === 'cloze' && (ord === ALL_BLANKS || s.n === ord) ? [s.answer] : []));
 

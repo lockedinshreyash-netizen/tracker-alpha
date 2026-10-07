@@ -8,8 +8,10 @@
    - `front`: the rod coming out of the slot toward you and ending in a
      ball tip, with the tip's small shadow on the pack. It paints over it.
 
-   So the rod visibly goes through the pack: rail → hook → pack. A hook with
-   no pack (taken) draws both halves with nothing between them. */
+   So the rod visibly goes through the pack: rail → hook → pack. When the
+   front pack has been taken, the next one hangs further back on the same rod
+   (higher, seen from above). `reach` extends the front half back to it, so
+   the empty stretch of rod in front of it shows. */
 
 import React from 'react';
 import { RAIL_H, RAIL_Y, metal } from './PackRail';
@@ -40,7 +42,7 @@ export const HookBack: React.FC<Props> = ({ x, pivotY, dark, scale }) => {
   );
 };
 
-export const HookFront: React.FC<Props & { bare?: boolean }> = ({ x, pivotY, dark, scale, bare = false }) => {
+export const HookFront: React.FC<Props & { bare?: boolean; reach?: number }> = ({ x, pivotY, dark, scale, bare = false, reach = 0 }) => {
   const m = metal(dark);
   const w = 5 * scale;
   const len = 15 * scale;
@@ -49,7 +51,7 @@ export const HookFront: React.FC<Props & { bare?: boolean }> = ({ x, pivotY, dar
     <div aria-hidden className="absolute pointer-events-none" style={{ left: 0, top: 0 }}>
       {/* The tip's shadow — on the pack, or on the wall when the hook is bare. */}
       <div className="absolute rounded-full" style={{ left: x - tip * 0.6 + 2, top: pivotY + len + tip * 0.4, width: tip * 1.3, height: tip * 0.55, background: m.shadow, filter: 'blur(3px)', opacity: bare ? 0.45 : 0.6 }} />
-      <div className="absolute" style={{ left: x - w / 2, top: pivotY - w * 0.4, width: w, height: len, background: rod(dark), borderRadius: w }} />
+      <div className="absolute" style={{ left: x - w / 2, top: pivotY - reach - w * 0.4, width: w, height: len + reach, background: rod(dark), borderRadius: w }} />
       <div className="absolute rounded-full" style={{
         left: x - tip / 2, top: pivotY + len - tip * 0.55, width: tip, height: tip,
         background: `radial-gradient(circle at 34% 30%, ${m.hi} 0%, ${m.mid} 45%, ${m.lo} 100%)`,

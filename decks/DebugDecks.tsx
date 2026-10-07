@@ -39,13 +39,12 @@ const RING = (() => {
 })();
 
 const NOTES: Omit<QueueCard, 'cardId' | 'progress'>[] = [
-  { noteId: 'a', ord: 1, kind: 'cloze', front: 'Aldehydes can be reduced to {{c1::primary alcohols}} using {{c2::LiAlH₄}}.', back: 'Ketones give secondary alcohols.', tags: ['organic'] },
-  { noteId: 'a', ord: 2, kind: 'cloze', front: 'Aldehydes can be reduced to {{c1::primary alcohols}} using {{c2::LiAlH₄}}.', back: 'Ketones give secondary alcohols.', tags: ['organic'] },
-  { noteId: 'b', ord: 1, kind: 'cloze', front: 'The Haber process: \\(\\ce{N2 + 3H2 <=> 2NH3}\\) uses an {{c1::iron::metal}} catalyst.', back: '', tags: ['inorganic'] },
-  { noteId: 'c', ord: 1, kind: 'cloze', front: 'Kinetic energy is {{c1::\\(\\frac{1}{2}mv^2\\)}}.<br><i>Units: joules.</i>', back: '', tags: ['physics'] },
+  { noteId: 'a', ord: 0, kind: 'cloze', front: 'Aldehydes can be reduced to {{c1::primary alcohols}} using {{c2::LiAlH₄}}.', back: 'Ketones give secondary alcohols.', tags: ['organic'] },
+  { noteId: 'b', ord: 0, kind: 'cloze', front: 'The Haber process: \\(\\ce{N2 + 3H2 <=> 2NH3}\\) uses an {{c1::iron::metal}} catalyst.', back: '', tags: ['inorganic'] },
+  { noteId: 'c', ord: 0, kind: 'cloze', front: 'Kinetic energy is {{c1::\\(\\frac{1}{2}mv^2\\)}}.<br><i>Units: joules.</i>', back: '', tags: ['physics'] },
   { noteId: 'd', ord: 0, kind: 'basic', front: 'What is the hybridisation of carbon in <b>ethyne</b>?', back: '<i>sp</i> — two π bonds, linear', tags: [] },
-  { noteId: 'e', ord: 1, kind: 'cloze', front: 'अम्ल + क्षार → {{c1::लवण + जल}}<ul><li>Acid + base</li><li>Neutralisation</li></ul>', back: '', tags: ['hindi'] },
-  { noteId: 'f', ord: 1, kind: 'cloze', front: `Benzene is drawn as a hexagon with a {{c1::circle}} inside.<img src="${RING}"> And <img src="benzene.png">`, back: '', tags: [] },
+  { noteId: 'e', ord: 0, kind: 'cloze', front: 'अम्ल + क्षार → {{c1::लवण + जल}}<ul><li>Acid + base</li><li>Neutralisation</li></ul>', back: '', tags: ['hindi'] },
+  { noteId: 'f', ord: 0, kind: 'cloze', front: `Benzene is drawn as a hexagon with a {{c1::circle}} inside.<img src="${RING}"> And <img src="benzene.png">`, back: '', tags: [] },
 ];
 const fixtureCards = (): QueueCard[] => NOTES.map((n, i) => ({ ...n, cardId: `card-${i}`, progress: null }));
 

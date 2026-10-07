@@ -24,7 +24,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Segmented, tokens } from '../ui/kit';
 import { CardFace } from './CardFace';
-import { ordinals } from './cloze';
+import { blankCount } from './cloze';
 import { getISTDateString } from '../utils';
 import { STATE_COLOR, deckAccent, fmtUntil } from './theme';
 import {
@@ -481,7 +481,7 @@ const NoteRow: React.FC<{
   onEdit: () => void; onDelete: () => Promise<void>; onPause: (s: boolean) => Promise<void>;
 }> = ({ note, dark, accent, canEdit, paused, onEdit, onDelete, onPause }) => {
   const t = tokens(dark);
-  const cards = note.kind === 'cloze' ? ordinals(note.front).length : 1;
+  const blanks = note.kind === 'cloze' ? blankCount(note.front) : 0;
   return (
     <li className={`group flex items-center gap-4 px-5 md:px-6 py-4 transition-colors ${canEdit ? `cursor-pointer ${t.hover}` : ''}`} onClick={canEdit ? onEdit : undefined}>
       <div className={`flex-1 min-w-0 ${paused ? 'opacity-45' : ''}`}>
@@ -492,7 +492,7 @@ const NoteRow: React.FC<{
           <p className={`text-[13px] mt-1 truncate ${t.muted}`}>→ {note.back.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}</p>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px]">
-          <span className={t.faint}>{note.kind === 'cloze' ? `${cards} ${cards === 1 ? 'card' : 'cards'}` : 'Basic'}</span>
+          <span className={t.faint}>{note.kind === 'cloze' ? `${blanks} ${blanks === 1 ? 'blank' : 'blanks'}` : 'Question'}</span>
           {note.tags.slice(0, 4).map(tg => <span key={tg} className={t.faint}>#{tg}</span>)}
           {paused && <span className={`font-semibold ${dark ? 'text-amber-400' : 'text-amber-700'}`}>Paused</span>}
         </div>

@@ -52,6 +52,64 @@ const barcode = (seed: number) => {
   return Array.from({ length: 15 }, () => { a = (a * 9301 + 49297) % 233280; return 1 + Math.floor((a / 233280) * 3); });
 };
 
+/* ── The packs behind the front one ──
+   A hook holds a stack, and the stack is what tells a student that taking a
+   pack does not empty the hook. Behind every pack hang two more copies,
+   further back on the rod: higher, a little smaller, in shadow. Only their
+   tops show above the pack in front, as two stepped strips with the rod
+   through their slots.
+
+   They are deliberately out of focus: a dark, soft, outline-free mass, so the
+   front pack is the one crisp object on the hook and the stack is felt
+   rather than read. (Outlined copies made every hook a set of stepped lines
+   and the rack looked busy.)
+
+   Kept cheap, because every hook draws them: a flat die-cut silhouette per
+   copy, one solid fill, no label, no gradient, and a light blur that is
+   painted once. They live inside the pack's sway element, whose layer only
+   ever moves by transform, so neither sliding nor swaying repaints them. */
+
+const shade = (hex: string, f: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v: number) => Math.round(Math.min(255, v * f)).toString(16).padStart(2, '0');
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+};
+
+export const PackStackEdges: React.FC<{
+  g: PackGeometry;
+  finish: Finish;
+  dark: boolean;
+  /** Copies to draw, nearest first: 1 is just behind the front pack. */
+  depths: number[];
+  /** How far back along the rod each copy hangs, px. */
+  step: number;
+}> = ({ g, finish, dark, depths, step }) => {
+  const s = SKIN[finish];
+  // Each copy further back sits deeper in the shadow of the ones in front.
+  const falloff = finish === 'ink' ? [0.5, 0.32] : dark ? [0.34, 0.24] : [0.58, 0.46];
+  return (
+    <>
+      {[...depths].sort((a, b) => b - a).map(dp => (
+        <svg
+          key={dp}
+          aria-hidden
+          width={g.w}
+          height={g.h}
+          viewBox={`0 0 ${g.w} ${g.h}`}
+          className="absolute left-0 top-0 pointer-events-none"
+          style={{
+            transform: `translateY(${-dp * step}px) scale(${1 - 0.035 * dp})`,
+            transformOrigin: `${g.pivot.x}px ${g.pivot.y}px`,
+            filter: `blur(${(0.9 + 0.5 * dp).toFixed(1)}px)`,
+          }}
+        >
+          <path d={`${g.silhouette} ${g.holePath}`} fillRule="evenodd" fill={shade(s.top, falloff[Math.min(dp, 2) - 1])} />
+        </svg>
+      ))}
+    </>
+  );
+};
+
 export const PackCard: React.FC<{
   pack: Pick<Pack, 'title' | 'packNo' | 'subject' | 'decks' | 'examLine' | 'access' | 'priceInr' | 'finish' | 'status'>;
   w: number;

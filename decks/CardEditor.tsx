@@ -1,9 +1,9 @@
 /* ── Making a card ──
    Built for "a useful card in seconds": type the sentence, select the words,
-   press Hide. They become a chip in the deck's colour carrying the number of
-   the card that hides them (the second Hide makes card 2), and the preview
-   on the right is a miniature of the real review card — same renderer, same
-   colour. "Save & add another" keeps the mode and tags so the next card
+   press Hide. They become a chip in the deck's colour, numbered so blanks
+   can be told apart. However many blanks there are, it is ONE card, studied
+   with every blank hidden at once. The preview on the right is a miniature
+   of that real review card — same renderer, same colour. "Save & add another" keeps the mode and tags so the next card
    starts where this one ended.
 
    Nobody here is asked to know the storage format. The fields are
@@ -13,7 +13,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Segmented, Sheet } from '../ui/kit';
 import { CardFace } from './CardFace';
-import { isCloze, normalizeOrdinals, ordinals, parseCloze } from './cloze';
+import { ALL_BLANKS, blankCount, isCloze, ordinals, parseCloze } from './cloze';
 import { DuplicateNoteError, addNote, humanError, updateNote } from './api';
 import { uploadEditorImage } from './media';
 import { MAX_FIELD, MAX_TAGS, parseTags } from './anki';
@@ -66,7 +66,6 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
   const [back, setBack] = useState(note?.back ?? initial?.back ?? '');
   const [tags, setTags] = useState<string[]>(note?.tags ?? initial?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
-  const [previewOrd, setPreviewOrd] = useState<number | null>(null);
   const [answerSide, setAnswerSide] = useState(false);
   const [busy, setBusy] = useState<'save' | 'another' | 'image' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,11 +81,7 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
 
   const ords = useMemo(() => (kind === 'cloze' ? ordinals(front) : [0]), [kind, front]);
   const parsed = useMemo(() => parseCloze(front), [front]);
-  const shownOrd = previewOrd !== null && ords.includes(previewOrd) ? previewOrd : ords[0] ?? 1;
-
-  const original = note ? ordinals(note.front) : [];
-  const removed = note && note.kind === 'cloze' && kind === 'cloze' ? original.filter(n => !ords.includes(n)) : [];
-  const hasGaps = kind === 'cloze' && ords.length > 0 && ords[ords.length - 1] !== ords.length;
+  const blanks = kind === 'cloze' ? blankCount(front) : 0;
 
   const problem = front.length > MAX_FIELD || back.length > MAX_FIELD
     ? 'This card is too long.'
@@ -122,7 +117,7 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
 
   const onShortcut = (e: React.KeyboardEvent) => {
     if (!(e.metaKey || e.ctrlKey)) return;
-    if (e.shiftKey && e.code === 'KeyC') { e.preventDefault(); hide(e.altKey); }
+    if (e.shiftKey && e.code === 'KeyC') { e.preventDefault(); hide(false); }
   };
 
   /* ── Tags ── */
@@ -146,7 +141,6 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
         setBack('');
         setTagInput('');
         setTags(draft.tags);
-        setPreviewOrd(null);
         setAnswerSide(false);
         setSavedCount(c => c + 1);
         window.setTimeout(() => frontApi.current?.focus(), 0);
@@ -221,7 +215,6 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
                   <span className="inline-block w-5 h-3.5 rounded-[4px]" style={{ background: `color-mix(in srgb, ${accent} 30%, transparent)`, boxShadow: `inset 0 -2px 0 ${accent}` }} />
                   Hide
                 </button>
-                <Tool dark={dark} label="Hide on the same card" hint="Hide these words on the same card as the last ones (⌘⌥⇧C)" onClick={() => hide(true)} disabled={!ords.length} wide>Same card</Tool>
                 <Tool dark={dark} label="Add a hint" hint="Add a hint to the last hidden words" onClick={hint} disabled={!ords.length} wide>Hint</Tool>
                 <span className={`w-px h-5 mx-1 ${dark ? 'bg-white/10' : 'bg-zinc-200'}`} />
               </>
@@ -261,9 +254,6 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
             <p className={`text-[12px] font-ui mt-2.5 min-h-[18px] ${problem ? 'text-rose-500' : tip ? (dark ? 'text-amber-300' : 'text-amber-700') : muted}`}>
               {problem ?? tip ?? nudge ?? (kind === 'cloze' && ords.length ? 'Tap a highlighted part to change it or add a hint.' : '')}
             </p>
-            {!note && hasGaps && !problem && (
-              <button type="button" onClick={() => setFront(normalizeOrdinals(front))} className={`text-[12px] font-ui underline ${muted}`}>Renumber the cards 1, 2, 3…</button>
-            )}
           </div>
 
           <div>
@@ -318,11 +308,6 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
             )}
           </div>
 
-          {removed.length > 0 && (
-            <p className={`text-[12px] font-ui leading-relaxed rounded-xl px-4 py-3 bg-amber-500/10 ${dark ? 'text-amber-300' : 'text-amber-800'}`}>
-              This removes card {removed.join(', ')} and {isGlobal ? 'every student\'s' : 'your'} progress on {removed.length === 1 ? 'it' : 'them'}.
-            </p>
-          )}
         </div>
 
         {/* ── The card, as it will be studied ── */}
@@ -337,22 +322,11 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
               options={[{ value: 'q', label: 'Question' }, { value: 'a', label: 'Answer' }]}
             />
           </div>
-          {kind === 'cloze' && ords.length > 1 && (
-            <div className="flex items-center gap-1.5 mb-4 overflow-x-auto mk-scroll-x">
-              {ords.map(n => (
-                <button key={n} type="button" onClick={() => setPreviewOrd(n)} aria-pressed={n === shownOrd}
-                  className={`shrink-0 h-7 pl-1.5 pr-3 rounded-full text-[12px] font-ui font-bold flex items-center gap-1.5 transition-colors ${n === shownOrd ? (dark ? 'bg-white text-black' : 'bg-zinc-900 text-white') : dark ? 'text-zinc-500 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-900'}`}>
-                  <span className="w-4 h-4 rounded-full text-[10px] flex items-center justify-center text-white" style={{ background: accent }}>{n}</span>
-                  Card {n}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="relative flex-1 min-h-[260px]">
             <div aria-hidden className="absolute inset-x-4 -bottom-2 top-2 rounded-[22px]" style={{ background: r.layer, boxShadow: r.layerShadow }} />
             <div className="relative h-full min-h-[260px] rounded-[22px] flex items-center justify-center px-7 py-10 text-center" style={{ background: r.card, boxShadow: r.cardShadow }}>
               {front.trim() && !problem && (kind === 'basic' || ords.length) ? (
-                <CardFace kind={kind} front={front} back={back} ord={kind === 'cloze' ? shownOrd : 0} revealed={answerSide} deckId={deckId} dark={dark} accent={accent} size="medium" />
+                <CardFace kind={kind} front={front} back={back} ord={ALL_BLANKS} revealed={answerSide} deckId={deckId} dark={dark} accent={accent} size="medium" />
               ) : (
                 <p className={`text-[14px] font-ui max-w-[240px] ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
                   {kind === 'cloze' ? 'Write a sentence, then hide the words you want to remember.' : 'Your card shows up here as you type.'}
@@ -361,7 +335,7 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
             </div>
           </div>
           <p className={`text-[12px] font-ui mt-5 ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>
-            {kind === 'cloze' && ords.length > 1 ? `This makes ${ords.length} cards — each one hides a different part.` : 'This is exactly what you\'ll study.'}
+            {blanks > 1 ? `One card, ${blanks} blanks — all hidden together. This is exactly what you'll study.` : 'One card. This is exactly what you\'ll study.'}
           </p>
         </div>
       </div>

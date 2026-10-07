@@ -47,10 +47,12 @@ export const PackCategory: React.FC<{
   const caret = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const [ends, setEnds] = useState<[boolean, boolean]>([true, true]);
-  const index = selected ? items.findIndex(i => i.pack.id === selected.id) : -1;
+  const index = selected ? items.findIndex(i => i.pack?.id === selected.id) : -1;
   const indexRef = useRef(index);
   indexRef.current = index;
-  const live = items.filter(i => !i.taken).length;
+  // Counts are of real packs; "coming soon" slots are not packs.
+  const packs = items.filter(i => i.pack).length;
+  const owned = items.filter(i => i.pack && i.taken).length;
 
   // Stable, so React does not detach and re-attach it on every render. Placed
   // at once rather than on the rack's next frame (which may never come).
@@ -80,7 +82,7 @@ export const PackCategory: React.FC<{
       <div className="flex items-end justify-between gap-4 mb-4">
         <div className="min-w-0">
           <h2 className={`font-display uppercase text-[22px] md:text-[26px] leading-none tracking-[0.04em] ${t.heading}`}>{title}</h2>
-          <p className={`text-[12px] mt-2 ${t.muted}`}>{note ?? `${items.length} ${items.length === 1 ? 'pack' : 'packs'}${live < items.length ? ` · ${items.length - live} in My Alpha` : ''}`}</p>
+          <p className={`text-[12px] mt-2 ${t.muted}`}>{note ?? `${packs} ${packs === 1 ? 'pack' : 'packs'}${owned ? ` · ${owned} in My Alpha` : ''}`}</p>
         </div>
         <div className="hidden sm:flex items-center gap-1.5">
           {(['l', 'r'] as const).map(d => (
@@ -99,6 +101,7 @@ export const PackCategory: React.FC<{
 
       <div className={`relative rounded-2xl border pt-3 ${dark ? 'border-white/[0.06]' : 'border-zinc-200/80'}`} style={wallStyle(dark)}>
         <PackRack
+          soonLabel={/packs$/i.test(title) ? 'More on the way' : `More ${title} packs`}
           ref={rack}
           items={items}
           size={size}

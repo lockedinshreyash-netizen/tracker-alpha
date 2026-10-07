@@ -1,7 +1,7 @@
 /* ── The card field ──
    Students write sentences, not markup. A cloze here is a chip — the hidden
-   words, tinted in the deck's colour, with the number of the card that hides
-   them — and formatting is formatting. What is stored is unchanged: the
+   words, tinted in the deck's colour, numbered so blanks can be told apart
+   (they are all on the note's one card) — and formatting is formatting. What is stored is unchanged: the
    field serialises to the same HTML-with-{{c1::…}} string the importer reads
    and the exporter writes, so nothing about portability depends on this
    screen.
@@ -375,14 +375,14 @@ const ChipPopover: React.FC<{
     <div
       ref={ref}
       role="dialog"
-      aria-label={`Hidden part on card ${pop.n}`}
+      aria-label={`Blank ${pop.n}`}
       className={`mk-sheet absolute z-20 w-[300px] p-4 rounded-2xl font-ui ${dark ? 'bg-[#1c1c21] ring-1 ring-white/[0.08] shadow-[0_24px_60px_-16px_rgba(0,0,0,0.9)]' : 'bg-white ring-1 ring-zinc-200 shadow-[0_24px_60px_-20px_rgba(24,24,27,0.3)]'}`}
       style={{ left: pop.x, top: pop.y }}
     >
       <div className="flex items-center justify-between mb-3">
         <span className="inline-flex items-center gap-2 text-[12px] font-bold" style={{ color: dark ? '#e4e4e7' : '#27272a' }}>
           <span className="dk-chip-n !ml-0" style={{ ['--dk-accent' as string]: accent }}>{pop.n}</span>
-          Hidden on card {pop.n}
+          Blank {pop.n}
         </span>
         <button onClick={onClose} className={`text-[12px] font-bold ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}>Done</button>
       </div>

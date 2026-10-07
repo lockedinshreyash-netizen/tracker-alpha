@@ -22,10 +22,13 @@
 -- blob it would be re-uploaded on every state change — the reason the CBT bank
 -- is a table too. Nothing in this file is read or written through AppState.
 --
--- NOTES AND CARDS. Anki's model, kept: a note is what you write, a card is what
--- you review. "Aldehydes → {{c1::primary alcohols}} with {{c2::LiAlH4}}" is ONE
--- note and TWO cards. `deck_cards` is derived from the note by a trigger and no
--- client may write it, so a card can never disagree with the text it came from.
+-- NOTES AND CARDS. A note is what you write; its card is what you review. One
+-- note is ONE card, however many blanks it has: "Aldehydes → {{c1::primary
+-- alcohols}} with {{c2::LiAlH4}}" is one card, shown with both blanks hidden
+-- and graded once. (Anki makes a card per cloze number; a two-deck pack came
+-- out at 254 "cards" that way, and a student should not be put off a deck by
+-- its size before trying it.) `deck_cards` is still derived by a trigger and
+-- no client may write it, so a card can never disagree with its note.
 --
 -- PRIVACY. `is_admin()` opens every Alpha-wide deck, drafts included. It never
 -- opens a student's personal deck — the same line moderation draws around
@@ -274,12 +277,11 @@ alter table public.deck_notes enable row level security;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 3. Cards — derived, never written by a client
 --
--- One row per cloze number (c1, c2, …) of a cloze note; one row with ord 0 for
--- a basic note. Kept in step with the note by the trigger in §6: adding c3 to
--- a note adds a card, removing c2 removes that card (and, by cascade, every
--- student's progress on it — the card no longer exists). Editing the words of
--- c1 changes nothing here, which is why fixing a typo keeps everyone's
--- schedule.
+-- Exactly one row per note, `ord` 0, made by the trigger in §6 when the note
+-- is written. Editing the note — its words, its blanks, even its kind —
+-- never touches the card, which is why fixing a typo or adding a blank keeps
+-- everyone's schedule. (`ord` survives from when a cloze note made one card
+-- per number; `deck_cards_one_per_note` now holds it at 0.)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 create table if not exists public.deck_cards (
@@ -584,9 +586,9 @@ create trigger deck_notes_before_update
   before update on public.deck_notes
   for each row execute function public.deck_notes_before_update();
 
--- The cards a note makes. The client's parser (decks/cloze.ts) decides the
--- same set; this is the authority, because it is the one place every write
--- passes through. Cloze numbers 1–99, as Anki allows.
+-- The blanks a note has, by number. Only used to refuse a fill-the-blank note
+-- with no blank; the note makes one card regardless (below). Cloze numbers
+-- 1–99, as Anki allows.
 create or replace function public.deck_note_ordinals(p_kind text, p_front text)
 returns smallint[]
 language sql
@@ -607,19 +609,16 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  v_ords smallint[];
 begin
   if tg_op = 'UPDATE' and new.kind = old.kind and new.front = old.front then
     return null;
   end if;
-  v_ords := public.deck_note_ordinals(new.kind, new.front);
-  if cardinality(v_ords) = 0 then
+  if cardinality(public.deck_note_ordinals(new.kind, new.front)) = 0 then
     raise exception 'a cloze card needs at least one {{c1::…}}' using errcode = '23514';
   end if;
-  delete from public.deck_cards where note_id = new.id and ord <> all (v_ords);
+  -- One card per note, made once. An edit finds it already there.
   insert into public.deck_cards (note_id, deck_id, ord)
-  select new.id, new.deck_id, o from unnest(v_ords) as o
+  values (new.id, new.deck_id, 0)
   on conflict (note_id, ord) do nothing;
   return null;
 end;
@@ -629,6 +628,55 @@ drop trigger if exists deck_notes_sync_cards on public.deck_notes;
 create trigger deck_notes_sync_cards
   after insert or update on public.deck_notes
   for each row execute function public.deck_notes_sync_cards();
+
+-- Once: notes written when a cloze note made one card per number are merged
+-- to one card. Each note keeps its first card. Each student keeps the copy of
+-- their schedule they reviewed most recently (blending two schedules would be
+-- a guess), and their review history moves onto the kept card, so no day
+-- disappears from their activity. A no-op once every card is ord 0.
+do $$
+begin
+  if not exists (select 1 from public.deck_cards where ord <> 0) then
+    return;
+  end if;
+
+  with keep as (
+    select distinct on (note_id) note_id, id as keep_id from public.deck_cards order by note_id, ord, id
+  ), ranked as (
+    select p.user_id, p.card_id,
+      row_number() over (partition by p.user_id, k.keep_id order by p.last_review desc nulls last, p.reps desc, p.card_id) as rn
+    from public.user_card_progress p
+    join public.deck_cards c on c.id = p.card_id
+    join keep k on k.note_id = c.note_id
+  )
+  delete from public.user_card_progress p using ranked r
+  where p.user_id = r.user_id and p.card_id = r.card_id and r.rn > 1;
+
+  with keep as (
+    select distinct on (note_id) note_id, id as keep_id from public.deck_cards order by note_id, ord, id
+  )
+  update public.user_card_progress p set card_id = k.keep_id
+  from public.deck_cards c join keep k on k.note_id = c.note_id
+  where p.card_id = c.id and c.id <> k.keep_id;
+
+  with keep as (
+    select distinct on (note_id) note_id, id as keep_id from public.deck_cards order by note_id, ord, id
+  )
+  update public.review_events e set card_id = k.keep_id
+  from public.deck_cards c join keep k on k.note_id = c.note_id
+  where e.card_id = c.id and c.id <> k.keep_id;
+
+  with keep as (
+    select distinct on (note_id) note_id, id as keep_id from public.deck_cards order by note_id, ord, id
+  )
+  delete from public.deck_cards c using keep k
+  where c.note_id = k.note_id and c.id <> k.keep_id;
+
+  update public.deck_cards set ord = 0 where ord <> 0;
+end $$;
+
+alter table public.deck_cards drop constraint if exists deck_cards_one_per_note;
+alter table public.deck_cards add constraint deck_cards_one_per_note check (ord = 0);
 
 -- Trigger functions are not for calling.
 revoke all on function public.decks_before_update() from public, anon, authenticated;

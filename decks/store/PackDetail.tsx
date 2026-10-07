@@ -12,7 +12,7 @@
 import React, { useEffect } from 'react';
 import { tokens } from '../../ui/kit';
 import { CardFace } from '../CardFace';
-import { ordinals } from '../cloze';
+import { ALL_BLANKS } from '../cloze';
 import { deckAccent } from '../theme';
 import { Icon } from '../ui';
 import { actionFor } from './checkout';
@@ -94,7 +94,7 @@ export const PackDetail: React.FC<{
               ) : (
                 preview.slice(0, 3).map((c, i) => (
                   <div key={i} className={`rounded-xl px-4 py-3.5 text-center ${dark ? 'bg-white/[0.03] ring-1 ring-inset ring-white/[0.05]' : 'bg-zinc-50 ring-1 ring-inset ring-zinc-100'}`}>
-                    <CardFace kind={c.kind} front={c.front} back={c.back} ord={c.kind === 'cloze' ? ordinals(c.front)[0] ?? 1 : 0} revealed deckId={c.deckId} dark={dark} accent={deckAccent(pack.decks.find(d => d.id === c.deckId)?.subject ?? pack.subject, dark)} size="small" />
+                    <CardFace kind={c.kind} front={c.front} back={c.back} ord={ALL_BLANKS} revealed deckId={c.deckId} dark={dark} accent={deckAccent(pack.decks.find(d => d.id === c.deckId)?.subject ?? pack.subject, dark)} size="small" />
                   </div>
                 ))
               )}

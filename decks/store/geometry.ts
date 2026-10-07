@@ -28,6 +28,8 @@ export interface PackGeometry {
   flapPath: string;
   bodyPath: string;
   holePath: string;
+  /** The whole die-cut outline in one piece, no tear: for a pack that is not there yet. */
+  silhouette: string;
   crackDown: string;
   crackLeft: string;
   crackRight: string;
@@ -93,6 +95,26 @@ export const geometry = (w: number, h: number, seed = 1): PackGeometry => {
   const { cx, cy, hw, hh } = hole;
   const holePath = `M${f(cx - hw + hh)} ${f(cy - hh)} H${f(cx + hw - hh)} A${f(hh)} ${f(hh)} 0 0 1 ${f(cx + hw - hh)} ${f(cy + hh)} H${f(cx - hw + hh)} A${f(hh)} ${f(hh)} 0 0 1 ${f(cx - hw + hh)} ${f(cy - hh)} Z`;
 
+  const silhouette = [
+    `M0 ${f(tabH + rb)}`,
+    `Q0 ${f(tabH)} ${f(rb)} ${f(tabH)}`,
+    `H${f(l - sh)}`,
+    `Q${f(l)} ${f(tabH)} ${f(l)} ${f(tabH - sh)}`,
+    `V${f(rt)}`,
+    `Q${f(l)} 0 ${f(l + rt)} 0`,
+    `H${f(r - rt)}`,
+    `Q${f(r)} 0 ${f(r)} ${f(rt)}`,
+    `V${f(tabH - sh)}`,
+    `Q${f(r)} ${f(tabH)} ${f(r + sh)} ${f(tabH)}`,
+    `H${f(w - rb)}`,
+    `Q${f(w)} ${f(tabH)} ${f(w)} ${f(tabH + rb)}`,
+    `V${f(h - R)}`,
+    `Q${f(w)} ${f(h)} ${f(w - R)} ${f(h)}`,
+    `H${f(R)}`,
+    `Q0 ${f(h)} 0 ${f(h - R)}`,
+    'Z',
+  ].join(' ');
+
   const bodyPath = [
     poly(edge),
     `V${f(h - R)}`,
@@ -121,6 +143,7 @@ export const geometry = (w: number, h: number, seed = 1): PackGeometry => {
     flapPath: `${flapPath} ${holePath}`,
     bodyPath,
     holePath,
+    silhouette,
     crackDown: poly(down),
     crackLeft: poly(left),
     crackRight: poly(right),
