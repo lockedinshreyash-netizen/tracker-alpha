@@ -136,6 +136,30 @@ export interface Pick {
   from: 'learning' | 'queue';
 }
 
+/** One card in one state: a card answered again is a different `Pick`. */
+const cardKey = (c: QueueCard) => `${c.cardId}|${c.progress?.lastReview ?? ''}`;
+
+/**
+ * The card on screen stays on screen until it is answered.
+ *
+ * `current` is a question about *now*, and now keeps moving: a learning card
+ * whose one-minute step runs out becomes due while another card is being
+ * looked at. Re-asking it on every render swapped the card under the student,
+ * mid-thought and even with its answer showing, and the rating they pressed
+ * then landed on the card that had slid in. This answers the only question the
+ * screen should ask: is the card I am showing still waiting for an answer? If
+ * so, it returns it as the session now holds it (an edit may have changed its
+ * text). Once it has been answered it returns null, and only then is
+ * `current` asked again.
+ */
+export const holding = (s: Session, p: Pick): Pick | null => {
+  const k = cardKey(p.card);
+  const card = p.from === 'queue'
+    ? s.queue.find(c => cardKey(c) === k)
+    : s.learning.find(w => cardKey(w.card) === k)?.card;
+  return card ? { card, from: p.from } : null;
+};
+
 /** The card to show now, or null when the session is over (for now). */
 export const current = (s: Session, now: number): Pick | null => {
   const ready = [...s.learning].sort((a, b) => a.at - b.at);
@@ -151,7 +175,8 @@ export const current = (s: Session, now: number): Pick | null => {
  */
 export const answer = (s: Session, pick: Pick, rating: Rating, next: Progress, dayEnd: number): Session => {
   const card: QueueCard = { ...pick.card, progress: next };
-  const queue = pick.from === 'queue' ? s.queue.slice(1) : s.queue;
+  // By id, not position: the answered card leaves wherever it was.
+  const queue = s.queue.filter(c => c.cardId !== pick.card.cardId);
   const learning = s.learning.filter(w => w.card.cardId !== pick.card.cardId);
   const at = new Date(next.due).getTime();
   if ((next.state === 1 || next.state === 3) && at < dayEnd) learning.push({ card, at });

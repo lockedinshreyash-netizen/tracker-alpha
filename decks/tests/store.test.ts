@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { IDLE, transition, isBusy, type AcqState } from '../store/PackAcquisition';
-import { EDGE_SPEED, MAX_OVER, TAU, edgeHit, glideAt, planRelease, releaseVelocity, rubber, snap, springStep, atRest, swayStep, SWAY } from '../store/physics';
+import { MAX_OVER, TAU, glideAt, planRelease, releaseVelocity, rubber, snap, springStep, atRest, swayStep, SWAY, type Motion } from '../store/physics';
 import { geometry } from '../store/geometry';
 
 const b = { min: -1000, max: 0 };
@@ -29,24 +29,39 @@ test('rack: a glide leaves at the finger\'s speed and lands on a hook', () => {
   for (let t = 1000; t < 1000 + 6 * m.tau; t += 16) { const x = glideAt(m, t); assert.ok(x <= prev + 1e-9); prev = x; }
 });
 
-test('rack: a throw past the end glides on toward it, at full speed', () => {
-  const m = planRelease(-900, -2.5, 200, b, 0);
-  assert.equal(m.kind, 'glide');
-  if (m.kind !== 'glide') return;
-  assert.ok(m.to < -1000);
-  assert.ok(Math.abs((glideAt(m, 1) - glideAt(m, 0)) - -2.5) < 0.05, 'leaves at the finger\'s speed');
+/** Every position a motion passes through, at 60fps, until it is done. */
+const trace = (m: Motion, x0: number): number[] => {
+  const out: number[] = [];
+  if (m.kind === 'glide') { for (let t = 0; t < 12 * m.tau; t += 16) out.push(glideAt(m, t + m.t0)); return out; }
+  let x = x0, v = m.v;
+  for (let i = 0; i < 400 && !atRest(x, v, m.to); i += 1) { ({ x, v } = springStep(x, v, m.to, 16, m.stiff)); out.push(x); }
+  return out;
+};
+/** True when a path only ever moves one way: no overshoot, no coming back. */
+const oneWay = (xs: number[], dir: number) => xs.every((x, i) => i === 0 || (x - xs[i - 1]) * dir >= -1e-9);
+
+test('rack: a throw at an end decelerates onto it, no bump, no coming back', () => {
+  for (const [x, v] of [[-900, -2.5], [-980, -2.6], [-700, -1.2], [-100, 1.8], [-30, 2.6]] as const) {
+    const m = planRelease(x, v, 200, b, 0);
+    const end = v < 0 ? -1000 : 0;
+    assert.equal(m.to, end, `${x},${v}`);
+    const path = trace(m, x);
+    assert.ok(oneWay(path, Math.sign(v)), `${x},${v} reverses`);
+    assert.ok(path.every(p => p >= -1000 - 1e-9 && p <= 1e-9), `${x},${v} crosses the end`);
+  }
 });
 
-test('rack: hitting an end is one short, firm bump, settled fast', () => {
-  // Even a wild flick arrives capped, overshoots a little, and is home in under 250ms.
-  const m = edgeHit(b, -2.6);
-  assert.equal(m.to, -1000);
-  if (m.kind !== 'spring') return;
-  let x = -1000, v = m.v, worst = 0, t = 0;
-  while (!atRest(x, v, m.to) && t < 2000) { ({ x, v } = springStep(x, v, m.to, 8, true)); worst = Math.max(worst, Math.abs(x - m.to)); t += 8; }
-  assert.ok(Math.abs(m.v) <= EDGE_SPEED);
-  assert.ok(worst <= 16, `overshoot ${worst.toFixed(1)}px`);
-  assert.ok(t <= 400, `settled in ${t}ms`);
+test('rack: a throw mid-rack lands on a hook ahead, in one motion, without overshoot', () => {
+  for (let x = -950; x <= -50; x += 37) {
+    for (const v of [-1.6, -0.6, -0.2, 0.2, 0.6, 1.6]) {
+      const m = planRelease(x, v, 200, b, 0);
+      if (m.to === 0 || m.to === -1000) continue; // reached an end: covered above
+      assert.equal(m.kind, 'glide', `${x},${v}`);
+      assert.equal(Math.abs(m.to % 200), 0);
+      assert.ok((m.to - x) * v > 0, 'lands ahead of the finger');
+      assert.ok(oneWay(trace(m, x), Math.sign(v)), `${x},${v} overshoots`);
+    }
+  }
 });
 
 test('rack: let go past an end, it springs back firmly and without bouncing', () => {

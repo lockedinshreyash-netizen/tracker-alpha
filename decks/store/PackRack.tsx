@@ -35,7 +35,7 @@ import { PackRail } from './PackRail';
 import { PackSoon } from './PackSoon';
 import { geometry, type RackSize } from './geometry';
 import {
-  type Bounds, type Motion, type Sample, atRest, clamp, edgeHit, glideAt, omegaFor, planRelease, releaseVelocity, rubber,
+  type Bounds, type Motion, type Sample, atRest, clamp, glideAt, omegaFor, planRelease, releaseVelocity, rubber,
   MAX_OVER, smoothAccel, snap, springStep, swayStep, swaying,
 } from './physics';
 import type { Pack } from '../types';
@@ -145,15 +145,9 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
     if (s.mode === 'drag') x = s.dragX;
     else if (s.mode === 'wheel') x = rubber(s.wheelRaw, L.bounds);
     else if (s.mode === 'glide' && s.motion?.kind === 'glide') {
+      // One curve from release to rest: it never crosses an end, so nothing switches mid-motion.
       x = glideAt(s.motion, now);
-      if (x > L.bounds.max || x < L.bounds.min) {
-        // Reached an end mid-glide: one short, firm bump instead of sailing on.
-        const v = (x - s.x) / dt;
-        x = clamp(x, L.bounds.min, L.bounds.max);
-        s.motion = edgeHit(L.bounds, v);
-        s.springV = s.motion.v;
-        s.mode = 'spring';
-      } else if (Math.abs(s.motion.to - x) < 0.35) { x = s.motion.to; s.mode = 'idle'; }
+      if (Math.abs(s.motion.to - x) < 0.35) { x = s.motion.to; s.mode = 'idle'; }
     } else if (s.mode === 'spring' && s.motion?.kind === 'spring') {
       const r = springStep(x, s.springV, s.motion.to, dt, s.motion.stiff);
       x = r.x;
@@ -342,8 +336,11 @@ export const PackRack = React.forwardRef<RackHandle, Props>(({
         const p = phys.current;
         if (p.mode !== 'wheel') return;
         const B = live.current.bounds;
-        const over = p.x > B.max || p.x < B.min;
-        springTo(over ? clamp(p.x, B.min, B.max) : snap(p.x, live.current.spacing, B), over);
+        // A trackpad brings its own momentum and stops where it means to. Only
+        // a rack left past an end moves again; snapping to a hook afterwards was
+        // a second motion after the first had ended, sometimes backwards.
+        if (p.x > B.max || p.x < B.min) springTo(clamp(p.x, B.min, B.max), true);
+        else { p.mode = 'idle'; p.motion = null; kick(); }
       }, 100);
     };
     el.addEventListener('wheel', onWheel, { passive: false });

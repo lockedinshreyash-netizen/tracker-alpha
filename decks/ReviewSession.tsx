@@ -35,7 +35,7 @@ import { answersFor } from './cloze';
 import { toPlain } from './html';
 import { fetchQueue, humanError, progressFromRow, progressRow, type ReviewEntry } from './api';
 import { enqueue, flush, pendingCount, pendingProgress, subscribe, undo as undoOutbox } from './outbox';
-import { Pick, Session, answer, appendCards, applyPending, current, laterToday, remaining, startSession } from './session';
+import { Pick, Session, answer, appendCards, applyPending, current, holding, laterToday, remaining, startSession } from './session';
 import { clearSnapshot, loadSnapshot, saveSnapshot } from './resume';
 import { getISTDateString } from '../utils';
 import { pushToast } from '../notify/toastBus';
@@ -70,6 +70,8 @@ interface Props {
 interface Step {
   before: Session;
   clientId: string;
+  /** The card that was answered, so undo puts that card back on screen. */
+  pick: Pick;
 }
 
 const isNew = (c: QueueCard) => !c.progress || c.progress.state === 0;
@@ -168,8 +170,18 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
     };
   }, [uid, local]);
 
+  /* ── The card on screen ──
+     Pinned until it is answered (see `holding`). Only then is the session
+     asked which card comes next. Before this, a learning card coming due
+     during any re-render (a save finishing, the rating chip, going online)
+     replaced the card being studied, and a rating could land on the wrong
+     card. Updated during render rather than in an effect, so there is never a
+     frame without a card. */
   const now = Date.now();
-  const pick: Pick | null = session ? current(session, now) : null;
+  const [pinned, setPinned] = useState<Pick | null>(null);
+  const held = session && pinned ? holding(session, pinned) : null;
+  const pick: Pick | null = held ?? (session ? current(session, now) : null);
+  if (!held && pick?.card !== pinned?.card) setPinned(pick);
   const cardDeck = pick?.card.deckId ? deckInfo?.[pick.card.deckId] : undefined;
   const accent = deckAccent(cardDeck ? cardDeck.subject : deck.subject, dark);
 
@@ -219,7 +231,7 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
       next: progressRow(choice.next),
     };
     if (!local) enqueue(uid, entry);
-    setHistory(h => [...h.slice(-19), { before: session, clientId }]);
+    setHistory(h => [...h.slice(-19), { before: session, clientId, pick }]);
     const nextSession = answer(session, pick, rating, choice.next, dayEnd);
     setSession(nextSession);
     setRevealed(false);
@@ -234,6 +246,8 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
     if (!last) return;
     setHistory(h => h.slice(0, -1));
     setSession(last.before);
+    // The undone card comes back, not whatever happens to be due now.
+    setPinned(last.pick);
     setRevealed(false);
     setChoices(null);
     setFlash(null);

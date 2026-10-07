@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { preview, intervalLabel } from '../srs';
 import { studyDayStart } from '../day';
-import { answer, appendCards, applyPending, current, interleave, remaining, startSession } from '../session';
+import { answer, appendCards, applyPending, current, holding, interleave, remaining, startSession } from '../session';
 import type { Progress, QueueCard } from '../types';
 
 const now = new Date('2026-10-06T10:00:00+05:30');
@@ -129,4 +129,36 @@ test('session: a pack mixes its decks — new cards take turns, reviews by due',
   const order = interleave(cards).map(c => c.cardId);
   assert.deepEqual(order.filter(id => !id.startsWith('r')), ['a1', 'b1', 'a2', 'a3']);
   assert.deepEqual(order.filter(id => id.startsWith('r')), ['rb', 'ra']);
+});
+
+test('session: the card on screen stays until it is answered, even when a learning card comes due', () => {
+  const t = now.getTime();
+  const dayEnd = t + 12 * 3600_000;
+  let s = startSession([card('a'), card('b'), card('c')], t);
+  // Answer a with Again: it comes back in a minute.
+  const pa = current(s, t)!;
+  s = answer(s, pa, 1, preview(null, now)[1].next, dayEnd);
+  // b is put on screen…
+  const pb = current(s, t)!;
+  assert.equal(pb.card.cardId, 'b');
+  // …and two minutes later, with a now due, b is still the card being studied.
+  const later = t + 2 * 60_000;
+  assert.equal(current(s, later)!.card.cardId, 'a', 'a is due now');
+  assert.equal(holding(s, pb)!.card.cardId, 'b', 'but b stays on screen');
+  // Answering b releases it; only then does a come up.
+  s = answer(s, pb, 3, preview(null, now)[3].next, dayEnd);
+  assert.equal(holding(s, pb), null);
+  assert.equal(current(s, later)!.card.cardId, 'a');
+});
+
+test('session: a learning card answered again is released, not shown twice', () => {
+  const t = now.getTime();
+  const dayEnd = t + 12 * 3600_000;
+  let s = startSession([card('a')], t);
+  s = answer(s, current(s, t)!, 1, preview(null, now)[1].next, dayEnd);
+  const later = new Date(t + 61_000);
+  const p = current(s, later.getTime())!;
+  assert.equal(p.from, 'learning');
+  s = answer(s, p, 1, preview(p.card.progress, later)[1].next, dayEnd);
+  assert.equal(holding(s, p), null, 'the same card, but a new state: released');
 });
