@@ -135,6 +135,8 @@ export interface AdminDeckStat {
 
 /** How a pack is had: free, bought once, or included with Alpha Pro. */
 export type PackAccess = 'free' | 'paid' | 'pro';
+/** How a pack is packaged on the rack: black or white. Packs have no shelf; they live in the store. */
+export type PackFinish = 'ink' | 'paper';
 
 /** One deck as a pack lists it. */
 export interface PackDeck {
@@ -154,8 +156,9 @@ export interface Pack {
   id: string;
   title: string;
   description: string | null;
+  /** Which rack it hangs on in the store. None: the "More packs" rack. */
   subject: DeckSubject | null;
-  collection: DeckCollection;
+  finish: PackFinish;
   status: DeckStatus;
   sortOrder: number;
   /** When it was published (explore) or last changed (console). */
@@ -180,7 +183,7 @@ export interface PackMeta {
   title: string;
   description: string | null;
   subject: DeckSubject | null;
-  collection: DeckCollection;
+  finish: PackFinish;
   access: PackAccess;
   priceInr: number | null;
   examLine: string | null;

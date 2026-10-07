@@ -23,6 +23,7 @@ import { COLLECTION_COPY } from '../decks/AudiencePicker';
 import { PackArt } from '../decks/Packs';
 import { PackSheet } from '../decks/PackSheet';
 import { packNumber, priceLabel } from '../decks/store/PackCard';
+import { rackName } from '../decks/store/racks';
 import { Icon, MoreMenu, StackArt, StatusPill, fmtAgo, pill } from '../decks/ui';
 import type { AdminDeckStat, DeckCollection, DeckStatus, Pack, PackMeta } from '../decks/types';
 
@@ -152,7 +153,6 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
         onNew={() => setSheet({ pack: null })}
         onEdit={p => setSheet({ pack: p })}
         onStatus={movePack}
-        onShelf={(p, c) => void act(p.id, () => packOps.update(p.id, { collection: c }))}
         onDelete={removePack}
       />
 
@@ -269,9 +269,8 @@ const PacksSection: React.FC<{
   onNew: () => void;
   onEdit: (p: Pack) => void;
   onStatus: (p: Pack, s: DeckStatus) => void;
-  onShelf: (p: Pack, c: DeckCollection) => void;
   onDelete: (p: Pack) => void;
-}> = ({ dark, packs, busy, onNew, onEdit, onStatus, onShelf, onDelete }) => {
+}> = ({ dark, packs, busy, onNew, onEdit, onStatus, onDelete }) => {
   const card = `rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const heading = dark ? 'text-white' : 'text-zinc-900';
   const faint = dark ? 'text-zinc-600' : 'text-zinc-400';
@@ -290,7 +289,7 @@ const PacksSection: React.FC<{
           <div className="hidden md:block"><PackArt dark={dark} decks={[{ subject: 'Physics' }, { subject: 'Physics' }, { subject: 'Physics' }]} count={3} size={110} /></div>
           <div>
             <p className={`text-[16px] font-bold ${heading}`}>Bundle decks into a pack.</p>
-            <p className="text-[13px] mt-1 text-zinc-500 max-w-[480px]">Physics Essentials: Kinematics, Laws of Motion, Work & Energy. It hangs in the Alpha Packs store, and students take the whole pack in one tap.</p>
+            <p className="text-[13px] mt-1 text-zinc-500 max-w-[480px]">Physics Essentials: Kinematics, Laws of Motion, Work & Energy. Packs hang on their subject's rack in the Alpha Packs store, and students take the whole pack in one tap.</p>
           </div>
           <button onClick={onNew} className={pill.red}>{Icon.plus}New pack</button>
         </div>
@@ -304,13 +303,12 @@ const PacksSection: React.FC<{
           <ul className={`divide-y ${dark ? 'divide-white/[0.05]' : 'divide-zinc-100'}`}>
             {packs.map(p => {
               const cards = p.decks.reduce((n, d) => n + d.cards, 0);
-              const other: DeckCollection = p.collection === 'essentials' ? 'more' : 'essentials';
               return (
                 <li key={p.id} className={`grid ${PACK_GRID} gap-x-4 gap-y-2 items-center px-6 py-4`}>
                   <button onClick={() => onEdit(p)} className="text-left min-w-0 group">
                     <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${faint}`}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: deckAccent(p.subject, dark) }} />
-                      {packNumber(p.packNo)} · {p.access === 'pro' ? 'Alpha Pro' : priceLabel(p) === 'FREE' ? 'Free' : priceLabel(p)} · {COLLECTION_COPY[p.collection].title}
+                      {packNumber(p.packNo)} · {rackName(p.subject)} rack · {p.access === 'pro' ? 'Alpha Pro' : priceLabel(p) === 'FREE' ? 'Free' : priceLabel(p)} · {p.finish === 'paper' ? 'White' : 'Black'}
                     </span>
                     <span className={`block text-[15px] font-bold truncate mt-1 group-hover:underline ${heading}`}>{p.title}</span>
                     <span className={`block text-[11px] mt-0.5 truncate ${faint}`}>{p.decks.map(d => d.title).join(' · ') || 'No decks yet'}</span>
@@ -331,7 +329,6 @@ const PacksSection: React.FC<{
                       label={`Actions for ${p.title}`}
                       items={[
                         { label: 'Edit pack', icon: Icon.pencil, onSelect: () => onEdit(p) },
-                        { label: `Move to ${COLLECTION_COPY[other].title}`, icon: Icon.arrow, onSelect: () => onShelf(p, other) },
                         { label: 'Unpublish', icon: Icon.pause, onSelect: () => onStatus(p, 'draft'), hidden: p.status !== 'published' },
                         { label: 'Archive', icon: Icon.trash, onSelect: () => onStatus(p, 'archived'), hidden: p.status !== 'published' },
                         { label: 'Delete pack', icon: Icon.trash, onSelect: () => onDelete(p), danger: true },

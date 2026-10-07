@@ -91,7 +91,7 @@ const ADMIN_STATS: AdminDeckStat[] = [
 let packNo = 0;
 const pk = (id: string, title: string, subject: DeckSubject | null, access: PackAccess, decks: [string, number][], o: Partial<Pack> = {}): Pack => ({
   id, title, subject, access,
-  description: null, collection: 'essentials', status: 'published', sortOrder: 0, at: null, inLibrary: false, students: 0,
+  description: null, finish: 'ink', status: 'published', sortOrder: 0, at: null, inLibrary: false, students: 0,
   packNo: (packNo += 1), priceInr: access === 'paid' ? 49 : null, examLine: subject === 'Biology' ? 'NEET • PCB' : 'JEE • PCM',
   unlocked: access === 'free',
   decks: decks.map(([t, n], i) => ({ id: `${id}-d${i}`, title: t, subject, status: 'published', cards: n })),
@@ -102,15 +102,15 @@ const FIXTURE_PACKS: Pack[] = [
   pk('pk1', 'Physics Essentials', 'Physics', 'paid', [['Kinematics', 52], ['Laws of Motion', 48], ['Work & Energy', 41], ['Rotation', 46]], { description: 'The formulas and relationships you should know cold.', examLine: 'Full JEE Physics syllabus' }),
   pk('pk2', 'Mechanics Essentials', 'Physics', 'free', [['Units & Errors', 30], ['Projectiles', 34], ['Friction', 28]], { description: 'The ideas every mechanics question is built on.' }),
   pk('pk4', 'Electrodynamics Essentials', 'Physics', 'pro', [['Electrostatics', 64], ['Current Electricity', 51], ['Magnetism', 58]], { description: 'Fields, circuits and forces, one card at a time.' }),
-  pk('pk5', 'Modern Physics Essentials', 'Physics', 'free', [['Photoelectric Effect', 22], ['Atoms & Nuclei', 37]], { collection: 'more', description: 'Short chapter, sure marks.' }),
+  pk('pk5', 'Modern Physics Essentials', 'Physics', 'free', [['Photoelectric Effect', 22], ['Atoms & Nuclei', 37]], { finish: 'paper', description: 'Short chapter, sure marks.' }),
   pk('pk3', 'Physical Chemistry Essentials', 'Chemistry', 'paid', [['Mole Concept', 40], ['Thermodynamics', 55], ['Equilibrium', 47]], { priceInr: 39, description: 'Every equation in physical chemistry, and when to use it.' }),
   pk('pk6', 'Organic Reaction Essentials', 'Chemistry', 'free', [['Named Reactions', 72], ['Reagents', 66]], { description: 'Reagent in, product out. No guessing.' }),
   pk('pk7', 'Inorganic Essentials', 'Chemistry', 'pro', [['p-Block', 80], ['d & f Block', 61], ['Coordination', 44]], { description: 'The facts NCERT hides in paragraphs.' }),
-  pk('pk8', 'NCERT Chemistry Facts', 'Chemistry', 'free', [['Class 11', 120], ['Class 12', 134]], { collection: 'more', description: 'Line by line, the facts that turn up in the paper.' }),
+  pk('pk8', 'NCERT Chemistry Facts', 'Chemistry', 'free', [['Class 11', 120], ['Class 12', 134]], { finish: 'paper', description: 'Line by line, the facts that turn up in the paper.' }),
   pk('pk9', 'Algebra Essentials', 'Maths', 'free', [['Quadratics', 36], ['Sequences & Series', 42], ['Complex Numbers', 39]], { description: 'Identities and shortcuts that save minutes.' }),
   pk('pk10', 'Calculus Essentials', 'Maths', 'paid', [['Limits', 33], ['Derivatives', 48], ['Integrals', 61]], { description: 'Every standard result, ready when the clock is running.' }),
-  pk('pk11', 'Coordinate Geometry Essentials', 'Maths', 'free', [['Straight Lines', 31], ['Circles', 29], ['Conics', 54]], { collection: 'more' }),
-  pk('pk12', 'Trigonometry Essentials', 'Maths', 'pro', [['Identities', 44], ['Equations', 27]], { collection: 'more' }),
+  pk('pk11', 'Coordinate Geometry Essentials', 'Maths', 'free', [['Straight Lines', 31], ['Circles', 29], ['Conics', 54]], { finish: 'paper' }),
+  pk('pk12', 'Trigonometry Essentials', 'Maths', 'pro', [['Identities', 44], ['Equations', 27]], { finish: 'paper' }),
 ];
 
 const PREVIEW: Record<string, PreviewCard[]> = {
@@ -133,7 +133,7 @@ const PREVIEW: Record<string, PreviewCard[]> = {
 
 /** A pack in My Alpha, as the library sees its decks. */
 const packDecks = (p: Pack): DeckSummary[] => p.decks.map((d, i) => deck({
-  id: d.id, title: d.title, scope: 'global', collection: p.collection, subject: d.subject, ownerId: 'admin', packId: p.id,
+  id: d.id, title: d.title, scope: 'global', collection: 'more', subject: d.subject, ownerId: 'admin', packId: p.id,
   total: d.cards, unseen: Math.round(d.cards * 0.6), newAvailable: i === 0 ? 12 : 0, due: i === 0 ? 9 : i === 1 ? 4 : 0,
   learning: 3, young: Math.round(d.cards * 0.25), mature: Math.round(d.cards * 0.1),
 }));

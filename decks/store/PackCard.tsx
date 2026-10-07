@@ -5,9 +5,9 @@
    which exam, and the price. A small barcode sits in the corner, because
    real packaging has one.
 
-   Two finishes, chosen by the pack's shelf rather than at random: Alpha
-   Essentials come in ink (black), everything else in paper (off-white). The
-   label reads the same in either room. The subject colour appears once, as a
+   Two finishes, ink (black) and paper (off-white), chosen by the
+   administrator when the pack is made. The label reads the same in either
+   room. The subject colour appears once, as a
    short bar, because colour here is data (schedule/colors.ts).
 
    Layers, back to front: shadow → cards (only during an opening) → body →
@@ -31,16 +31,16 @@ export interface PackParts {
   fibers?: React.Ref<SVGPathElement>;
 }
 
-type Finish = 'ink' | 'paper';
-export const finishOf = (pack: Pick<Pack, 'collection'>): Finish => (pack.collection === 'essentials' ? 'ink' : 'paper');
+type Finish = Pack['finish'];
+export const finishOf = (pack: Pick<Pack, 'finish'>): Finish => (pack.finish === 'paper' ? 'paper' : 'ink');
 
 const SKIN: Record<Finish, { top: string; bottom: string; ink: string; muted: string; rule: string; edge: string; perf: string; ring: string; fiber: string; crack: string }> = {
   ink: { top: '#1a1a1e', bottom: '#09090b', ink: '#FAFAFA', muted: '#8f8f98', rule: 'rgba(255,255,255,0.12)', edge: 'rgba(255,255,255,0.22)', perf: 'rgba(255,255,255,0.28)', ring: 'rgba(255,255,255,0.22)', fiber: '#d9d4c9', crack: '#e9e4d8' },
   paper: { top: '#f8f6f1', bottom: '#e9e6de', ink: '#0e0e10', muted: '#6f6f78', rule: 'rgba(14,14,16,0.12)', edge: 'rgba(255,255,255,0.95)', perf: 'rgba(14,14,16,0.3)', ring: 'rgba(14,14,16,0.16)', fiber: '#ffffff', crack: '#8b857a' },
 };
 
-/** "PACK 007". */
-export const packNumber = (n: number) => `PACK ${String(Math.max(0, n)).padStart(3, '0')}`;
+/** "PACK 007". A pack not yet saved has no number: "NEW PACK". */
+export const packNumber = (n: number) => (n > 0 ? `PACK ${String(n).padStart(3, '0')}` : 'NEW PACK');
 
 /** The price line, as the packaging prints it. */
 export const priceLabel = (p: Pick<Pack, 'access' | 'priceInr'>): string =>
@@ -53,7 +53,7 @@ const barcode = (seed: number) => {
 };
 
 export const PackCard: React.FC<{
-  pack: Pick<Pack, 'title' | 'packNo' | 'subject' | 'decks' | 'examLine' | 'access' | 'priceInr' | 'collection' | 'status'>;
+  pack: Pick<Pack, 'title' | 'packNo' | 'subject' | 'decks' | 'examLine' | 'access' | 'priceInr' | 'finish' | 'status'>;
   w: number;
   h: number;
   parts?: PackParts;

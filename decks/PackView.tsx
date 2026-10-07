@@ -13,7 +13,7 @@
 
 import React, { useState } from 'react';
 import { tokens } from '../ui/kit';
-import { COLLECTION_COPY } from './AudiencePicker';
+import { rackName } from './store/racks';
 import { DeckTile } from './Library';
 import { PackArt, PackBadge, packAccent, packLine, packTotals } from './Packs';
 import { STATE_COLOR, deckAccent, fmtUntil } from './theme';
@@ -38,10 +38,11 @@ interface Props {
   onDelete?: () => void;
 }
 
+// A pack is seen in one place only: the Alpha Packs store, on its subject's rack.
 const STATUS_LINE = (pack: Pack): Record<DeckStatus, string> => ({
-  draft: `Only admins can see this pack. Publishing it publishes its draft decks too, into ${COLLECTION_COPY[pack.collection].title}.`,
-  published: `Live in ${COLLECTION_COPY[pack.collection].title} for every student.`,
-  archived: 'Hidden from the library. Students who already added it keep studying it.',
+  draft: `Only admins can see this pack. Publishing hangs it on the ${rackName(pack.subject)} rack in the Alpha Packs store, and publishes its draft decks too.`,
+  published: `On the ${rackName(pack.subject)} rack in the Alpha Packs store, for every student.`,
+  archived: 'Off the racks. Students who already added it keep studying it.',
 });
 
 const PackView: React.FC<Props> = ({ pack, decks, dark, isAdmin, onBack, onStudy, onAdd, onRemove, onOpenDeck, onReviewDeck, onEdit, onSetStatus, onDelete }) => {

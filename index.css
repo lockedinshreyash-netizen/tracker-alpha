@@ -1038,3 +1038,7 @@ button:active,
   .pk-lift, .pk-shadow, .pk-focus { transition: none; }
   .pk-detail { animation: none; }
 }
+/* The pack editor's preview gives a small swing when a choice changes it, as a pack on a hook would. */
+@keyframes pk-swing { 0% { transform: rotate(0deg); } 25% { transform: rotate(2.6deg); } 55% { transform: rotate(-1.4deg); } 80% { transform: rotate(0.6deg); } 100% { transform: rotate(0deg); } }
+.pk-swing { animation: pk-swing .9s cubic-bezier(.3,.6,.4,1) both; }
+@media (prefers-reduced-motion: reduce) { .pk-swing { animation: none; } }

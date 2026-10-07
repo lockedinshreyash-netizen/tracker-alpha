@@ -98,7 +98,12 @@ alter table public.decks enable row level security;
 -- A pack is to decks what a deck is to cards: "Essential Chemistry" holding
 -- the Organic, Inorganic and Physical decks. Alpha-wide only, made by
 -- administrators, with the decks' own lifecycle (draft / published /
--- archived) and the same two shelves (essentials / more).
+-- archived).
+--
+-- A pack has no shelf. It is only ever seen in the Alpha Packs store,
+-- hanging on the rack for its subject (no subject: the "More packs" rack).
+-- What an administrator chooses instead is how it is packaged: `finish`,
+-- black (`ink`) or white (`paper`).
 --
 -- A deck belongs to at most one pack (`decks.pack_id`, ordered by
 -- `pack_position`). One home per deck keeps "where does this deck live"
@@ -117,7 +122,7 @@ create table if not exists public.deck_packs (
   title        text        not null check (char_length(btrim(title)) between 1 and 120),
   description  text        check (char_length(description) <= 600),
   subject      text        check (subject in ('Physics', 'Chemistry', 'Maths', 'Biology')),
-  collection   text        not null default 'essentials' check (collection in ('essentials', 'more')),
+  finish       text        not null default 'ink' check (finish in ('ink', 'paper')),
   status       text        not null default 'draft' check (status in ('draft', 'published', 'archived')),
   position     int         not null default 0,
   created_at   timestamptz not null default now(),
@@ -157,6 +162,20 @@ alter table public.deck_packs add constraint deck_packs_access_valid check (acce
 -- would show one, and a paid pack without one could not be bought.
 alter table public.deck_packs drop constraint if exists deck_packs_price;
 alter table public.deck_packs add constraint deck_packs_price check ((access = 'paid') = (price_inr is not null) and (price_inr is null or price_inr between 1 and 99999));
+-- Packs once had a shelf (`collection`). It never meant anything for a pack,
+-- which lives only in the store; its one visible effect was the packaging
+-- colour, which is now said directly. Carried over once, then dropped.
+alter table public.deck_packs add column if not exists finish text not null default 'ink';
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'deck_packs' and column_name = 'collection') then
+    execute 'update public.deck_packs set finish = case when collection = ''more'' then ''paper'' else ''ink'' end';
+    execute 'alter table public.deck_packs drop column collection';
+  end if;
+end $$;
+alter table public.deck_packs drop constraint if exists deck_packs_finish_valid;
+alter table public.deck_packs add constraint deck_packs_finish_valid check (finish in ('ink', 'paper'));
 alter table public.deck_packs drop constraint if exists deck_packs_exam_line;
 alter table public.deck_packs add constraint deck_packs_exam_line check (exam_line is null or char_length(exam_line) <= 60);
 create unique index if not exists deck_packs_no on public.deck_packs (pack_no);
@@ -1524,7 +1543,7 @@ $$;
 drop function if exists public.explore_packs();
 create or replace function public.explore_packs()
 returns table (
-  pack_id uuid, title text, description text, subject text, collection text, status text,
+  pack_id uuid, title text, description text, subject text, finish text, status text,
   sort_order int, published_at timestamptz, in_library boolean, decks jsonb,
   pack_no int, access text, price_inr int, exam_line text, unlocked boolean
 )
@@ -1533,7 +1552,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select pk.id, pk.title, pk.description, pk.subject, pk.collection, pk.status, pk.position, pk.published_at,
+  select pk.id, pk.title, pk.description, pk.subject, pk.finish, pk.status, pk.position, pk.published_at,
     exists (select 1 from public.user_packs u where u.user_id = auth.uid() and u.pack_id = pk.id),
     -- What is inside is shown before it is unlocked: names and counts, never cards.
     coalesce((
@@ -1550,7 +1569,7 @@ as $$
     and (pk.status = 'published'
          or exists (select 1 from public.user_packs u where u.user_id = auth.uid() and u.pack_id = pk.id)
          or public.is_admin())
-  order by (pk.collection = 'essentials') desc, pk.position, pk.published_at desc nulls last
+  order by pk.position, pk.pack_no
   limit 60;
 $$;
 
@@ -1580,7 +1599,7 @@ $$;
 drop function if exists public.admin_pack_stats();
 create or replace function public.admin_pack_stats()
 returns table (
-  pack_id uuid, title text, description text, subject text, collection text, status text,
+  pack_id uuid, title text, description text, subject text, finish text, status text,
   sort_order int, updated_at timestamptz, students int, decks jsonb,
   pack_no int, access text, price_inr int, exam_line text
 )
@@ -1594,7 +1613,7 @@ begin
     raise exception 'not authorized' using errcode = '42501';
   end if;
   return query
-  select pk.id, pk.title, pk.description, pk.subject, pk.collection, pk.status, pk.position, pk.updated_at,
+  select pk.id, pk.title, pk.description, pk.subject, pk.finish, pk.status, pk.position, pk.updated_at,
     (select count(*)::int from public.user_packs u where u.pack_id = pk.id),
     coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -1606,7 +1625,7 @@ begin
     pk.pack_no, pk.access, pk.price_inr, pk.exam_line
   from public.deck_packs pk
   order by case pk.status when 'draft' then 0 when 'published' then 1 else 2 end,
-           (pk.collection = 'essentials') desc, pk.position, pk.updated_at desc;
+           pk.subject nulls last, pk.position, pk.pack_no;
 end;
 $$;
 

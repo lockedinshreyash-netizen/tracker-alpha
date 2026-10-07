@@ -9,6 +9,7 @@ import { tokens } from '../../ui/kit';
 import { PackDetail } from './PackDetail';
 import { PackRack, type RackHandle, type RackItem } from './PackRack';
 import type { RackSize } from './geometry';
+import { wallStyle } from './PackRail';
 import type { Pack, PreviewCard } from '../types';
 
 const Chevron: React.FC<{ dir: 'l' | 'r' }> = ({ dir }) => (
@@ -17,10 +18,7 @@ const Chevron: React.FC<{ dir: 'l' | 'r' }> = ({ dir }) => (
   </svg>
 );
 
-export const wallStyle = (dark: boolean): React.CSSProperties => (dark
-  // A graphite gallery wall, a step lighter than the page, so black packs read against it.
-  ? { background: 'radial-gradient(120% 90% at 50% 0%, #2e2e33 0%, #242428 55%, #1f1f23 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 28px 40px -34px rgba(0,0,0,0.75)' }
-  : { background: 'linear-gradient(180deg, #ebe9e4 0%, #e3e0d9 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), inset 0 28px 40px -34px rgba(24,24,27,0.25)' });
+export { wallStyle } from './PackRail';
 
 export const PackCategory: React.FC<{
   title: string;

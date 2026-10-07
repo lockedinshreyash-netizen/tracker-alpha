@@ -278,7 +278,7 @@ const toPack = (r: any, at: string | null): Pack => ({
   title: r.title,
   description: r.description ?? null,
   subject: r.subject ?? null,
-  collection: r.collection ?? 'essentials',
+  finish: r.finish === 'paper' ? 'paper' : 'ink',
   status: r.status,
   sortOrder: r.sort_order ?? 0,
   at,
@@ -327,7 +327,7 @@ const packRow = (m: Partial<PackMeta>) => ({
   ...(m.title !== undefined ? { title: m.title.trim().slice(0, 120) } : {}),
   ...(m.description !== undefined ? { description: m.description?.trim() ? m.description.trim().slice(0, 600) : null } : {}),
   ...(m.subject !== undefined ? { subject: m.subject } : {}),
-  ...(m.collection !== undefined ? { collection: m.collection } : {}),
+  ...(m.finish !== undefined ? { finish: m.finish } : {}),
   // Access and price travel together: the table refuses one without the other.
   ...(m.access !== undefined ? { access: m.access, price_inr: m.access === 'paid' ? m.priceInr : null } : {}),
   ...(m.examLine !== undefined ? { exam_line: m.examLine?.trim() ? m.examLine.trim().slice(0, 60) : null } : {}),

@@ -9,8 +9,7 @@ import { tokens } from '../../ui/kit';
 import { Icon } from '../ui';
 import { PackCard } from './PackCard';
 import { HookBack, HookFront } from './PackHook';
-import { PackRail } from './PackRail';
-import { wallStyle } from './PackCategory';
+import { PackRail, wallStyle } from './PackRail';
 import { geometry } from './geometry';
 import type { Pack } from '../types';
 

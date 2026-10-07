@@ -22,6 +22,7 @@ import { PackCategory } from './PackCategory';
 import { PackOpeningAnimation } from './PackOpeningAnimation';
 import type { RackItem } from './PackRack';
 import { useRackSize, useReducedMotion } from './env';
+import { rackName } from './racks';
 import type { DeckSubject, Pack, PreviewCard } from '../types';
 
 interface Props {
@@ -41,10 +42,9 @@ interface Props {
   onAcquired: (packId: string) => Promise<void> | void;
 }
 
-const NAME: Record<DeckSubject, string> = { Physics: 'Physics', Chemistry: 'Chemistry', Maths: 'Mathematics', Biology: 'Biology' };
 
-const order = (a: Pack, b: Pack) =>
-  Number(b.collection === 'essentials') - Number(a.collection === 'essentials') || a.sortOrder - b.sortOrder || a.packNo - b.packNo;
+/** The rack's own order: as placed, then oldest pack first. */
+const order = (a: Pack, b: Pack) => a.sortOrder - b.sortOrder || a.packNo - b.packNo;
 
 const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owned, onBack, onOpenOwned, acquire, loadPreview, onAcquired }) => {
   const t = tokens(dark);
@@ -66,10 +66,10 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
     const out: { key: string; title: string; items: RackItem[] }[] = [];
     subjects.forEach(s => {
       const list = visible.filter(p => p.subject === s).sort(order);
-      if (list.length) out.push({ key: s, title: NAME[s], items: list.map(p => ({ pack: p, taken: p.inLibrary })) });
+      if (list.length) out.push({ key: s, title: rackName(s), items: list.map(p => ({ pack: p, taken: p.inLibrary })) });
     });
     const rest = visible.filter(p => !p.subject).sort(order);
-    if (rest.length) out.push({ key: 'more', title: 'More packs', items: rest.map(p => ({ pack: p, taken: p.inLibrary })) });
+    if (rest.length) out.push({ key: 'more', title: rackName(null), items: rest.map(p => ({ pack: p, taken: p.inLibrary })) });
     return out;
   }, [visible, examPreference]);
 

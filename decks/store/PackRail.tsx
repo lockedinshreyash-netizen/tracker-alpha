@@ -11,6 +11,12 @@ export const metal = (dark: boolean) => (dark
   ? { hi: '#8a8a93', mid: '#4a4a52', lo: '#1d1d22', edge: 'rgba(255,255,255,0.28)', shadow: 'rgba(0,0,0,0.55)' }
   : { hi: '#ffffff', mid: '#c9c9cf', lo: '#8e8e96', edge: 'rgba(255,255,255,0.95)', shadow: 'rgba(24,24,27,0.22)' });
 
+/** The store's wall: what every rack hangs on. Graphite in the dark, so black packs still read. */
+export const wallStyle = (dark: boolean): React.CSSProperties => (dark
+  // A graphite gallery wall, a step lighter than the page, so black packs read against it.
+  ? { background: 'radial-gradient(120% 90% at 50% 0%, #2e2e33 0%, #242428 55%, #1f1f23 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 28px 40px -34px rgba(0,0,0,0.75)' }
+  : { background: 'linear-gradient(180deg, #ebe9e4 0%, #e3e0d9 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), inset 0 28px 40px -34px rgba(24,24,27,0.25)' });
+
 export const RAIL_Y = 8;
 export const RAIL_H = 12;
 

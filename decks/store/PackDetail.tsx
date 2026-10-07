@@ -17,9 +17,9 @@ import { deckAccent } from '../theme';
 import { Icon } from '../ui';
 import { actionFor } from './checkout';
 import { packNumber } from './PackCard';
+import { rackName } from './racks';
 import type { Pack, PreviewCard } from '../types';
 
-const SUBJECT_NAME: Record<string, string> = { Physics: 'Physics', Chemistry: 'Chemistry', Maths: 'Mathematics', Biology: 'Biology' };
 
 export const PackDetail: React.FC<{
   pack: Pack;
@@ -57,7 +57,7 @@ export const PackDetail: React.FC<{
           <div className="min-w-0">
             <p className={`text-[10px] font-bold uppercase tracking-[0.12em] flex items-center gap-2 ${t.faint}`}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
-              {packNumber(pack.packNo)}{pack.subject ? ` · ${SUBJECT_NAME[pack.subject] ?? pack.subject}` : ''}
+              {packNumber(pack.packNo)}{pack.subject ? ` · ${rackName(pack.subject)}` : ''}
             </p>
             <h3 className={`font-display uppercase text-[28px] md:text-[36px] leading-[0.98] mt-3 pr-10 ${t.heading}`}>{pack.title}</h3>
             {pack.description && <p className={`font-accent italic text-[17px] md:text-[19px] leading-snug mt-4 max-w-[520px] ${t.body}`}>“{pack.description}”</p>}
