@@ -3,7 +3,9 @@
    each, empty ones included: a full shelf, one deck, only Alpha decks, all
    caught up, an empty deck, first run with and without Alpha decks, signed
    out, the console with and without decks, every sheet and the review room —
-   in either theme. Gated on import.meta.env.DEV in index.tsx and
+   in either theme. The Alpha Packs store runs for real on fixtures: slide
+   the racks, open a free pack and watch it land in My Alpha. A "Pro + bought"
+   switch unlocks the rest. Gated on import.meta.env.DEV in index.tsx and
    tree-shaken out of production, like cbt/DebugCbt.tsx. Nothing here writes
    anywhere; actions just log. */
 
@@ -15,8 +17,12 @@ import ImportSheet from './ImportSheet';
 import { DeckDetailsSheet, SettingsSheet } from './DeckSheets';
 import { deckAccent } from './theme';
 import ReviewSession from './ReviewSession';
-import DecksAdmin from '../admin/DecksAdmin';
-import type { AdminDeckStat, DeckSummary, ExploreDeck, Note, QueueCard } from './types';
+import DecksAdmin, { type PackOps } from '../admin/DecksAdmin';
+import PackStore from './store/PackStore';
+import PackView from './PackView';
+import { PackSheet } from './PackSheet';
+import { checkout } from './store/checkout';
+import type { AdminDeckStat, DeckSubject, DeckSummary, ExploreDeck, Note, Pack, PackAccess, PreviewCard, QueueCard } from './types';
 
 /* A benzene ring as a PNG data URI, drawn here so the fixture needs no asset. */
 const RING = (() => {
@@ -44,7 +50,7 @@ const NOTES: Omit<QueueCard, 'cardId' | 'progress'>[] = [
 const fixtureCards = (): QueueCard[] => NOTES.map((n, i) => ({ ...n, cardId: `card-${i}`, progress: null }));
 
 const deck = (o: Partial<DeckSummary> & Pick<DeckSummary, 'id' | 'title'>): DeckSummary => ({
-  scope: 'personal', status: 'published', collection: null, description: null, subject: null, classId: null, chapter: null, ownerId: 'me',
+  scope: 'personal', status: 'published', collection: null, description: null, subject: null, classId: null, chapter: null, ownerId: 'me', packId: null,
   updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(), newPerDay: 20, maxReviews: 200, desiredRetention: 0.9,
   total: 0, unseen: 0, newAvailable: 0, due: 0, learning: 0, young: 0, mature: 0, suspended: 0, reviewsToday: 0,
   nextDue: new Date(Date.now() + 3 * 3600000).toISOString(), ...o,
@@ -75,10 +81,62 @@ export const FIXTURE_EXPLORE: ExploreDeck[] = [
 ];
 
 const ADMIN_STATS: AdminDeckStat[] = [
-  { id: 'g3', title: 'High-Yield Organic Reactions', status: 'draft', collection: 'essentials', subject: 'Chemistry', chapter: null, updatedAt: new Date(Date.now() - 3600000).toISOString(), publishedAt: null, cards: 96, students: 1, active7d: 1, reviews7d: 40, againRate: null },
-  { id: 'g1', title: 'JEE 2027 Chemistry Essentials', status: 'published', collection: 'essentials', subject: 'Chemistry', chapter: null, updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(), publishedAt: null, cards: 512, students: 1840, active7d: 1210, reviews7d: 48210, againRate: 0.11 },
-  { id: 'g2', title: 'NCERT Inorganic — Every Line That Matters', status: 'published', collection: 'more', subject: 'Chemistry', chapter: 'p-Block Elements', updatedAt: new Date(Date.now() - 6 * 86400000).toISOString(), publishedAt: null, cards: 320, students: 612, active7d: 288, reviews7d: 9450, againRate: 0.18 },
+  { id: 'g3', title: 'High-Yield Organic Reactions', status: 'draft', collection: 'essentials', subject: 'Chemistry', chapter: null, updatedAt: new Date(Date.now() - 3600000).toISOString(), publishedAt: null, cards: 96, students: 1, active7d: 1, reviews7d: 40, againRate: null, packId: null, packTitle: null },
+  { id: 'g1', title: 'JEE 2027 Chemistry Essentials', status: 'published', collection: 'essentials', subject: 'Chemistry', chapter: null, updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(), publishedAt: null, cards: 512, students: 1840, active7d: 1210, reviews7d: 48210, againRate: 0.11, packId: null, packTitle: null },
+  { id: 'g2', title: 'NCERT Inorganic — Every Line That Matters', status: 'published', collection: 'more', subject: 'Chemistry', chapter: 'p-Block Elements', updatedAt: new Date(Date.now() - 6 * 86400000).toISOString(), publishedAt: null, cards: 320, students: 612, active7d: 288, reviews7d: 9450, againRate: 0.18, packId: 'pk3', packTitle: 'Chemistry Essentials' },
 ];
+
+/* ── The store's stock ── */
+
+let packNo = 0;
+const pk = (id: string, title: string, subject: DeckSubject | null, access: PackAccess, decks: [string, number][], o: Partial<Pack> = {}): Pack => ({
+  id, title, subject, access,
+  description: null, collection: 'essentials', status: 'published', sortOrder: 0, at: null, inLibrary: false, students: 0,
+  packNo: (packNo += 1), priceInr: access === 'paid' ? 49 : null, examLine: subject === 'Biology' ? 'NEET • PCB' : 'JEE • PCM',
+  unlocked: access === 'free',
+  decks: decks.map(([t, n], i) => ({ id: `${id}-d${i}`, title: t, subject, status: 'published', cards: n })),
+  ...o,
+});
+
+const FIXTURE_PACKS: Pack[] = [
+  pk('pk1', 'Physics Essentials', 'Physics', 'paid', [['Kinematics', 52], ['Laws of Motion', 48], ['Work & Energy', 41], ['Rotation', 46]], { description: 'The formulas and relationships you should know cold.', examLine: 'Full JEE Physics syllabus' }),
+  pk('pk2', 'Mechanics Essentials', 'Physics', 'free', [['Units & Errors', 30], ['Projectiles', 34], ['Friction', 28]], { description: 'The ideas every mechanics question is built on.' }),
+  pk('pk4', 'Electrodynamics Essentials', 'Physics', 'pro', [['Electrostatics', 64], ['Current Electricity', 51], ['Magnetism', 58]], { description: 'Fields, circuits and forces, one card at a time.' }),
+  pk('pk5', 'Modern Physics Essentials', 'Physics', 'free', [['Photoelectric Effect', 22], ['Atoms & Nuclei', 37]], { collection: 'more', description: 'Short chapter, sure marks.' }),
+  pk('pk3', 'Physical Chemistry Essentials', 'Chemistry', 'paid', [['Mole Concept', 40], ['Thermodynamics', 55], ['Equilibrium', 47]], { priceInr: 39, description: 'Every equation in physical chemistry, and when to use it.' }),
+  pk('pk6', 'Organic Reaction Essentials', 'Chemistry', 'free', [['Named Reactions', 72], ['Reagents', 66]], { description: 'Reagent in, product out. No guessing.' }),
+  pk('pk7', 'Inorganic Essentials', 'Chemistry', 'pro', [['p-Block', 80], ['d & f Block', 61], ['Coordination', 44]], { description: 'The facts NCERT hides in paragraphs.' }),
+  pk('pk8', 'NCERT Chemistry Facts', 'Chemistry', 'free', [['Class 11', 120], ['Class 12', 134]], { collection: 'more', description: 'Line by line, the facts that turn up in the paper.' }),
+  pk('pk9', 'Algebra Essentials', 'Maths', 'free', [['Quadratics', 36], ['Sequences & Series', 42], ['Complex Numbers', 39]], { description: 'Identities and shortcuts that save minutes.' }),
+  pk('pk10', 'Calculus Essentials', 'Maths', 'paid', [['Limits', 33], ['Derivatives', 48], ['Integrals', 61]], { description: 'Every standard result, ready when the clock is running.' }),
+  pk('pk11', 'Coordinate Geometry Essentials', 'Maths', 'free', [['Straight Lines', 31], ['Circles', 29], ['Conics', 54]], { collection: 'more' }),
+  pk('pk12', 'Trigonometry Essentials', 'Maths', 'pro', [['Identities', 44], ['Equations', 27]], { collection: 'more' }),
+];
+
+const PREVIEW: Record<string, PreviewCard[]> = {
+  Physics: [
+    { deckId: '', kind: 'cloze', front: 'v = u + {{c1::at}}', back: '' },
+    { deckId: '', kind: 'cloze', front: 'F = {{c1::ma}}', back: '' },
+    { deckId: '', kind: 'cloze', front: '{{c1::ΔK}} = W (work–energy theorem)', back: '' },
+  ],
+  Chemistry: [
+    { deckId: '', kind: 'cloze', front: 'PV = {{c1::nRT}}', back: '' },
+    { deckId: '', kind: 'cloze', front: 'ΔG = ΔH − {{c1::TΔS}}', back: '' },
+    { deckId: '', kind: 'basic', front: 'One mole holds how many particles?', back: '6.022 × 10²³' },
+  ],
+  Maths: [
+    { deckId: '', kind: 'cloze', front: 'sin²x + cos²x = {{c1::1}}', back: '' },
+    { deckId: '', kind: 'cloze', front: 'd/dx (sin x) = {{c1::cos x}}', back: '' },
+    { deckId: '', kind: 'cloze', front: '∫ eˣ dx = {{c1::eˣ + C}}', back: '' },
+  ],
+};
+
+/** A pack in My Alpha, as the library sees its decks. */
+const packDecks = (p: Pack): DeckSummary[] => p.decks.map((d, i) => deck({
+  id: d.id, title: d.title, scope: 'global', collection: p.collection, subject: d.subject, ownerId: 'admin', packId: p.id,
+  total: d.cards, unseen: Math.round(d.cards * 0.6), newAvailable: i === 0 ? 12 : 0, due: i === 0 ? 9 : i === 1 ? 4 : 0,
+  learning: 3, young: Math.round(d.cards * 0.25), mature: Math.round(d.cards * 0.1),
+}));
 
 const FIXTURE_NOTES: Note[] = [
   ...NOTES.filter((n, i, a) => a.findIndex(x => x.noteId === n.noteId) === i).map(n => ({
@@ -125,6 +183,10 @@ const SCREENS = {
   import: 'Import',
   create: 'Create a deck (admin)',
   settings: 'Study settings',
+  store: 'Alpha Packs — store',
+  storeempty: 'Alpha Packs — nothing published yet',
+  pack: 'Pack — in My Alpha',
+  packsheet: 'Pack editor (admin)',
   admin: 'Console — Decks',
   adminempty: 'Console — no Alpha decks',
   review: 'Review room',
@@ -150,6 +212,19 @@ const DebugDecks: React.FC = () => {
   const [log, setLog] = useState<string[]>([]);
   const cards = useMemo(fixtureCards, [reviewing]);
   const say = (s: string) => setLog(l => [...l.slice(-4), s]);
+  // The store's stock lives here, so taking a pack really changes the board.
+  const [stock, setStock] = useState<Pack[]>(() => FIXTURE_PACKS.map(p => (p.id === 'pk5' ? { ...p, inLibrary: true } : p)));
+  const [pro, setPro] = useState(false);
+  const shelf = stock.map(p => ({ ...p, unlocked: p.unlocked || pro }));
+  const ownedDecks = shelf.filter(p => p.inLibrary).flatMap(packDecks);
+  const packOps: PackOps = useMemo(() => ({
+    load: async () => FIXTURE_PACKS.map((p, i) => ({ ...p, status: i === 1 ? 'draft' as const : p.status, students: 120 * (i + 1) })),
+    create: async m => { say(`create pack ${m.title} ${m.access} ${m.priceInr ?? ''}`); return 'new'; },
+    update: async (id, m) => say(`update ${id} ${JSON.stringify(m)}`),
+    setDecks: async (id, d) => say(`decks ${id} ${d.join(',')}`),
+    setStatus: async (id, st) => say(`pack ${id} ${st}`),
+    remove: async id => say(`delete pack ${id}`),
+  }), []);
 
   const go = (s: Screen) => {
     setScreen(s);
@@ -157,7 +232,10 @@ const DebugDecks: React.FC = () => {
     p.set('screen', s);
     history.replaceState(null, '', `?${p}`);
   };
-  const lib = LIBRARY[screen];
+  const base = LIBRARY[screen];
+  const lib = base && (screen === 'library' || screen === 'alphaonly')
+    ? { ...base, summaries: [...base.summaries, ...ownedDecks] }
+    : base;
   const deckFor = screen === 'emptydeck' ? EMPTY_DECKS[0] : screen === 'alpha' ? FIXTURE_DECKS[6] : screen === 'noreviews' ? { ...FIXTURE_DECKS[1], young: 0, mature: 0, learning: 0, unseen: 183 } : FIXTURE_DECKS[0];
 
   return (
@@ -169,6 +247,10 @@ const DebugDecks: React.FC = () => {
             className={`h-8 px-3 rounded-full text-[12px] font-semibold outline-none ${dark ? 'bg-white/[0.08] text-white' : 'bg-zinc-900 text-white'}`}>
             {(Object.keys(SCREENS) as Screen[]).map(k => <option key={k} value={k}>{SCREENS[k]}</option>)}
           </select>
+          {(screen === 'store' || screen === 'library') && (
+            <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={pro} onChange={e => setPro(e.target.checked)} />Pro + bought</label>
+          )}
+          {screen === 'store' && <button onClick={() => setStock(FIXTURE_PACKS)} className="px-3 h-8 rounded-full hover:opacity-70">Restock</button>}
           <button onClick={() => setDark(d => !d)} className="ml-auto px-3 h-8 rounded-full hover:opacity-70">{dark ? 'Light' : 'Dark'}</button>
         </div>
       </div>
@@ -190,6 +272,64 @@ const DebugDecks: React.FC = () => {
             onStudyExplore={() => setReviewing(true)}
             onOpenAuth={() => say('sign in')}
             onRetry={() => say('retry')}
+            packs={screen === 'firstbare' ? [] : shelf}
+            onOpenStore={() => go('store')}
+            onOpenPack={id => { say(`open pack ${id}`); go('pack'); }}
+            onReviewPack={() => setReviewing(true)}
+          />
+        )}
+        {(screen === 'store' || screen === 'storeempty') && (
+          <PackStore
+            packs={screen === 'storeempty' ? [] : shelf}
+            dark={dark}
+            examPreference="JEE"
+            isAdmin={false}
+            owned={shelf.filter(p => p.inLibrary).length}
+            onBack={() => go('library')}
+            onOpenOwned={id => { say(`open pack ${id}`); go('pack'); }}
+            acquire={async p => {
+              await new Promise(r => setTimeout(r, 450));
+              if (!p.unlocked) {
+                const paid = await checkout(p);
+                if ('message' in paid) throw new Error(paid.message);
+              }
+              setStock(list => list.map(x => (x.id === p.id ? { ...x, inLibrary: true } : x)));
+            }}
+            loadPreview={async id => {
+              await new Promise(r => setTimeout(r, 250));
+              const p = shelf.find(x => x.id === id);
+              return (PREVIEW[p?.subject ?? 'Physics'] ?? []).map(c => ({ ...c, deckId: p?.decks[0]?.id ?? '' }));
+            }}
+            onAcquired={id => { say(`acquired ${id}`); go('library'); }}
+          />
+        )}
+        {screen === 'pack' && (() => {
+          const p = { ...FIXTURE_PACKS[1], inLibrary: true };
+          return (
+            <PackView
+              pack={p}
+              decks={packDecks(p)}
+              dark={dark}
+              isAdmin
+              onBack={() => go('library')}
+              onStudy={() => setReviewing(true)}
+              onAdd={async () => say('add pack')}
+              onRemove={() => say('remove pack')}
+              onOpenDeck={id => say(`open ${id}`)}
+              onReviewDeck={() => setReviewing(true)}
+              onEdit={() => go('packsheet')}
+              onSetStatus={st => say(`pack ${st}`)}
+              onDelete={() => say('delete pack')}
+            />
+          );
+        })()}
+        {screen === 'packsheet' && (
+          <PackSheet
+            dark={dark}
+            pack={FIXTURE_PACKS[0]}
+            decks={[...ADMIN_STATS, ...FIXTURE_PACKS[0].decks.map(d => ({ ...ADMIN_STATS[1], id: d.id, title: d.title, subject: d.subject, cards: d.cards, packId: 'pk1', packTitle: 'Physics Essentials' }))]}
+            onClose={() => go('pack')}
+            onSave={async (m, ids) => say(`save ${JSON.stringify(m)} ${ids.join(',')}`)}
           />
         )}
         {(screen === 'deck' || screen === 'alpha' || screen === 'emptydeck' || screen === 'noreviews') && (
@@ -240,7 +380,7 @@ const DebugDecks: React.FC = () => {
         )}
         {(screen === 'admin' || screen === 'adminempty') && (
           <Suspense fallback={null}>
-            <DecksAdmin key={screen} theme={dark ? 'dark' : 'light'} onOpenDeck={id => say(`open ${id}`)} loadStats={async () => (screen === 'admin' ? ADMIN_STATS : [])} />
+            <DecksAdmin key={screen} theme={dark ? 'dark' : 'light'} onOpenDeck={id => say(`open ${id}`)} loadStats={async () => (screen === 'admin' ? ADMIN_STATS : [])} packOps={packOps} />
           </Suspense>
         )}
         {screen === 'review' && (

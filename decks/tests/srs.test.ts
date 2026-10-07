@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { preview, intervalLabel } from '../srs';
 import { studyDayStart } from '../day';
-import { answer, appendCards, current, interleave, remaining, startSession } from '../session';
+import { answer, appendCards, applyPending, current, interleave, remaining, startSession } from '../session';
 import type { Progress, QueueCard } from '../types';
 
 const now = new Date('2026-10-06T10:00:00+05:30');
@@ -91,4 +91,42 @@ test('session: prefetch never adds a card twice', () => {
   let s = startSession([card('a')]);
   s = appendCards(s, [card('a'), card('b')]);
   assert.deepEqual(s.queue.map(c => c.cardId), ['a', 'b']);
+});
+
+test('session: a card answered before leaving waits out its step on return', () => {
+  const t = now.getTime();
+  const justAnswered = card('j', 1, new Date(t + 9 * 60_000).toISOString());
+  const s = startSession([justAnswered, card('n1'), card('r1', 2)], t);
+  assert.deepEqual(s.queue.map(c => c.cardId).sort(), ['n1', 'r1']);
+  assert.equal(s.learning.length, 1);
+  assert.notEqual(current(s, t)!.card.cardId, 'j');
+  // Due now: shown first.
+  const overdue = startSession([card('o', 1, new Date(t - 60_000).toISOString()), card('n2')], t);
+  assert.equal(current(overdue, t)!.card.cardId, 'o');
+});
+
+test('session: unsent answers are laid over the server queue', () => {
+  const t = now.getTime();
+  const dayEnd = t + 6 * 3600_000;
+  const learning: Progress = { state: 1, due: new Date(t + 10 * 60_000).toISOString(), stability: 1, difficulty: 5, scheduledDays: 0, learningSteps: 1, reps: 1, lapses: 0, lastReview: now.toISOString() };
+  const tomorrow: Progress = { ...learning, state: 2, due: new Date(dayEnd + 3600_000).toISOString(), scheduledDays: 1 };
+  const out = applyPending([card('a'), card('b'), card('c')], new Map([['a', learning], ['b', tomorrow]]), dayEnd);
+  assert.deepEqual(out.map(c => c.cardId), ['a', 'c']);
+  assert.equal(out[0].progress?.state, 1);
+  const s = startSession(out, t);
+  assert.equal(current(s, t)!.card.cardId, 'c');
+});
+
+test('session: a pack mixes its decks — new cards take turns, reviews by due', () => {
+  const t = now.getTime();
+  const at = (m: number) => new Date(t - m * 60_000).toISOString();
+  const inDeck = (c: QueueCard, deckId: string) => ({ ...c, deckId });
+  const cards = [
+    inDeck(card('a1'), 'A'), inDeck(card('a2'), 'A'), inDeck(card('a3'), 'A'),
+    inDeck(card('b1'), 'B'),
+    inDeck(card('ra', 2, at(5)), 'A'), inDeck(card('rb', 2, at(50)), 'B'),
+  ];
+  const order = interleave(cards).map(c => c.cardId);
+  assert.deepEqual(order.filter(id => !id.startsWith('r')), ['a1', 'b1', 'a2', 'a3']);
+  assert.deepEqual(order.filter(id => id.startsWith('r')), ['rb', 'ra']);
 });

@@ -63,11 +63,15 @@ interface Props {
   onSetStatus: (status: DeckStatus) => void;
   /** Administrators: move an Alpha deck between Essentials and More. */
   onSetCollection: (collection: DeckCollection) => void;
+  /** The Alpha pack this deck is in, if any. */
+  pack?: { title: string } | null;
+  /** Where Back goes, when it is not the library. */
+  backLabel?: string;
 }
 
 const DeckView: React.FC<Props> = ({
   deck, dark, canEdit, isAdmin, source, version, onBack, onReview, onAddCard, onEditNote, onDeleteNote, onSuspendNote,
-  onImport, onExport, onSettings, onRemove, onDelete, onSetStatus, onSetCollection,
+  onImport, onExport, onSettings, onRemove, onDelete, onSetStatus, onSetCollection, pack = null, backLabel = 'Decks',
 }) => {
   const t = tokens(dark);
   const accent = deckAccent(deck.subject, dark);
@@ -89,7 +93,7 @@ const DeckView: React.FC<Props> = ({
     <div className="space-y-6 font-ui">
       {/* Back */}
       <button onClick={onBack} className={`mk-rise -ml-1 inline-flex items-center gap-1.5 h-8 px-2 rounded-full text-[13px] font-semibold transition-opacity hover:opacity-70 ${t.muted}`}>
-        {Icon.back} Decks
+        {Icon.back} <span className="truncate max-w-[60vw]">{backLabel}</span>
       </button>
 
       {/* Header */}
@@ -126,7 +130,7 @@ const DeckView: React.FC<Props> = ({
       </header>
 
       {isGlobal && isAdmin && (
-        <PublishStrip status={deck.status} collection={deck.collection ?? 'more'} dark={dark} onSetStatus={onSetStatus} onSetCollection={onSetCollection} />
+        <PublishStrip status={deck.status} collection={deck.collection ?? 'more'} pack={pack} dark={dark} onSetStatus={onSetStatus} onSetCollection={onSetCollection} />
       )}
 
       {deck.total === 0 ? (
@@ -232,11 +236,12 @@ const TodayCard: React.FC<{ deck: DeckSummary; dark: boolean; accent: string; on
 /* ── Publishing (administrators, Alpha decks) ── */
 
 const PublishStrip: React.FC<{
-  status: DeckStatus; collection: DeckCollection; dark: boolean;
+  status: DeckStatus; collection: DeckCollection; pack: { title: string } | null; dark: boolean;
   onSetStatus: (s: DeckStatus) => void; onSetCollection: (c: DeckCollection) => void;
-}> = ({ status, collection, dark, onSetStatus, onSetCollection }) => {
+}> = ({ status, collection, pack, dark, onSetStatus, onSetCollection }) => {
   const t = tokens(dark);
-  const shelf = COLLECTION_COPY[collection].title;
+  // A deck in a pack is found through its pack, not on a shelf of its own.
+  const shelf = pack ? `the ${pack.title} pack` : COLLECTION_COPY[collection].title;
   const copy: Record<DeckStatus, string> = {
     draft: `Only admins can see this deck. Check the cards, then publish it to ${shelf}.`,
     published: `Live in ${shelf} for every student.`,
@@ -260,13 +265,17 @@ const PublishStrip: React.FC<{
       </div>
       <div className={`px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3 ${dark ? 'border-white/[0.06]' : 'border-zinc-200/70'}`}>
         <p className={`text-[12px] ${t.muted}`}>Students find it in</p>
-        <Segmented
-          dark={dark}
-          label="Shelf"
-          value={collection}
-          onChange={onSetCollection}
-          options={[{ value: 'essentials', label: 'Alpha Essentials' }, { value: 'more', label: 'More from Alpha' }]}
-        />
+        {pack ? (
+          <p className={`text-[13px] font-semibold ${t.heading}`}>The {pack.title} pack <span className={`font-normal ${t.muted}`}>· change it from the pack</span></p>
+        ) : (
+          <Segmented
+            dark={dark}
+            label="Shelf"
+            value={collection}
+            onChange={onSetCollection}
+            options={[{ value: 'essentials', label: 'Alpha Essentials' }, { value: 'more', label: 'More from Alpha' }]}
+          />
+        )}
       </div>
     </section>
   );

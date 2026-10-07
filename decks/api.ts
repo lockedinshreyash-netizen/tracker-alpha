@@ -13,7 +13,7 @@
 
 import { supabase } from '../supabaseClient';
 import type {
-  ActivityDay, AdminDeckStat, DeckCollection, DeckMeta, DeckScope, DeckStatus, DeckSummary, DraftNote, ExploreDeck, Note, Progress, QueueCard,
+  ActivityDay, AdminDeckStat, DeckCollection, DeckMeta, DeckScope, DeckStatus, DeckSummary, DraftNote, ExploreDeck, Note, Pack, PackMeta, PreviewCard, Progress, QueueCard,
 } from './types';
 import { contentHash } from './hash';
 import { studyDayBounds } from './day';
@@ -32,6 +32,7 @@ export const humanError = (error: unknown): string => {
   const e = error as { code?: string; message?: string } | null;
   const code = e?.code ?? '';
   const message = e?.message ?? '';
+  if (/payment required/i.test(message)) return 'This pack has to be unlocked first.';
   if (code === '42501' || /row-level security|not authorized/i.test(message)) return "You don't have permission to do that.";
   /* PGRST205 is a missing table and PGRST202 a missing function: decks.sql
      has not been run on this project yet. */
@@ -62,6 +63,7 @@ const toSummary = (r: any): DeckSummary => ({
   chapter: r.chapter ?? null,
   ownerId: r.owner_id ?? null,
   updatedAt: r.updated_at,
+  packId: r.pack_id ?? null,
   newPerDay: r.new_per_day,
   maxReviews: r.max_reviews,
   desiredRetention: Number(r.desired_retention),
@@ -128,6 +130,18 @@ export const progressRow = (p: Progress) => ({
   last_review: p.lastReview,
 });
 export type ProgressRow = ReturnType<typeof progressRow>;
+
+export const progressFromRow = (r: ProgressRow): Progress => ({
+  state: r.state,
+  due: r.due,
+  stability: r.stability,
+  difficulty: r.difficulty,
+  scheduledDays: r.scheduled_days,
+  learningSteps: r.learning_steps,
+  reps: r.reps,
+  lapses: r.lapses,
+  lastReview: r.last_review,
+});
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -248,7 +262,114 @@ export const fetchAdminStats = async (): Promise<AdminDeckStat[]> => {
     id: r.deck_id, title: r.title, status: r.status, collection: r.collection ?? 'more', subject: r.subject ?? null, chapter: r.chapter ?? null,
     updatedAt: r.updated_at, publishedAt: r.published_at ?? null, cards: r.cards, students: r.students,
     active7d: r.active_7d, reviews7d: r.reviews_7d, againRate: r.again_rate === null ? null : Number(r.again_rate),
+    packId: r.pack_id ?? null, packTitle: r.pack_title ?? null,
   }));
+};
+
+/* ── Packs ──
+   A pack is a set of Alpha decks. Students add or remove a whole pack;
+   administrators make one, choose its decks and publish it. Which decks are
+   in a pack, and publishing, go through functions so a pack is never half
+   built. */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toPack = (r: any, at: string | null): Pack => ({
+  id: r.pack_id,
+  title: r.title,
+  description: r.description ?? null,
+  subject: r.subject ?? null,
+  collection: r.collection ?? 'essentials',
+  status: r.status,
+  sortOrder: r.sort_order ?? 0,
+  at,
+  inLibrary: !!r.in_library,
+  students: r.students ?? 0,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  decks: (r.decks ?? []).map((d: any) => ({ id: d.id, title: d.title, subject: d.subject ?? null, status: d.status, cards: Number(d.cards ?? 0) })),
+  packNo: r.pack_no ?? 0,
+  access: r.access ?? 'free',
+  priceInr: r.price_inr ?? null,
+  examLine: r.exam_line ?? null,
+  unlocked: r.unlocked ?? true,
+});
+
+/** Three cards from a pack, for the store. */
+export const packPreview = async (packId: string): Promise<PreviewCard[]> => {
+  const { data, error } = await supabase.rpc('pack_preview', { p_pack: packId });
+  fail(error);
+  return (data ?? []).map((r: { deck_id: string; kind: PreviewCard['kind']; front: string; back: string | null }) => ({
+    deckId: r.deck_id, kind: r.kind, front: r.front, back: r.back ?? '',
+  }));
+};
+
+/** Published packs, plus any the caller added (and drafts, for administrators). */
+export const explorePacks = async (): Promise<Pack[]> => {
+  const { data, error } = await supabase.rpc('explore_packs');
+  fail(error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => toPack(r, r.published_at ?? null));
+};
+
+/** Put a pack and every deck in it on your shelf. Returns how many decks were added. */
+export const addPack = async (packId: string): Promise<number> => {
+  const { data, error } = await supabase.rpc('add_pack', { p_pack: packId });
+  fail(error);
+  return Number(data ?? 0);
+};
+
+/** Take a pack and its decks off your shelf. Progress is kept. */
+export const removePack = async (packId: string): Promise<void> => {
+  const { error } = await supabase.rpc('remove_pack', { p_pack: packId });
+  fail(error);
+};
+
+const packRow = (m: Partial<PackMeta>) => ({
+  ...(m.title !== undefined ? { title: m.title.trim().slice(0, 120) } : {}),
+  ...(m.description !== undefined ? { description: m.description?.trim() ? m.description.trim().slice(0, 600) : null } : {}),
+  ...(m.subject !== undefined ? { subject: m.subject } : {}),
+  ...(m.collection !== undefined ? { collection: m.collection } : {}),
+  // Access and price travel together: the table refuses one without the other.
+  ...(m.access !== undefined ? { access: m.access, price_inr: m.access === 'paid' ? m.priceInr : null } : {}),
+  ...(m.examLine !== undefined ? { exam_line: m.examLine?.trim() ? m.examLine.trim().slice(0, 60) : null } : {}),
+});
+
+/** A new pack, always a draft — the insert policy refuses anything else. */
+export const createPack = async (meta: PackMeta): Promise<string> => {
+  const { data, error } = await supabase.from('deck_packs').insert({ status: 'draft', ...packRow(meta) }).select('id').single();
+  fail(error);
+  return (data as { id: string }).id;
+};
+
+export const updatePack = async (packId: string, meta: Partial<PackMeta>): Promise<void> => {
+  const { data, error } = await supabase.from('deck_packs').update(packRow(meta)).eq('id', packId).select('id');
+  fail(error);
+  if (!data?.length) throw Object.assign(new Error('not authorized'), { code: '42501' });
+};
+
+/** Delete a pack. Its decks stay, as loose Alpha decks. */
+export const deletePack = async (packId: string): Promise<void> => {
+  const { data, error } = await supabase.from('deck_packs').delete().eq('id', packId).select('id');
+  fail(error);
+  if (!data?.length) throw Object.assign(new Error('not authorized'), { code: '42501' });
+};
+
+/** Which decks are in a pack, in this order. A deck listed here leaves any other pack. */
+export const setPackDecks = async (packId: string, deckIds: string[]): Promise<void> => {
+  const { error } = await supabase.rpc('set_pack_decks', { p_pack: packId, p_decks: deckIds });
+  fail(error);
+};
+
+/** Publishing a pack publishes its draft decks too, unless told not to. */
+export const setPackStatus = async (packId: string, status: DeckStatus, withDecks = true): Promise<void> => {
+  const { error } = await supabase.rpc('set_pack_status', { p_pack: packId, p_status: status, p_with_decks: withDecks });
+  fail(error);
+};
+
+export const fetchAdminPacks = async (): Promise<Pack[]> => {
+  const { data, error } = await supabase.rpc('admin_pack_stats');
+  fail(error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => toPack(r, r.updated_at ?? null));
 };
 
 /* ── Notes ── */
@@ -413,7 +534,7 @@ export const fetchQueue = async (
     p_exclude: opts.exclude ?? [],
   });
   fail(error);
-  return (data ?? []).map(toQueueCard);
+  return (data ?? []).map((r: unknown) => ({ ...toQueueCard(r), deckId }));
 };
 
 export interface ReviewEntry {

@@ -12,7 +12,7 @@
    Keyed per user: a shared laptop's next account must never upload the last
    one's reviews. Wiped on sign-out with everything else. */
 
-import { recordReviews, undoReview, type ReviewEntry } from './api';
+import { recordReviews, undoReview, type ProgressRow, type ReviewEntry } from './api';
 import { OUTBOX_PREFIX as PREFIX } from './forget';
 
 export { forgetDecksOnDevice } from './forget';
@@ -40,6 +40,16 @@ const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(l => l());
 
 export const pendingCount = (uid: string): number => read(uid).length;
+
+/** Answers not yet on the server, newest per card — laid over a fresh queue so they are never asked again. */
+export const pendingProgress = (uid: string): Map<string, ProgressRow> => {
+  const out = new Map<string, { at: string; next: ProgressRow }>();
+  for (const e of read(uid)) {
+    const prev = out.get(e.card_id);
+    if (!prev || prev.at < e.reviewed_at) out.set(e.card_id, { at: e.reviewed_at, next: e.next });
+  }
+  return new Map(Array.from(out, ([id, v]) => [id, v.next]));
+};
 
 export const subscribe = (fn: () => void): (() => void) => {
   listeners.add(fn);

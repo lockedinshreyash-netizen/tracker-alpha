@@ -12,6 +12,9 @@
    - The decks: drawn as decks. "Your decks" appears only once the student has
      one of their own, and a short row is finished by an "add another" tile
      that spans the gap instead of leaving a hole.
+   - My Alpha: what you got from Alpha. A pack is one item, drawn as a
+     digital deck (AlphaLibraryItem), never as the packaging it came in.
+   - The store: a sign with a short rack on it, leading to Alpha Packs.
    - Discovering: Alpha Essentials as featured cards, More from Alpha as a
      compact grid — the administrator's choice of shelf is what puts a deck in
      one or the other.
@@ -24,7 +27,9 @@ import { PageHeader, tokens } from '../ui/kit';
 import { CardFace } from './CardFace';
 import { MASTERY_RAMP, STATE_COLOR, deckAccent, fmtUntil, room } from './theme';
 import { AlphaBadge, Icon, MasteryBar, StackArt, SubjectEyebrow, masteryOf, masteryPct, pill } from './ui';
-import type { DeckSubject, DeckSummary, ExploreDeck } from './types';
+import { AlphaLibraryItem, packTotals } from './Packs';
+import { StoreEntry } from './store/StoreEntry';
+import type { DeckSubject, DeckSummary, ExploreDeck, Pack } from './types';
 
 interface Props {
   dark: boolean;
@@ -42,6 +47,11 @@ interface Props {
   onStudyExplore: (id: string) => void;
   onOpenAuth: () => void;
   onRetry: () => void;
+  /** Alpha packs: the store's stock and the ones you have. Null while loading. */
+  packs?: Pack[] | null;
+  onOpenStore?: () => void;
+  onOpenPack?: (id: string) => void;
+  onReviewPack?: (id: string) => void;
 }
 
 const todayCount = (d: DeckSummary) => d.due + d.newAvailable;
@@ -49,16 +59,23 @@ const essentialsFirst = (a: DeckSummary, b: DeckSummary) => Number(b.collection 
 
 const Library: React.FC<Props> = props => {
   const { dark, isAdmin, signedIn, summaries, explore, error, onOpenDeck, onReview, onNewDeck, onImport, onOpenAuth, onRetry } = props;
+  const { packs = null, onOpenStore, onOpenPack = () => undefined, onReviewPack = () => undefined } = props;
   const t = tokens(dark);
 
   const groups = useMemo(() => {
     const all = summaries ?? [];
+    // A pack you have is one item; its decks are not listed again beside it.
+    const owned = (packs ?? []).filter(p => p.inLibrary || all.some(d => d.packId === p.id));
+    const ownedIds = new Set(owned.map(p => p.id));
+    const inPack = (d: DeckSummary) => !!d.packId && ownedIds.has(d.packId);
     return {
       mine: all.filter(d => d.scope === 'personal'),
-      alpha: all.filter(d => d.scope === 'global' && d.status !== 'draft').sort(essentialsFirst),
-      drafts: all.filter(d => d.scope === 'global' && d.status === 'draft').sort(essentialsFirst),
+      packs: owned.map(p => ({ pack: p, decks: all.filter(d => d.packId === p.id) })),
+      alpha: all.filter(d => d.scope === 'global' && d.status !== 'draft' && !inPack(d)).sort(essentialsFirst),
+      drafts: all.filter(d => d.scope === 'global' && d.status === 'draft' && !inPack(d)).sort(essentialsFirst),
     };
-  }, [summaries]);
+  }, [summaries, packs]);
+  const stocked = (packs ?? []).filter(p => p.status === 'published' || (isAdmin && p.status === 'draft'));
 
   const discover = useMemo(() => {
     const out = (explore ?? []).filter(e => !e.inLibrary);
@@ -91,6 +108,7 @@ const Library: React.FC<Props> = props => {
         note="Have a deck file? Import it in one step."
         essentials={discover.essentials}
         more={discover.more}
+        store={stocked.length && onOpenStore ? <StoreEntry packs={stocked} dark={dark} onOpen={onOpenStore} /> : null}
       />
     );
   }
@@ -116,7 +134,9 @@ const Library: React.FC<Props> = props => {
         }
       />
 
-      <TodayHero dark={dark} decks={summaries} onReview={onReview} onOpenDeck={onOpenDeck} />
+      <TodayHero dark={dark} decks={summaries} packs={groups.packs} onReview={onReview} onReviewPack={onReviewPack} onOpenDeck={onOpenDeck} />
+
+      {stocked.length > 0 && onOpenStore && <StoreEntry packs={stocked} dark={dark} onOpen={onOpenStore} delay={60} />}
 
       {/* Hidden until the student has a deck of their own: someone studying
           only Alpha decks has nothing to put here, and an empty shelf with a
@@ -128,12 +148,15 @@ const Library: React.FC<Props> = props => {
         </Shelf>
       )}
 
-      {groups.alpha.length > 0 && (
-        <Shelf title="Alpha decks" line="Made by Alpha. Free for everyone." count={groups.alpha.length} dark={dark}>
-          {groups.alpha.map((d, i) => <DeckTile key={d.id} deck={d} dark={dark} delay={i * 40} onOpen={() => onOpenDeck(d.id)} onReview={() => onReview(d.id)} />)}
+      {groups.packs.length + groups.alpha.length > 0 && (
+        <Shelf title="My Alpha" line="Your packs and decks from Alpha." count={groups.packs.length + groups.alpha.length} dark={dark}>
+          {groups.packs.map(({ pack, decks }, i) => (
+            <AlphaLibraryItem key={pack.id} pack={pack} decks={decks} dark={dark} delay={i * 40} onOpen={() => onOpenPack(pack.id)} onContinue={() => onReviewPack(pack.id)} />
+          ))}
+          {groups.alpha.map((d, i) => <DeckTile key={d.id} deck={d} dark={dark} delay={(groups.packs.length + i) * 40} onOpen={() => onOpenDeck(d.id)} onReview={() => onReview(d.id)} />)}
           {/* A short row ends in the decks still waiting below, not in a hole. */}
-          {groups.alpha.length % 3 !== 0 && discover.essentials.length + discover.more.length > 0 && (
-            <FindMoreTile dark={dark} count={groups.alpha.length} waiting={discover.essentials.length + discover.more.length} delay={groups.alpha.length * 40} />
+          {(groups.packs.length + groups.alpha.length) % 3 !== 0 && discover.essentials.length + discover.more.length > 0 && (
+            <FindMoreTile dark={dark} count={groups.packs.length + groups.alpha.length} waiting={discover.essentials.length + discover.more.length} delay={(groups.packs.length + groups.alpha.length) * 40} />
           )}
         </Shelf>
       )}
@@ -156,14 +179,22 @@ const Library: React.FC<Props> = props => {
 
 /* ── Today ── */
 
-const TodayHero: React.FC<{ dark: boolean; decks: DeckSummary[]; onReview: (id: string) => void; onOpenDeck: (id: string) => void }> = ({ dark, decks, onReview, onOpenDeck }) => {
+const TodayHero: React.FC<{
+  dark: boolean; decks: DeckSummary[]; packs: { pack: Pack; decks: DeckSummary[] }[];
+  onReview: (id: string) => void; onReviewPack: (id: string) => void; onOpenDeck: (id: string) => void;
+}> = ({ dark, decks, packs, onReview, onReviewPack, onOpenDeck }) => {
   const t = tokens(dark);
   const c = STATE_COLOR(dark);
   const live = decks.filter(d => d.status !== 'draft');
   const fresh = live.reduce((n, d) => n + d.newAvailable, 0);
   const due = live.reduce((n, d) => n + d.due, 0);
   const total = fresh + due;
-  const next = [...live].sort((a, b) => todayCount(b) - todayCount(a))[0];
+  // What to start with: the biggest pile today, a whole pack counting as one.
+  const packed = new Set(packs.flatMap(p => p.decks.map(d => d.id)));
+  const next = [
+    ...packs.map(p => ({ id: p.pack.id, title: p.pack.title, count: packTotals(p.decks).today, subject: p.pack.subject, start: () => onReviewPack(p.pack.id) })),
+    ...live.filter(d => !packed.has(d.id)).map(d => ({ id: d.id, title: d.title, count: todayCount(d), subject: d.subject, start: () => onReview(d.id) })),
+  ].sort((a, b) => b.count - a.count)[0];
   const minutes = Math.max(1, Math.round((due * 8 + fresh * 20) / 60));
 
   if (!total) {
@@ -226,8 +257,8 @@ const TodayHero: React.FC<{ dark: boolean; decks: DeckSummary[]; onReview: (id: 
           <div className="md:text-right md:min-w-[260px]">
             <p className={`text-[10px] font-bold uppercase tracking-[0.08em] ${t.faint}`}>Start with</p>
             <p className={`font-display text-[22px] leading-tight mt-2 max-w-[320px] md:ml-auto ${t.heading}`}>{next.title}</p>
-            <p className={`text-[13px] mt-1 ${t.muted}`}>{todayCount(next)} {todayCount(next) === 1 ? 'card' : 'cards'} waiting</p>
-            <button onClick={() => onReview(next.id)} className={`mt-5 ${pill.redLg}`}>Start review {Icon.arrow}</button>
+            <p className={`text-[13px] mt-1 ${t.muted}`}>{next.count} {next.count === 1 ? 'card' : 'cards'} waiting</p>
+            <button onClick={next.start} className={`mt-5 ${pill.redLg}`}>Start review {Icon.arrow}</button>
           </div>
         )}
       </div>
@@ -589,7 +620,8 @@ const Welcome: React.FC<Props & {
   note: string;
   essentials: ExploreDeck[];
   more: ExploreDeck[];
-}> = ({ dark, primary, secondary, note, essentials, more, onAddExplore, onStudyExplore }) => {
+  store?: React.ReactNode;
+}> = ({ dark, primary, secondary, note, essentials, more, store, onAddExplore, onStudyExplore }) => {
   const t = tokens(dark);
   const [shown, setShown] = useState(false);
   return (
@@ -647,6 +679,7 @@ const Welcome: React.FC<Props & {
         </div>
       </section>
 
+      {store}
       {essentials.length > 0 && (
         <EssentialsShelf decks={essentials} dark={dark} title="Start with Alpha Essentials" line="Ready to study. No setup." onAdd={onAddExplore} onStudy={onStudyExplore} />
       )}

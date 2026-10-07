@@ -18,16 +18,27 @@
      an answer that leaves no trace is indistinguishable from a missed tap.
 
    Anki users get Anki's three counters (new · learning · due), with the
-   current card's kind marked, and Anki's keys. */
+   current card's kind marked, and Anki's keys.
+
+   Leaving is never losing. Every answer is in the outbox before the screen
+   moves on; the session itself (what is left, the count, the answers so far)
+   is remembered after every answer (decks/resume.ts), so coming back to the
+   same deck the same day resumes at "13 / 34". A fresh session lays answers
+   still waiting to upload over what the server returns, so nothing answered
+   is ever asked twice. One room serves a single deck or a whole Alpha pack:
+   `deckIds` lists the decks, and each card carries its own. */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Overlay } from '../ui/kit';
 import { CardFace } from './CardFace';
 import { answersFor } from './cloze';
 import { toPlain } from './html';
-import { fetchQueue, humanError, progressRow, type ReviewEntry } from './api';
-import { enqueue, flush, pendingCount, subscribe, undo as undoOutbox } from './outbox';
-import { Pick, Session, answer, appendCards, current, laterToday, remaining, startSession } from './session';
+import { fetchQueue, humanError, progressFromRow, progressRow, type ReviewEntry } from './api';
+import { enqueue, flush, pendingCount, pendingProgress, subscribe, undo as undoOutbox } from './outbox';
+import { Pick, Session, answer, appendCards, applyPending, current, laterToday, remaining, startSession } from './session';
+import { clearSnapshot, loadSnapshot, saveSnapshot } from './resume';
+import { getISTDateString } from '../utils';
+import { pushToast } from '../notify/toastBus';
 import { Choice, RATING_LABEL, preview } from './srs';
 import { studyDayBounds } from './day';
 import { RATING_RAMP, STATE_COLOR, STATE_LABEL, deckAccent, fmtDuration, fmtUntil, room, stateKey } from './theme';
@@ -43,8 +54,14 @@ interface Props {
   dark: boolean;
   /** Only study cards carrying one of these tags. */
   tags?: string[] | null;
-  /** Present when the caller may edit this deck's cards: E opens the editor on the current card. */
-  onEdit?: (noteId: string, done: (note: Note | null) => void) => void;
+  /** Several decks studied as one session (an Alpha pack). Defaults to the one deck. */
+  deckIds?: string[];
+  /** Per-deck settings and colour when the session spans decks. */
+  deckInfo?: Record<string, { title: string; desiredRetention: number; subject: DeckSubject | null }>;
+  /** Where the remembered session lives. Defaults to the deck (and tag filter). */
+  resumeKey?: string;
+  /** Present when the caller may edit cards: E opens the editor on the current card. */
+  onEdit?: (noteId: string, deckId: string, done: (note: Note | null) => void) => void;
   onExit: (reviewed: number) => void;
   /** The dev harness: start from these cards instead of the server, write nothing. */
   initialCards?: QueueCard[];
@@ -57,11 +74,20 @@ interface Step {
 
 const isNew = (c: QueueCard) => !c.progress || c.progress.state === 0;
 
-const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, onExit, initialCards }) => {
+const PAGE = 100;
+
+const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds, deckInfo, resumeKey, onEdit, onExit, initialCards }) => {
   const r = room(dark);
-  const accent = deckAccent(deck.subject, dark);
   const states = STATE_COLOR(dark);
-  const [session, setSession] = useState<Session | null>(initialCards ? startSession(initialCards) : null);
+  const local = !!initialCards;
+  const ids = useMemo(() => deckIds?.length ? deckIds : [deck.id], [deckIds, deck.id]);
+  const scope = resumeKey ?? `${deck.id}${tags?.length ? `#${[...tags].sort().join(',')}` : ''}`;
+  const today = useMemo(() => getISTDateString(), []);
+  const dayEnd = useMemo(() => studyDayBounds().end.getTime(), []);
+  // A session left earlier today on this device: resume it, no network needed.
+  const [snap] = useState(() => loadSnapshot(uid, scope, today));
+  const [session, setSession] = useState<Session | null>(() => (snap ? snap.session : initialCards ? startSession(initialCards) : null));
+  const [resumedNote, setResumedNote] = useState(!!snap && snap.session.done > 0);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [choices, setChoices] = useState<Record<Rating, Choice> | null>(null);
@@ -75,27 +101,55 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
   const shownAt = useRef(Date.now());
   const revealedAt = useRef(0);
   const ratedAt = useRef(0);
-  const startedAt = useRef(Date.now());
-  const exhausted = useRef(!!initialCards);
+  const startedAt = useRef(snap?.startedAt ?? Date.now());
+  // Decks with nothing more to fetch. A local session never fetches.
+  const exhausted = useRef<Set<string>>(new Set(local ? ids : []));
   const fetching = useRef(false);
-  const local = !!initialCards;
+
+  /* Answers still waiting to upload, as progress — never ask them again. */
+  const pendingMap = useCallback(() => {
+    const out = new Map<string, ReturnType<typeof progressFromRow>>();
+    if (local) return out;
+    pendingProgress(uid).forEach((row, id) => out.set(id, progressFromRow(row)));
+    return out;
+  }, [uid, local]);
+
+  const fetchPage = useCallback(async (exclude: string[]) => {
+    const want = ids.filter(id => !exhausted.current.has(id));
+    const pages = await Promise.all(want.map(id => fetchQueue(id, { limit: PAGE, exclude, tags })));
+    pages.forEach((p, i) => { if (p.length < PAGE) exhausted.current.add(want[i]); });
+    return applyPending(pages.flat(), pendingMap(), dayEnd);
+  }, [ids, tags, pendingMap, dayEnd]);
 
   /* ── Load ── */
   useEffect(() => {
-    if (initialCards) return;
+    if (local) return;
+    if (snap) { void flush(uid); return; }
     let live = true;
-    flush(uid).finally(() => {
-      fetchQueue(deck.id, { limit: 100, tags })
-        .then(cards => {
-          if (!live) return;
-          if (cards.length < 100) exhausted.current = true;
-          setSession(startSession(cards));
-        })
-        .catch(e => { if (live) setError(humanError(e)); });
-    });
+    // Give a pending upload a moment to land, but never let it hold the room shut.
+    Promise.race([flush(uid), new Promise(res => window.setTimeout(res, 4000))])
+      .finally(() => {
+        fetchPage([])
+          .then(cards => { if (live) setSession(startSession(cards)); })
+          .catch(e => { if (live) setError(humanError(e)); });
+      });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deck.id]);
+  }, []);
+
+  /* ── Remember the session after every change ── */
+  useEffect(() => {
+    if (!session) return;
+    if (remaining(session) === 0) { clearSnapshot(uid, scope); return; }
+    if (session.done === 0 && !snap) return;
+    saveSnapshot(uid, scope, { day: today, startedAt: startedAt.current, session });
+  }, [session, uid, scope, today, snap]);
+
+  useEffect(() => {
+    if (!resumedNote) return;
+    const id = window.setTimeout(() => setResumedNote(false), 3800);
+    return () => window.clearTimeout(id);
+  }, [resumedNote]);
 
   useEffect(() => subscribe(() => setPending(pendingCount(uid))), [uid]);
   useEffect(() => {
@@ -116,7 +170,8 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
 
   const now = Date.now();
   const pick: Pick | null = session ? current(session, now) : null;
-  const dayEnd = useMemo(() => studyDayBounds().end.getTime(), []);
+  const cardDeck = pick?.card.deckId ? deckInfo?.[pick.card.deckId] : undefined;
+  const accent = deckAccent(cardDeck ? cardDeck.subject : deck.subject, dark);
 
   /* A learning card waiting out its step with nothing else to show: wake when it is due. */
   useEffect(() => {
@@ -129,17 +184,14 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
 
   /* ── Prefetch the next page while the last few cards are answered ── */
   useEffect(() => {
-    if (!session || local || exhausted.current || fetching.current || session.queue.length > PREFETCH_AT) return;
+    if (!session || local || ids.every(id => exhausted.current.has(id)) || fetching.current || session.queue.length > PREFETCH_AT) return;
     fetching.current = true;
     flush(uid)
-      .then(() => fetchQueue(deck.id, { limit: 100, exclude: session.seen, tags }))
-      .then(cards => {
-        if (!cards.length) exhausted.current = true;
-        setSession(s => (s ? appendCards(s, cards) : s));
-      })
+      .then(() => fetchPage(session.seen))
+      .then(cards => setSession(s => (s ? appendCards(s, cards) : s)))
       .catch(() => { /* offline: finish what is here; the next answer tries again */ })
       .finally(() => { fetching.current = false; });
-  }, [session, uid, deck.id, tags, local]);
+  }, [session, uid, ids, local, fetchPage]);
 
   useEffect(() => { shownAt.current = Date.now(); }, [pick?.card.cardId, pick?.card.progress?.lastReview]);
 
@@ -147,10 +199,10 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
   const reveal = useCallback(() => {
     if (!pick || revealed) return;
     if (Date.now() - ratedAt.current < GUARD_MS) return;
-    setChoices(preview(pick.card.progress, new Date(), deck.desiredRetention));
+    setChoices(preview(pick.card.progress, new Date(), cardDeck?.desiredRetention ?? deck.desiredRetention));
     setRevealed(true);
     revealedAt.current = Date.now();
-  }, [pick, revealed, deck.desiredRetention]);
+  }, [pick, revealed, deck.desiredRetention, cardDeck]);
 
   const rate = useCallback((rating: Rating) => {
     if (!pick || !revealed || !choices || !session) return;
@@ -190,20 +242,24 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
 
   const exit = useCallback(() => {
     if (!local) void flush(uid);
+    // Leaving with cards still to go: say plainly that nothing was lost.
+    if (session && session.done > 0 && current(session, Date.now())) {
+      pushToast({ id: 'dk-saved', title: 'Progress saved.', body: 'Open it again any time today to pick up where you left off.', tone: 'good' });
+    }
     onExit(session?.done ?? 0);
   }, [onExit, session, uid, local]);
 
   const edit = useCallback(() => {
     if (!pick || !onEdit) return;
     setEditing(true);
-    onEdit(pick.card.noteId, note => {
+    onEdit(pick.card.noteId, pick.card.deckId ?? deck.id, note => {
       setEditing(false);
       if (!note) return;
       // The fix shows at once, on every card of that note still in the session.
       const patch = (c: QueueCard) => (c.noteId === note.id ? { ...c, front: note.front, back: note.back, kind: note.kind, tags: note.tags } : c);
       setSession(s => s && ({ ...s, queue: s.queue.map(patch), learning: s.learning.map(w => ({ ...w, card: patch(w.card) })) }));
     });
-  }, [pick, onEdit]);
+  }, [pick, onEdit, deck.id]);
 
   /* ── Keys ── */
   const keys = useRef({ reveal, rate, undo, exit, edit, revealed });
@@ -283,7 +339,7 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
             <div className="flex-1 min-w-0 text-center">
               <p className="text-[10px] font-bold uppercase tracking-[0.08em] flex items-center justify-center gap-1.5" style={{ color: r.faint }}>
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accent }} />
-                <span className="truncate">{deck.subject ? `${deck.subject}${deck.chapter ? ` · ${deck.chapter}` : ''}` : 'Deck'}</span>
+                <span className="truncate">{ids.length > 1 ? `Alpha pack · ${ids.length} decks` : deck.subject ? `${deck.subject}${deck.chapter ? ` · ${deck.chapter}` : ''}` : 'Deck'}</span>
               </p>
               <p className="text-[14px] font-bold truncate mt-0.5" style={{ color: r.ink }}>{deck.title}</p>
             </div>
@@ -314,6 +370,14 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
 
         {/* ── Stage ── */}
         <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          {resumedNote && session && pick && (
+            <div className="dk-in absolute left-1/2 -translate-x-1/2 top-4 z-10 px-3.5 h-8 rounded-full flex items-center gap-2 text-[12px] font-semibold whitespace-nowrap"
+              style={{ background: r.card, boxShadow: r.layerShadow, color: r.ink }} role="status">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: states.due }} />
+              Picked up where you left off
+              <span style={{ color: r.muted }}>· {session.done} done</span>
+            </div>
+          )}
           <div className="min-h-full flex items-center justify-center px-4 md:px-8 py-8 md:py-12">
             {error ? (
               <Empty dark={dark} title="Couldn't open this deck." line={error} action="Back" onAction={() => onExit(0)} />
@@ -348,7 +412,8 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
                       </span>
                     )}
                     <span className="text-[11px] truncate" style={{ color: r.faint }}>
-                      {pick.card.tags.slice(0, 3).map(t => `#${t}`).join('   ')}
+                      {/* In a pack, which deck this card is from matters more than its tags. */}
+                      {cardDeck && ids.length > 1 ? cardDeck.title : pick.card.tags.slice(0, 3).map(t => `#${t}`).join('   ')}
                     </span>
                   </div>
                   <div className="flex-1 flex items-center justify-center px-6 md:px-14 py-10 md:py-14 text-center select-text">
@@ -359,7 +424,7 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, onEdit, 
                         back={pick.card.back}
                         ord={pick.card.ord}
                         revealed={revealed}
-                        deckId={local ? null : deck.id}
+                        deckId={local ? null : pick.card.deckId ?? deck.id}
                         dark={dark}
                         accent={accent}
                       />

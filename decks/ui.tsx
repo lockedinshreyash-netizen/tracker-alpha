@@ -6,6 +6,7 @@
    is where they were validated. */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Overlay } from '../ui/kit';
 import { MASTERY_RAMP, deckAccent, room } from './theme';
 import type { DeckSubject, DeckSummary } from './types';
 
@@ -277,23 +278,66 @@ export interface MenuItem {
   hidden?: boolean;
 }
 
+/* Drawn through a portal, fixed to the button, never inside the page's own
+   stacking: every card here rises in with a transform (`mk-rise`), and a
+   transform makes each card its own stacking context, so a dropdown inside
+   one paints *under* the next card down whatever its z-index — and a list
+   with rounded corners clips it outright. Measured on open; flips upward
+   when there is no room below; closes on scroll or resize rather than
+   drifting away from its button. */
+const MENU_W = 220;
+
 export const MoreMenu: React.FC<{ items: MenuItem[]; dark: boolean; label?: string; quiet?: boolean }> = ({ items, dark, label = 'More', quiet = false }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const shown = items.filter(i => !i.hidden);
+  const open = pos !== null;
+
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const height = shown.length * 40 + 12;
+    const up = r.bottom + 8 + height > window.innerHeight - 8 && r.top - 8 - height > 8;
+    const left = Math.min(Math.max(8, r.right - MENU_W), window.innerWidth - MENU_W - 8);
+    setPos({ top: up ? r.top - 8 - height : r.bottom + 8, left, up });
+  };
+
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('mousedown', close);
-    window.addEventListener('keydown', esc);
-    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc); };
+    const away = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!menuRef.current?.contains(t) && !btnRef.current?.contains(t)) setPos(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setPos(null); btnRef.current?.focus(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const list: HTMLButtonElement[] = menuRef.current ? Array.from(menuRef.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')) : [];
+      const i = list.indexOf(document.activeElement as HTMLButtonElement);
+      list[(i + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length]?.focus();
+    };
+    const shut = () => setPos(null);
+    window.addEventListener('mousedown', away);
+    window.addEventListener('keydown', key);
+    window.addEventListener('resize', shut);
+    window.addEventListener('scroll', shut, true);
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    return () => {
+      window.removeEventListener('mousedown', away);
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('resize', shut);
+      window.removeEventListener('scroll', shut, true);
+    };
   }, [open]);
-  const shown = items.filter(i => !i.hidden);
+
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={() => (open ? setPos(null) : place())}
         aria-label={label}
+        aria-haspopup="menu"
         aria-expanded={open}
         className={`rounded-full flex items-center justify-center transition-colors ${quiet
           ? `w-9 h-9 ${dark ? 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06]' : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-900/[0.05]'}`
@@ -301,23 +345,31 @@ export const MoreMenu: React.FC<{ items: MenuItem[]; dark: boolean; label?: stri
       >
         {Icon.more}
       </button>
-      {open && (
-        <div role="menu" className={`mk-sheet absolute right-0 top-full mt-2 min-w-[210px] p-1.5 rounded-xl z-30 font-ui ${dark ? 'bg-[#1a1a1f] ring-1 ring-white/[0.08] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)]' : 'bg-white ring-1 ring-zinc-200 shadow-[0_20px_50px_-16px_rgba(24,24,27,0.25)]'}`}>
-          {shown.map(i => (
-            <button
-              key={i.label}
-              role="menuitem"
-              onClick={() => { setOpen(false); i.onSelect(); }}
-              className={`w-full flex items-center gap-2.5 px-3 h-10 rounded-lg text-[13px] font-semibold text-left transition-colors ${
-                i.danger ? 'text-rose-500 hover:bg-rose-500/10' : dark ? 'text-zinc-200 hover:bg-white/[0.06]' : 'text-zinc-800 hover:bg-zinc-100'}`}
-            >
-              <span className="w-4 flex justify-center opacity-80">{i.icon}</span>
-              {i.label}
-            </button>
-          ))}
-        </div>
+      {pos && (
+        <Overlay>
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={label}
+            className={`mk-fade fixed z-[140] p-1.5 rounded-xl font-ui ${dark ? 'bg-[#1a1a1f] ring-1 ring-white/[0.08] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.8)]' : 'bg-white ring-1 ring-zinc-200 shadow-[0_20px_50px_-16px_rgba(24,24,27,0.25)]'}`}
+            style={{ top: pos.top, left: pos.left, width: MENU_W, animationDuration: '0.15s' }}
+          >
+            {shown.map(i => (
+              <button
+                key={i.label}
+                role="menuitem"
+                onClick={e => { e.stopPropagation(); setPos(null); i.onSelect(); }}
+                className={`w-full flex items-center gap-2.5 px-3 h-10 rounded-lg text-[13px] font-semibold text-left transition-colors outline-none ${
+                  i.danger ? 'text-rose-500 hover:bg-rose-500/10 focus:bg-rose-500/10' : dark ? 'text-zinc-200 hover:bg-white/[0.06] focus:bg-white/[0.06]' : 'text-zinc-800 hover:bg-zinc-100 focus:bg-zinc-100'}`}
+              >
+                <span className="w-4 flex justify-center opacity-80">{i.icon}</span>
+                {i.label}
+              </button>
+            ))}
+          </div>
+        </Overlay>
       )}
-    </div>
+    </>
   );
 };
 

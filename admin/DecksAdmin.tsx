@@ -4,6 +4,10 @@
    lifecycle. Content is edited in the Decks tab (one editor, not two), so each
    row opens there; moving a deck between shelves is one click here.
 
+   Above the shelves, Alpha packs: sets of Alpha decks that hang in the
+   store. Made here (New pack), priced here (free / paid / Alpha Pro), and
+   published here; publishing a pack publishes its draft decks with it.
+
    Aggregates only. `admin_deck_stats()` returns counts and an again-rate per
    deck; there is no endpoint that tells anybody which student is studying
    what, or how any one of them is doing, and this screen does not want one.
@@ -11,11 +15,41 @@
    Loaded lazily from AdminTab so decks/api stays out of the main bundle. */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { fetchAdminStats, humanError, setDeckCollection, setDeckStatus } from '../decks/api';
+import {
+  createPack, deletePack, fetchAdminPacks, fetchAdminStats, humanError, setDeckCollection, setDeckStatus, setPackDecks, setPackStatus, updatePack,
+} from '../decks/api';
 import { deckAccent } from '../decks/theme';
 import { COLLECTION_COPY } from '../decks/AudiencePicker';
+import { PackArt } from '../decks/Packs';
+import { PackSheet } from '../decks/PackSheet';
+import { packNumber, priceLabel } from '../decks/store/PackCard';
 import { Icon, MoreMenu, StackArt, StatusPill, fmtAgo, pill } from '../decks/ui';
-import type { AdminDeckStat, DeckCollection, DeckStatus } from '../decks/types';
+import type { AdminDeckStat, DeckCollection, DeckStatus, Pack, PackMeta } from '../decks/types';
+
+/** What the console does to packs. The design board swaps in fakes. */
+export interface PackOps {
+  load: () => Promise<Pack[]>;
+  create: (meta: PackMeta) => Promise<string>;
+  update: (id: string, meta: Partial<PackMeta>) => Promise<void>;
+  setDecks: (id: string, deckIds: string[]) => Promise<void>;
+  setStatus: (id: string, status: DeckStatus) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+}
+
+const REAL_PACKS: PackOps = {
+  load: fetchAdminPacks,
+  create: createPack,
+  update: updatePack,
+  setDecks: setPackDecks,
+  setStatus: (id, st) => setPackStatus(id, st, true),
+  remove: deletePack,
+};
+
+const PACK_CONFIRM: Record<DeckStatus, string> = {
+  published: 'Publish this pack? It goes on the store racks for every student, and its draft decks are published with it.',
+  draft: 'Unpublish this pack? It leaves the store. Students who already have it keep it.',
+  archived: 'Archive this pack? It leaves the store. Students who already have it keep studying it.',
+};
 
 interface Props {
   theme: 'dark' | 'light';
@@ -23,6 +57,7 @@ interface Props {
   onOpenDeck: (id: string | null) => void;
   /** The design board's fixtures; the real console always asks the database. */
   loadStats?: () => Promise<AdminDeckStat[]>;
+  packOps?: PackOps;
 }
 
 const CONFIRM: Record<DeckStatus, string> = {
@@ -34,15 +69,19 @@ const CONFIRM: Record<DeckStatus, string> = {
 /* Fixed columns, the action one included: a grid per row sizes `auto` per row, and the figures stop lining up under their headings. */
 const GRID = 'md:grid-cols-[minmax(0,1fr)_104px_repeat(4,72px)_148px]';
 
-const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdminStats }) => {
+const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdminStats, packOps = REAL_PACKS }) => {
   const dark = theme === 'dark';
   const [rows, setRows] = useState<AdminDeckStat[] | null>(null);
+  const [packs, setPacks] = useState<Pack[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<{ pack: Pack | null } | null>(null);
 
   const load = useCallback(() => {
     loadStats().then(r => { setRows(r); setError(null); }).catch(e => setError(humanError(e)));
-  }, [loadStats]);
+    // Packs arrive with the rest; a database without them yet just shows none.
+    packOps.load().then(setPacks).catch(() => setPacks([]));
+  }, [loadStats, packOps]);
   useEffect(load, [load]);
 
   const act = async (id: string, fn: () => Promise<void>) => {
@@ -54,6 +93,14 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
     void act(d.id, () => setDeckStatus(d.id, status));
   };
   const shelve = (d: AdminDeckStat, c: DeckCollection) => void act(d.id, () => setDeckCollection(d.id, c));
+  const movePack = (p: Pack, status: DeckStatus) => {
+    if (!window.confirm(PACK_CONFIRM[status])) return;
+    void act(p.id, () => packOps.setStatus(p.id, status));
+  };
+  const removePack = (p: Pack) => {
+    if (!window.confirm(`Delete the pack "${p.title}"? Its decks stay, as Alpha decks on their own. This can't be undone.`)) return;
+    void act(p.id, () => packOps.remove(p.id));
+  };
 
   const card = `rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
   const heading = dark ? 'text-white' : 'text-zinc-900';
@@ -98,6 +145,17 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
 
       {error && <p className="text-[13px] text-rose-500">{error}</p>}
 
+      <PacksSection
+        dark={dark}
+        packs={packs}
+        busy={busy}
+        onNew={() => setSheet({ pack: null })}
+        onEdit={p => setSheet({ pack: p })}
+        onStatus={movePack}
+        onShelf={(p, c) => void act(p.id, () => packOps.update(p.id, { collection: c }))}
+        onDelete={removePack}
+      />
+
       {!rows ? (
         <div className={`${card} h-40`} aria-busy="true" />
       ) : (
@@ -137,7 +195,7 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
                               {d.subject ?? 'No subject'}{d.chapter ? ` · ${d.chapter}` : ''}
                             </span>
                             <span className={`block text-[15px] font-bold truncate mt-1 group-hover:underline ${heading}`}>{d.title}</span>
-                            <span className={`block text-[11px] mt-0.5 ${faint}`}>updated {fmtAgo(d.updatedAt)}</span>
+                            <span className={`block text-[11px] mt-0.5 ${faint}`}>{d.packTitle ? `in ${d.packTitle} · ` : ''}updated {fmtAgo(d.updatedAt)}</span>
                           </button>
                           <span><StatusPill status={d.status} dark={dark} /></span>
                           {[d.cards, d.students, d.active7d].map((n, i) => (
@@ -177,7 +235,116 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
         })
       )}
       <p className={`text-[12px] ${faint}`}>"Again" is how often students pressed Again on cards they had already learned, over the last 30 days. A high number means the cards may need fixing.</p>
+
+      {sheet && (
+        <PackSheet
+          dark={dark}
+          pack={sheet.pack}
+          decks={rows ?? []}
+          onClose={() => setSheet(null)}
+          onSave={async (meta, deckIds) => {
+            try {
+              const id = sheet.pack ? sheet.pack.id : await packOps.create(meta);
+              if (sheet.pack) await packOps.update(id, meta);
+              await packOps.setDecks(id, deckIds);
+              load();
+            } catch (e) {
+              throw new Error(humanError(e));
+            }
+          }}
+        />
+      )}
     </section>
+  );
+};
+
+/* ── Alpha packs ── */
+
+const PACK_GRID = 'md:grid-cols-[minmax(0,1fr)_104px_repeat(3,72px)_148px]';
+
+const PacksSection: React.FC<{
+  dark: boolean;
+  packs: Pack[] | null;
+  busy: string | null;
+  onNew: () => void;
+  onEdit: (p: Pack) => void;
+  onStatus: (p: Pack, s: DeckStatus) => void;
+  onShelf: (p: Pack, c: DeckCollection) => void;
+  onDelete: (p: Pack) => void;
+}> = ({ dark, packs, busy, onNew, onEdit, onStatus, onShelf, onDelete }) => {
+  const card = `rounded-2xl border ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`;
+  const heading = dark ? 'text-white' : 'text-zinc-900';
+  const faint = dark ? 'text-zinc-600' : 'text-zinc-400';
+  if (!packs) return null;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-4 mb-3">
+        <div className="flex items-baseline gap-2.5">
+          <h3 className={`font-display text-[20px] ${heading}`}>Alpha packs</h3>
+          <span className={`num-stat text-[13px] ${faint}`}>{packs.length}</span>
+        </div>
+        {packs.length > 0 && <button onClick={onNew} className={`${pill.red} !h-9 !px-4 !text-[13px]`}>{Icon.plus}New pack</button>}
+      </div>
+      {packs.length === 0 ? (
+        <div className={`${card} grid md:grid-cols-[auto_1fr_auto] items-center gap-6 p-6 md:p-7`}>
+          <div className="hidden md:block"><PackArt dark={dark} decks={[{ subject: 'Physics' }, { subject: 'Physics' }, { subject: 'Physics' }]} count={3} size={110} /></div>
+          <div>
+            <p className={`text-[16px] font-bold ${heading}`}>Bundle decks into a pack.</p>
+            <p className="text-[13px] mt-1 text-zinc-500 max-w-[480px]">Physics Essentials: Kinematics, Laws of Motion, Work & Energy. It hangs in the Alpha Packs store, and students take the whole pack in one tap.</p>
+          </div>
+          <button onClick={onNew} className={pill.red}>{Icon.plus}New pack</button>
+        </div>
+      ) : (
+        <div className={`${card} overflow-hidden`}>
+          <div className={`hidden md:grid ${PACK_GRID} gap-4 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.08em] ${faint} ${dark ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
+            <span>Pack</span><span>Status</span>
+            <span className="text-right">Decks</span><span className="text-right">Cards</span><span className="text-right">Students</span>
+            <span />
+          </div>
+          <ul className={`divide-y ${dark ? 'divide-white/[0.05]' : 'divide-zinc-100'}`}>
+            {packs.map(p => {
+              const cards = p.decks.reduce((n, d) => n + d.cards, 0);
+              const other: DeckCollection = p.collection === 'essentials' ? 'more' : 'essentials';
+              return (
+                <li key={p.id} className={`grid ${PACK_GRID} gap-x-4 gap-y-2 items-center px-6 py-4`}>
+                  <button onClick={() => onEdit(p)} className="text-left min-w-0 group">
+                    <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${faint}`}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: deckAccent(p.subject, dark) }} />
+                      {packNumber(p.packNo)} · {p.access === 'pro' ? 'Alpha Pro' : priceLabel(p) === 'FREE' ? 'Free' : priceLabel(p)} · {COLLECTION_COPY[p.collection].title}
+                    </span>
+                    <span className={`block text-[15px] font-bold truncate mt-1 group-hover:underline ${heading}`}>{p.title}</span>
+                    <span className={`block text-[11px] mt-0.5 truncate ${faint}`}>{p.decks.map(d => d.title).join(' · ') || 'No decks yet'}</span>
+                  </button>
+                  <span><StatusPill status={p.status} dark={dark} /></span>
+                  {[p.decks.length, cards, p.students].map((n, i) => (
+                    <span key={i} className={`num-stat text-[15px] md:text-right tabular-nums ${heading}`}>
+                      <span className={`md:hidden text-[11px] font-ui font-semibold mr-1.5 ${faint}`}>{['Decks', 'Cards', 'Students'][i]}</span>
+                      {n.toLocaleString()}
+                    </span>
+                  ))}
+                  <span className="flex items-center gap-1 md:justify-end">
+                    {p.status === 'draft' && <button disabled={busy === p.id || !p.decks.length} onClick={() => onStatus(p, 'published')} className={`${pill.red} !h-9 !px-4 !text-[13px]`}>Publish</button>}
+                    {p.status === 'archived' && <button disabled={busy === p.id} onClick={() => onStatus(p, 'published')} className={pill.quiet(dark)}>Publish again</button>}
+                    <MoreMenu
+                      dark={dark}
+                      quiet
+                      label={`Actions for ${p.title}`}
+                      items={[
+                        { label: 'Edit pack', icon: Icon.pencil, onSelect: () => onEdit(p) },
+                        { label: `Move to ${COLLECTION_COPY[other].title}`, icon: Icon.arrow, onSelect: () => onShelf(p, other) },
+                        { label: 'Unpublish', icon: Icon.pause, onSelect: () => onStatus(p, 'draft'), hidden: p.status !== 'published' },
+                        { label: 'Archive', icon: Icon.trash, onSelect: () => onStatus(p, 'archived'), hidden: p.status !== 'published' },
+                        { label: 'Delete pack', icon: Icon.trash, onSelect: () => onDelete(p), danger: true },
+                      ]}
+                    />
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 };
 

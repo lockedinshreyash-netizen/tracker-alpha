@@ -9,18 +9,23 @@
    triggerSync, and reviews go through decks/outbox.ts instead.
 
    Reached only through React.lazy from App.tsx: ts-fsrs, the CSV reader and
-   (later, on demand) KaTeX never reach anyone who does not open this tab. */
+   (later, on demand) KaTeX never reach anyone who does not open this tab.
+
+   Views: the library, a deck, a pack (in My Alpha), and the Alpha Packs
+   store. A pack is studied as one session across its decks. */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { pushToast } from '../notify/toastBus';
 import type { ExamPreference } from '../types';
 import {
-  addToLibrary, createDeck, deckTags, deleteDeck, deleteNotes, exploreDecks, fetchActivity, fetchAllNotes, fetchNote,
-  fetchSummaries, humanError, listNotes, removeFromLibrary, resetDeckProgress, setDeckStatus, setNoteSuspended,
-  setDeckCollection, suspendedNotes, updateDeck, updateDeckSettings,
+  addPack, addToLibrary, createDeck, deckTags, deleteDeck, deleteNotes, deletePack, exploreDecks, explorePacks, fetchActivity,
+  fetchAdminStats, fetchAllNotes, fetchNote, fetchSummaries, humanError, listNotes, packPreview, removeFromLibrary, removePack,
+  resetDeckProgress, setDeckStatus, setNoteSuspended, setDeckCollection, setPackDecks, setPackStatus, suspendedNotes, updateDeck,
+  updateDeckSettings, updatePack,
 } from './api';
 import { exportFileName, exportNotes } from './exportCsv';
+import { flush } from './outbox';
 import { deckAccent } from './theme';
 import Library from './Library';
 import DeckView, { DeckSource } from './DeckView';
@@ -29,7 +34,14 @@ import CardEditor from './CardEditor';
 import ImportSheet from './ImportSheet';
 import { DeckDetailsSheet, SettingsSheet } from './DeckSheets';
 import { COLLECTION_COPY } from './AudiencePicker';
-import type { DeckStatus, DeckSummary, ExploreDeck, Note } from './types';
+import PackView from './PackView';
+import { PackSheet } from './PackSheet';
+import { packTotals } from './Packs';
+import { checkout } from './store/checkout';
+import type { AdminDeckStat, DeckStatus, DeckSummary, ExploreDeck, Note, Pack } from './types';
+
+// The store's rack physics and opening animation load only when the store opens.
+const PackStore = React.lazy(() => import('./store/PackStore'));
 
 interface Props {
   user: User | null;
@@ -42,7 +54,12 @@ interface Props {
   onOpenedDeck?: () => void;
 }
 
-type View = { kind: 'library' } | { kind: 'deck'; id: string };
+type View =
+  | { kind: 'library' }
+  | { kind: 'deck'; id: string; fromPack?: string }
+  | { kind: 'pack'; id: string }
+  | { kind: 'store' };
+type Review = { deckId: string; tags: string[] | null } | { packId: string };
 interface EditorState { deckId: string; note: Note | null; done?: (n: Note | null) => void }
 
 const source: DeckSource = {
@@ -50,6 +67,12 @@ const source: DeckSource = {
   notes: (id, opts) => listNotes(id, opts),
   tags: id => deckTags(id),
   suspended: (id, noteIds) => suspendedNotes(id, noteIds),
+};
+
+const PACK_CONFIRM: Record<DeckStatus, string> = {
+  published: 'Publish this pack? It goes on the store racks for every student, and its draft decks are published with it.',
+  draft: 'Unpublish this pack? It leaves the store. Students who already have it keep it.',
+  archived: 'Archive this pack? It leaves the store. Students who already have it keep studying it.',
 };
 
 const STATUS_CONFIRM: Record<DeckStatus, string> = {
@@ -64,8 +87,10 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
   const [summaries, setSummaries] = useState<DeckSummary[] | null>(null);
   const [explore, setExplore] = useState<ExploreDeck[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [packs, setPacks] = useState<Pack[] | null>(null);
   const [view, setView] = useState<View>({ kind: 'library' });
-  const [review, setReview] = useState<{ deckId: string; tags: string[] | null } | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
+  const [packSheet, setPackSheet] = useState<{ pack: Pack | null; decks: AdminDeckStat[] } | null>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [importing, setImporting] = useState<{ deckId: string | null } | null>(null);
   const [details, setDetails] = useState<{ deckId: string | null } | null>(null);
@@ -89,11 +114,14 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
   const refreshExplore = useCallback(() => {
     if (!uid) return;
     exploreDecks().then(setExplore).catch(() => setExplore([]));
+    explorePacks().then(setPacks).catch(() => setPacks([]));
   }, [uid]);
 
   useEffect(() => {
-    if (!uid) { setSummaries(null); setExplore(null); return; }
-    void refresh();
+    if (!uid) { setSummaries(null); setExplore(null); setPacks(null); return; }
+    // Answers left in the outbox by a tab closed mid-session land first, so
+    // the counts drawn here already include them.
+    flush(uid).finally(() => { void refresh(); });
     refreshExplore();
   }, [uid, refresh, refreshExplore]);
 
@@ -111,7 +139,11 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
   const canEdit = useCallback((d: DeckSummary | null) => !!d && ((d.scope === 'personal' && d.ownerId === uid) || (d.scope === 'global' && isAdmin)), [uid, isAdmin]);
   const editable = useMemo(() => (summaries ?? []).filter(canEdit), [summaries, canEdit]);
   const current = view.kind === 'deck' ? deckById(view.id) : null;
-  const reviewing = review ? deckById(review.deckId) : null;
+  const packById = useCallback((id: string) => packs?.find(p => p.id === id) ?? null, [packs]);
+  const decksOfPack = useCallback((id: string) => (summaries ?? []).filter(d => d.packId === id), [summaries]);
+  const reviewing = review && 'deckId' in review ? deckById(review.deckId) : null;
+  const reviewingPack = review && 'packId' in review ? packById(review.packId) : null;
+  const ownedPacks = (packs ?? []).filter(p => p.inLibrary).length;
 
   // Tag suggestions for the editor come from the deck being edited.
   useEffect(() => {
@@ -185,6 +217,39 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
     } catch (e) { fail(e); }
   };
 
+  /* ── Packs ── */
+
+  /** Take a pack. Resolves only once the server agrees it is yours. */
+  const acquirePack = useCallback(async (pack: Pack) => {
+    if (!pack.unlocked) {
+      const paid = await checkout(pack);
+      if ('message' in paid) throw new Error(paid.message);
+    }
+    try { await addPack(pack.id); } catch (e) { throw new Error(humanError(e)); }
+  }, []);
+
+  const loadPreview = useCallback((id: string) => packPreview(id), []);
+
+  const studyPack = (pack: Pack) => {
+    const ids = decksOfPack(pack.id).filter(d => (isAdmin || d.status !== 'draft') && d.due + d.newAvailable > 0);
+    if (!ids.length) return;
+    setReview({ packId: pack.id });
+  };
+
+  const onPackStatus = async (pack: Pack, status: DeckStatus) => {
+    if (!window.confirm(PACK_CONFIRM[status])) return;
+    try {
+      await setPackStatus(pack.id, status, true);
+      await refresh();
+      refreshExplore();
+      pushToast({ id: 'dk-pack', title: status === 'published' ? 'Pack published. It is on the racks now.' : status === 'draft' ? 'Pack unpublished.' : 'Pack archived.', tone: 'good' });
+    } catch (e) { fail(e); }
+  };
+
+  const openPackSheet = async (pack: Pack | null) => {
+    try { setPackSheet({ pack, decks: await fetchAdminStats() }); } catch (e) { fail(e); }
+  };
+
   /* ── Render ── */
   if (!user) {
     return (
@@ -194,17 +259,65 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
     );
   }
 
+  const viewPack = view.kind === 'pack' ? packById(view.id) : null;
+  const fromPack = view.kind === 'deck' && view.fromPack ? packById(view.fromPack) : null;
+
   return (
     <>
-      {view.kind === 'deck' && current ? (
+      {view.kind === 'store' ? (
+        <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+          <PackStore
+            packs={packs}
+            dark={dark}
+            examPreference={examPreference}
+            isAdmin={isAdmin}
+            owned={ownedPacks}
+            onBack={() => setView({ kind: 'library' })}
+            onOpenOwned={id => setView({ kind: 'pack', id })}
+            acquire={acquirePack}
+            loadPreview={loadPreview}
+            onAcquired={async id => {
+              await refresh();
+              refreshExplore();
+              setView({ kind: 'pack', id });
+            }}
+          />
+        </React.Suspense>
+      ) : view.kind === 'pack' && viewPack ? (
+        <PackView
+          pack={viewPack}
+          decks={decksOfPack(viewPack.id)}
+          dark={dark}
+          isAdmin={isAdmin}
+          onBack={() => setView({ kind: 'library' })}
+          onStudy={() => studyPack(viewPack)}
+          onAdd={async () => {
+            try { await acquirePack(viewPack); await refresh(); refreshExplore(); } catch (e) { pushToast({ id: 'dk-error', title: e instanceof Error ? e.message : humanError(e), tone: 'alert' }); }
+          }}
+          onRemove={async () => {
+            if (!window.confirm(`Remove "${viewPack.title}" from My Alpha? Your progress is kept if you add it back.`)) return;
+            try { await removePack(viewPack.id); setView({ kind: 'library' }); await refresh(); refreshExplore(); } catch (e) { fail(e); }
+          }}
+          onOpenDeck={id => setView({ kind: 'deck', id, fromPack: viewPack.id })}
+          onReviewDeck={id => setReview({ deckId: id, tags: null })}
+          onEdit={isAdmin ? () => void openPackSheet(viewPack) : undefined}
+          onSetStatus={isAdmin ? st => void onPackStatus(viewPack, st) : undefined}
+          onDelete={isAdmin ? async () => {
+            if (!window.confirm(`Delete the pack "${viewPack.title}"? Its decks stay, as Alpha decks on their own. This can't be undone.`)) return;
+            try { await deletePack(viewPack.id); setView({ kind: 'library' }); await refresh(); refreshExplore(); } catch (e) { fail(e); }
+          } : undefined}
+        />
+      ) : view.kind === 'deck' && current ? (
         <DeckView
           deck={current}
+          pack={current.packId ? packById(current.packId) : null}
+          backLabel={fromPack ? fromPack.title : 'Decks'}
           dark={dark}
           canEdit={canEdit(current)}
           isAdmin={isAdmin}
           source={source}
           version={version}
-          onBack={() => setView({ kind: 'library' })}
+          onBack={() => setView(fromPack ? { kind: 'pack', id: fromPack.id } : { kind: 'library' })}
           onReview={t => setReview({ deckId: current.id, tags: t ?? null })}
           onAddCard={() => { saved.current = false; setEditor({ deckId: current.id, note: null }); }}
           onEditNote={n => { saved.current = false; setEditor({ deckId: current.id, note: n }); }}
@@ -241,21 +354,55 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
           onStudyExplore={id => void onStudyExplore(id)}
           onOpenAuth={onOpenAuth}
           onRetry={() => void refresh()}
+          packs={packs}
+          onOpenStore={() => { refreshExplore(); setView({ kind: 'store' }); }}
+          onOpenPack={id => setView({ kind: 'pack', id })}
+          onReviewPack={id => { const pk = packById(id); if (pk) studyPack(pk); }}
         />
       )}
+
+      {reviewingPack && uid && (() => {
+        const decks = decksOfPack(reviewingPack.id).filter(d => (isAdmin || d.status !== 'draft') && d.due + d.newAvailable > 0);
+        const first = decks[0];
+        if (!first) return null;
+        return (
+          <ReviewSession
+            uid={uid}
+            deck={{ id: `pack:${reviewingPack.id}`, title: reviewingPack.title, desiredRetention: first.desiredRetention, subject: reviewingPack.subject, chapter: null, nextDue: packTotals(decksOfPack(reviewingPack.id)).nextDue }}
+            deckIds={decks.map(d => d.id)}
+            deckInfo={Object.fromEntries(decks.map(d => [d.id, { title: d.title, desiredRetention: d.desiredRetention, subject: d.subject }]))}
+            resumeKey={`pack:${reviewingPack.id}`}
+            dark={dark}
+            onEdit={isAdmin ? (noteId, deckId, done) => {
+              fetchNote(noteId)
+                .then(note => { saved.current = false; setEditor({ deckId, note, done }); })
+                .catch(e => { fail(e); done(null); });
+            } : undefined}
+            onExit={() => {
+              setReview(null);
+              void flush(uid).finally(() => { void refresh(); setVersion(v => v + 1); });
+            }}
+          />
+        );
+      })()}
 
       {review && reviewing && uid && (
         <ReviewSession
           uid={uid}
           deck={{ id: reviewing.id, title: reviewing.title, desiredRetention: reviewing.desiredRetention, subject: reviewing.subject, chapter: reviewing.chapter, nextDue: reviewing.nextDue }}
           dark={dark}
-          tags={review.tags}
-          onEdit={canEdit(reviewing) ? (noteId, done) => {
+          tags={'tags' in review ? review.tags : null}
+          onEdit={canEdit(reviewing) ? (noteId, deckId, done) => {
             fetchNote(noteId)
-              .then(note => { saved.current = false; setEditor({ deckId: reviewing.id, note, done }); })
+              .then(note => { saved.current = false; setEditor({ deckId, note, done }); })
               .catch(e => { fail(e); done(null); });
           } : undefined}
-          onExit={() => { setReview(null); void refresh(); setVersion(v => v + 1); }}
+          onExit={() => {
+            setReview(null);
+            // Refresh after the session's last answers have landed, so the deck
+            // page does not show cards as still due that were just answered.
+            void flush(uid).finally(() => { void refresh(); setVersion(v => v + 1); });
+          }}
         />
       )}
 
@@ -323,6 +470,26 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
           />
         );
       })()}
+
+      {packSheet && (
+        <PackSheet
+          dark={dark}
+          pack={packSheet.pack}
+          decks={packSheet.decks}
+          onClose={() => setPackSheet(null)}
+          onSave={async (meta, deckIds) => {
+            try {
+              if (!packSheet.pack) throw new Error('Packs are made in the console.');
+              await updatePack(packSheet.pack.id, meta);
+              await setPackDecks(packSheet.pack.id, deckIds);
+              await refresh();
+              refreshExplore();
+            } catch (e) {
+              throw new Error(e instanceof Error && !('code' in e) ? e.message : humanError(e));
+            }
+          }}
+        />
+      )}
 
       {settings && (() => {
         const d = deckById(settings);

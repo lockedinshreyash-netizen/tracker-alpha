@@ -28,6 +28,8 @@ export interface DeckSummary {
   chapter: string | null;
   ownerId: string | null;
   updatedAt: string;
+  /** The Alpha pack this deck sits in, if any. */
+  packId: string | null;
   newPerDay: number;
   maxReviews: number;
   desiredRetention: number;
@@ -88,6 +90,8 @@ export interface Progress {
 /** A card ready to study: its note's content plus the caller's progress. */
 export interface QueueCard {
   cardId: string;
+  /** The deck it came from — a pack's session holds cards from several. */
+  deckId?: string;
   noteId: string;
   ord: number;
   kind: NoteKind;
@@ -125,6 +129,69 @@ export interface AdminDeckStat {
   reviews7d: number;
   /** Share of review-state answers that were Again, last 30 days. Null with no data. */
   againRate: number | null;
+  packId: string | null;
+  packTitle: string | null;
+}
+
+/** How a pack is had: free, bought once, or included with Alpha Pro. */
+export type PackAccess = 'free' | 'paid' | 'pro';
+
+/** One deck as a pack lists it. */
+export interface PackDeck {
+  id: string;
+  title: string;
+  subject: DeckSubject | null;
+  status: DeckStatus;
+  cards: number;
+}
+
+/**
+ * An Alpha pack: a set of Alpha decks studied together ("Essential
+ * Chemistry" holding Organic, Inorganic and Physical). Packs are made by
+ * administrators only; a student adds a whole pack at once.
+ */
+export interface Pack {
+  id: string;
+  title: string;
+  description: string | null;
+  subject: DeckSubject | null;
+  collection: DeckCollection;
+  status: DeckStatus;
+  sortOrder: number;
+  /** When it was published (explore) or last changed (console). */
+  at: string | null;
+  /** On the caller's shelf. Always false in the console. */
+  inLibrary: boolean;
+  /** Students who added it — console only, 0 elsewhere. */
+  students: number;
+  decks: PackDeck[];
+  /** The number printed on the packaging: PACK 001. */
+  packNo: number;
+  access: PackAccess;
+  /** Rupees, for a paid pack only. */
+  priceInr: number | null;
+  /** The short line under the name: "JEE • PCM". */
+  examLine: string | null;
+  /** The caller may add it now: free, bought, or Pro. Decided by the server. */
+  unlocked: boolean;
+}
+
+export interface PackMeta {
+  title: string;
+  description: string | null;
+  subject: DeckSubject | null;
+  collection: DeckCollection;
+  access: PackAccess;
+  priceInr: number | null;
+  examLine: string | null;
+}
+
+/** A card shown in the store before a pack is yours. */
+export interface PreviewCard {
+  deckId: string;
+  kind: NoteKind;
+  front: string;
+  back: string;
 }
 
 export interface ActivityDay {

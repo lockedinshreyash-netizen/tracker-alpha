@@ -1016,3 +1016,25 @@ button:active,
   .dk-face [data-cloze="shown"], .dk-in, .dk-deal, .dk-flash, .dk-shimmer, .dk-grow-y { animation: none; }
   .dk-tile, .dk-tile .dk-peek { transition: none; }
 }
+
+/* ── Alpha Packs store (decks/store/) ──
+   A pack lifts toward you on its hook when pointed at, focused or chosen.
+   The lift pivots on the hook (transform-origin is set inline), so the pack
+   never leaves the rod; its shadow lengthens with it. Hover is for devices
+   that hover: on a phone, a lifted pack would stick after the tap. */
+.pk-lift { transition: transform .28s cubic-bezier(.2,.7,.2,1); }
+.pk-shadow { opacity: var(--pk-shadow-o, .3); transform: translateY(10px); transition: opacity .28s ease, transform .28s cubic-bezier(.2,.7,.2,1); }
+.pk-focus { opacity: 0; box-shadow: 0 0 0 2px #E10600; transition: opacity .15s ease; }
+@media (hover: hover) {
+  .pk-rack:not(.pk-dragging) .pk-lift:hover { transform: translateY(-3px) scale(1.03); }
+  .pk-rack:not(.pk-dragging) .pk-lift:hover .pk-shadow { opacity: calc(var(--pk-shadow-o, .3) * 1.45); transform: translateY(18px); }
+}
+.pk-lift[data-selected="true"] { transform: translateY(-4px) scale(1.04); }
+.pk-lift[data-selected="true"] .pk-shadow { opacity: calc(var(--pk-shadow-o, .3) * 1.5); transform: translateY(20px); }
+.pk-lift:focus-visible .pk-focus { opacity: 1; }
+@keyframes pk-caret-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.pk-detail { animation: pk-caret-in .26s cubic-bezier(.2,.7,.2,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .pk-lift, .pk-shadow, .pk-focus { transition: none; }
+  .pk-detail { animation: none; }
+}
