@@ -20,6 +20,8 @@ import MocksTab from './mocks/MocksTab';
 import { applyAttempts, mergeMocks, normalizeMocks } from './mocks/model';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
+import { landingWillShow } from './landing/gate';
+import { readDeepLink, settleDeepLink } from './landing/deeplink';
 import AuthModal from './AuthModal';
 import Header from './Header';
 import TodayTab from './today/TodayTab';
@@ -126,6 +128,9 @@ const findTask = (spoken: string, tasks: Task[]): Task | null => {
 // --- Main App Component ---
 
 const App: React.FC = () => {
+  /* `/?open=syllabus&exam=NEET` from a guide page. Read before state so a new
+     student can start with that exam. See landing/deeplink.ts. */
+  const [deepLink] = useState(readDeepLink);
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('locked_in_state_v2');
     if (saved) {
@@ -194,13 +199,14 @@ const App: React.FC = () => {
         return DEFAULT_STATE;
       }
     }
-    return DEFAULT_STATE;
+    return deepLink?.exam ? { ...DEFAULT_STATE, examPreference: deepLink.exam } : DEFAULT_STATE;
   });
 
   const [user, setUser] = useState<User | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>(state.lastUsedTab);
+  const [activeTab, setActiveTab] = useState<TabType>(deepLink?.tab ?? state.lastUsedTab);
+  useEffect(() => { if (deepLink) settleDeepLink(); }, [deepLink]);
   /* True for the length of the Observatory entry transition, then cleared.
      Alpha's chrome falls away, the paper comes up, the geometry resolves.
      Deliberately short (~700ms): the point is psychological separation, and a
@@ -223,7 +229,11 @@ const App: React.FC = () => {
     dailyQuestionsLog: state.questionTracking.dailyQuestionsLog,
     dailyGoalHours: state.dailyGoalHours,
   }), [state.logs, state.tasks, state.questionTracking.dailyQuestionsLog, state.dailyGoalHours]);
-  const [showLanding, setShowLanding] = useState<boolean | null>(null); // null = still checking
+  /* null = still checking the session. A first-time visitor with no stored
+     session is answered at once, so the pre-rendered landing page hydrates on
+     the first render instead of being swapped for a blank screen while
+     getSession() runs. See landing/gate.ts. */
+  const [showLanding, setShowLanding] = useState<boolean | null>(() => (landingWillShow() ? true : null));
   /* A group invite from `/?join=CODE`, lifted out of the URL on the first
      render and held (in localStorage too) until it is used or dismissed — the
      person opening it has often not signed up yet. See groups/invite.ts. */
@@ -295,7 +305,8 @@ const App: React.FC = () => {
 
   // Handle Auth, Initial Fetch, and Landing Page gating
   useEffect(() => {
-    const hasVisited = localStorage.getItem('hasVisited') === 'true';
+    // Arriving through a guide page's deep link counts as having chosen the app.
+    const hasVisited = localStorage.getItem('hasVisited') === 'true' || deepLink !== null;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;

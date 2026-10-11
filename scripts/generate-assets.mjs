@@ -98,10 +98,10 @@ const og = `<svg xmlns="http://www.w3.org/2000/svg" width="${OG_W}" height="${OG
   <rect x="408" y="300" width="86" height="5" fill="#E10600"/>
 
   <text x="406" y="368" font-family="${SANS}" font-size="31" font-weight="500" fill="#A1A1AA">
-    The free JEE 2027 study tracker. No fluff.
+    The free study tracker for JEE &amp; NEET 2027.
   </text>
   <text x="406" y="414" font-family="${SANS}" font-size="31" font-weight="500" fill="#A1A1AA">
-    Hours, syllabus, questions, streaks.
+    Timer, planner, syllabus, mocks, streaks.
   </text>
 
   <text x="406" y="512" font-family="${SANS}" font-size="21" font-weight="600"

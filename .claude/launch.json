@@ -18,6 +18,18 @@
         "cd film && exec npx remotion studio --no-open --port 3123"
       ],
       "port": 3123
+    },
+    {
+      "name": "tracker-alpha-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
     }
   ]
 }

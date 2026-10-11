@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Tracker Alpha — JEE 2027 Study Tracker",
   "short_name": "Alpha",
-  "description": "The free JEE 2027 study tracker. Log hours, plan your day, track syllabus and questions, and hold a streak. No fluff.",
+  "description": "The free study tracker for JEE and NEET 2027. Time every session, plan your day, track the syllabus, log mock tests and keep your streak.",
   "lang": "en-IN",
   "dir": "ltr",
   "start_url": "/",

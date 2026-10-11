@@ -1,41 +1,43 @@
+/* ── trackeralpha.in, for first-time visitors ──
+   Rendered to static HTML at build time (landing/prerender.tsx) so search
+   engines and AI crawlers — most of which never run JavaScript — read the
+   whole page, then hydrated in place by index.tsx. That contract shapes the
+   code: the first render must be pure (no window, no storage, no clock except
+   landingNow()), and anything that moves on arrival is CSS.
+
+   Order is the argument: the promise (hero), the problem (you are guessing),
+   the tools, how to start, the price, the comparison, the questions, the
+   close. Copy lives in landing/content.ts. */
+
 import React, { useState } from 'react';
-import HeroSection from './landing/HeroSection';
-import StatsSection from './landing/StatsSection';
-import FeaturesSection from './landing/FeaturesSection';
-import FinalCtaSection from './landing/FinalCtaSection';
-import { ExamPreference } from './types';
-import { INK, INK_DEEP, MICRO_LABEL, PAGE_X, PAPER, RULE_DARK } from './landing/tokens';
+import './landing/landing.css';
+import type { Exam } from './landing/content';
+import { Hero } from './landing/Hero';
+import { Compare, Faq, Features, Final, Footer, Manifesto, Nav, Price, Ribbon, Steps } from './landing/Sections';
 
 const LandingPage = ({ onCtaClick }: { onCtaClick: () => void }) => {
-  const [examPref, setExamPref] = useState<ExamPreference>('JEE');
+  const [exam, setExam] = useState<Exam>('JEE');
 
-  const handleCta = () => {
-    localStorage.setItem('hasVisited', 'true');
+  const start = () => {
+    try { localStorage.setItem('hasVisited', 'true'); } catch { /* private mode: they will see this page again */ }
     onCtaClick();
   };
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: PAPER, color: INK, overflowX: 'hidden' }}>
-      <HeroSection onCtaClick={handleCta} examPref={examPref} onExamPrefChange={setExamPref} />
-      <FeaturesSection />
-      <StatsSection />
-      <FinalCtaSection onCtaClick={handleCta} examPref={examPref} />
-
-      {/* Footer sits on the same dark ground as the final CTA — one continuous close */}
-      <footer
-        style={{
-          background: INK_DEEP,
-          paddingLeft: PAGE_X,
-          paddingRight: PAGE_X,
-          paddingBottom: '44px',
-        }}
-      >
-        <div style={{ borderTop: `1px solid ${RULE_DARK}`, paddingTop: '28px' }}>
-          <p className="font-data" style={{ ...MICRO_LABEL, color: 'rgba(242,240,236,0.32)', margin: 0 }}>
-            Tracker Alpha · Lock In HQ · Built for JEE 2027
-          </p>
-        </div>
-      </footer>
+    <div className="lp" id="top">
+      <Nav onCta={start} />
+      <main>
+        <Hero exam={exam} onExam={setExam} onCta={start} />
+        <Ribbon />
+        <Manifesto />
+        <Features exam={exam} />
+        <Steps onCta={start} />
+        <Price onCta={start} />
+        <Compare />
+        <Faq />
+        <Final exam={exam} onCta={start} />
+      </main>
+      <Footer />
     </div>
   );
 };

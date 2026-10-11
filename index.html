@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-IN">
 
 <head>
   <meta charset="UTF-8" />
@@ -26,9 +26,12 @@
        path here is a missing image everywhere it matters.
        ══════════════════════════════════════════════════════════════════════ -->
 
-  <title>Tracker Alpha — Free JEE 2027 Study Tracker</title>
+  <!-- Title and description are rewritten at build time from landing/seo.ts
+       (scripts/prerenderLanding.ts), so the copy below only has to be right in
+       dev. Change them there. -->
+  <title>Tracker Alpha: Free JEE &amp; NEET Study Tracker App for 2027</title>
   <meta name="description"
-    content="Free study tracker for JEE 2027 aspirants. Log study hours, plan your whole day, track syllabus and questions chapter by chapter, and hold a daily streak. No fluff." />
+    content="Free study tracker for JEE and NEET 2027. Time every session, plan your day, track the syllabus chapter-wise, log mock tests and keep your streak. No ads." />
   <link rel="canonical" href="https://trackeralpha.in/" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta name="author" content="Tracker Alpha" />
@@ -52,20 +55,20 @@
        it wants an absolute https image and gives up quietly without one. -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Tracker Alpha" />
-  <meta property="og:title" content="Tracker Alpha — Free JEE 2027 Study Tracker" />
+  <meta property="og:title" content="Tracker Alpha — the free study tracker for JEE &amp; NEET 2027" />
   <meta property="og:description"
-    content="Log study hours, plan your whole day, track syllabus and questions, and hold a daily streak. Free, no fluff." />
+    content="Time every session. Plan your day. Finish the syllabus. It’s free, and it honestly shouldn’t be." />
   <meta property="og:url" content="https://trackeralpha.in/" />
   <meta property="og:image" content="https://trackeralpha.in/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Tracker Alpha — the free JEE 2027 study tracker" />
+  <meta property="og:image:alt" content="Tracker Alpha — the free study tracker for JEE and NEET 2027" />
   <meta property="og:locale" content="en_IN" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Tracker Alpha — Free JEE 2027 Study Tracker" />
+  <meta name="twitter:title" content="Tracker Alpha — the free study tracker for JEE &amp; NEET 2027" />
   <meta name="twitter:description"
-    content="Log study hours, plan your whole day, track syllabus and questions, and hold a daily streak. Free, no fluff." />
+    content="Time every session. Plan your day. Finish the syllabus. It’s free, and it honestly shouldn’t be." />
   <meta name="twitter:image" content="https://trackeralpha.in/og-image.png" />
 
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -73,41 +76,33 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- Structured data. This is what lets a result carry a name, a rating slot
-       and a price rather than a bare blue link. `offers` at 0 is not decoration:
-       "free" is the single most load-bearing word in this product's pitch, and
-       SoftwareApplication is the only way to state it as a fact rather than as
-       marketing inside a description. -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Tracker Alpha",
-    "alternateName": "LOCK IN",
-    "url": "https://trackeralpha.in/",
-    "description": "Free study tracker for JEE 2027 aspirants. Log study hours, plan your whole day, track syllabus and questions chapter by chapter, and hold a daily streak.",
-    "applicationCategory": "EducationalApplication",
-    "operatingSystem": "Any — web browser, installable on Android and iOS",
-    "browserRequirements": "Requires JavaScript.",
-    "inLanguage": "en-IN",
-    "isAccessibleForFree": true,
-    "image": "https://trackeralpha.in/og-image.png",
-    "screenshot": "https://trackeralpha.in/og-image.png",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "INR"
-    },
-    "featureList": [
-      "Study session timer with focus quality and distraction tracking",
-      "Full-day planner with repeating blocks and plan-vs-actual adherence",
-      "Class 11 and 12 syllabus progress for JEE and NEET",
-      "Practice question tracking with weekly goals",
-      "Daily streaks and milestone rewards",
-      "Daily hours leaderboard"
-    ]
-  }
+  <!-- Structured data is generated at build time from landing/content.ts and
+       injected at the end of the head (scripts/prerenderLanding.ts): one JSON-LD
+       graph of Organization, WebSite, WebApplication, WebPage and FAQPage,
+       written from the same words the page shows, so it can never disagree. -->
+
+  <!-- Hide the pre-rendered landing page before first paint for anyone who will
+       not see it (returning, signed in, arriving on an invite). A hand copy of
+       landing/gate.ts — change one, change both. Crawlers have no storage, so
+       they always read the page. -->
+  <script>
+    (function () {
+      var show = true;
+      try {
+        if (localStorage.getItem('hasVisited') === 'true') show = false;
+        else if (new URLSearchParams(location.search).has('join')) show = false;
+        else if (new URLSearchParams(location.search).has('open')) show = false;
+        else if (localStorage.getItem('groups_pending_invite_v1')) show = false;
+        else for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('sb-') === 0 && k.slice(-11) === '-auth-token') { show = false; break; }
+        }
+      } catch (e) { /* storage blocked: a new visitor */ }
+      if (!show) document.documentElement.classList.add('lp-skip');
+    })();
   </script>
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://fonts.cdnfonts.com" crossorigin>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
