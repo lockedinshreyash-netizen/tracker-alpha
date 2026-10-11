@@ -6,6 +6,8 @@ import ModerationAdmin from './ModerationAdmin';
 
 /* Lazy so the Decks data layer stays out of the main bundle. */
 const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
+/* Lazy for the same reason: the charts are the console's alone. */
+const AnalyticsAdmin = React.lazy(() => import('../analytics/AnalyticsAdmin'));
 
 interface Props {
   adminId: string;
@@ -14,9 +16,10 @@ interface Props {
   onOpenDeck: (id: string | null) => void;
 }
 
-type Section = 'announce' | 'inbox' | 'moderation' | 'decks' | 'people';
+type Section = 'analytics' | 'announce' | 'inbox' | 'moderation' | 'decks' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
+  { id: 'analytics', label: 'Analytics' },
   { id: 'announce', label: 'Announcements' },
   { id: 'inbox', label: 'Feedback' },
   { id: 'moderation', label: 'Moderation' },
@@ -27,7 +30,7 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
 /**
  * The console.
  *
- * Five sections behind one switch rather than three tabs in the rail: the rail
+ * Six sections behind one switch rather than six tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -35,7 +38,8 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
  */
 const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
   const dark = theme === 'dark';
-  const [section, setSection] = useState<Section>('announce');
+  /* Analytics first: how the app is doing is what an administrator opens the console to see. */
+  const [section, setSection] = useState<Section>('analytics');
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -44,7 +48,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
           Console
         </h2>
         <p className={`text-[11px] font-ui mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-          What goes out to everyone, and what comes back.
+          How the app is doing, what goes out to everyone, and what comes back.
         </p>
       </div>
 
@@ -62,6 +66,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
         ))}
       </div>
 
+      {section === 'analytics' && <Suspense fallback={null}><AnalyticsAdmin theme={theme} /></Suspense>}
       {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}

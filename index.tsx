@@ -21,6 +21,9 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).get('share') ===
 } else if (import.meta.env.DEV && new URLSearchParams(location.search).get('decks') === 'debug') {
   // Alpha Decks' review, editor and import preview on fixture cards, no database.
   import('./decks/DebugDecks').then(({ default: DebugDecks }) => root.render(<DebugDecks />));
+} else if (import.meta.env.DEV && new URLSearchParams(location.search).get('analytics') === 'debug') {
+  // The console's Analytics section in every state, on fixtures, no database.
+  import('./analytics/DebugAnalytics').then(({ default: DebugAnalytics }) => root.render(<DebugAnalytics />));
 } else {
   root.render(
     <React.StrictMode>

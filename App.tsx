@@ -64,6 +64,8 @@ import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
 import { forgetGroupsOnDevice } from './groups/publish';
 import { forgetDecksOnDevice } from './decks/forget';
+import { useActivityPing } from './analytics/useActivityPing';
+import { forgetAnalyticsOnDevice } from './analytics/track';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -563,6 +565,7 @@ const App: React.FC = () => {
         localStorage.removeItem('locked_in_state_v2');
         forgetGroupsOnDevice();
         forgetDecksOnDevice();
+        forgetAnalyticsOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -1735,6 +1738,18 @@ const App: React.FC = () => {
     tasks: state.tasks,
     watching: activeTab === 'Groups',
     ready: syncSettled,
+  });
+  /* ── Counting heads for the console ──
+     Mounted here for the same reason: a visit happens on whatever tab the app
+     opens on. Sends a day's totals and a few counts, never a log; never writes
+     AppState, so it never triggers a sync. Waits on the cloud pull so a fresh
+     device does not report its empty defaults as somebody's day. */
+  const getStateForPing = useCallback(() => stateRef.current, []);
+  useActivityPing({
+    user,
+    ready: syncSettled,
+    logs: state.logs,
+    getState: getStateForPing,
   });
   /* ── Being told you were removed ──
      Mounted at root: a removal can land while you are on any tab. A race
