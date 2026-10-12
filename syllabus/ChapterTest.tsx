@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as sfx from '../audio';
+import { comboSemitones } from '../sound/cues';
 import { Subject, TopicMastery, TopicResult } from '../types';
 import { testForChapter } from '../content/questions';
 
@@ -24,6 +26,8 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [results, setResults] = useState<Record<string, TopicMastery>>({});
+  /** Right answers in a row, for the rising pitch. */
+  const runRef = useRef(0);
   /* The verdict for the question on screen is held directly rather than read
      back out of `results`. Deriving it from the map meant the reveal block
      depended on `revealed` and `results` landing in the same render — and when
@@ -54,6 +58,11 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
     const result: TopicResult = !correct ? 'gap' : sure ? 'solid' : 'shaky';
     setResults((r) => ({ ...r, [current.topic.id]: { result, date: new Date().toISOString().slice(0, 10) } }));
     setVerdict(result);
+    if (correct) sfx.play('correct', { semitones: comboSemitones(runRef.current++) });
+    else {
+      runRef.current = 0;
+      sfx.play('wrong');
+    }
   };
 
   const next = () => {
@@ -63,6 +72,7 @@ const ChapterTest: React.FC<Props> = ({ chapter, classId, subject, theme, onClos
       setVerdict(null);
     } else {
       setDone(true);
+      if (items.every((it) => results[it.topic.id]?.result === 'solid')) sfx.play('run-complete');
     }
   };
 

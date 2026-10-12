@@ -44,6 +44,8 @@ import { studyDayBounds } from './day';
 import { RATING_RAMP, STATE_COLOR, STATE_LABEL, deckAccent, fmtDuration, fmtUntil, room, stateKey } from './theme';
 import type { DeckSubject, Note, QueueCard, Rating } from './types';
 import { Key, StackArt } from './ui';
+import * as sfx from '../audio';
+import { comboSemitones } from '../sound/cues';
 
 const GUARD_MS = 300;
 const PREFETCH_AT = 10;
@@ -214,7 +216,23 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
     setChoices(preview(pick.card.progress, new Date(), cardDeck?.desiredRetention ?? deck.desiredRetention));
     setRevealed(true);
     revealedAt.current = Date.now();
+    sfx.play('reveal');
   }, [pick, revealed, deck.desiredRetention, cardDeck]);
+
+  /* Cards passed in a row. Good and Easy climb the pitch; Again resets it.
+     Hard is a pass that should not feel like a win, so it only ticks. */
+  const passRun = useRef(0);
+  const rateSound = (rating: Rating) => {
+    if (rating === 1) {
+      passRun.current = 0;
+      sfx.play('wrong');
+    } else if (rating === 2) {
+      sfx.play('tap');
+    } else {
+      const step = passRun.current++ + (rating === 4 ? 2 : 0);
+      sfx.play('correct', { semitones: comboSemitones(step) });
+    }
+  };
 
   const rate = useCallback((rating: Rating) => {
     if (!pick || !revealed || !choices || !session) return;
@@ -238,6 +256,7 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
     setChoices(null);
     setFlash({ id: Date.now(), rating, label: choice.label });
     ratedAt.current = Date.now();
+    rateSound(rating);
     if (!local && nextSession.done % 10 === 0) void flush(uid);
   }, [pick, revealed, choices, session, uid, dayEnd, local]);
 
@@ -304,6 +323,15 @@ const ReviewSession: React.FC<Props> = ({ uid, deck, dark, tags = null, deckIds,
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, []);
+
+  /* The last card of a session answered: a short fanfare, once. A session
+     that opens with nothing due never played a card and stays quiet. */
+  const sessionOver = !!session && !pick;
+  const wasOver = useRef(sessionOver);
+  useEffect(() => {
+    if (sessionOver && !wasOver.current && (session?.done ?? 0) > 0) sfx.play('run-complete');
+    wasOver.current = sessionOver;
+  }, [sessionOver, session?.done]);
 
   /* ── Derived ── */
   const done = session?.done ?? 0;

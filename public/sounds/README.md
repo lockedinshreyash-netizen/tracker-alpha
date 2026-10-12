@@ -1,20 +1,27 @@
-# Sound cues
+# Sound effects
 
-Filenames here are **exact** — `audio.ts` looks each one up by path, so a
-renamed file is a silent cue.
+Generated, not sourced. Every file here is rendered by
+`film/scripts/render-sfx.ts` from the instruments in
+`film/scripts/audio/sfx-instruments.ts`:
 
-| File | Fires when | Length | Character |
-|---|---|---|---|
-| `ignite.mp3` | Onboarding spotlight turns on | ~1.5s | Whoosh into a soft impact |
-| `riser.mp3` | Under the days-remaining count-up | ~1.2s | Rising tone that resolves as the number lands |
-| `select.mp3` | Any tap/choice in onboarding or Pomodoro | ~150ms | Clean, dry tap — not a beep |
-| `lock.mp3` | Final "Lock in" button at the end of onboarding | ~1s | Mechanical, low, satisfying |
-| `phase-complete.mp3` | A Pomodoro focus block finishes | ~1–1.5s | Warm chime, earned rather than alarming |
-| `break-over.mp3` | A Pomodoro break finishes | ~1s | Gentle nudge back to work |
+```
+npm run sfx:generate                      # every cue
+cd film && npm run sfx -- --only=streak   # just the ids containing "streak"
+```
 
-Every cue fails silently: a missing file, a blocked autoplay, or a browser with
-no audio support is a no-op, never an error. The app is meant to run fine with
-this folder empty.
+Do not edit or replace the files by hand: the next render overwrites them.
 
-Per-cue volume is set in `CUE_CONFIG` in `/audio.ts`, so a file that lands too
-loud or too quiet is a one-line change there rather than a re-export.
+- **The ids come from `sound/cues.ts`.** That catalog is the single list. The
+  renderer refuses to run if a cue there has no recipe, and the player
+  (`audio.ts`) fetches `/sounds/<id>.aac` for each one.
+- **The format is ADTS AAC** (`.aac`): mono at 48 kbps for short cues, stereo
+  at 80 kbps for celebrations. It is not `.m4a`, because afconvert pads every
+  MP4 with about 3 kB of empty space.
+- **Levels live in the catalog's `gain`, not in these files.** Every master
+  is normalised to the same −1 dBFS peak. To make a cue louder or quieter,
+  change one number in `sound/cues.ts`, then judge it at `?sfx=debug`.
+- **Listen to all of them in Remotion Studio.** Run `cd film && npm run dev`
+  and open the `SoundBoard` composition.
+
+Every cue fails silently. A missing file, a blocked context, or a browser
+with no Web Audio is a no-op, never an error.

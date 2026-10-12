@@ -15,6 +15,7 @@
 
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { tokens } from '../../ui/kit';
+import * as sfx from '../../audio';
 import type { ExamPreference } from '../../types';
 import { Icon } from '../ui';
 import { IDLE, isBusy, isOpening, transition } from './PackAcquisition';
@@ -67,6 +68,8 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
   const [previews, setPreviews] = useState<Record<string, PreviewCard[] | 'error'>>({});
   const els = useRef(new Map<string, HTMLElement>());
   const [flight, setFlight] = useState<{ pack: Pack; from: DOMRect } | null>(null);
+  // The opening's sounds land on its animation, so they are fetched on the way in.
+  useEffect(() => { sfx.preload('store'); }, []);
 
   const visible = useMemo(
     () => (packs ?? []).filter(p => p.status === 'published' || p.inLibrary || (isAdmin && p.status === 'draft')),

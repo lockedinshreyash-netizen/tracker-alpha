@@ -28,6 +28,7 @@
    development; the timeline is guarded to start once. */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as sfx from '../../audio';
 import { Overlay, tokens } from '../../ui/kit';
 import { STATE_COLOR } from '../theme';
 import { Icon } from '../ui';
@@ -118,6 +119,7 @@ export const PackOpeningAnimation: React.FC<{
     const go = async () => {
       if (reduced) {
         for (let i = 0; i < 5; i += 1) step();
+        sfx.play('pack-added', { late: 400 });
         await run(confirm.current, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
         if (mounted.current) setReady(true);
         await wait(1600);
@@ -126,6 +128,7 @@ export const PackOpeningAnimation: React.FC<{
       }
 
       // TAKE: up off the rod and forward.
+      sfx.play('pack-lift', { late: 300 });
       await run(stage.current, [{ transform: tf(x0, y0, 0, s0) }, { transform: tf(x0, y0 - 12, -2.4, s0 * 1.05) }], { duration: T(220), easing: 'cubic-bezier(.3,0,.3,1)' });
       step(); // → centering
 
@@ -145,6 +148,7 @@ export const PackOpeningAnimation: React.FC<{
         { transform: 'rotateX(6deg)' },
       ], { duration: T(200), easing: 'cubic-bezier(.3,0,.4,1)' });
       // It splits at the slot first, catches for a moment…
+      sfx.play('pack-tear', { late: 150 });
       await run(crackDown.current, [{ strokeDashoffset: g.crackLen.down }, { strokeDashoffset: 0 }], { duration: T(160), easing: 'cubic-bezier(.4,0,.7,1)' });
       await wait(T(50));
       // …then runs along the perforation, gathering speed as a real tear does.
@@ -163,6 +167,7 @@ export const PackOpeningAnimation: React.FC<{
       // Nearly all the way out: the last sixth stays in the pack.
       const lift = -((g.h - g.perf) * 0.74 * 0.84);
       const fanned = (i: number) => `translate(${FAN_X[i] * (w / 198)}px, ${lift + (i === 1 ? -10 : 6)}px) rotate(${FAN_R[i]}deg)`;
+      sfx.play('pack-reveal', { late: 200 });
       await Promise.all([fold, ...cardEls.current.map((el, i) => run(el, [
         { transform: 'translate(0px, 0px) rotate(0deg)' },
         { transform: `translate(0px, ${lift}px) rotate(0deg)`, offset: 0.5 },
@@ -176,6 +181,7 @@ export const PackOpeningAnimation: React.FC<{
         { transform: fanned(i) },
         { transform: `translate(0px, ${lift + (i - 1) * -3}px) rotate(0deg)` },
       ], { duration: T(220), easing: 'ease-in-out' })));
+      sfx.play('pack-added', { late: 200 });
       await Promise.all([
         run(body.current, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(18px) scale(0.97)' }], { duration: T(340), easing: 'ease-in' }),
         // The whole object goes, its shadow included.

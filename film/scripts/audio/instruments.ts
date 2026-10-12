@@ -9,7 +9,7 @@ const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const t60k = (t60: number) => Math.exp(Math.log(0.001) / (t60 * SR));
 
 /** A decaying sine via rotating phasor, added into `out`. */
-const partial = (out: Float32Array, f: number, amp: number, t60: number, delay = 0, attack = 0.0006) => {
+export const partial = (out: Float32Array, f: number, amp: number, t60: number, delay = 0, attack = 0.0006) => {
   if (f >= SR * 0.45 || amp <= 0) return;
   const w = (TAU * f) / SR;
   const c = Math.cos(w);

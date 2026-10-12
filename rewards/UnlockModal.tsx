@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import * as sfx from '../audio';
 import { RewardDef } from './catalog';
 
 interface Props {
@@ -25,6 +26,15 @@ const KIND_ACTION: Record<RewardDef['kind'], string> = {
  */
 const UnlockModal: React.FC<Props> = ({ def, theme, onDismiss, onOpen }) => {
   const dark = theme === 'dark';
+
+  /* The biggest sound the app has, once per reward. A reward backfilled on
+     page load arrives before any click has unlocked audio; that one stays
+     silent rather than queueing a fanfare for the first random tap. */
+  useEffect(() => {
+    if (!sfx.canPlayNow()) return;
+    sfx.preload('rare');
+    sfx.play('reward-unlock', { late: 2500 });
+  }, [def.id]);
 
   return (
     <div

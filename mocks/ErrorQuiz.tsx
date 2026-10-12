@@ -9,7 +9,9 @@
    · Nothing touches AppState until the run ends (or is abandoned with answers
      in it): one write, one sync, however many questions. */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as sfx from '../audio';
+import { comboSemitones } from '../sound/cues';
 import { ErrorEntry } from '../types';
 import { CLEAR_STREAK, OPTION_LETTERS, REASONS, isCleared } from './model';
 import { practiceOrder } from './insights';
@@ -51,10 +53,13 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [committed, setCommitted] = useState(false);
   const [typed, setTyped] = useState('');
+  /** Right answers in a row, for the rising pitch. */
+  const runRef = useRef(0);
 
   const pool = useMemo(() => (skipCleared ? errors.filter(e => !isCleared(e)) : errors), [errors, skipCleared]);
 
   const start = (list: ErrorEntry[]) => {
+    runRef.current = 0;
     setQs(build(list));
     setI(0);
     setPicked(null);
@@ -74,19 +79,40 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
 
   const q = qs[i];
   const isNumeric = q?.e.numeric !== undefined;
+  /* Right climbs a step each time in a row; the answer that clears an error
+     (right twice running) gets the sparkle; wrong is a soft knock. */
+  const answerSound = (e: ErrorEntry, ok: boolean) => {
+    if (!ok) {
+      runRef.current = 0;
+      sfx.play('wrong');
+      return;
+    }
+    if (!isCleared(e) && e.streak + 1 >= CLEAR_STREAK) sfx.play('cleared');
+    else sfx.play('correct', { semitones: comboSemitones(runRef.current) });
+    runRef.current++;
+  };
   const choose = (slot: number) => {
     if (picked !== null || !q || isNumeric) return;
     setPicked(slot);
-    setAnswers(a => ({ ...a, [q.e.id]: q.order[slot] === q.e.correct }));
+    const ok = q.order[slot] === q.e.correct;
+    setAnswers(a => ({ ...a, [q.e.id]: ok }));
+    answerSound(q.e, ok);
   };
   // A numerical question is "picked" once its typed answer is checked.
   const check = () => {
     if (picked !== null || !q || q.e.numeric === undefined || !typed.trim()) return;
     setPicked(0);
-    setAnswers(a => ({ ...a, [q.e.id]: numericRight(typed, q.e.numeric as number) }));
+    const ok = numericRight(typed, q.e.numeric as number);
+    setAnswers(a => ({ ...a, [q.e.id]: ok }));
+    answerSound(q.e, ok);
   };
   const next = () => {
-    if (i + 1 >= qs.length) { setPhase('done'); return; }
+    if (i + 1 >= qs.length) {
+      setPhase('done');
+      // A clean sweep is worth the bigger sound.
+      sfx.play(qs.every(x => answers[x.e.id]) ? 'target-hit' : 'run-complete');
+      return;
+    }
     setI(i + 1);
     setPicked(null);
     setTyped('');

@@ -19,6 +19,7 @@ import { getISTDateString } from '../utils';
 import { servedMs } from '../today/pomodoro';
 import { ActivitySignal, LeaderboardRow, fetchBoard, hoursToday, isRanked, publishEntry } from './api';
 import { pushToast } from '../notify/toastBus';
+import * as sfx from '../audio';
 import { RaceState, buildRaceState, minutesOf } from './engine';
 import { RaceDay, RaceEvent, advanceRaceDay, loadRaceDay, priorityOf, saveRaceDay } from './raceDay';
 import { RaceStatus, describeEvent, raceStatus } from './messages';
@@ -287,6 +288,8 @@ export const useRace = ({ user, state, watching, onNotificationsChange }: Option
         tone: copy.good ? 'good' : 'alert',
         ttlMs: TOAST_MS,
       });
+      // The whoosh of being passed, or of passing. Silent in a hidden tab.
+      sfx.play('overtake');
     }
 
     /* One event, one place. On screen if the user is here to read it, on the

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ReminderPrefs } from '../types';
+import { Switch } from '../ui/kit';
 import { formatClock, fromClockValue, toClockValue } from '../schedule/schedule';
 import { PermissionState, notificationPermission, requestNotificationPermission, showSystem } from '../notify/system';
 
@@ -106,23 +107,6 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
   const muted = dark ? 'text-zinc-500' : 'text-zinc-500';
   const rowNote = `text-[12px] font-ui mt-1 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`;
 
-  const Switch: React.FC<{ on: boolean; disabled?: boolean; onToggle: (v: boolean) => void; label: string }> =
-    ({ on, disabled, onToggle, label }) => (
-      <button
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onToggle(!on)}
-        className={`w-11 h-6 rounded-full flex-shrink-0 transition-colors relative disabled:opacity-40 ${on ? 'bg-[#E10600]' : dark ? 'bg-[#27272a]' : 'bg-zinc-300'}`}
-      >
-        <span
-          className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-          style={{ transform: on ? 'translateX(22px)' : 'translateX(2px)' }}
-        />
-      </button>
-    );
-
   const stateCopy: Record<PermissionState, string> = {
     unsupported: 'This browser cannot show notifications at all.',
     default: 'Not asked yet. Nothing can reach you until you allow it.',
@@ -187,7 +171,7 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
             The app never invents a reminder. If you never set a due date, nothing here ever fires.
           </p>
         </div>
-        <Switch on={prefs.enabled} disabled={busy} onToggle={enable} label="Deadline reminders" />
+        <Switch dark={dark} on={prefs.enabled} disabled={busy} onToggle={enable} label="Deadline reminders" />
       </div>
 
       {prefs.enabled && (
@@ -217,6 +201,7 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
               <p className={rowNote}>A deadline you hear about on the day is a deadline you already lost.</p>
             </div>
             <Switch
+              dark={dark}
               on={prefs.leadMinutes >= 1440}
               onToggle={v => onChange({ leadMinutes: v ? 1440 : 0 })}
               label="Warn a day early"
@@ -229,6 +214,7 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
               <p className={rowNote}>Ten minutes before a block on your plan starts. Never mid-session.</p>
             </div>
             <Switch
+              dark={dark}
               on={prefs.planBlocks}
               onToggle={v => onChange({ planBlocks: v })}
               label="Planned block reminders"
@@ -249,6 +235,7 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
               </p>
             </div>
             <Switch
+              dark={dark}
               on={prefs.push}
               disabled={busy || !signedIn || !pushSupported() || permission === 'denied'}
               onToggle={togglePush}

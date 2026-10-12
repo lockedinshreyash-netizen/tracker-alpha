@@ -8,12 +8,17 @@ import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_
 import { buildExperiment } from './insight/observe';
 import AnalysisIntro from './analysis/AnalysisIntro';
 import ObservatoryTab from './analysis/ObservatoryTab';
-import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations } from './rewards/engine';
+import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations, nextReward } from './rewards/engine';
 import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
 import { wallpaperById } from './rewards/wallpapers';
 import WallpaperLayer from './rewards/WallpaperLayer';
 import UnlockModal from './rewards/UnlockModal';
+import StreakMoment, { markStreakMoment, streakMomentDue } from './streak/StreakMoment';
+import * as sfx from './audio';
+import { comboSemitones, loggedCue } from './sound/cues';
+import { useSoundHotkey } from './sound/useSound';
+import { soundForTaskMove } from './sound/moments';
 import BookReader from './rewards/BookReader';
 import { Recommendation } from './today/recommend';
 import MocksTab from './mocks/MocksTab';
@@ -631,6 +636,17 @@ const App: React.FC = () => {
     });
   }, [state.logs]);
 
+  /* Opens the streak moment once the first log of the day has landed, so the
+     streak it shows is derived from the logs that include it. */
+  useEffect(() => {
+    if (!pendingStreakMoment.current) return;
+    pendingStreakMoment.current = false;
+    const today = getISTDateString();
+    if (!state.logs.some(l => l.date === today)) return;
+    markStreakMoment(user?.id ?? null, today);
+    setStreakMoment(calculateStreak(state.logs));
+  }, [state.logs]);
+
   const selectWallpaper = (id: string | null) => {
     setState(prev => {
       const next = { ...prev, rewards: { ...normalizeRewards(prev.rewards), wallpaper: id }, lastUpdated: Date.now() };
@@ -701,6 +717,43 @@ const App: React.FC = () => {
     setNeedsOnboarding(false);
   };
 
+  /* ── What a new log sounds like ──
+     Read from `stateRef` before the write lands, so "first log today" and
+     "crossed the target" compare against the state the user was looking at.
+     Only the two paths that write a study log call this (logStudy and
+     commitPomodoro), and only for a log dated today: a sync pull, a realtime
+     update or a backfill for a past day never reaches it, so none of them can
+     open the streak moment or ring anything. */
+  const [streakMoment, setStreakMoment] = useState<number | null>(null);
+  const pendingStreakMoment = useRef(false);
+  const closeStreakMoment = useCallback(() => setStreakMoment(null), []);
+  // The core sounds are fetched once the app is on screen, never under the landing page.
+  useEffect(() => {
+    if (showLanding === false) sfx.prefetchCore();
+  }, [showLanding]);
+  // `M` mutes and unmutes from anywhere. Desktop is most of the audience.
+  useSoundHotkey();
+
+  const celebrateLog = (date: string, hours: number, opts: { rang?: boolean } = {}) => {
+    const today = getISTDateString();
+    if (date !== today || hours <= 0) return;
+    const before = stateRef.current;
+    const todays = before.logs.filter(l => l.date === today);
+    if (todays.length === 0 && streakMomentDue(user?.id ?? null, today)) {
+      // The moment owns the sound; it opens once the log is in (effect below).
+      pendingStreakMoment.current = true;
+      return;
+    }
+    const had = todays.reduce((sum, l) => sum + l.hours, 0);
+    const goal = before.dailyGoalHours;
+    if (goal > 0 && had < goal && had + hours >= goal) {
+      sfx.play('target-hit');
+      return;
+    }
+    // A Pomodoro bell already rang for this block; a second sound on top is noise.
+    if (!opts.rang) sfx.play(loggedCue(hours));
+  };
+
   /* `source` defaults to 'manual' on purpose: only the paths that actually
      measured the time say so explicitly, so a caller that forgets can never
      accidentally donate leaderboard hours. */
@@ -725,6 +778,7 @@ const App: React.FC = () => {
   ) => {
     if (hours <= 0) return;
     const today = getISTDateString();
+    celebrateLog(today, hours);
     setState(prev => {
       /* Both or neither. Half an interval cannot be placed on a clock, and a
          log carrying one of the two would be silently dropped downstream by
@@ -765,6 +819,11 @@ const App: React.FC = () => {
   };
 
   const toggleChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string) => {
+    {
+      const existing = stateRef.current.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
+      const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(existing ? existing.status : 'not_started') + 1) % STATUS_CYCLE.length];
+      sfx.play(next === 'completed' ? 'chapter-complete' : 'tap');
+    }
     setState(prev => {
       const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
       const currentStatus = existing ? existing.status : 'not_started';
@@ -795,6 +854,7 @@ const App: React.FC = () => {
    * and remember the topic was served so tomorrow offers a different one.
    */
   const engageRecommendation = (rec: Recommendation) => {
+    sfx.play('session-start');
     setState(prev => {
       const today = getISTDateString();
       const nextState: AppState = {
@@ -887,6 +947,7 @@ const App: React.FC = () => {
   };
 
   const updateTimer = (timerUpdate: Partial<TimerState>) => {
+    if (timerUpdate.isRunning && !stateRef.current.timer.isRunning) sfx.play('session-start');
     setState(prev => {
       const nextState = { ...prev, timer: { ...prev.timer!, ...timerUpdate } };
       stateRef.current = nextState;
@@ -920,6 +981,7 @@ const App: React.FC = () => {
    * bumping it on every tick would just fight the cloud for no reason.
    */
   const commitPomodoro = (update: Partial<PomodoroRuntime>, extra?: PomodoroCommit) => {
+    if (extra?.log) celebrateLog(extra.log.date, extra.log.hours, { rang: extra.rang });
     setState(prev => {
       const runtime = { ...prev.pomodoro, ...update };
       let logs = prev.logs;
@@ -1292,6 +1354,7 @@ const App: React.FC = () => {
    * flag and the date could drift apart.
    */
   const moveTask = useCallback((id: string, column: TaskColumn, index: number) => {
+    soundForTaskMove(stateRef.current.tasks, id, column);
     setState(prev => {
       const tasks = moveCard(prev.tasks, id, column, index);
       if (tasks === prev.tasks) return prev;
@@ -1318,6 +1381,7 @@ const App: React.FC = () => {
      longer finished on. Both now happen inside moveCard, which is also what
      puts the card in the right column. */
   const toggleTask = useCallback((id: string) => {
+    soundForTaskMove(stateRef.current.tasks, id, 'done');
     setState(prev => {
       const task = prev.tasks.find(t => t.id === id);
       if (!task) return prev;
@@ -1535,6 +1599,7 @@ const App: React.FC = () => {
       window.alert('A SESSION IS ALREADY RUNNING. FINISH IT.');
       return;
     }
+    sfx.play('session-start');
     setState(prev => {
       const nextState: AppState = {
         ...prev,
@@ -1814,6 +1879,7 @@ const App: React.FC = () => {
   /* Voice sets a chapter status outright. Deliberately separate from
      toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
   const setChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string, status: SyllabusStatus) => {
+    if (status === 'completed') sfx.play('chapter-complete');
     setState(prev => {
       const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
       const filtered = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
@@ -2427,7 +2493,7 @@ const App: React.FC = () => {
           Only on Today. An announcement that could open over the Plan grid or
           mid-way through the Observatory would be a modal that follows you
           around the app, which is the thing this feature is deliberately not. */}
-      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
         && activeTab === 'Today' && announcements.current && (
         <AnnouncementModal
           announcement={announcements.current}
@@ -2448,7 +2514,7 @@ const App: React.FC = () => {
           the screen, and the news keeps until the block is done), and
           queued behind the other full-screen moments, including an
           announcement already open on Today. */}
-      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen
         && !state.timer.isRunning && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
@@ -2466,14 +2532,14 @@ const App: React.FC = () => {
           for the same reason everything else here is: the first run already has
           a landing page and a tour, and a third thing asking for a tap on top
           of those is how all three get dismissed unread. */}
-      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen && (
         <InstallBanner install={install} theme={theme} />
       )}
 
       {/* "Need help? Tell us." Bottom-left, clear of the mic in the opposite
           corner, and gone during any full-screen moment — a floating bubble
           over the reward modal or the book is a bubble in the way. */}
-      {!showOnboarding && !isBookOpen && !celebration && !sharePeriod && !introOpen && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen && (
         <FeedbackWidget
           user={user}
           theme={theme}
@@ -2483,9 +2549,22 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* The daily streak moment: once a day, after the first session logged on
+          this device. It goes before a reward unlock — on day 30 the streak
+          lands first and the wallpaper pack follows when it is closed. */}
+      {!showOnboarding && !isBookOpen && !sharePeriod && streakMoment !== null && (
+        <StreakMoment
+          streak={streakMoment}
+          logs={state.logs}
+          next={nextReward(rewards, streakCount, verifiedStreakCount)}
+          theme={theme}
+          onClose={closeStreakMoment}
+        />
+      )}
+
       {/* The payoff. Held back until the tour is done and the book is closed,
           so it never lands on top of another full-screen moment. */}
-      {!showOnboarding && !isBookOpen && celebration && (
+      {!showOnboarding && !isBookOpen && streakMoment === null && celebration && (
         <UnlockModal
           def={celebration}
           theme={theme}

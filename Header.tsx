@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, SyncStatus, ExamPreference } from './types';
 import { calculateStreak } from './utils';
+import * as sfx from './audio';
+import { useSound } from './sound/useSound';
 
 interface Props {
   currentClass: 11 | 12;
@@ -35,6 +37,7 @@ const Header: React.FC<Props> = ({
   targetExamDate,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const sound = useSound();
 
   useEffect(() => {
     const handleClickOutside = () => setShowTooltip(false);
@@ -81,6 +84,15 @@ const Header: React.FC<Props> = ({
                 INSTALL
               </button>
             )}
+            <button
+              onClick={sfx.toggleSound}
+              title={sound.enabled ? 'Sound on. Press M to mute' : 'Sound off. Press M to turn it on'}
+              aria-label={sound.enabled ? 'Mute sound' : 'Turn sound on'}
+              aria-pressed={sound.enabled}
+              className={`p-2 rounded-md border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-white border-[#E3E0D9] text-[#17150F] hover:border-[#D6D1C5]'}`}
+            >
+              {sound.enabled ? '🔊' : '🔇'}
+            </button>
             <button
               onClick={onToggleTheme}
               className={`p-2 rounded-md border transition-all flex items-center justify-center ${theme === 'dark' ? 'bg-[#111114] border-white/[0.06] text-white hover:border-white/[0.12]' : 'bg-white border-[#E3E0D9] text-[#17150F] hover:border-[#D6D1C5]'}`}

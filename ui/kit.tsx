@@ -118,6 +118,31 @@ export function Segmented<T extends string>({
   );
 }
 
+/** An on/off switch. Red when on: it is the one control whose state is an action. */
+export const Switch: React.FC<{ on: boolean; dark: boolean; disabled?: boolean; onToggle: (v: boolean) => void; label: string }> = ({
+  on,
+  dark,
+  disabled,
+  onToggle,
+  label,
+}) => (
+  <button
+    role="switch"
+    aria-checked={on}
+    aria-label={label}
+    disabled={disabled}
+    onClick={() => onToggle(!on)}
+    className={`w-11 h-6 rounded-full flex-shrink-0 transition-colors relative disabled:opacity-40 ${on ? 'bg-[#E10600]' : dark ? 'bg-[#27272a]' : 'bg-zinc-300'}`}
+  >
+    {/* `left-0` matters: a button centres its content, so an absolute child
+        with no `left` starts mid-track and the knob ends up off the end. */}
+    <span
+      className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+      style={{ transform: on ? 'translateX(22px)' : 'translateX(2px)' }}
+    />
+  </button>
+);
+
 /**
  * Rendered into document.body, not in place. <main> is `relative z-20`, a
  * stacking context of its own, so anything fixed inside it — however high its

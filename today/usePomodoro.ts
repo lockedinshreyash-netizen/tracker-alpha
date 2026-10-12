@@ -54,6 +54,8 @@ const MAX_PENDING_RATINGS = 4;
 export interface PomodoroCommit {
   log?: DailyLog;
   rate?: { logId: string; quality: number };
+  /** The log came from the bell, which has already made its sound. */
+  rang?: boolean;
 }
 
 export interface EndResult {
@@ -136,7 +138,7 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
    * finished while the tab was hidden, so its hours land on the study day it
    * was actually served, not the day the user happened to come back.
    */
-  const settle = useCallback((opts: { at: number; autoStart: boolean }): EndResult => {
+  const settle = useCallback((opts: { at: number; autoStart: boolean; rang?: boolean }): EndResult => {
     const { pomodoro: p, settings: s } = readRef.current();
     if (isIdle(p)) return { hours: 0, counted: false };
 
@@ -184,7 +186,7 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
         // The legacy field is dead the moment this engine writes anything.
         pendingBlock: null,
       },
-      log ? { log } : undefined,
+      log ? { log, rang: opts.rang } : undefined,
     );
 
     return { hours: log?.hours ?? 0, counted: credit.counted };
@@ -222,7 +224,13 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
     const late = overdue > LATE_THRESHOLD_MS;
     const wasWork = p.phase === 'work';
 
-    if (wasWork) sfx.phaseComplete(); else sfx.breakOver();
+    /* Usually already rung, on time, by the audio clock (see the schedule
+       effect below) — this path is the one that notices late in a throttled
+       background tab. If the scheduled sound has rung, it stays quiet; if the
+       clock stopped (a sleeping laptop), it rings now instead. */
+    if (!sfx.claimScheduled(`pomodoro@${p.phaseEndsAt}`)) {
+      if (wasWork) sfx.phaseComplete(); else sfx.breakOver();
+    }
 
     if (s.notify) {
       /* Through the shared router rather than a private `new Notification`.
@@ -256,7 +264,7 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
        forward — chaining on from a bell nobody heard would fabricate a run of
        phases the user never sat through. */
     setLateBy(late ? overdue : null);
-    settle({ at: p.phaseEndsAt, autoStart: s.autoStartNext && !late });
+    settle({ at: p.phaseEndsAt, autoStart: s.autoStartNext && !late, rang: true });
   }, [settle]);
 
   const bellRef = useRef(bell);
@@ -289,6 +297,20 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
       window.removeEventListener('pageshow', onWake);
     };
   }, [runtime.isRunning, runtime.phaseEndsAt, ready]);
+
+  /* ── The bell, on the audio clock ──
+     Desktop Chrome slows timers in a tab hidden for five minutes to one a
+     minute, so the watchers above can notice a finished block up to a minute
+     late — and the bell rang when they noticed. The sound is now placed on
+     the audio clock the moment a phase starts, which nothing throttles. A
+     pause or an early end withdraws it before it plays; the watchers still
+     settle the phase and log the hours exactly as before. */
+  useEffect(() => {
+    if (!runtime.isRunning || runtime.phaseEndsAt === null) return;
+    const key = `pomodoro@${runtime.phaseEndsAt}`;
+    sfx.scheduleAt(runtime.phase === 'work' ? 'block-done' : 'break-over', runtime.phaseEndsAt, key);
+    return () => sfx.cancelScheduled(key);
+  }, [runtime.isRunning, runtime.phaseEndsAt, runtime.phase]);
 
   /* ── Screen wake lock ──
      Opt-in. Released whenever the phase stops, and re-taken on return to the
@@ -403,7 +425,7 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
     if (p.isRunning) return false;
     setLateBy(null);
     setStaleDrop(null);
-    sfx.select();
+    if (p.phase === 'work') sfx.play('session-start'); else sfx.select();
     const subjectUpdate = subject && p.phase === 'work' ? { subject } : {};
     commitRef.current({ ...beginPhase(p, s), ...subjectUpdate });
     return true;

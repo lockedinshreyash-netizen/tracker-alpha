@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Card, Eyebrow, Field, PageHeader, Segmented, StatTile, btn, tokens } from '../ui/kit';
+import { Card, Eyebrow, Field, PageHeader, Segmented, StatTile, Switch, btn, tokens } from '../ui/kit';
+import * as sfx from '../audio';
+import { useSound } from '../sound/useSound';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, DailyQuestionsLog, Subject, ExamPreference, ReminderPrefs } from '../types';
 import ReminderSettings from '../reminders/ReminderSettings';
@@ -34,6 +36,38 @@ const Row: React.FC<{ title: string; detail: React.ReactNode; children: React.Re
       </div>
       <div className="flex flex-wrap gap-2 shrink-0">{children}</div>
     </Card>
+  );
+};
+
+/* Sound lives on the device, not in the synced state: a laptop in a library
+   and a phone at home want different answers. Letting go of the slider plays
+   a sample at the new level, so the number means something. */
+const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) => {
+  const { enabled, volume } = useSound();
+  return (
+    <Row
+      dark={dark}
+      delay={delay}
+      title="Sound"
+      detail={enabled ? 'Plays when you finish a session, a task or a card. Press M to mute.' : 'Muted on this device. Press M to turn it back on.'}
+    >
+      <div className="flex items-center gap-4">
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          disabled={!enabled}
+          onChange={e => sfx.setVolume(Number(e.target.value))}
+          onPointerUp={() => sfx.play('correct')}
+          onKeyUp={() => sfx.play('correct')}
+          aria-label="Volume"
+          className="w-32 accent-[#E10600] disabled:opacity-40"
+        />
+        <Switch dark={dark} on={enabled} onToggle={v => { sfx.setSoundEnabled(v); if (v) sfx.play('tap'); }} label="Sound" />
+      </div>
+    </Row>
   );
 };
 
@@ -151,6 +185,8 @@ const ReviewTab: React.FC<Props> = ({
             signedIn={!!user}
             onChange={onChangeReminders}
           />
+
+          <SoundRow dark={dark} delay={290} />
 
           <Row dark={dark} delay={300} title="Exam" detail="Switch any time. The other exam’s data stays safe and comes back if you switch back.">
             <Segmented
