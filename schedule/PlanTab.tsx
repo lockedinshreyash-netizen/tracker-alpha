@@ -3,6 +3,7 @@ import {
   BlockKind, DailyLog, ExamPreference, ScheduleBlock, ScheduleState, Subject, Task, TemplateRule, TimerState,
 } from '../types';
 import { addDays, getISTDateString } from '../utils';
+import { isArmed } from '../today/stopwatch';
 import { openTasks } from '../board/board';
 import AdherenceSection from './AdherenceSection';
 import BlockEditor, { EditorDraft } from './BlockEditor';
@@ -280,7 +281,7 @@ const PlanTab: React.FC<Props> = ({
       colors={schedule.colors}
       minute={minute}
       readOnly={readOnly}
-      runningBlockId={timer.isRunning ? timer.blockId : undefined}
+      runningBlockId={isArmed(timer) ? timer.blockId : undefined}
       taskNames={taskNames}
       onCommit={commitGeometry}
       onOpen={b => {
@@ -308,7 +309,7 @@ const PlanTab: React.FC<Props> = ({
       colors={schedule.colors}
       /* Engaging a block on a day you are not living is meaningless, and
          a second timer while one runs is refused upstream anyway. */
-      canEngage={date === today && !timer.isRunning}
+      canEngage={date === today && !isArmed(timer)}
       theme={theme}
       activeSubjects={activeSubjects}
       openTasks={openTasks(tasks)}

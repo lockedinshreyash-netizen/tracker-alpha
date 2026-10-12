@@ -92,7 +92,6 @@ export const CLIP_RULES: ClipRule[] = [
   fixed('SET RESET.', 'set-reset', 'set reset.'),
   fixed('NOT IN POMODORO MODE.', 'not-pomodoro-mode', 'not in pomodoro mode.'),
   fixed('FINISH THE RUNNING SESSION FIRST.', 'finish-session-first', 'finish the running session first.'),
-  fixed('THE STOPWATCH DOESN’T PAUSE. SAY “END SESSION”.', 'stopwatch-no-pause', "the stopwatch doesn't pause. say, end session."),
   fixed('SAY “START SESSION” TO BEGIN.', 'say-start-session', 'say, start session, to begin.'),
 
   // ── Logging ── the count and the hours are on screen.

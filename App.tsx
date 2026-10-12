@@ -55,6 +55,7 @@ import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
 import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused, heldMode, effectiveMode } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
+import { CLEARED as STOPWATCH_CLEARED, isArmed as stopwatchArmed, isPaused as stopwatchPaused, pauseRun, resumeRun, sessionSpan } from './today/stopwatch';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
@@ -791,17 +792,19 @@ const App: React.FC = () => {
     endedAt?: number,
   ) => {
     if (hours <= 0) return;
-    const today = getISTDateString();
-    celebrateLog(today, hours);
+    /* Both or neither. Half an interval cannot be placed on a clock, and a
+       log carrying one of the two would be silently dropped downstream by
+       `isObserved` anyway — better not to write it. */
+    const timed = Number.isFinite(startedAt) && Number.isFinite(endedAt) && (endedAt as number) > (startedAt as number);
+    /* A measured session belongs to the study day it ended on. That is today
+       for everything but a stopwatch paused last night and ended this morning,
+       whose minutes were served — and keep the streak — on the day before. */
+    const date = timed ? getISTDateString(new Date(endedAt as number)) : getISTDateString();
+    celebrateLog(date, hours);
     setState(prev => {
-      /* Both or neither. Half an interval cannot be placed on a clock, and a
-         log carrying one of the two would be silently dropped downstream by
-         `isObserved` anyway — better not to write it. */
-      const timed = Number.isFinite(startedAt) && Number.isFinite(endedAt) && (endedAt as number) > (startedAt as number);
-
       const newLog: DailyLog = {
         id: generateId(),
-        date: today,
+        date,
         subject,
         hours: parseFloat(hours.toFixed(2)),
         quality: quality,
@@ -1076,7 +1079,7 @@ const App: React.FC = () => {
     read: readReminders,
     commit: commitReminded,
     ready: remindersReady,
-    busy: state.timer.isRunning || !pomodoroIsIdle(state.pomodoro),
+    busy: stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro),
   });
 
   /* Publish what the server should be holding, so a deadline can still arrive
@@ -1311,17 +1314,12 @@ const App: React.FC = () => {
      few seconds started mid-tour isn't real study data worth keeping. */
   const discardActiveSession = () => {
     setState(prev => {
-      if (!prev.timer.isRunning && !prev.timer.accumulatedMs) {
+      if (!stopwatchArmed(prev.timer)) {
         return prev;
       }
       const nextState = {
         ...prev,
-        timer: {
-          ...prev.timer,
-          isRunning: false,
-          startTime: null,
-          accumulatedMs: 0,
-        },
+        timer: { ...prev.timer, ...STOPWATCH_CLEARED },
       };
       stateRef.current = nextState;
       return nextState;
@@ -1609,7 +1607,7 @@ const App: React.FC = () => {
    */
   const startBlock = (block: ScheduleBlock) => {
     const current = stateRef.current;
-    if (current.timer.isRunning || !pomodoroIsIdle(current.pomodoro)) {
+    if (stopwatchArmed(current.timer) || !pomodoroIsIdle(current.pomodoro)) {
       window.alert('A SESSION IS ALREADY RUNNING. FINISH IT.');
       return;
     }
@@ -1916,6 +1914,16 @@ const App: React.FC = () => {
     const current = stateRef.current;
     // What the Today tab is showing, so "pause" reaches the block on screen.
     const mode = effectiveMode(current);
+
+    /* "Start" and "resume" said to a paused stopwatch both land here, so the
+       two cannot disagree about a pause that crossed the study day. */
+    const resumeStopwatch = (): VoiceFeedback => {
+      const t = current.timer;
+      const { bank, update } = resumeRun(t);
+      if (bank) logStudy(t.subject, bank.hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, bank.startedAt, bank.endedAt);
+      updateTimer(update);
+      return { ok: true, message: `SESSION LIVE: ${t.subject.toUpperCase()}.` };
+    };
     const exam = current.examPreference || 'JEE';
 
     switch (intent.kind) {
@@ -1942,6 +1950,13 @@ const App: React.FC = () => {
         }
 
         if (current.timer.isRunning) return { ok: false, message: 'SESSION ALREADY RUNNING.' };
+        if (stopwatchPaused(current.timer)) {
+          // A different subject is a different session; this one ends first.
+          if (intent.subject && intent.subject !== current.timer.subject) {
+            return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
+          }
+          return resumeStopwatch();
+        }
         const subject = intent.subject ?? current.timer.subject;
         updateTimer({ isRunning: true, startTime: Date.now(), subject });
         return { ok: true, message: `SESSION LIVE: ${subject.toUpperCase()}.` };
@@ -1960,16 +1975,14 @@ const App: React.FC = () => {
         }
 
         const t = current.timer;
-        if (!t.isRunning && !t.accumulatedMs) return { ok: false, message: 'NOTHING RUNNING.' };
-        const endedAt = Date.now();
-        const elapsedMs = (t.isRunning ? endedAt - (t.startTime || endedAt) : 0) + t.accumulatedMs;
-        const hours = elapsedMs / (1000 * 60 * 60);
+        if (!stopwatchArmed(t)) return { ok: false, message: 'NOTHING RUNNING.' };
         /* Ending by voice still ends a stopwatch the app timed itself, so it
            carries the same interval the button would have recorded. Stopping a
            session by speaking rather than tapping must not make it invisible to
            the analysis. */
-        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, t.startTime ?? undefined, endedAt);
-        updateTimer({ isRunning: false, startTime: null, accumulatedMs: 0 });
+        const { hours, startedAt, endedAt } = sessionSpan(t);
+        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, startedAt, endedAt);
+        updateTimer(STOPWATCH_CLEARED);
         return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
       }
 
@@ -2016,7 +2029,10 @@ const App: React.FC = () => {
 
       case 'pauseTimer': {
         if (mode !== 'pomodoro') {
-          return { ok: false, message: 'THE STOPWATCH DOESN’T PAUSE. SAY “END SESSION”.' };
+          if (!current.timer.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
+          sfx.select();
+          updateTimer(pauseRun(current.timer));
+          return { ok: true, message: 'PAUSED. THE CLOCK IS HELD.' };
         }
         if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
         pomodoro.pause();
@@ -2026,7 +2042,9 @@ const App: React.FC = () => {
 
       case 'resumeTimer': {
         if (mode !== 'pomodoro') {
-          return { ok: false, message: 'SAY “START SESSION” TO BEGIN.' };
+          if (current.timer.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
+          if (!stopwatchPaused(current.timer)) return { ok: false, message: 'SAY “START SESSION” TO BEGIN.' };
+          return resumeStopwatch();
         }
         if (current.pomodoro.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
         const phase = current.pomodoro.phase;
@@ -2046,7 +2064,7 @@ const App: React.FC = () => {
 
       case 'setTimerMode': {
         if (mode === intent.mode) return { ok: false, message: `ALREADY IN ${intent.mode.toUpperCase()}.` };
-        if (current.pomodoro.isRunning || current.timer.isRunning) {
+        if (current.pomodoro.isRunning || stopwatchArmed(current.timer)) {
           return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
         }
         handleTabChange('Today');
@@ -2531,7 +2549,7 @@ const App: React.FC = () => {
           queued behind the other full-screen moments, including an
           announcement already open on Today. */}
       {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen
-        && !state.timer.isRunning && pomodoroIsIdle(state.pomodoro)
+        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
         <RemovalNoticeModal

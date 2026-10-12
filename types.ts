@@ -207,8 +207,12 @@ export interface LeaderboardPrefs {
 
 export interface TimerState {
   isRunning: boolean;
+  /* Start of the run on the clock now — the latest resume, not the session. */
   startTime: number | null;
+  /* Time banked by earlier runs. Non-zero while not running means paused. */
   accumulatedMs: number;
+  /* When the clock was paused: where a paused session's log ends. */
+  pausedAt?: number;
   subject: Subject;
   /* Set when the session was launched from a block on the Plan tab, and
      stamped onto the log when it stops. Device-local like the rest of the

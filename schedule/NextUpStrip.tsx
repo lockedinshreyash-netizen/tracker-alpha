@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScheduleBlock, ScheduleState, TimerState } from '../types';
 import { getISTDateString } from '../utils';
+import { isArmed } from '../today/stopwatch';
 import { blockStyle, blockTitle, countsAsStudy } from './colors';
 import { currentBlock, formatRange, formatSpan, materializeDay, nextBlock, nowMinute } from './schedule';
 
@@ -21,7 +22,7 @@ interface Props {
  */
 const NextUpStrip: React.FC<Props> = ({ schedule, timer, theme, onStartBlock, onOpenPlan }) => {
   const dark = theme === 'dark';
-  if (timer.isRunning) return null;
+  if (isArmed(timer)) return null;
 
   const today = getISTDateString();
   const minute = nowMinute();

@@ -1,4 +1,5 @@
 import { PomodoroPhase, PomodoroRuntime, PomodoroSettings, TimerMode, TimerState } from '../types';
+import { isArmed as stopwatchArmed } from './stopwatch';
 
 /* Pure rules for the Pomodoro cycle. Kept out of React so the whole state
    machine is readable in one place, and so the same transitions serve the UI,
@@ -101,10 +102,11 @@ export const isPaused = (p: PomodoroRuntime): boolean => !p.isRunning && p.phase
  * Stopwatch over a laptop mid-block, or a Plan block started on the stopwatch
  * while the mode said Pomodoro. Shown as stored, the running session's controls
  * vanished and the mode switch was locked by the very session it hid. A
- * running stopwatch wins over a Pomodoro because it has no other way to stop.
+ * stopwatch session, running or paused, wins over a Pomodoro because it has
+ * no other way to be stopped.
  */
 export const heldMode = (timer: TimerState | undefined, p: PomodoroRuntime): TimerMode | null =>
-  timer?.isRunning ? 'stopwatch' : isIdle(p) ? null : 'pomodoro';
+  stopwatchArmed(timer) ? 'stopwatch' : isIdle(p) ? null : 'pomodoro';
 
 /** The mode the Today tab, the engine and voice act on. */
 export const effectiveMode = (s: { timerMode: TimerMode; timer?: TimerState; pomodoro: PomodoroRuntime }): TimerMode =>

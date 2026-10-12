@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, SleepState, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import { isIdle as pomodoroIsIdle, effectiveMode } from './pomodoro';
+import { CLEARED, isArmed, isPaused, pauseRun, resumeRun, sessionSpan } from './stopwatch';
+import * as sfx from '../audio';
 import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
@@ -83,6 +85,10 @@ const TodayTab: React.FC<Props> = ({
 }) => {
   const { timer, tasks, logs, dailyGoalHours, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
+  /* Running or paused: either way there is a session on the card, and
+     everything that hides mid-session stays hidden through a pause. */
+  const stopwatchBusy = isArmed(timer);
+  const stopwatchPaused = isPaused(timer);
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
 
@@ -121,26 +127,45 @@ const TodayTab: React.FC<Props> = ({
 
   const handleStopTimer = () => {
     const currentTimer = timerRef.current;
-    if (!currentTimer.startTime && !currentTimer.accumulatedMs) return;
-    const endedAt = Date.now();
-    const finalMs = (currentTimer.isRunning ? endedAt - (currentTimer.startTime || endedAt) : 0) + currentTimer.accumulatedMs;
+    if (!isArmed(currentTimer)) return;
     /* Measured by the stopwatch, so it counts towards the leaderboard. The
        chapter and block ride along when the session was started from a plan —
        that stamp is the only thing that lets adherence say a block was
        honoured rather than infer it from subject and hours.
 
-       The two instants were already in hand here and were being thrown away:
-       `finalMs` is computed from `startTime` and then only its magnitude
-       survived. Passing them is what makes every time-of-day question
-       answerable — and the stopwatch has no pause (`accumulatedMs` is never
-       written non-zero anywhere), so the pair really is one contiguous
-       interval rather than a summary of several. */
+       `sessionSpan` places it on the clock: ending where the clock last ran
+       (the pause, for a paused session) and spanning exactly the time served,
+       so a pause in the middle is never counted as study. */
+    const { hours, startedAt, endedAt } = sessionSpan(currentTimer);
     onLog(
-      currentTimer.subject, finalMs / (1000 * 60 * 60), quality, 0, 'timer',
+      currentTimer.subject, hours, quality, 0, 'timer',
       currentTimer.chapter, currentTimer.blockId,
-      currentTimer.startTime ?? undefined, endedAt,
+      startedAt, endedAt,
     );
-    onTimerUpdate({ isRunning: false, startTime: null, accumulatedMs: 0, chapter: undefined, blockId: undefined });
+    onTimerUpdate(CLEARED);
+  };
+
+  /* Nothing is logged on a pause — the session is still open, and End logs it
+     once with everything served. */
+  const handlePauseTimer = () => {
+    const currentTimer = timerRef.current;
+    if (!currentTimer.isRunning) return;
+    sfx.select();
+    onTimerUpdate(pauseRun(currentTimer));
+  };
+
+  const handleResumeTimer = () => {
+    const currentTimer = timerRef.current;
+    if (!isPaused(currentTimer)) return;
+    const { bank, update } = resumeRun(currentTimer);
+    if (bank) {
+      onLog(
+        currentTimer.subject, bank.hours, quality, 0, 'timer',
+        currentTimer.chapter, currentTimer.blockId,
+        bank.startedAt, bank.endedAt,
+      );
+    }
+    onTimerUpdate(update);
   };
 
   const formatTime = (ms: number) => {
@@ -183,7 +208,7 @@ const TodayTab: React.FC<Props> = ({
   const dot = (s: Subject) => (SUBJECT_COLORS[s] ?? SUBJECT_COLORS.General).dot;
   const todayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
   const remaining = Math.max(0, dailyGoalHours - totalToday);
-  const busy = timer.isRunning || pomodoroBusy;
+  const busy = stopwatchBusy || pomodoroBusy;
 
   return (
     <div className="space-y-6">
@@ -203,7 +228,7 @@ const TodayTab: React.FC<Props> = ({
       )}
       {/* Only while idle — mid-session the last thing anyone needs is a second
           opinion about what they should be doing. */}
-      {!timer.isRunning && !pomodoroBusy && state.schedule && (
+      {!stopwatchBusy && !pomodoroBusy && state.schedule && (
         <NextUpStrip
           schedule={state.schedule}
           timer={timer}
@@ -221,7 +246,7 @@ const TodayTab: React.FC<Props> = ({
           Hidden mid-session for the same reason everything else here is — the
           last thing anyone needs while a clock is running is somewhere else to
           go. */}
-      {!timer.isRunning && !pomodoroBusy && (
+      {!stopwatchBusy && !pomodoroBusy && (
         <ObservatoryStrip
           experiment={experiment}
           theme={theme}
@@ -234,7 +259,7 @@ const TodayTab: React.FC<Props> = ({
           the Observatory, beside the one thing that reads it — Today is for
           what you need to do today, and sleep is an input to a study rather
           than a task. */}
-      {!timer.isRunning && !pomodoroBusy && (
+      {!stopwatchBusy && !pomodoroBusy && (
         <SleepReminder sleep={sleep} theme={theme} onOpen={onEnterObservatory} />
       )}
 
@@ -244,7 +269,7 @@ const TodayTab: React.FC<Props> = ({
           would be a notice that never arrived.
 
           Hidden mid-session with everything else here. */}
-      {!timer.isRunning && !pomodoroBusy && unreadAnnouncements > 0 && (
+      {!stopwatchBusy && !pomodoroBusy && unreadAnnouncements > 0 && (
         <NoticeLine
           theme={theme}
           label="A message from LOCK IN"
@@ -252,7 +277,7 @@ const TodayTab: React.FC<Props> = ({
           onOpen={onOpenAnnouncement}
         />
       )}
-      {!timer.isRunning && (
+      {!stopwatchBusy && (
         <Card dark={dark} delay={60} className="p-6 md:p-8">
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full" data-onboarding-target="daily-target">
             <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
@@ -303,10 +328,10 @@ const TodayTab: React.FC<Props> = ({
         </Card>
       )}
 
-      {/* Mode switch — hidden mid-stopwatch so a running session can't be orphaned.
-          A part-served Pomodoro block isn't orphaned by it: switching away banks
-          the time first (see setTimerMode). */}
-      {!timer.isRunning && (
+      {/* Mode switch — hidden mid-stopwatch, paused included, so a session can't
+          be orphaned. A part-served Pomodoro block isn't orphaned by it:
+          switching away banks the time first (see setTimerMode). */}
+      {!stopwatchBusy && (
         <div className={`flex justify-center ${pomodoro.isRunning ? 'opacity-40 pointer-events-none' : ''}`}>
           <Segmented
             value={shownMode}
@@ -331,7 +356,7 @@ const TodayTab: React.FC<Props> = ({
         <section
           data-onboarding-target="session-timer"
           className={`mk-rise px-6 py-10 md:p-16 text-center rounded-xl border relative overflow-hidden transition-all duration-500 ${t.card}`}
-          style={{ animationDelay: '120ms', ...(timer.isRunning ? { borderColor: `${dot(timer.subject)}66` } : {}) }}
+          style={{ animationDelay: '120ms', ...(stopwatchBusy ? { borderColor: `${dot(timer.subject)}66` } : {}) }}
         >
           {/* The subject's colour, always. Before a session it previews the
               subject picked; once running it is the session's own subject,
@@ -339,17 +364,19 @@ const TodayTab: React.FC<Props> = ({
           <div
             className="absolute inset-0 pointer-events-none transition-[background] duration-700"
             style={{
-              background: timer.isRunning
+              background: stopwatchBusy
                 ? `radial-gradient(95% 75% at 50% 0%, ${dot(timer.subject)}${dark ? '3d' : '29'}, transparent 72%)`
                 : `radial-gradient(80% 60% at 50% 0%, ${dot(manualSubject)}${dark ? '1f' : '14'}, transparent 70%)`,
             }}
           />
           {timer.isRunning && <div className="absolute top-5 right-5 animate-ping w-2 h-2 bg-[#E10600] rounded-full z-10" />}
           <div className="relative z-10">
-            <Eyebrow dark={dark}>{timer.isRunning ? `Focused on ${timer.subject}` : 'Pick a subject, then start'}</Eyebrow>
-            <p className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer mt-8 ${t.heading}`}>{formatTime(currentDisplayMs)}</p>
+            <Eyebrow dark={dark}>
+              {timer.isRunning ? `Focused on ${timer.subject}` : stopwatchPaused ? `Paused · ${timer.subject}` : 'Pick a subject, then start'}
+            </Eyebrow>
+            <p className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer mt-8 transition-opacity ${t.heading} ${stopwatchPaused ? 'opacity-40' : ''}`}>{formatTime(currentDisplayMs)}</p>
 
-            {!timer.isRunning ? (
+            {!stopwatchBusy ? (
               <>
                 <div className="flex flex-wrap justify-center gap-2 mt-10">
                   {activeSubjects.map((s: Subject) => (
@@ -384,9 +411,23 @@ const TodayTab: React.FC<Props> = ({
                     ))}
                   </div>
                 </div>
-                <button onClick={handleStopTimer} className={`${btn} w-full max-w-xs py-5 !text-[12px] !tracking-[0.3em] !rounded-xl ${t.primary}`}>
-                  End session
-                </button>
+                {/* Running, End stays the red button it always was and Pause sits
+                    beside it in outline. Paused, the colour moves to Resume:
+                    getting back to work is the thing the card is asking for. */}
+                <div className="flex w-full max-w-md gap-3">
+                  <button
+                    onClick={timer.isRunning ? handlePauseTimer : handleResumeTimer}
+                    className={`${btn} flex-1 py-5 !text-[12px] !tracking-[0.3em] !rounded-xl ${timer.isRunning ? t.ghost : t.primary}`}
+                  >
+                    {timer.isRunning ? 'Pause' : 'Resume'}
+                  </button>
+                  <button
+                    onClick={handleStopTimer}
+                    className={`${btn} flex-1 py-5 !text-[12px] !tracking-[0.3em] !rounded-xl ${timer.isRunning ? t.primary : t.ghost}`}
+                  >
+                    End session
+                  </button>
+                </div>
               </div>
             )}
           </div>
