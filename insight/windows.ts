@@ -22,6 +22,19 @@ import {
 export const WINDOW_BUCKETS = 5;
 export const WINDOW_MINS = WINDOW_BUCKETS * BUCKET_MINS;
 
+/**
+ * How much of its sessions a window has to actually hold to describe them.
+ *
+ * Sliding windows overlap, so a window can clear every sample gate on the first
+ * twenty minutes of sessions that mostly ran after it closed. Measured, that
+ * window is "6:30 – 9:00 AM" for a student whose sessions start at 8:40 — and
+ * it can top the ranking, because it only ever sees the fresh opening minutes.
+ * Half of what each session could have spent inside (all of it, or the whole
+ * window for a session longer than one) keeps the label on the hours that were
+ * actually worked, without ruling out a student whose sessions run all day.
+ */
+export const MIN_COVERAGE = 0.5;
+
 export interface StudyWindow {
   /** Study-day minutes. 0 is 04:00 IST. */
   start: number;
@@ -33,8 +46,28 @@ export interface StudyWindow {
   spanDays: number;
   /** Minute-weighted, recency-weighted mean focus rating. Null if never studied. */
   quality: number | null;
+  /** Share of its sessions' time that fell inside it, 0–1. See `MIN_COVERAGE`. */
+  coverage: number;
   sample: SampleGate;
 }
+
+/**
+ * What the claim is waiting on, in the order the requirements are met.
+ *
+ * `window` — no time of day has enough evidence yet.
+ * `second` — one has. "Best" needs a separate time of day with the same before
+ *   there is anything to compare it with.
+ * `gap` — both have. The difference between them is too small to call, and
+ *   that is an answer: more sessions are not owed, they only keep checking it.
+ * `null` — established.
+ *
+ * Each stage needs its own panel. One set of meters drawn across all three
+ * pointed, after the first stage, at whichever stray half-hour had not
+ * qualified — a single 10 PM session read "1 of 6 days" a month into the
+ * study, and the panel could never fill, because filling it was not what the
+ * claim was waiting for.
+ */
+export type WindowWait = 'window' | 'second' | 'gap' | null;
 
 export interface WindowFindings {
   /** Every candidate that clears the sample gates, strongest first. */
@@ -53,15 +86,39 @@ export interface WindowFindings {
   /** Mean focus outside the strongest window, so the gap can be drawn to scale. */
   restQuality?: number | null;
   /**
-   * The candidate closest to qualifying, whole.
+   * The gated difference, best window minus the rest of the day, in rating
+   * points. Present once `best` is. Raw rather than recency-weighted, because
+   * it is the figure the effect gate judged.
+   */
+  gap?: number;
+  waiting: WindowWait;
+  /**
+   * The qualified window that best describes where the evidence already is —
+   * the one holding the most observed time. Set while `waiting` is `second`, so
+   * the panel can say which time of day is done.
+   */
+  anchor: StudyWindow | null;
+  /**
+   * The candidate the evidence meters follow, whole.
    *
    * The UI draws the evidence gates as filling meters — "5 of 8 sessions" — so
    * it needs the counts themselves, not just what is missing. A meter is read
    * in a glance and a sentence is read in a second, and this panel exists to be
    * glanced at.
+   *
+   * At `window` it is the busiest time of day not yet qualified. At `second`
+   * it is the busiest one clear of every qualified window, so a meter never
+   * names another slice of the hours that already count. Null when nothing
+   * that would move the claim can be filled — including `second` for somebody
+   * who has only ever studied at one time of day.
    */
   nearestWindow: StudyWindow | null;
 }
+
+const disjoint = (a: StudyWindow, b: StudyWindow): boolean =>
+  a.end <= b.start || a.start >= b.end;
+
+const byMinutes = (a: StudyWindow, b: StudyWindow) => b.minutes - a.minutes;
 
 /** Whole days between two study-day strings. */
 const daysBetween = (from: string, to: string): number =>
@@ -118,6 +175,7 @@ export const measureWindows = (logs: DailyLog[], today: string): StudyWindow[] =
     const end = start + WINDOW_MINS;
 
     let minutes = 0;
+    let reachable = 0;
     let weighted = 0;
     let weight = 0;
     let count = 0;
@@ -130,6 +188,7 @@ export const measureWindows = (logs: DailyLog[], today: string): StudyWindow[] =
       if (inside <= 0) continue;
 
       minutes += inside;
+      reachable += Math.min(s.end - s.start, WINDOW_MINS);
       count += 1;
       days.add(s.date);
       if (first === null || s.date < first) first = s.date;
@@ -154,6 +213,7 @@ export const measureWindows = (logs: DailyLog[], today: string): StudyWindow[] =
       days: days.size,
       spanDays,
       quality: weight > 0 ? weighted / weight : null,
+      coverage: reachable > 0 ? minutes / reachable : 0,
       sample,
     });
   }
@@ -178,6 +238,7 @@ const splitQuality = (sessions: SessionView[], start: number, end: number) => {
  *
  *  1. A window that does not clear the sample gates is never a candidate, so
  *     three good mornings can never become "you work best in the morning".
+ *     Nor is one holding only the edges of its sessions (`MIN_COVERAGE`).
  *  2. Fewer than `MIN_COMPARISON_WINDOWS` qualified windows means there is
  *     nothing to compare against, and "best" is withheld entirely rather than
  *     awarded by default to the only window that happens to have data.
@@ -186,7 +247,8 @@ const splitQuality = (sessions: SessionView[], start: number, end: number) => {
  *     believing the rest.
  *
  * Passing all three still only earns `emerging` — the claim itself waits on the
- * effect gate.
+ * effect gate, which also has to point the right way: the best window's
+ * sessions rated *above* the rest of the day, not merely apart from them.
  */
 export const findWindows = (logs: DailyLog[], today: string): WindowFindings => {
   const all = measureWindows(logs, today);
@@ -204,34 +266,40 @@ export const findWindows = (logs: DailyLog[], today: string): WindowFindings => 
       dir * ((b.quality as number) - (a.quality as number)) || (b.minutes - a.minutes);
 
   const qualified = all
-    .filter(w => w.sample.passed && w.quality !== null)
+    .filter(w => w.sample.passed && w.quality !== null && w.coverage >= MIN_COVERAGE)
     .sort(byQuality(1));
 
-  /* The candidate closest to qualifying, so the "still learning" panel can name
-     a real shortfall rather than a generic one. Ranked by how much observed
-     time it already holds — the window the student is actually building
-     evidence in is the one they care about the wait for. */
-  const nearestWindow = all
-    .filter(w => !w.sample.passed && w.minutes > 0)
-    .sort((a, b) => b.minutes - a.minutes)[0] ?? null;
-  const nearest = nearestWindow?.sample ?? null;
+  /* Ranked by how much observed time a window already holds — the window the
+     student is actually building evidence in is the one they care about the
+     wait for. Slivers are left out so a meter never names one. */
+  const pending = all
+    .filter(w => !w.sample.passed && w.minutes > 0 && w.coverage >= MIN_COVERAGE)
+    .sort(byMinutes);
 
   const comparisonShort = Math.max(0, MIN_COMPARISON_WINDOWS - qualified.length);
-
-  if (qualified.length < MIN_COMPARISON_WINDOWS) {
-    return { qualified, best: null, worst: null, confidence: 'insufficient', comparisonShort, nearest, nearestWindow };
-  }
-
-  const best = qualified[0];
+  const best = qualified[0] ?? null;
   /* Sorted ascending rather than reversed, so the minutes tie-break still runs
      the right way round — reversing a descending sort would prefer the window
      holding the *least* evidence among equals, which is exactly backwards. */
-  const worst = [...qualified]
-    .sort(byQuality(-1))
-    .find(w => w.end <= best.start || w.start >= best.end) ?? null;
+  const worst = best
+    ? [...qualified].sort(byQuality(-1)).find(w => disjoint(w, best)) ?? null
+    : null;
 
-  if (!worst) {
-    return { qualified, best: null, worst: null, confidence: 'insufficient', comparisonShort, nearest, nearestWindow };
+  if (!best || !worst || qualified.length < MIN_COMPARISON_WINDOWS) {
+    /* Waiting on a second time of day only when nothing qualified is clear of
+       the best — two separated windows short of the count is still a wait on
+       windows, and the meters follow the busiest one left. */
+    const second = best !== null && !worst;
+    const nearestWindow = second
+      ? pending.find(w => qualified.every(q => disjoint(w, q))) ?? null
+      : pending[0] ?? null;
+    return {
+      qualified, best: null, worst: null, confidence: 'insufficient', comparisonShort,
+      nearest: nearestWindow?.sample ?? null,
+      waiting: second ? 'second' : 'window',
+      anchor: second ? [...qualified].sort(byMinutes)[0] : null,
+      nearestWindow,
+    };
   }
 
   const { inside, outside } = splitQuality(sessions, best.start, best.end);
@@ -244,15 +312,23 @@ export const findWindows = (logs: DailyLog[], today: string): WindowFindings => 
   const effect = outside.length > 0
     ? checkEffect(inside, outside, FLOORS.quality)
     : { passed: false, diff: 0 };
+  /* `checkEffect` judges the size of a gap in either direction. "You focus
+     best between…" needs it in this one: best is ranked on the recency-weighted
+     figure, and a window can top that while its sessions, all told, rated
+     below the rest of the day. */
+  const confidence = gradeConfidence(best.sample, effect.passed && effect.diff > 0);
 
   return {
     qualified,
     best,
     worst,
-    confidence: gradeConfidence(best.sample, effect.passed),
+    confidence,
     comparisonShort,
-    nearest,
-    nearestWindow,
+    nearest: null,
+    waiting: confidence === 'established' ? null : 'gap',
+    anchor: null,
+    nearestWindow: null,
+    gap: effect.diff,
     /* The rest-of-day mean, so the comparison can be drawn rather than
        described. A finding that says "4.6 vs 2.9" against a scale the reader
        can see is understood instantly; the same fact in a sentence is not. */

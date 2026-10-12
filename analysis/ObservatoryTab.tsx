@@ -4,11 +4,13 @@ import { getISTDateString } from '../utils';
 import {
   ExperimentState, dayRows, evidenceGates, formatRange, formatStartDate,
 } from '../insight/observe';
-import { MIN_DAYS } from '../insight/confidence';
+import { FLOORS, MIN_DAYS } from '../insight/confidence';
+import { MIN_NIGHTS, SleepFindings } from '../insight/sleep';
 import WhenYouStudy from './WhenYouStudy';
 import RecentDays from './RecentDays';
 import ProgressRows from './ProgressRows';
 import SleepEntry, { fmtDuration } from './SleepEntry';
+import SleepCompare, { sleepFindingTitle } from './SleepCompare';
 import ExplainCard from './ExplainCard';
 import { worthExplaining } from '../insight/packet';
 
@@ -58,7 +60,7 @@ const Card: React.FC<{
       </div>
     )}
     {title && <h2 className="o-title mb-1.5">{title}</h2>}
-    {sub && <p className="o-body mb-7" style={{ maxWidth: '52ch' }}>{sub}</p>}
+    {sub && <p className={`o-body ${children ? 'mb-7' : ''}`} style={{ maxWidth: '52ch' }}>{sub}</p>}
     {!sub && (title || label) && <div className="mb-7" />}
     {children}
   </section>
@@ -173,18 +175,42 @@ const ObservatoryTab: React.FC<Props> = ({
                 caused it.
               </p>
             </Card>
-          ) : windows.confidence === 'emerging' && windows.best ? (
-            <Card label="Early signal" delay={280}>
-              <p className="o-title" style={{ fontSize: 'clamp(1.25rem, 4.2vw, 1.75rem)', lineHeight: 1.3, marginBottom: 14 }}>
-                <span className="o-accent">{formatRange(windows.best.start, windows.best.end)}</span>{' '}
-                is your strongest so far.
-              </p>
-              <p className="o-body" style={{ maxWidth: '50ch' }}>
-                {windows.best.sessions} sessions across {windows.best.days} days — enough to look
-                at, not yet enough to be sure. The gap between it and the rest of your day could
-                still be chance.
-              </p>
-            </Card>
+          ) : windows.waiting === 'gap' && windows.best ? (
+            /* Every sample gate is open, so this is an answer rather than a
+               wait: either the day is flat, or the gap is real-sized but your
+               focus swings too much to call it. Neither is fixed by "more
+               sessions", so neither gets a progress bar. */
+            steady(windows.gap) ? (
+              <Card label="What Alpha found" delay={280}>
+                <p className="o-title" style={{ fontSize: 'clamp(1.25rem, 4.2vw, 1.75rem)', lineHeight: 1.3, marginBottom: 14 }}>
+                  Your focus is steady across the day.
+                </p>
+                <p className="o-body" style={{ maxWidth: '50ch', marginBottom: 26 }}>
+                  Your best stretch, {formatRange(windows.best.start, windows.best.end)}, is close to
+                  the rest of your day. So far, when you study isn't what decides how well it goes.
+                </p>
+                <Compare
+                  best={{ label: formatRange(windows.best.start, windows.best.end), value: windows.best.quality ?? 0 }}
+                  rest={{ label: 'Rest of your day', value: windows.restQuality ?? 0 }}
+                  accent={false}
+                />
+              </Card>
+            ) : (
+              <Card label="Early signal" delay={280}>
+                <p className="o-title" style={{ fontSize: 'clamp(1.25rem, 4.2vw, 1.75rem)', lineHeight: 1.3, marginBottom: 14 }}>
+                  <span className="o-accent">{formatRange(windows.best.start, windows.best.end)}</span>{' '}
+                  is your strongest so far.
+                </p>
+                <p className="o-body" style={{ maxWidth: '50ch', marginBottom: 26 }}>
+                  But your focus swings a lot from one session to the next, so the gap could
+                  still be chance. Alpha checks again with every session.
+                </p>
+                <Compare
+                  best={{ label: formatRange(windows.best.start, windows.best.end), value: windows.best.quality ?? 0 }}
+                  rest={{ label: 'Rest of your day', value: windows.restQuality ?? 0 }}
+                />
+              </Card>
+            )
           ) : null}
 
           {/* ── When you study ── */}
@@ -219,15 +245,18 @@ const ObservatoryTab: React.FC<Props> = ({
             </Card>
           )}
 
-          {/* ── What's still needed ── */}
-          {!named && (
+          {/* ── What's still needed ──
+              Only while something can still be filled. Each stage names the
+              window its meters are counting, because three bars with no window
+              on them read as one wait that never ends. */}
+          {(windows.waiting === 'window' || windows.waiting === 'second') && (
             <Card
               label="Before Alpha can be sure"
               title="What's still needed"
-              sub="Alpha won't name your best time of day until there's enough evidence behind it. Here's how close you are."
+              sub={neededSentence(experiment)}
               delay={460}
             >
-              <ProgressRows gates={gates} />
+              {(windows.nearestWindow || windows.waiting === 'window') && <ProgressRows gates={gates} />}
             </Card>
           )}
 
@@ -237,12 +266,8 @@ const ObservatoryTab: React.FC<Props> = ({
               and nothing else. */}
           <Card
             label="Sleep"
-            title={sleepTitle(sleep, nights)}
-            sub={
-              sleep.enabled
-                ? 'Sleep gives one reading a night, so this fills slowly. After three weeks Alpha can start comparing your nights to the days after them.'
-                : 'Two times each morning, and Alpha can start comparing your sleep to the day that follows it. Off until you ask for it.'
-            }
+            title={sleepTitle(sleep, nights, experiment.sleep)}
+            sub={sleepSentence(sleep, experiment.sleep)}
             delay={520}
           >
             {sleep.enabled && (
@@ -254,25 +279,22 @@ const ObservatoryTab: React.FC<Props> = ({
                   onClearNight={onClearNight}
                 />
 
-                <div className="mt-7">
-                  <div className="flex items-baseline justify-between gap-4 mb-2.5">
-                    <span style={{ fontSize: 15, fontWeight: 600 }}>Nights recorded</span>
-                    <span className="o-num" style={{ fontSize: 15, color: nights >= 21 ? 'var(--o-accent)' : 'var(--o-ink-2)' }}>
-                      {nights}
-                      <span style={{ color: 'var(--o-ink-3)', fontWeight: 600 }}> / 21</span>
-                    </span>
-                  </div>
-                  <div className="o-track" style={{ height: 10 }}>
-                    <div
-                      className="o-fill o-bar-x"
-                      style={{
-                        width: `${Math.min(100, (nights / 21) * 100)}%`,
-                        background: nights >= 21 ? 'var(--o-accent)' : 'var(--o-bar)',
-                        animationDelay: '160ms',
-                      }}
+                {experiment.sleep.waiting !== 'contrast' && <div className="mt-7">
+                  {experiment.sleep.waiting === 'nights' && (
+                    <ProgressRows gates={[{ label: 'Nights recorded', have: nights, need: MIN_NIGHTS, unit: '' }]} />
+                  )}
+                  {experiment.sleep.waiting === 'days' && (
+                    <ProgressRows
+                      gates={[{
+                        label: 'Nights followed by a timed session',
+                        have: experiment.sleep.paired,
+                        need: experiment.sleep.pairedNeed,
+                        unit: '',
+                      }]}
                     />
-                  </div>
-                </div>
+                  )}
+                  {experiment.sleep.waiting === null && <SleepCompare findings={experiment.sleep} />}
+                </div>}
 
                 {recentNights.length > 0 && (
                   <div className="flex gap-2 flex-wrap mt-6">
@@ -334,6 +356,8 @@ const ObservatoryTab: React.FC<Props> = ({
 const headline = (exp: ExperimentState, named: boolean): string => {
   if (exp.sessions === 0) return 'Your experiment has started. Nothing recorded yet — start a timed session and the first one lands here.';
   if (named) return 'Alpha has enough evidence to name your strongest time of day.';
+  if (exp.windows.waiting === 'gap') return 'Alpha has enough evidence to compare the times you study.';
+  if (exp.windows.waiting === 'second') return 'One part of your day has enough evidence. Alpha needs a second to compare it with.';
   if (exp.studyDays < 2) return 'First day on the record. Come back tomorrow and there will be something to compare it to.';
   return `Alpha is watching. ${MIN_DAYS - exp.studyDays > 0 ? `${MIN_DAYS - exp.studyDays} more study ${MIN_DAYS - exp.studyDays === 1 ? 'day' : 'days'} before it can start testing a pattern.` : 'Building the evidence to test a pattern.'}`;
 };
@@ -352,12 +376,58 @@ const peakSentence = (grid: { buckets: { minutes: number }[] }): string => {
   return `Most of your time lands around ${label}`;
 };
 
+/**
+ * A gap under the quality floor.
+ *
+ * The floor is the effect gate's own: below it the student could not have told
+ * the two stretches apart while living them, which is the same thing as the
+ * day being flat. Above it and still ungated, the gap is real-sized but the
+ * ratings vary too much — a different sentence.
+ */
+const steady = (gap: number | undefined): boolean =>
+  gap === undefined || Math.abs(gap) < FLOORS.quality.absolute;
+
+/** The "still needed" card's sentence, naming the window its meters count. */
+const neededSentence = (exp: ExperimentState): string => {
+  const { waiting, nearestWindow, anchor } = exp.windows;
+  if (waiting === 'second' && anchor) {
+    const done = formatRange(anchor.start, anchor.end);
+    return nearestWindow
+      ? `${done} has enough. To call a time your best, Alpha needs a second time of day to compare it with. Your next busiest is ${formatRange(nearestWindow.start, nearestWindow.end)}.`
+      : `${done} has enough. But you've only timed sessions around then, so there's nothing to compare it with. Study at another time of day on a few days and Alpha can start.`;
+  }
+  if (nearestWindow) {
+    return `Alpha won't name your best time of day until there's enough evidence behind it. Your busiest time so far is ${formatRange(nearestWindow.start, nearestWindow.end)}. Here's how close it is.`;
+  }
+  return "Alpha won't name your best time of day until there's enough evidence behind it. Here's how close you are.";
+};
+
 /** The sleep card's headline, as a sentence rather than a state name. */
-const sleepTitle = (sleep: SleepState, nights: number): string => {
+const sleepTitle = (sleep: SleepState, nights: number, findings: SleepFindings): string => {
   if (!sleep.enabled) return 'Not being tracked';
   if (nights === 0) return 'Log your first night';
-  if (nights >= 21) return `${nights} nights — enough to start comparing`;
+  if (findings.waiting === null) return sleepFindingTitle(findings);
+  if (findings.waiting === 'contrast') return 'Your nights are all about the same length';
   return `${nights} ${nights === 1 ? 'night' : 'nights'} recorded`;
+};
+
+/** The sleep card's sentence for each stage of the comparison. */
+const sleepSentence = (sleep: SleepState, findings: SleepFindings): string => {
+  if (!sleep.enabled) {
+    return 'Two times each morning, and Alpha can start comparing your sleep to the day that follows it. Off until you ask for it.';
+  }
+  switch (findings.waiting) {
+    case 'nights':
+      return 'Sleep gives one reading a night, so this fills slowly. After three weeks Alpha can start comparing your nights to the days after them.';
+    case 'days':
+      return 'Alpha compares each night with the day after it, so it only counts nights followed by a timed session.';
+    case 'contrast': {
+      const [lo, hi] = findings.range ?? [0, 0];
+      return `Every night has been between ${fmtDuration(lo * 60_000)} and ${fmtDuration(hi * 60_000)}. That's a steady routine, but it leaves no short night to compare a long one with.`;
+    }
+    default:
+      return 'Your longer nights against your shorter ones, and how the next day went.';
+  }
 };
 
 const Stat: React.FC<{ value: string; label: string; delay: number }> = ({ value, label, delay }) => (
@@ -378,8 +448,11 @@ const Stat: React.FC<{ value: string; label: string; delay: number }> = ({ value
 const Compare: React.FC<{
   best: { label: string; value: number };
   rest: { label: string; value: number };
-  worst: { label: string; value: number };
-}> = ({ best, rest, worst }) => {
+  worst?: { label: string; value: number };
+  /* Off when the finding is that nothing stands out — an accent bar would
+     draw the eye to a winner the text has just said there isn't. */
+  accent?: boolean;
+}> = ({ best, rest, worst, accent = true }) => {
   const row = (r: { label: string; value: number }, tone: 'accent' | 'mid' | 'low', i: number) => (
     <div key={r.label} className="o-in" style={{ animationDelay: `${180 + i * 90}ms` }}>
       <div className="flex items-baseline justify-between gap-4 mb-2">
@@ -405,9 +478,9 @@ const Compare: React.FC<{
 
   return (
     <div className="flex flex-col gap-5">
-      {row(best, 'accent', 0)}
+      {row(best, accent ? 'accent' : 'mid', 0)}
       {row(rest, 'mid', 1)}
-      {row(worst, 'low', 2)}
+      {worst && row(worst, 'low', 2)}
       <p className="o-body" style={{ fontSize: 12.5, color: 'var(--o-ink-3)' }}>
         Focus rating out of 5, weighted by how long each session ran.
       </p>

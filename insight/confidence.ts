@@ -116,12 +116,15 @@ export interface EffectFloor {
  * than that and the student could not have told the two windows apart while
  * living them. `minutes` is mean session length; twelve minutes is the
  * difference between a session you would describe differently. `ratio` is for
- * anything compared proportionally, at 15%.
+ * anything compared proportionally, at 15%. `hours` is a whole day's study
+ * time, for the sleep comparison: half an hour a day is the least a student
+ * would notice in their own week.
  */
 export const FLOORS = {
   quality: { absolute: 0.4, sd: 0.5 } as EffectFloor,
   minutes: { absolute: 12, sd: 0.5 } as EffectFloor,
   ratio: { absolute: 0.15, sd: 0.5 } as EffectFloor,
+  hours: { absolute: 0.5, sd: 0.5 } as EffectFloor,
 };
 
 /** Population standard deviation of a list. Zero for fewer than two values. */
@@ -158,6 +161,27 @@ export const checkEffect = (
   if (pooled > 0 && magnitude < floor.sd * pooled) return { passed: false, diff };
 
   return { passed: true, diff };
+};
+
+/**
+ * Whether a difference stands clear of what chance alone produces at this
+ * sample size: at least `z` standard errors (Welch), so roughly 95% at 2.
+ *
+ * `checkEffect`'s floors measure the gap against the spread of the ratings,
+ * which does not shrink as observations arrive — so on its own it cannot tell
+ * a real gap from a lucky one in a small sample. Comparisons whose halves are
+ * a week or two of nights each need this as well: with nine nights a side, a
+ * student with no sleep effect at all cleared the floors one time in four.
+ */
+export const clearOfChance = (a: number[], b: number[], z = 2): boolean => {
+  if (a.length < 2 || b.length < 2) return false;
+  const variance = (v: number[]) => {
+    const m = mean(v);
+    return v.reduce((acc, x) => acc + (x - m) ** 2, 0) / (v.length - 1);
+  };
+  const diff = Math.abs(mean(a) - mean(b));
+  const se = Math.sqrt(variance(a) / a.length + variance(b) / b.length);
+  return se === 0 ? diff > 0 : diff / se >= z;
 };
 
 /**

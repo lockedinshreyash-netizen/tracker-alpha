@@ -2,6 +2,7 @@ import { AnalysisState, DailyLog, SleepLog } from '../types';
 import { DAY_START_HOUR, IST_OFFSET_MS, addDays, dateValue, getISTDateString } from '../utils';
 import { BUCKET_COUNT, DayGrid, buildGrid, isObserved, observedSince } from './buckets';
 import { MIN_DAYS, MIN_SESSIONS, MIN_SPAN_DAYS } from './confidence';
+import { SleepFindings, compareSleep } from './sleep';
 import { WindowFindings, findWindows } from './windows';
 
 /* ── The experiment, as a thing you can look at ──
@@ -59,6 +60,8 @@ export interface ExperimentState {
   nights: number;
   grid: DayGrid;
   windows: WindowFindings;
+  /** Sleep against the day after it. Computed whether or not sleep is on; with it off there are simply no nights. */
+  sleep: SleepFindings;
 }
 
 /** Day 1 is the start day itself — an experiment begun today is on its first day. */
@@ -91,8 +94,8 @@ export const buildExperiment = (
   const spanDays = sorted.length ? Math.round((dateValue(sorted[sorted.length - 1]) - dateValue(sorted[0])) / 86_400_000) + 1 : 0;
 
   const nights = analysis.startedOn
-    ? sleepLogs.filter(s => s.date >= (analysis.startedOn as string)).length
-    : 0;
+    ? sleepLogs.filter(s => s.date >= (analysis.startedOn as string))
+    : [];
 
   return {
     status: statusOf(analysis, grid, windows),
@@ -102,9 +105,10 @@ export const buildExperiment = (
     hours: Math.round(observed.reduce((a, l) => a + l.hours, 0) * 10) / 10,
     studyDays: days.size,
     spanDays,
-    nights,
+    nights: nights.length,
     grid,
     windows,
+    sleep: compareSleep(observed, nights),
   };
 };
 
@@ -200,70 +204,21 @@ export interface Gate {
 }
 
 /**
- * What the strongest candidate window still needs, as filling meters.
+ * What the window the claim is waiting on still needs, as filling meters.
  *
- * Measured against the window closest to qualifying rather than the day as a
- * whole, because that is the one the student is actually building evidence in —
- * and the numbers are its real counts, never a percentage invented to make a
- * bar look fuller.
+ * Measured against `nearestWindow` rather than the day as a whole, because that
+ * is the one the student is actually building evidence in — and the numbers are
+ * its real counts, never a percentage invented to make a bar look fuller. With
+ * nothing left to fill they are the best window's, full: the AI packet reads
+ * these too, and "0 of 8" for a study whose gates are all open would be a lie.
  */
 export const evidenceGates = (exp: ExperimentState): Gate[] => {
-  const w = exp.windows.nearestWindow ?? exp.windows.qualified[0] ?? null;
+  const w = exp.windows.nearestWindow ?? exp.windows.best ?? exp.windows.anchor ?? exp.windows.qualified[0] ?? null;
   return [
     { label: 'Sessions in a window', have: w?.sessions ?? 0, need: MIN_SESSIONS, unit: '' },
     { label: 'Study days covered', have: w?.days ?? 0, need: MIN_DAYS, unit: '' },
     { label: 'Days of elapsed time', have: w?.spanDays ?? 0, need: MIN_SPAN_DAYS, unit: '' },
   ];
-};
-
-/**
- * What the experiment is still waiting for, in the order it will arrive.
- *
- * This is the "what Alpha is still learning" panel, and it exists because an
- * empty state that says "not enough data" is an apology. A student who is told
- * "4 more study days before this can be tested" knows what to do and knows the
- * system is not stalled.
- *
- * Only genuine shortfalls are listed. Nothing here invents a milestone to fill
- * space — when the analysis is waiting on nothing, this returns nothing.
- */
-export const stillLearning = (exp: ExperimentState, sleepEnabled: boolean): string[] => {
-  const out: string[] = [];
-
-  if (exp.status === 'started') {
-    out.push('Alpha needs a second study day before your record becomes a distribution.');
-    return out;
-  }
-
-  const gate = exp.windows.nearest;
-  if (exp.windows.confidence === 'insufficient') {
-    if (gate && gate.missing.length) {
-      const m = gate.missing[0];
-      if (m.kind === 'days') {
-        out.push(`${m.short} more study ${m.short === 1 ? 'day' : 'days'} before your strongest window can be tested.`);
-      } else if (m.kind === 'sessions') {
-        out.push(`${m.short} more ${m.short === 1 ? 'session' : 'sessions'} before your strongest window can be tested.`);
-      } else {
-        out.push(`${m.short} more ${m.short === 1 ? 'day' : 'days'} of elapsed time — a pattern needs to hold across more than one week.`);
-      }
-    } else {
-      out.push(`A window needs ${MIN_SESSIONS} sessions across ${MIN_DAYS} study days, spanning ${MIN_SPAN_DAYS} days.`);
-    }
-
-    if (exp.windows.comparisonShort > 0 && exp.windows.qualified.length > 0) {
-      out.push(`${exp.windows.comparisonShort} more ${exp.windows.comparisonShort === 1 ? 'window' : 'windows'} need enough data before yours can be compared against anything.`);
-    }
-  } else if (exp.windows.confidence === 'emerging') {
-    out.push('Your strongest window has enough observations, but the gap is still inside normal variation.');
-  }
-
-  if (!sleepEnabled) {
-    out.push('Sleep is not being recorded. Without it, nothing can be compared against the night before.');
-  } else if (exp.nights < 21) {
-    out.push(`${21 - exp.nights} more nights before sleep can be compared against the following day.`);
-  }
-
-  return out;
 };
 
 /* ── Formatting ──
