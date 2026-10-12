@@ -53,7 +53,7 @@ import { useReminders } from './reminders/useReminders';
 import { materializeDay } from './schedule/schedule';
 import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
 import { VoiceIntent, toQSubject } from './voice/commands';
-import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused } from './today/pomodoro';
+import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused, heldMode, effectiveMode } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
@@ -174,7 +174,10 @@ const App: React.FC = () => {
         const merged: AppState = { ...DEFAULT_STATE, ...parsed };
         merged.pomodoroSettings = { ...DEFAULT_POMODORO_SETTINGS, ...(parsed.pomodoroSettings || {}) };
         merged.pomodoro = normalizePomodoro(parsed.pomodoro);
-        merged.timerMode = parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch';
+        /* Held to the session armed here, which also repairs a state saved
+           while a synced mode was hiding it (see `heldMode`). */
+        merged.timerMode = heldMode(merged.timer, merged.pomodoro)
+          ?? (parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch');
         merged.leaderboard = { ...DEFAULT_LEADERBOARD, ...(parsed.leaderboard || {}) };
         /* Rewards arrived late too, and an account with a long history should
            find its earned tiers already in the vault on first load — `evaluate`
@@ -367,9 +370,11 @@ const App: React.FC = () => {
               lastUsedTab: prev.lastUsedTab,
               theme: prev.theme,
               // A push from another device must not reach in and restart or
-              // rewind a timer running here.
+              // rewind a timer running here…
               timer: prev.timer,
               pomodoro: prev.pomodoro,
+              // …nor switch the Today tab away from it (see `heldMode`).
+              timerMode: heldMode(prev.timer, prev.pomodoro) ?? remoteState.timerMode ?? prev.timerMode,
               // …nor take back a reward already earned here.
               rewards: mergeRewards(normalizeRewards(prev.rewards), normalizeRewards(remoteState.rewards)),
               /* `schedule` deliberately rides the wholesale spread, exactly like
@@ -433,6 +438,7 @@ const App: React.FC = () => {
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
               pomodoro: localState.pomodoro,
+              timerMode: heldMode(localState.timer, localState.pomodoro) ?? remoteState.timerMode ?? localState.timerMode,
               /* Never last-write-wins: an unlock is a receipt, and a stale
                  push from another device must not be able to revoke one. */
               rewards: mergeRewards(
@@ -482,9 +488,12 @@ const App: React.FC = () => {
                preventSyncOnUpdate window, so the stale server copy won the next
                merge and the same block was logged again, and again. The same
                hazard applies to `timer`: a stale record could restart a
-               stopwatch the user had stopped. */
+               stopwatch the user had stopped. The mode that shows them is held
+               with them while one is armed: a phone's Stopwatch landing on a
+               laptop mid-block hid the block and locked the switch back. */
             timer: localState.timer,
             pomodoro: localState.pomodoro,
+            timerMode: heldMode(localState.timer, localState.pomodoro) ?? remoteState.timerMode ?? localState.timerMode,
             rewards: mergeRewards(
               normalizeRewards(localState.rewards),
               normalizeRewards(remoteState.rewards),
@@ -563,12 +572,17 @@ const App: React.FC = () => {
     }
   };
 
+  /* Keyed on the user's id, not the object. Supabase re-emits SIGNED_IN (or
+     TOKEN_REFRESHED) with a freshly parsed user every time a tab comes back to
+     the foreground, so `[state, user]` pushed on every resume. A phone resumed
+     from memory hours later then stamped its stale copy as the newest state in
+     the account, and the next device to open adopted it wholesale. */
   useEffect(() => {
     localStorage.setItem('locked_in_state_v2', JSON.stringify(state));
     if (user && isInitialSyncDone.current && !preventSyncOnUpdate.current) {
       triggerSync();
     }
-  }, [state, user]);
+  }, [state, user?.id]);
 
   const handleSignOut = async () => {
     if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
@@ -1022,7 +1036,7 @@ const App: React.FC = () => {
     settings: state.pomodoroSettings,
     read: () => ({ pomodoro: stateRef.current.pomodoro, settings: stateRef.current.pomodoroSettings }),
     commit: commitPomodoro,
-    active: state.timerMode === 'pomodoro',
+    active: effectiveMode(state) === 'pomodoro',
     ready: syncSettled,
   });
 
@@ -1900,6 +1914,8 @@ const App: React.FC = () => {
      sees the result of the first. */
   const executeVoiceCommand = (intent: VoiceIntent): VoiceFeedback => {
     const current = stateRef.current;
+    // What the Today tab is showing, so "pause" reaches the block on screen.
+    const mode = effectiveMode(current);
     const exam = current.examPreference || 'JEE';
 
     switch (intent.kind) {
@@ -1913,7 +1929,7 @@ const App: React.FC = () => {
         }
         handleTabChange('Today');
 
-        if (current.timerMode === 'pomodoro') {
+        if (mode === 'pomodoro') {
           if (current.pomodoro.isRunning) return { ok: false, message: 'A BLOCK IS ALREADY RUNNING.' };
           const phase = current.pomodoro.phase;
           const resuming = pomodoroIsPaused(current.pomodoro);
@@ -1932,7 +1948,7 @@ const App: React.FC = () => {
       }
 
       case 'endSession': {
-        if (current.timerMode === 'pomodoro') {
+        if (mode === 'pomodoro') {
           if (pomodoroIsIdle(current.pomodoro)) return { ok: false, message: 'NOTHING RUNNING.' };
           const wasWork = current.pomodoro.phase === 'work';
           // Ending early still banks every minute that was served.
@@ -1999,7 +2015,7 @@ const App: React.FC = () => {
       }
 
       case 'pauseTimer': {
-        if (current.timerMode !== 'pomodoro') {
+        if (mode !== 'pomodoro') {
           return { ok: false, message: 'THE STOPWATCH DOESN’T PAUSE. SAY “END SESSION”.' };
         }
         if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
@@ -2009,7 +2025,7 @@ const App: React.FC = () => {
       }
 
       case 'resumeTimer': {
-        if (current.timerMode !== 'pomodoro') {
+        if (mode !== 'pomodoro') {
           return { ok: false, message: 'SAY “START SESSION” TO BEGIN.' };
         }
         if (current.pomodoro.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
@@ -2019,7 +2035,7 @@ const App: React.FC = () => {
       }
 
       case 'resetPomodoro': {
-        if (current.timerMode !== 'pomodoro') return { ok: false, message: 'NOT IN POMODORO MODE.' };
+        if (mode !== 'pomodoro') return { ok: false, message: 'NOT IN POMODORO MODE.' };
         // Resets the set, not the day: focus already served is logged first.
         const { hours } = pomodoro.reset();
         return {
@@ -2029,7 +2045,7 @@ const App: React.FC = () => {
       }
 
       case 'setTimerMode': {
-        if (current.timerMode === intent.mode) return { ok: false, message: `ALREADY IN ${intent.mode.toUpperCase()}.` };
+        if (mode === intent.mode) return { ok: false, message: `ALREADY IN ${intent.mode.toUpperCase()}.` };
         if (current.pomodoro.isRunning || current.timer.isRunning) {
           return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
         }

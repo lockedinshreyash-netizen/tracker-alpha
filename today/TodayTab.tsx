@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, SleepState, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
-import { isIdle as pomodoroIsIdle } from './pomodoro';
+import { isIdle as pomodoroIsIdle, effectiveMode } from './pomodoro';
 import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
@@ -81,7 +81,7 @@ const TodayTab: React.FC<Props> = ({
   unreadAnnouncements,
   onOpenAnnouncement,
 }) => {
-  const { timer, tasks, logs, dailyGoalHours, timerMode, pomodoro, pomodoroSettings } = state;
+  const { timer, tasks, logs, dailyGoalHours, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
@@ -176,7 +176,10 @@ const TodayTab: React.FC<Props> = ({
 
   const dark = theme === 'dark';
   const t = tokens(dark);
-  const isPomodoro = timerMode === 'pomodoro';
+  /* Not `timerMode`: a session running here decides what is shown, whatever
+     mode another device last synced (see `heldMode`). */
+  const shownMode = effectiveMode(state);
+  const isPomodoro = shownMode === 'pomodoro';
   const dot = (s: Subject) => (SUBJECT_COLORS[s] ?? SUBJECT_COLORS.General).dot;
   const todayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
   const remaining = Math.max(0, dailyGoalHours - totalToday);
@@ -306,7 +309,7 @@ const TodayTab: React.FC<Props> = ({
       {!timer.isRunning && (
         <div className={`flex justify-center ${pomodoro.isRunning ? 'opacity-40 pointer-events-none' : ''}`}>
           <Segmented
-            value={timerMode}
+            value={shownMode}
             onChange={mode => onSetTimerMode(mode)}
             dark={dark}
             label="Timer mode"

@@ -1,4 +1,4 @@
-import { PomodoroPhase, PomodoroRuntime, PomodoroSettings } from '../types';
+import { PomodoroPhase, PomodoroRuntime, PomodoroSettings, TimerMode, TimerState } from '../types';
 
 /* Pure rules for the Pomodoro cycle. Kept out of React so the whole state
    machine is readable in one place, and so the same transitions serve the UI,
@@ -91,6 +91,24 @@ export const isIdle = (p: PomodoroRuntime): boolean => !p.isRunning && p.phaseTo
 
 /** Armed and part-served, but the clock is stopped. */
 export const isPaused = (p: PomodoroRuntime): boolean => !p.isRunning && p.phaseTotalMs !== null;
+
+/**
+ * The timer mode a session in flight on this device holds the Today tab to —
+ * null when nothing is armed and the user's own choice stands.
+ *
+ * `timerMode` syncs with the account but both runtimes are device-local, so the
+ * stored mode can name the one that is *not* running here: a phone pushing its
+ * Stopwatch over a laptop mid-block, or a Plan block started on the stopwatch
+ * while the mode said Pomodoro. Shown as stored, the running session's controls
+ * vanished and the mode switch was locked by the very session it hid. A
+ * running stopwatch wins over a Pomodoro because it has no other way to stop.
+ */
+export const heldMode = (timer: TimerState | undefined, p: PomodoroRuntime): TimerMode | null =>
+  timer?.isRunning ? 'stopwatch' : isIdle(p) ? null : 'pomodoro';
+
+/** The mode the Today tab, the engine and voice act on. */
+export const effectiveMode = (s: { timerMode: TimerMode; timer?: TimerState; pomodoro: PomodoroRuntime }): TimerMode =>
+  heldMode(s.timer, s.pomodoro) ?? s.timerMode;
 
 /** Time served in the armed phase. Off the clock while running, banked while paused. */
 export const servedMs = (p: PomodoroRuntime, now: number = Date.now()): number => {
