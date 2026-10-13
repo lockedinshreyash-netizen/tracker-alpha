@@ -25,7 +25,7 @@ const ToastHost: React.FC<Props> = ({ theme }) => {
 
   return (
     <div
-      className="fixed top-16 md:top-6 left-1/2 -translate-x-1/2 z-[45] w-[min(92vw,26rem)] flex flex-col gap-2 pointer-events-none"
+      className="toast-stack fixed left-1/2 -translate-x-1/2 z-[45] w-[min(92vw,26rem)] flex flex-col gap-2 pointer-events-none"
       role="status"
       aria-live="polite"
     >

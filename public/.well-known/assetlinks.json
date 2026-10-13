@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "in.trackeralpha.app",
+        "sha256_cert_fingerprints": ["8F:1A:43:AD:21:2C:B6:96:44:BC:77:73:C3:13:77:BF:7C:51:1F:69:10:D0:B2:89:AE:4F:38:A5:1C:C1:B8:4B"]
+      }
+    }]

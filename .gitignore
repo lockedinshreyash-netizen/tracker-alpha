@@ -36,3 +36,17 @@ vapid.local.json
 *.njsproj
 *.sln
 *.sw?
+
+# The Play app (twa/). The upload key and its password never enter git: lose
+# the repo copy and Play can reset the upload key, but a leaked one can sign
+# releases. Back both up to a password manager. Build outputs are rebuilt.
+twa/*.keystore
+twa/*.jks
+twa/signing.local.json
+twa/.gradle
+twa/build
+twa/app/build
+twa/local.properties
+twa/*.apk
+twa/*.aab
+twa/*.idsig

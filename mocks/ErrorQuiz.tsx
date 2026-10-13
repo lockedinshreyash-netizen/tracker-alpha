@@ -143,7 +143,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
 
   const shell = (children: React.ReactNode) => (
     <Overlay>
-    <div className={`fixed inset-0 z-[130] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D]' : 'bg-[#FAFAF9]'}`} role="dialog" aria-modal="true" aria-label={title}>
+    <div className={`safe-top fixed inset-0 z-[130] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D]' : 'bg-[#FAFAF9]'}`} role="dialog" aria-modal="true" aria-label={title}>
       <div className={`shrink-0 flex items-center gap-4 px-5 md:px-8 h-16 border-b ${t.rule}`}>
         <button onClick={close} aria-label="Close test" className={`w-9 h-9 -ml-2 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
         <div className="min-w-0 flex-1">

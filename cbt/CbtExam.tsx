@@ -257,7 +257,7 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
 
   const shell = (children: React.ReactNode) => (
     <Overlay>
-      <div className={`fixed inset-0 z-[140] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D] text-white' : 'bg-[#FAFAF9] text-zinc-900'}`} role="dialog" aria-modal="true" aria-label={paper.name}>
+      <div className={`safe-top fixed inset-0 z-[140] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D] text-white' : 'bg-[#FAFAF9] text-zinc-900'}`} role="dialog" aria-modal="true" aria-label={paper.name}>
         <div className={`shrink-0 flex items-center gap-3 px-4 md:px-6 h-14 border-b ${t.rule}`}>
           <button onClick={leave} aria-label="Leave the paper" title="Leave — the clock keeps running" className={`w-9 h-9 -ml-2 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
           <div className="min-w-0 flex-1">

@@ -45,10 +45,20 @@ export const isIOS = (): boolean => {
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
+/** Running inside the Play Store app (a Trusted Web Activity, see twa/).
+    Decided once, before first paint, by the inline script in index.html, which
+    marks <html>; this only reads that mark, so the two cannot disagree. */
+export const isAndroidApp = (): boolean =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('android-app');
+
 /** Already installed: launched from the home screen rather than the browser. */
 export const isStandalone = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return window.matchMedia?.('(display-mode: standalone)').matches === true
+  /* The Play app is checked by name rather than trusted to the display mode:
+     there is no display mode a TWA is promised to report, and offering to
+     install the website inside the app it was installed as would be absurd. */
+  return isAndroidApp()
+    || window.matchMedia?.('(display-mode: standalone)').matches === true
     || window.matchMedia?.('(display-mode: fullscreen)').matches === true
     /* Safari's own, predating the standard and still the only one it sets. */
     || (navigator as unknown as { standalone?: boolean }).standalone === true;

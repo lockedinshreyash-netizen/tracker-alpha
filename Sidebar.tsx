@@ -157,8 +157,12 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className={`md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b backdrop-blur-xl ${dark ? 'bg-[#0B0B0D]/90 border-white/[0.04]' : 'bg-white/90 border-[#E3E0D9]'}`}>
+      {/* Mobile top bar. Its background runs up behind the camera cutout in the
+          Play app and its contents sit below it (`--safe-top`, index.css). */}
+      <div
+        className={`md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 border-b backdrop-blur-xl ${dark ? 'bg-[#0B0B0D]/90 border-white/[0.04]' : 'bg-white/90 border-[#E3E0D9]'}`}
+        style={{ height: 'calc(3.5rem + var(--safe-top))', paddingTop: 'var(--safe-top)' }}
+      >
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           data-onboarding-mobile-menu="toggle"
@@ -197,6 +201,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
           ${collapsed ? 'w-[60px]' : 'w-[200px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
+        style={{ paddingTop: 'var(--safe-top)' }}
       >
         {/* Logo + Collapse Toggle */}
         <div className={`flex items-center h-16 px-4 border-b ${dark ? 'border-white/[0.04]' : 'border-[#E3E0D9]'}`}>

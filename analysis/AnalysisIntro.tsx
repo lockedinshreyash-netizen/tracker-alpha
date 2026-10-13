@@ -48,7 +48,7 @@ const AnalysisIntro: React.FC<Props> = ({ theme, onBegin, onClose, alreadyStarte
 
   return (
     <div
-      className={`obs ${dark ? 'obs-dark' : ''} fixed inset-0 z-[60] overflow-y-auto`}
+      className={`obs ${dark ? 'obs-dark' : ''} safe-top fixed inset-0 z-[60] overflow-y-auto`}
       role="dialog"
       aria-modal="true"
       aria-label="How the Observatory works"

@@ -192,7 +192,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
 
   return (
     <Overlay>
-      <div className={`fixed inset-0 z-[140] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D]' : 'bg-[#FAFAF9]'}`} role="dialog" aria-modal="true" aria-label={`${paper.name} — review`}>
+      <div className={`safe-top fixed inset-0 z-[140] flex flex-col font-ui mk-fade ${dark ? 'bg-[#0B0B0D]' : 'bg-[#FAFAF9]'}`} role="dialog" aria-modal="true" aria-label={`${paper.name} — review`}>
         <div className={`shrink-0 flex items-center gap-3 px-4 md:px-6 h-14 border-b ${t.rule}`}>
           <button onClick={onClose} aria-label="Close" className={`w-9 h-9 -ml-2 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
           <div className="min-w-0 flex-1">

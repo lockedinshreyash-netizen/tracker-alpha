@@ -38,7 +38,7 @@ const BookReader: React.FC<Props> = ({ theme, chapter, onChapterChange, onClose 
   if (!current) return null;
 
   return (
-    <div className={`fixed inset-0 z-[80] ${dark ? 'bg-[#0B0B0D]' : 'bg-[#F6F4F0]'}`}>
+    <div className={`safe-top fixed inset-0 z-[80] ${dark ? 'bg-[#0B0B0D]' : 'bg-[#F6F4F0]'}`}>
       {/* Top bar */}
       <div className={`h-14 flex items-center justify-between px-4 md:px-6 border-b ${dark ? 'border-white/[0.06]' : 'border-zinc-200'}`}>
         <button
@@ -60,7 +60,11 @@ const BookReader: React.FC<Props> = ({ theme, chapter, onChapterChange, onClose 
 
       {/* Contents drawer */}
       {contentsOpen && (
-        <div className={`absolute top-14 left-0 right-0 z-10 border-b max-h-[60vh] overflow-y-auto ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+        <div
+          className={`absolute left-0 right-0 z-10 border-b max-h-[60vh] overflow-y-auto ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}
+          // Measured from the padding edge, so the cutout inset is added back by hand.
+          style={{ top: 'calc(3.5rem + var(--safe-top))' }}
+        >
           {BOOK.chapters.map((c, i) => (
             <button
               key={c.id}

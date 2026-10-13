@@ -12,7 +12,9 @@
     "assets:generate": "node scripts/generate-assets.mjs public",
     "sfx:generate": "npm --prefix film run sfx --",
     "qbank:chapters": "esbuild scripts/qbank/export-chapters.ts --bundle --platform=node --log-level=warning | node > scripts/qbank/chapters.json",
-    "test:decks": "node scripts/test-decks.mjs"
+    "test:decks": "node scripts/test-decks.mjs",
+    "android:build": "node scripts/android.mjs build",
+    "android:fingerprint": "node scripts/android.mjs fingerprint"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.0",

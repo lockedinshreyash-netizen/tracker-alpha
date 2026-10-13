@@ -1046,3 +1046,36 @@ button:active,
 .pk-rear { filter: var(--pk-rear); transition: filter .25s ease; }
 @media (hover: hover) { .pk-rear-btn:not(:disabled):hover .pk-rear { filter: var(--pk-rear-hover); } }
 .pk-rear-btn:focus-visible .pk-focus { opacity: 1; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The camera cutout (the Play app)
+   ══════════════════════════════════════════════════════════════════════════
+
+   The Play app (twa/) runs in sticky immersive mode, so there is no status bar
+   and no navigation bar. On Android 15+ the page then draws under the camera
+   cutout, so index.html switches on viewport-fit=cover inside the app, and
+   Chrome reports the cutout as env(safe-area-inset-top). Everything pinned to
+   the top of the screen pads by `--safe-top`.
+
+   Browsers never get viewport-fit=cover, so for them this resolves to 0px and
+   none of it moves anything. Only the top edge needs it: immersive mode hides
+   the navigation bar, the app is portrait-only, and Android puts cutouts on
+   the short edge. */
+
+:root { --safe-top: env(safe-area-inset-top, 0px); }
+
+/* The page, under the phone's fixed top bar (Sidebar.tsx). */
+.shell-offset { padding-top: calc(3.5rem + var(--safe-top)); }
+@media (min-width: 768px) { .shell-offset { padding-top: var(--safe-top); } }
+
+/* Full-screen surfaces (CBT, error tests, the reader) keep their close buttons clear of it. */
+.safe-top { padding-top: var(--safe-top); }
+
+.toast-stack { top: calc(4rem + var(--safe-top)); }
+@media (min-width: 768px) { .toast-stack { top: calc(1.5rem + var(--safe-top)); } }
+
+/* In Chrome a pull at the top of the page reloads it. An app does not do that,
+   and here it would fire in the middle of a drag on the board or the plan, or
+   reload a CBT mid-paper. The website keeps it. */
+html.android-app,
+html.android-app body { overscroll-behavior-y: none; }

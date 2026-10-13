@@ -3,7 +3,7 @@
    Source of truth:  public/icon-512.png  (everything below is derived from it)
 
    Produces: favicon.ico (16/32/48), favicon-16/32/48.png, apple-touch-icon.png,
-   icon-maskable-512.png, og-image.png.
+   icon-maskable-512.png, icon-monochrome.png, og-image.png.
 
    Committed rather than generated at build time on purpose — these are brand
    assets, they change roughly never, and a build step that needs `sharp` on a
@@ -64,6 +64,38 @@ icoSizes.forEach((s, i) => {
   offset += pngs[i].length;
 });
 fs.writeFileSync(path.join(PUB, 'favicon.ico'), Buffer.concat([dir, ...pngs]));
+
+// ── Monochrome (notification icon) ────────────────────────────────────────
+// Android draws a notification's small icon from its alpha channel alone, so
+// the full-colour icon arrives in the status bar as a solid white square. This
+// is the α as a white silhouette on transparent: the Play app's notification
+// icon (twa/twa-manifest.json `monochromeIconUrl`) and the manifest's
+// `monochrome` entry.
+//
+// The mask is the GREEN channel, not brightness: the glyph's core is
+// (255, 49, 49) while its glow never passes 16 in green, so green separates
+// the letter from its halo with the anti-aliasing intact. Brightness or red
+// would carry the glow in as a grey smudge around the letter.
+{
+  const { data, info } = await sharp(SRC).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const LO = 18, HI = 49;
+  const rgba = Buffer.alloc(info.width * info.height * 4);
+  for (let p = 0, q = 0; p < data.length; p += 3, q += 4) {
+    const a = Math.max(0, Math.min(1, (data[p + 1] - LO) / (HI - LO)));
+    rgba[q] = rgba[q + 1] = rgba[q + 2] = 255;
+    rgba[q + 3] = Math.round(a * 255);
+  }
+  const glyph = await sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .trim({ threshold: 0 })
+    .png()
+    .toBuffer();
+  // ~2dp of a 24dp icon's edge stays clear, as Android's own icons leave it.
+  const fit = Math.round(512 * 0.84);
+  await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: await sharp(glyph).resize(fit, fit, { fit: 'inside' }).toBuffer(), gravity: 'centre' }])
+    .png({ compressionLevel: 9 })
+    .toFile(path.join(PUB, 'icon-monochrome.png'));
+}
 
 console.log('icons written');
 

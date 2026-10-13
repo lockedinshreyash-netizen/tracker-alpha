@@ -5,6 +5,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
+  <!-- The Play Store app. On Android, Tracker Alpha is this same site running
+       in a Trusted Web Activity (twa/): real Chrome, address bar removed once
+       /.well-known/assetlinks.json proves we own the domain, in sticky
+       immersive full screen. Decided here, once, before anything paints:
+
+       - <html class="android-app">, the one flag everything else reads
+         (`isAndroidApp` in install/useInstall.ts).
+       - viewport-fit=cover, in the app only. Immersive mode hides the status
+         bar, and on Android 15+ the page then draws under the camera cutout.
+         `cover` makes Chrome report the cutout as env(safe-area-inset-top),
+         which the app's chrome pads by (`--safe-top` in index.css). Browsers
+         keep the viewport they had: in iPhone landscape `cover` would put the
+         rail under the notch.
+       - hasVisited, the mark the landing page's CTA writes. Someone who
+         installed the app from Play has already chosen it, and a pitch has no
+         place inside it. Writing the mark here makes all three landing gates
+         agree without any of them having to know about the app.
+
+       Two signals, so one failing does not lose it: the launch referrer, which
+       Chrome sets to android-app://<package>/ for a TWA, and the start URL's
+       ?source=android-app (twa/twa-manifest.json), stripped once read. Kept in
+       sessionStorage because that is per tab: it survives a reload inside the
+       app but never reaches a browser tab of the site, whereas localStorage is
+       shared with Chrome. -->
+  <script>
+    (function () {
+      var app = false;
+      try {
+        var url = new URL(location.href);
+        app = /^android-app:\/\/in\.trackeralpha\.app(\/|$)/.test(document.referrer)
+          || url.searchParams.get('source') === 'android-app';
+        if (url.searchParams.get('source') === 'android-app') {
+          url.searchParams.delete('source');
+          history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+        }
+        if (app) sessionStorage.setItem('alpha_android_app', '1');
+        else app = sessionStorage.getItem('alpha_android_app') === '1';
+        if (app) localStorage.setItem('hasVisited', 'true');
+      } catch (e) { /* storage blocked: the referrer alone decides */ }
+      if (!app) return;
+      document.documentElement.classList.add('android-app');
+      var vp = document.querySelector('meta[name="viewport"]');
+      if (vp) vp.setAttribute('content', vp.getAttribute('content') + ', viewport-fit=cover');
+    })();
+  </script>
+
   <!-- ══════════════════════════════════════════════════════════════════════
        Search and social
        ───────────────────────────────────────────────────────────────────────

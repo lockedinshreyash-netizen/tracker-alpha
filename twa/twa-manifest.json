@@ -1,0 +1,50 @@
+{
+  "packageId": "in.trackeralpha.app",
+  "host": "trackeralpha.in",
+  "name": "Tracker Alpha",
+  "launcherName": "Alpha",
+  "display": "fullscreen-sticky",
+  "themeColor": "#0B0B0D",
+  "themeColorDark": "#0B0B0D",
+  "navigationColor": "#0B0B0D",
+  "navigationColorDark": "#0B0B0D",
+  "navigationDividerColor": "#0B0B0D",
+  "navigationDividerColorDark": "#0B0B0D",
+  "backgroundColor": "#000000",
+  "enableNotifications": true,
+  "startUrl": "/?source=android-app",
+  "iconUrl": "https://trackeralpha.in/icon-512.png",
+  "maskableIconUrl": "https://trackeralpha.in/icon-maskable-512.png",
+  "monochromeIconUrl": "https://trackeralpha.in/icon-monochrome.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./upload.keystore",
+    "alias": "upload"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://trackeralpha.in/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://trackeralpha.in/",
+  "minSdkVersion": 24,
+  "orientation": "portrait-primary",
+  "fingerprints": [
+    {
+      "name": "Upload key",
+      "value": "8F:1A:43:AD:21:2C:B6:96:44:BC:77:73:C3:13:77:BF:7C:51:1F:69:10:D0:B2:89:AE:4F:38:A5:1C:C1:B8:4B"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "displayOverride": [],
+  "appVersion": "1.0.0"
+}

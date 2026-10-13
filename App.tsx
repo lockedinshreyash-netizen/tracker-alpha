@@ -2266,7 +2266,7 @@ const App: React.FC = () => {
 
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
-      <div className={`transition-all duration-300 pt-14 md:pt-0 ${sidebarCollapsed ? 'md:ml-[60px]' : 'md:ml-[200px]'}`}>
+      <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[60px]' : 'md:ml-[200px]'}`}>
         <Header
           currentClass={state.currentClass}
           onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
