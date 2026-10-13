@@ -21,6 +21,8 @@ const TABS: Record<string, TabType> = {
   decks: 'Decks',
   groups: 'Groups',
   streak: 'Streak',
+  // The "delete your account" page (site/legal.tsx) links to /?open=review#account.
+  review: 'Review',
 };
 
 export interface DeepLink {

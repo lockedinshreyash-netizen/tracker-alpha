@@ -742,10 +742,10 @@ button:active,
 
 @media (min-width: 768px) {
   /* Past the rail, whatever width it currently is. */
-  .fb-dock { left: calc(var(--rail, 200px) + 16px); }
+  .fb-dock { left: calc(var(--rail, 212px) + 16px); }
 
   .fb-panel {
-    left: calc(var(--rail, 200px) + 16px);
+    left: calc(var(--rail, 212px) + 16px);
     right: auto;
     width: 23rem;
   }
@@ -1079,3 +1079,65 @@ button:active,
    reload a CBT mid-paper. The website keeps it. */
 html.android-app,
 html.android-app body { overscroll-behavior-y: none; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The navigation (Sidebar.tsx, glass from ui/LiquidGlass.tsx)
+   ══════════════════════════════════════════════════════════════════════════
+
+   Floating, not docked, in the Apple manner: a capsule over the content on a
+   phone (iOS 26's bars), an inset panel beside it on a laptop (macOS Tahoe's
+   sidebar). Floating is what gives the glass something to bend: the page
+   scrolls under the capsule, and the phone's menu opens over the page.
+
+   On a phone the menu hangs BELOW the capsule rather than over it, so the
+   capsule's close button is never covered.
+
+   The rail's footprint (the page margin in App.tsx and `--rail` for the
+   feedback dock) is the panel plus 8px either side: 72 collapsed, 212 open. */
+
+.nav-capsule {
+  position: fixed;
+  z-index: 50;
+  top: calc(var(--safe-top) + 8px);
+  left: 10px;
+  right: 10px;
+  height: 52px;
+}
+
+.nav-rail {
+  position: fixed;
+  z-index: 50;
+  left: 8px;
+  bottom: 8px;
+  top: calc(var(--safe-top) + 68px);
+  width: 196px;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(calc(-100% - 24px));
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), width 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.nav-rail[data-open='true'] { transform: none; }
+.nav-rail[data-collapsed='true'] { width: 56px; }
+
+/* The capsule is hidden on a laptop by Tailwind's md:hidden on the element:
+   the CDN's `.flex` is injected after this file and would beat a display
+   rule here. */
+@media (min-width: 768px) {
+  .nav-rail { top: calc(var(--safe-top) + 8px); transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-rail { transition: none; }
+}
+
+/* Glass that can be seen through is a choice some people turn off. */
+@media (prefers-reduced-transparency: reduce) {
+  .lg-lens { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .lg-tint { background: var(--lg-solid, #141418) !important; }
+}
+
+/* Glass enters by moving, never by fading: opacity below 1 makes an element
+   a backdrop root, and the glass would show nothing until the fade ended. */
+@keyframes lg-pop { from { transform: translateY(12px) scale(0.97); } to { transform: none; } }
+.lg-pop { animation: lg-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@media (prefers-reduced-motion: reduce) { .lg-pop { animation: none; } }

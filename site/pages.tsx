@@ -28,11 +28,13 @@ export interface SitePage {
   title: string;
   description: string;
   crumbs: Crumb[];
-  section: 'syllabus' | 'jee' | 'neet' | 'weightage';
+  section: 'syllabus' | 'jee' | 'neet' | 'weightage' | 'legal';
   faq: Faq[];
   body: React.ReactNode;
   /** For the hub, the sitemap and llms.txt. */
   label: string;
+  /** When this page last changed, if not CONTENT_UPDATED (the legal pages carry their own). */
+  updated?: string;
 }
 
 /* ── Shared pieces ── */
@@ -663,6 +665,8 @@ export const Shell: React.FC<{ page: SitePage; pages: SitePage[] }> = ({ page, p
               <li><a href="/syllabus/">All syllabus guides</a></li>
               <li><a href="https://instagram.com/trackeralpha" rel="noopener noreferrer">Instagram</a></li>
               <li><a href="mailto:lockinhq@gmail.com">Email us</a></li>
+              <li><a href="/privacy/">Privacy policy</a></li>
+              <li><a href="/delete-account/">Delete your account</a></li>
             </ul>
           </div>
         </div>

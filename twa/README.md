@@ -51,10 +51,12 @@ set up on this Mac.
    (adb is in `~/.bubblewrap/android_sdk/platform-tools`), or copy the file to
    the phone. It is signed with the upload key, which `assetlinks.json` already
    trusts, so it should open with **no address bar**.
-3. **Create the app** in Play Console with package `in.trackeralpha.app`, and
+3. **Run `supabase/account.sql`** in the Supabase SQL editor, or the in-app
+   *Delete account* button answers "isn't switched on yet".
+4. **Create the app** in Play Console with package `in.trackeralpha.app`, and
    upload `app-release-bundle.aab` to **Closed testing**. Play App Signing is
    automatic: Google re-signs every install with *its own* key.
-4. **Trust Google's key.** This is the step that, if skipped, leaves Play
+5. **Trust Google's key.** This is the step that, if skipped, leaves Play
    installs showing the address bar. Play Console → Test and release → App
    integrity → App signing → copy the **App signing key certificate**
    SHA-256 (not the upload key's), then:
@@ -64,7 +66,9 @@ set up on this Mac.
    ```
 
    Deploy the site again.
-5. **Closed testing gate.** New personal developer accounts need 12 testers
+6. **Store listing URLs.** Privacy policy: `https://trackeralpha.in/privacy/`.
+   Data safety → account deletion URL: `https://trackeralpha.in/delete-account/`.
+7. **Closed testing gate.** New personal developer accounts need 12 testers
    opted in for 14 continuous days before Production unlocks. Start
    recruiting now; this is the long pole, not the build.
 

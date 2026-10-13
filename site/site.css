@@ -193,6 +193,19 @@ ol.ranked li::before { content: counter(r, decimal-leading-zero); position: abso
 .tips li::before { content: '✓'; position: absolute; left: 20px; top: 15px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 900; color: #fff; background: var(--red); }
 .tips b { color: var(--l1); }
 
+/* Plain lists (the legal pages): a check mark beside "what we collect" would
+   read as a selling point. Numbered when the order matters. */
+.plain { display: grid; gap: 10px; margin-top: 14px; max-width: 68ch; }
+.plain li { position: relative; padding-left: 22px; color: var(--l2); line-height: 1.55; }
+.plain li::before { content: ''; position: absolute; left: 5px; top: 0.68em; width: 5px; height: 5px; border-radius: 50%; background: var(--l3); }
+.plain b { color: var(--l1); }
+ol.plain { counter-reset: step; gap: 12px; }
+ol.plain li { counter-increment: step; padding-left: 34px; }
+ol.plain li::before { content: counter(step); left: 0; top: 1px; width: 22px; height: 22px; display: grid; place-items: center; font: 700 11px var(--mono); color: #fff; background: var(--l1); }
+.content h3 + p, .content h3 + .plain { margin-top: 8px; }
+.content p + h3, .content .plain + h3 { margin-top: 26px; }
+.content .plain + p { margin-top: 14px; }
+
 /* Method note */
 .method { padding: 22px 24px; border-radius: 22px; background: #fbfaf8; box-shadow: 0 0 0 1px rgba(10, 10, 11, 0.07) inset; }
 .method p { font-size: 15px; }

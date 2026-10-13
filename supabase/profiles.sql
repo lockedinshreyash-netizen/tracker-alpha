@@ -218,5 +218,6 @@ create policy "users delete their own avatar"
   to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
--- No select policy needed: the bucket's `public` flag serves GET requests
+-- No select policy for READING: the bucket's `public` flag serves GET requests
 -- through /storage/v1/object/public/avatars/... without RLS being consulted.
+-- Listing and removing your own files do need one; it is in account.sql.

@@ -74,6 +74,7 @@ import { forgetGroupsOnDevice } from './groups/publish';
 import { forgetDecksOnDevice } from './decks/forget';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
+import { deleteAccount } from './account/deleteAccount';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -585,18 +586,24 @@ const App: React.FC = () => {
     }
   }, [state, user?.id]);
 
+  /* What signing out and deleting the account both leave on this device:
+     nothing of the account. One list, so the two can never drift apart. */
+  const forgetAccountOnDevice = () => {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('sb-')) localStorage.removeItem(key);
+    });
+    localStorage.removeItem('locked_in_state_v2');
+    forgetGroupsOnDevice();
+    forgetDecksOnDevice();
+    forgetAnalyticsOnDevice();
+  };
+
   const handleSignOut = async () => {
     if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
       try {
         preventSyncOnUpdate.current = true;
         await supabase.auth.signOut();
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-')) localStorage.removeItem(key);
-        });
-        localStorage.removeItem('locked_in_state_v2');
-        forgetGroupsOnDevice();
-        forgetDecksOnDevice();
-        forgetAnalyticsOnDevice();
+        forgetAccountOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
@@ -605,6 +612,31 @@ const App: React.FC = () => {
         window.location.href = window.location.origin;
       }
     }
+  };
+
+  /* Review → Account & sync → Delete account (account/DeleteAccountSheet.tsx).
+     Sync is held off first and never released on success: the state effect
+     would otherwise upsert this device's copy straight back into
+     user_profiles between the delete and the reload, and if that table's
+     foreign key does not cascade it would land as a row with no account. */
+  const handleDeleteAccount = async (): Promise<void> => {
+    if (!user) return;
+    preventSyncOnUpdate.current = true;
+    try {
+      await deleteAccount(user.id);
+    } catch (e) {
+      preventSyncOnUpdate.current = false;
+      throw e;
+    }
+    // The server session died with the account; only this device's copy is left to clear.
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => { /* already gone */ });
+    forgetAccountOnDevice();
+    /* Signing out changes `user?.id`, which re-runs the effect that writes
+       `locked_in_state_v2` before the reload lands. It must write the default,
+       as sign-out's does, not the account just deleted. */
+    setState(DEFAULT_STATE);
+    setActiveTab('Today');
+    window.location.href = window.location.origin;
   };
 
   const theme = state.theme || 'dark';
@@ -2266,7 +2298,7 @@ const App: React.FC = () => {
 
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
-      <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[60px]' : 'md:ml-[200px]'}`}>
+      <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
         <Header
           currentClass={state.currentClass}
           onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
@@ -2450,6 +2482,7 @@ const App: React.FC = () => {
               user={user}
               onOpenAuth={() => setIsAuthModalOpen(true)}
               onSignOut={handleSignOut}
+              onDeleteAccount={handleDeleteAccount}
               onLog={logStudy}
               dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
               examPreference={state.examPreference || 'JEE'}
@@ -2578,7 +2611,7 @@ const App: React.FC = () => {
           user={user}
           theme={theme}
           route={activeTab}
-          railPx={sidebarCollapsed ? 60 : 200}
+          railPx={sidebarCollapsed ? 72 : 212}
           onOpenAuth={() => setIsAuthModalOpen(true)}
         />
       )}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
+import LiquidGlass from './ui/LiquidGlass';
 
 interface Props {
   isOpen: boolean;
@@ -49,19 +50,44 @@ const AuthModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
+  const dark = theme === 'dark';
+  const field = `w-full rounded-xl px-3.5 py-3 text-[13px] font-medium font-ui border outline-none transition-colors ${dark
+    ? 'bg-white/[0.06] border-white/[0.10] text-white placeholder:text-zinc-500 focus:border-white/30'
+    : 'bg-white/60 border-black/[0.08] text-zinc-900 placeholder:text-zinc-400 focus:border-black/25'
+    }`;
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 py-6">
+    /* Glass card over the live app (ui/LiquidGlass.tsx). The dimming is a
+       SIBLING behind the card, never its parent, and never blurred: a
+       backdrop-filter or opacity on an ancestor makes it a backdrop root, and
+       the card would refract only that ancestor's black fill. */
+    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 py-6">
       <div
-        className={`w-full max-w-sm rounded-xl border p-6 space-y-4 max-h-full overflow-y-auto ${theme === 'dark' ? 'bg-[#0B0B0D] border-[#27272a]' : 'bg-white border-zinc-200'
-          }`}
+        aria-hidden="true"
+        className="absolute inset-0 mk-fade"
+        style={{ background: dark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(20, 20, 24, 0.26)' }}
+      />
+      <LiquidGlass
+        dark={dark}
+        radius={28}
+        variant="panel"
+        bezel={20}
+        strength={24}
+        className="lg-pop relative w-full max-w-sm max-h-full flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === 'login' ? 'Sign in' : 'Create account'}
       >
+      {/* Scrolls inside the glass: on the glass itself the absolutely placed
+          layers would scroll away with the form. */}
+      <div className="p-7 space-y-4 min-h-0 overflow-y-auto no-scrollbar">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-[0.2em] font-ui">
             {mode === 'login' ? 'Sign In' : 'Create Account'}
           </h2>
           <button
             onClick={onClose}
-            className={`text-xs font-black uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
+            className={`text-xs font-black uppercase tracking-[0.06em] ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             Close
           </button>
@@ -75,9 +101,9 @@ const AuthModal: React.FC<Props> = ({
           type="button"
           disabled={googleLoading || loading}
           onClick={handleGoogleSignIn}
-          className={`w-full py-3 rounded-md border flex items-center justify-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.12em] font-ui transition-all disabled:opacity-60 ${theme === 'dark'
+          className={`w-full py-3.5 rounded-xl border flex items-center justify-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.12em] font-ui transition-all active:scale-[0.98] disabled:opacity-60 ${dark
             ? 'bg-white text-zinc-900 border-transparent hover:bg-zinc-100'
-            : 'bg-white text-zinc-900 border-zinc-200 hover:border-zinc-300'
+            : 'bg-white text-zinc-900 border-black/[0.08] hover:border-black/20'
             }`}
         >
           <GoogleMark />
@@ -86,31 +112,27 @@ const AuthModal: React.FC<Props> = ({
 
         {/* Divider */}
         <div className="flex items-center gap-3">
-          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-zinc-200'}`} />
-          <span className={`text-[9px] font-bold uppercase tracking-[0.14em] ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>or</span>
-          <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-[#27272a]' : 'bg-zinc-200'}`} />
+          <div className={`flex-1 h-px ${dark ? 'bg-white/[0.10]' : 'bg-black/[0.08]'}`} />
+          <span className={`text-[9px] font-bold uppercase tracking-[0.14em] ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>or</span>
+          <div className={`flex-1 h-px ${dark ? 'bg-white/[0.10]' : 'bg-black/[0.08]'}`} />
         </div>
 
         <div className="space-y-3">
           <input
             type="email"
+            autoComplete="email"
             placeholder="Email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className={`w-full rounded-md px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
-              ? 'bg-[#18181b] border-[#27272a] text-white'
-              : 'bg-zinc-50 border-zinc-200 text-zinc-900'
-              }`}
+            className={field}
           />
           <input
             type="password"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className={`w-full rounded-md px-3 py-2 text-xs font-bold uppercase tracking-tight border ${theme === 'dark'
-              ? 'bg-[#18181b] border-[#27272a] text-white'
-              : 'bg-zinc-50 border-zinc-200 text-zinc-900'
-              }`}
+            className={field}
           />
         </div>
 
@@ -140,19 +162,20 @@ const AuthModal: React.FC<Props> = ({
                 setLoading(false);
               }
             }}
-            className="w-full py-3 rounded-md bg-[#E10600] text-white text-[10px] font-bold uppercase tracking-[0.15em] font-ui hover:bg-red-700 disabled:opacity-60"
+            className="w-full py-3.5 rounded-xl bg-[#E10600] text-white text-[10px] font-bold uppercase tracking-[0.15em] font-ui hover:bg-red-700 active:scale-[0.98] transition-transform shadow-[0_8px_24px_-10px_rgba(225,6,0,0.7)] disabled:opacity-60"
           >
             {loading ? 'Processing…' : mode === 'login' ? 'Sign In' : 'Sign Up'}
           </button>
           <button
             type="button"
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className={`text-[10px] font-medium uppercase tracking-[0.06em] ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-500 hover:text-zinc-900'}`}
+            className={`text-[10px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
           >
             {mode === 'login' ? 'Need an account? Sign up' : 'Already enrolled? Sign in'}
           </button>
         </div>
       </div>
+      </LiquidGlass>
     </div>
   );
 };

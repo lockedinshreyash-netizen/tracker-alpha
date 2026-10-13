@@ -9,6 +9,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CONTENT_UPDATED, SITE_URL, Shell, SitePage, allPages } from './pages';
+import { legalPages } from './legal';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -28,7 +29,7 @@ const jsonLd = (page: SitePage): string => {
         isPartOf: { '@id': `${SITE_URL}/#website` },
         publisher: { '@id': `${SITE_URL}/#organization` },
         breadcrumb: { '@id': `${url}#breadcrumb` },
-        dateModified: CONTENT_UPDATED,
+        dateModified: page.updated ?? CONTENT_UPDATED,
         isAccessibleForFree: true,
       },
       {
@@ -41,12 +42,13 @@ const jsonLd = (page: SitePage): string => {
           item: `${SITE_URL}${c.path}`,
         })),
       },
-      {
+      // The legal pages have no FAQ, and an empty FAQPage is an error in Search Console.
+      ...(page.faq.length ? [{
         '@type': 'FAQPage',
         '@id': `${url}#faq`,
         isPartOf: { '@id': `${url}#webpage` },
         mainEntity: page.faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
-      },
+      }] : []),
     ],
   };
   return JSON.stringify(graph).replace(/</g, '\\u003c');
@@ -83,7 +85,7 @@ const document = (page: SitePage, pages: SitePage[], css: string): string => {
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:locale" content="en_IN" />
-<meta property="article:modified_time" content="${CONTENT_UPDATED}" />
+<meta property="article:modified_time" content="${page.updated ?? CONTENT_UPDATED}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${title}" />
 <meta name="twitter:description" content="${desc}" />
@@ -113,11 +115,15 @@ export interface BuiltSite {
   guides: Array<{ path: string; label: string; description: string }>;
 }
 
+/* The legal pages (site/legal.tsx) are built in the same shell and go in the
+   sitemap, but they are not guides: the footers' guide lists, the landing
+   page's "Free guides" and llms.txt list only `pages`. */
 export const buildSite = (css: string): BuiltSite => {
   const pages = allPages();
+  const all = [...pages, ...legalPages()];
   return {
-    files: pages.map(p => ({ path: p.path, html: document(p, pages, css) })),
-    urls: pages.map(p => ({ path: p.path, lastmod: CONTENT_UPDATED })),
+    files: all.map(p => ({ path: p.path, html: document(p, pages, css) })),
+    urls: all.map(p => ({ path: p.path, lastmod: p.updated ?? CONTENT_UPDATED })),
     guides: pages.map(p => ({ path: p.path, label: p.label, description: p.description })),
   };
 };

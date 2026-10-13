@@ -315,6 +315,8 @@ export const Footer: React.FC = () => {
                 <li><a href={SITE.instagram} target="_blank" rel="noopener noreferrer">Instagram</a></li>
                 <li><a href={`mailto:${SITE.email}`}>Email us</a></li>
                 <li><a href="#faq">FAQ</a></li>
+                <li><a href="/privacy/">Privacy policy</a></li>
+                <li><a href="/delete-account/">Delete your account</a></li>
               </ul>
             </div>
           </div>

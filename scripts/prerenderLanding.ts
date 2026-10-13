@@ -97,7 +97,7 @@ export const prerenderLanding = (): Plugin => {
       await writeFile(indexPath, doc);
       await writeFile(path.join(outDir, 'llms.txt'), llms);
 
-      config.logger.info(`prerender-landing: ${Math.round(html.length / 1024)} kB of landing HTML, ${site.files.length} guide pages, sitemap, JSON-LD and llms.txt written`);
+      config.logger.info(`prerender-landing: ${Math.round(html.length / 1024)} kB of landing HTML, ${site.files.length} static pages (guides + legal), sitemap, JSON-LD and llms.txt written`);
     },
   };
 };

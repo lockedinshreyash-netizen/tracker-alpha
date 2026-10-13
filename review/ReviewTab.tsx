@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Eyebrow, Field, PageHeader, Segmented, StatTile, Switch, btn, tokens } from '../ui/kit';
 import * as sfx from '../audio';
 import { useSound } from '../sound/useSound';
 import type { User } from '@supabase/supabase-js';
 import { DailyLog, DailyQuestionsLog, Subject, ExamPreference, ReminderPrefs } from '../types';
 import ReminderSettings from '../reminders/ReminderSettings';
+import DeleteAccountSheet from '../account/DeleteAccountSheet';
 
 interface Props {
   logs: DailyLog[];
@@ -14,6 +15,8 @@ interface Props {
   user: User | null;
   onOpenAuth: () => void;
   onSignOut: () => void;
+  /** Resolves only once the account is gone (the app then reloads); throws a message for the student. */
+  onDeleteAccount: () => Promise<void>;
   onLog: (subject: Subject, hours: number, quality: number, distractions: number) => void;
   dailyQuestionsLog: DailyQuestionsLog[];
   examPreference: ExamPreference;
@@ -72,12 +75,21 @@ const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) =
 };
 
 const ReviewTab: React.FC<Props> = ({
-  logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onLog,
+  logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onDeleteAccount, onLog,
   examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
+  const [deleting, setDeleting] = useState(false);
+
+  /* /?open=review#account is where the "delete your account" web page sends
+     people (site/legal.tsx), so arriving with that hash lands on the row. */
+  useEffect(() => {
+    if (window.location.hash !== '#account') return;
+    const id = window.setTimeout(() => document.getElementById('account')?.scrollIntoView({ block: 'center' }), 300);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const handleManualLog = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +109,7 @@ const ReviewTab: React.FC<Props> = ({
   const verdict = score >= 80 ? 'Locked in. Hold it.' : score >= 60 ? 'Solid. Not yet dangerous.' : score >= 30 ? 'Showing up. Now show up harder.' : 'The score starts moving with your first week.';
 
   const field = `${t.input} !py-3 cursor-pointer`;
+  const danger = dark ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10' : 'border-rose-200 text-rose-600 hover:bg-rose-50';
 
   return (
     <div className="space-y-6">
@@ -167,17 +180,20 @@ const ReviewTab: React.FC<Props> = ({
       <div className="pt-4">
         <Eyebrow dark={dark} className="mb-3">Settings</Eyebrow>
         <div className="space-y-3">
-          <Row
-            dark={dark}
-            delay={260}
-            title="Account & sync"
-            detail={user ? <>Signed in as <b className={t.heading}>{user.email}</b>. Synced across your devices.</> : 'Offline mode. Your progress lives on this device only.'}
-          >
-            {user
-              ? <button onClick={onSignOut} className={`${btn} px-5 py-3 ${t.ghost}`}>Log out</button>
-              : <button onClick={onOpenAuth} className={`${btn} px-5 py-3 ${t.primary}`}>Sign in to sync</button>}
-            <button onClick={onClearData} className={`${btn} px-5 py-3 border ${dark ? 'border-rose-500/30 text-rose-400 hover:bg-rose-500/10' : 'border-rose-200 text-rose-600 hover:bg-rose-50'}`}>Reset device</button>
-          </Row>
+          <div id="account" className="scroll-mt-24">
+            <Row
+              dark={dark}
+              delay={260}
+              title="Account & sync"
+              detail={user ? <>Signed in as <b className={t.heading}>{user.email}</b>. Synced across your devices.</> : 'Offline mode. Your progress lives on this device only.'}
+            >
+              {user
+                ? <button onClick={onSignOut} className={`${btn} px-5 py-3 ${t.ghost}`}>Log out</button>
+                : <button onClick={onOpenAuth} className={`${btn} px-5 py-3 ${t.primary}`}>Sign in to sync</button>}
+              <button onClick={onClearData} className={`${btn} px-5 py-3 border ${danger}`}>Reset device</button>
+              {user && <button onClick={() => setDeleting(true)} className={`${btn} px-5 py-3 border ${danger}`}>Delete account</button>}
+            </Row>
+          </div>
 
           <ReminderSettings
             prefs={reminders}
@@ -214,9 +230,21 @@ const ReviewTab: React.FC<Props> = ({
               </svg>
               lockinhq@gmail.com
             </a>
+            <a href="/privacy/" className={`${btn} px-4 py-3 ${t.ghost} !normal-case !tracking-normal !text-[12px] !font-semibold`}>
+              Privacy policy
+            </a>
           </Row>
         </div>
       </div>
+
+      {deleting && user && (
+        <DeleteAccountSheet
+          email={user.email ?? 'your account'}
+          dark={dark}
+          onClose={() => setDeleting(false)}
+          onConfirm={onDeleteAccount}
+        />
+      )}
     </div>
   );
 };

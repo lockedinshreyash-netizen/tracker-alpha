@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TabType } from './types';
 import { Avatar } from './profile/Avatar';
 import { Profile } from './profile/profileApi';
+import LiquidGlass from './ui/LiquidGlass';
 
 interface Props {
   activeTab: TabType;
@@ -157,20 +158,24 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
 
   return (
     <>
-      {/* Mobile top bar. Its background runs up behind the camera cutout in the
-          Play app and its contents sit below it (`--safe-top`, index.css). */}
-      <div
-        className={`md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 border-b backdrop-blur-xl ${dark ? 'bg-[#0B0B0D]/90 border-white/[0.04]' : 'bg-white/90 border-[#E3E0D9]'}`}
-        style={{ height: 'calc(3.5rem + var(--safe-top))', paddingTop: 'var(--safe-top)' }}
+      {/* Phone: a floating glass capsule. The page scrolls under it, and its
+          rim bends what passes (ui/LiquidGlass.tsx). Below the camera cutout in
+          the Play app; geometry in index.css (.nav-capsule). */}
+      <LiquidGlass
+        dark={dark}
+        radius={26}
+        variant="bar"
+        className="nav-capsule md:hidden flex items-center justify-between px-1.5"
       >
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           data-onboarding-mobile-menu="toggle"
           aria-label={groupsUnread > 0 && !mobileOpen ? `Menu, ${groupsUnread} unread group messages` : 'Menu'}
-          className={`relative p-2 rounded-md transition-all ${dark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-[#6B675C] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
+          aria-expanded={mobileOpen}
+          className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 ${dark ? 'text-zinc-300 hover:text-white hover:bg-white/[0.08]' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/[0.05]'}`}
         >
           {groupsUnread > 0 && !mobileOpen && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#E10600]" aria-hidden="true" />
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#E10600]" aria-hidden="true" />
           )}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             {mobileOpen ? (
@@ -180,31 +185,36 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             )}
           </svg>
         </button>
-        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] font-ui ${dark ? 'text-zinc-400' : 'text-[#6B675C]'}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] font-ui ${dark ? 'text-zinc-200' : 'text-zinc-700'}`}>
           {activeTab}
         </span>
-        <div className="w-8" />
-      </div>
+        <div className="w-10" />
+      </LiquidGlass>
 
-      {/* Mobile overlay */}
+      {/* Phone overlay. Dims without blurring: the menu's glass has to have
+          something sharp behind it to bend. */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="md:hidden fixed inset-0 z-40 bg-black/30"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed top-0 left-0 h-full z-50 flex flex-col transition-all duration-300 ease-out
-          ${dark ? 'bg-[#0B0B0D] border-r border-white/[0.04]' : 'bg-white border-r border-[#E3E0D9]'}
-          ${collapsed ? 'w-[60px]' : 'w-[200px]'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
-        style={{ paddingTop: 'var(--safe-top)' }}
+      {/* The rail: an inset glass panel on a laptop, the menu hanging under the
+          capsule on a phone. Geometry in index.css (.nav-rail). */}
+      <LiquidGlass
+        as="aside"
+        dark={dark}
+        radius={22}
+        variant="panel"
+        bezel={18}
+        strength={22}
+        className="nav-rail"
+        data-open={mobileOpen}
+        data-collapsed={collapsed}
       >
         {/* Logo + Collapse Toggle */}
-        <div className={`flex items-center h-16 px-4 border-b ${dark ? 'border-white/[0.04]' : 'border-[#E3E0D9]'}`}>
+        <div className={`hidden md:flex items-center h-16 px-4 border-b shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
           {!collapsed && (
             <span className={`text-sm logo-text flex-1 ${dark ? 'text-white' : 'text-[#17150F]'}`}>
               LOCK IN
@@ -212,7 +222,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
           )}
           <button
             onClick={onToggleCollapsed}
-            className={`hidden md:flex p-1.5 rounded-md transition-all ${collapsed ? 'mx-auto' : ''} ${dark ? 'text-zinc-500 hover:text-white hover:bg-zinc-800' : 'text-[#8A8577] hover:text-[#17150F] hover:bg-[#F2F0EC]'}`}
+            className={`hidden md:flex p-1.5 rounded-md transition-all ${collapsed ? 'mx-auto' : ''} ${dark ? 'text-zinc-400 hover:text-white hover:bg-white/[0.08]' : 'text-zinc-500 hover:text-zinc-900 hover:bg-black/[0.05]'}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               {collapsed ? (
@@ -225,7 +235,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 flex flex-col gap-1 px-2 py-4">
+        <nav className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-1 px-2 py-3 md:py-4">
           {tabs.map(tab => {
             const isActive = activeTab === tab;
             return (
@@ -239,7 +249,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
               {(tab === 'Observatory' || tab === 'Admin') && (
                 <div
                   className={`my-2 ${collapsed ? 'mx-3' : 'mx-4'}`}
-                  style={{ height: 1, background: dark ? 'rgba(255,255,255,.07)' : '#E3E0D9' }}
+                  style={{ height: 1, background: dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)' }}
                   aria-hidden="true"
                 />
               )}
@@ -249,8 +259,8 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
                 className={`flex items-center gap-3 rounded-lg transition-all duration-200 group relative
                   ${collapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'}
                   ${isActive
-                    ? (dark ? 'bg-white/[0.04] text-white' : 'bg-[#F2F0EC] text-[#17150F]')
-                    : (dark ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]' : 'text-[#8A8577] hover:text-[#17150F] hover:bg-[#F2F0EC]')
+                    ? (dark ? 'bg-white/[0.09] text-white' : 'bg-black/[0.05] text-[#17150F]')
+                    : (dark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05]' : 'text-zinc-500 hover:text-[#17150F] hover:bg-black/[0.04]')
                   }
                 `}
               >
@@ -296,12 +306,12 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             rather than the public card RanksTab/RaceChat open on someone
             else's identity; see profile/EditProfile.tsx. Falls back to the
             plain footer until there's a profile to show. */}
-        <div className={`px-4 py-4 border-t ${dark ? 'border-white/[0.04]' : 'border-[#E3E0D9]'}`}>
+        <div className={`px-4 py-4 border-t shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
           {ownProfile ? (
             <button
               onClick={onOpenAccount}
               data-onboarding-target="account-nav"
-              className={`w-full flex items-center gap-2.5 rounded-lg transition-all group relative ${collapsed ? 'justify-center py-1' : 'px-1 py-1'} ${dark ? 'hover:bg-white/[0.04]' : 'hover:bg-[#F2F0EC]'}`}
+              className={`w-full flex items-center gap-2.5 rounded-lg transition-all group relative ${collapsed ? 'justify-center py-1' : 'px-1 py-1'} ${dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'}`}
             >
               <Avatar
                 profile={ownProfile}
@@ -327,7 +337,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             <div className={`w-2 h-2 rounded-full mx-auto ${dark ? 'bg-zinc-700' : 'bg-[#D6D1C5]'}`} />
           )}
         </div>
-      </aside>
+      </LiquidGlass>
     </>
   );
 };
