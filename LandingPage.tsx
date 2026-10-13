@@ -15,12 +15,13 @@ import type { Exam } from './landing/content';
 import { Hero } from './landing/Hero';
 import { Compare, Faq, Features, Final, Footer, Manifesto, Nav, Price, Ribbon, Steps } from './landing/Sections';
 
-const LandingPage = ({ onCtaClick }: { onCtaClick: () => void }) => {
+const LandingPage = ({ onCtaClick }: { onCtaClick: (exam: Exam) => void }) => {
   const [exam, setExam] = useState<Exam>('JEE');
 
   const start = () => {
     try { localStorage.setItem('hasVisited', 'true'); } catch { /* private mode: they will see this page again */ }
-    onCtaClick();
+    // The exam on the hero's toggle goes with them into onboarding.
+    onCtaClick(exam);
   };
 
   return (

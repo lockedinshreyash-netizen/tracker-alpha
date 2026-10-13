@@ -534,6 +534,28 @@ export const prefetchCore = () => {
   window.setTimeout(() => (ric ? ric.call(window, run, { timeout: 4000 }) : run()), 1500);
 };
 
+/**
+ * Download cues' bytes before there is an audio context to decode them into
+ * (no gesture yet). The onboarding gate calls this so the cold open's score
+ * arrives while the student is reading, not after they tap.
+ */
+export const prefetch = (cues: Cue[]) => {
+  if (typeof window === 'undefined') return;
+  cues.forEach(id => void fetchBytes(id));
+};
+
+/**
+ * Resolves true once a cue is decoded and can start on the dot, or false after
+ * `ms`. For sound that has to line up with something else: the cold open waits
+ * on this before it starts the film, so the score and the picture begin
+ * together instead of the score being dropped as late.
+ */
+export const ready = (cue: Cue, ms: number): Promise<boolean> =>
+  Promise.race([
+    load(cue).then(e => !!e).catch(() => false),
+    new Promise<boolean>(resolve => window.setTimeout(() => resolve(false), ms)),
+  ]);
+
 /* ── The original cue names, kept so existing callers need not change ── */
 
 export const ignite = () => play('ignite', { late: 600 });

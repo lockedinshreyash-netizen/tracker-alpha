@@ -16,7 +16,7 @@ import { buildCity, HERO } from './city';
 
 const FOV = 40;
 const D0 = 0.32;
-const D1 = 230;
+const D1 = 190;
 const PULL_END = 7.6;
 
 const smooth = (a: number, b: number, t: number) => {
@@ -35,8 +35,10 @@ export interface Shot {
 export const shotAt = (t: number): Shot => {
   const u = easeInOut(Math.min(1, t / PULL_END));
   const dist = Math.exp(lerp(Math.log(D0), Math.log(D1), u));
-  const pitch = THREE.MathUtils.degToRad(lerp(6, 54, Math.pow(u, 0.75)));
-  const yaw = THREE.MathUtils.degToRad(lerp(-24, 14, u));
+  // Ends low enough that the city runs out to a hazy horizon at the top of
+  // the frame: a field seen from straight above is just texture.
+  const pitch = THREE.MathUtils.degToRad(lerp(4, 19, Math.pow(u, 0.8)));
+  const yaw = THREE.MathUtils.degToRad(lerp(-32, 12, u));
   const pos = new THREE.Vector3(
     HERO.x + dist * Math.cos(pitch) * Math.sin(yaw),
     HERO.y + dist * Math.sin(pitch),
@@ -55,14 +57,19 @@ const VERT = /* glsl */ `
   uniform float uAperture;
   uniform float uScale;
   uniform float uFade;
+  uniform float uFog;
   varying vec3 vColor;
   varying float vAlpha;
   varying float vSoft;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float depth = max(-mv.z, 0.001);
+    float air = exp(-depth / uFog);
     float on = smoothstep(aOn, aOn + 0.4, uTime);
-    float flick = 1.0 + 0.07 * sin(uTime * (1.7 + aSeed * 4.0) + aSeed * 31.0);
+    // No per-light twinkle: every pixel changing every frame is the one thing
+    // a video codec cannot compress, and it tripled the file for a shimmer
+    // nobody could see.
+    float flick = 1.0;
     float sharp = max(aSize * uScale / depth, 1.15);
     float coc = uAperture * abs(depth - uFocus) / depth * uScale;
     float d = sharp + coc;
@@ -70,9 +77,10 @@ const VERT = /* glsl */ `
     // The light a defocused point carries is spread over a bigger disc, so it
     // dims as it grows: bokeh, not a balloon.
     float energy = (sharp * sharp) / (d * d);
-    vAlpha = on * flick * uFade * clamp(energy * 1.35, 0.015, 1.0);
+    vAlpha = on * flick * uFade * clamp(energy * 1.35, 0.015, 1.0) * (0.25 + 0.75 * air);
     vSoft = clamp(coc / max(d, 1.0), 0.0, 1.0);
-    vColor = aColor;
+    // Through more air, light goes warmer.
+    vColor = mix(aColor * vec3(1.0, 0.72, 0.5), aColor, air);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -114,6 +122,7 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
       uAperture: { value: 0.02 },
       uScale: { value: 1 },
       uFade: { value: 1 },
+      uFog: { value: 400 },
     };
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -140,6 +149,7 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
       uAperture: { value: 0 },
       uScale: { value: 1 },
       uFade: { value: 1 },
+      uFog: { value: 1e6 },
     };
     const heroMat = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -153,19 +163,42 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
     hero.frustumCulled = false;
     scene.add(hero);
 
+    // The sky: black overhead, a faint warm haze at the horizon.
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: { uHaze: { value: 0 } },
+      vertexShader: /* glsl */ `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: /* glsl */ `
+        varying vec3 vDir; uniform float uHaze;
+        void main(){
+          float e = vDir.y;
+          // Above the horizon a glow; below it the same glow, so the farthest
+          // lights fade into haze rather than ending against a band of black.
+          float glow = exp(-abs(e) * (e > 0.0 ? 14.0 : 22.0));
+          vec3 c = vec3(0.16, 0.075, 0.035) * glow * uHaze + vec3(0.006, 0.007, 0.012);
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    });
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), skyMat);
+    scene.add(sky);
+
     // The shockwave: a ring on the ground around the hero window.
     const ringMat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      uniforms: { uR: { value: 0 }, uW: { value: 1 }, uA: { value: 0 } },
+      uniforms: { uR: { value: 0 }, uW: { value: 1 }, uA: { value: 0 }, uGlowR: { value: 1 }, uGlow: { value: 0 } },
       vertexShader: /* glsl */ `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: /* glsl */ `
-        varying vec2 vP; uniform float uR; uniform float uW; uniform float uA;
+        varying vec2 vP; uniform float uR; uniform float uW; uniform float uA; uniform float uGlowR; uniform float uGlow;
         void main(){
-          float d = abs(length(vP) - uR);
-          float a = exp(-d * d / (uW * uW)) * uA;
-          gl_FragColor = vec4(vec3(1.0, 0.1, 0.05) * a, 1.0);
+          float r = length(vP);
+          float d = abs(r - uR);
+          float ring = exp(-d * d / (uW * uW)) * uA;
+          // The red light pools on the ground around it.
+          float pool = exp(-r * r / (uGlowR * uGlowR)) * uGlow;
+          gl_FragColor = vec4(vec3(1.0, 0.09, 0.04) * (ring + pool), 1.0);
         }`,
     });
     const ring = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), ringMat);
@@ -173,7 +206,7 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
     ring.position.set(HERO.x, 0.01, HERO.z);
     scene.add(ring);
 
-    return { scene, uniforms, heroUniforms, heroGeo, ringMat };
+    return { scene, uniforms, heroUniforms, heroGeo, ringMat, skyMat, sky };
   }, []);
 
   const fx = useMemo(() => {
@@ -195,21 +228,27 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
     c.position.copy(shot.pos);
     c.up.set(0, 1, 0);
     c.lookAt(HERO.x, HERO.y, HERO.z);
-    c.fov = FOV;
+    // A phone's frame is tall: widen the lens so the city, not the sky and the
+    // foreground, still fills it.
+    c.fov = height > width ? 58 : FOV;
     c.near = 0.01;
     c.far = 2000;
     c.aspect = width / height;
     c.updateProjectionMatrix();
     c.updateMatrixWorld();
 
-    const scale = height / (2 * Math.tan(THREE.MathUtils.degToRad(FOV) / 2));
+    const scale = height / (2 * Math.tan(THREE.MathUtils.degToRad(c.fov) / 2));
     const u = world.uniforms;
     u.uTime.value = t;
     u.uFocus.value = shot.dist;
     // Shallow focus close up, deep focus once the city is the subject.
     u.uAperture.value = lerp(0.034, 0.0035, smooth(0, 5.2, t));
     u.uScale.value = scale;
-    u.uFade.value = 1 - smooth(BEATS.out, BEATS.out + 0.65, t);
+    const fade = 1 - smooth(BEATS.out, BEATS.out + 0.65, t);
+    u.uFade.value = fade;
+    u.uFog.value = Math.max(60, shot.dist * 2.4);
+    world.sky.position.copy(shot.pos);
+    world.skyMat.uniforms.uHaze.value = smooth(3.0, 5.5, t) * fade;
 
     // The hero: warm until "you", then red, then a heartbeat, then alone.
     const h = world.heroUniforms;
@@ -227,14 +266,19 @@ export const ArenaScene: React.FC<{ t: number; width: number; height: number }> 
     // Stays a readable dot however far the camera goes: its on-screen size is
     // held, not left to shrink with distance like the rest of the city.
     const sa = world.heroGeo.getAttribute('aSize') as THREE.BufferAttribute;
-    sa.setX(0, Math.max(0.07, shot.dist * 0.0105 * (1 + 0.35 * red)));
+    sa.setX(0, Math.max(0.07, shot.dist * 0.0125 * (1 + 0.9 * red)));
     sa.needsUpdate = true;
 
     const since = t - BEATS.you;
     const ring = world.ringMat.uniforms;
-    ring.uR.value = since > 0 ? shot.dist * 0.42 * (1 - Math.exp(-since * 2.4)) : 0;
-    ring.uW.value = Math.max(0.6, shot.dist * 0.012);
-    ring.uA.value = since > 0 ? 1.4 * Math.exp(-since * 1.6) : 0;
+    // One thin, fast wave, gone before the words land: a pulse, not a target.
+    ring.uR.value = since > 0 ? shot.dist * 0.6 * (1 - Math.exp(-since * 3.2)) : 0;
+    ring.uW.value = Math.max(0.25, shot.dist * 0.0035);
+    ring.uA.value = since > 0 ? 0.9 * Math.exp(-since * 3.0) : 0;
+    ring.uGlowR.value = Math.max(0.5, shot.dist * 0.05);
+    // Fades with the city: the last frame is the red light alone on black,
+    // because the app's own red dot takes over from exactly that.
+    ring.uGlow.value = red * (0.3 + 0.5 * Math.exp(-Math.max(0, since) * 3)) * fade;
 
     fx.bloom.intensity = 1.5 + 1.2 * red * Math.exp(-Math.max(0, since) * 2);
   }, [t, camera, world, fx, width, height]);

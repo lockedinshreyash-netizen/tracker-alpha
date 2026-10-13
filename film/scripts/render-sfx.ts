@@ -25,7 +25,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CUES, CUE_IDS, type Cue } from '../../sound/cues';
 import { Biquad, Bus, SR, encodeWav16, limit, reverb } from './audio/dsp';
-import { clap, clunk, kick, riser as noiseRiser, shimmer, whoosh } from './audio/instruments';
+import { clap, clunk, impact, kick, riser as noiseRiser, shepard, shimmer, whoosh } from './audio/instruments';
+import { BEATS, ARENA_SECONDS } from '../../onboarding/arena';
 import { flick, glock, marimba, pop, sparkleInto, tear, thud } from './audio/sfx-instruments';
 
 const FILM = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -426,6 +427,100 @@ const RECIPES: Record<Cue, Recipe> = {
       m.add(pop(0.6, 260, 800, 0.1), 0.02, 1, 0, 0.1);
       m.add(marimba(D4, 0.6), 0.06);
       [D5, A5, D6].forEach((n, k) => m.add(glock(n, 0.6, 1.4), 0.06 + k * 0.025, 1, (k - 1) * 0.3));
+    },
+  },
+
+  /* ── The new onboarding ── */
+
+  /* Scored to the Arena film (onboarding/arena.ts), so its hits land on the
+     film's beats: one bell for one lamp, a few for the neighbours, a pulse
+     that starts as a heartbeat and races as the city floods in, one hit on
+     "This one is you", then a breath of silence for the wordmark. */
+  arena: {
+    len: ARENA_SECONDS + 0.6,
+    room: 0.86,
+    wet: 0.5,
+    build: m => {
+      // A low bed under everything, gone before the end.
+      m.addStereo(shimmer([D3, A3], BEATS.out + 0.4, 0.22), 0, 0.5, 0.6);
+      // One lamp.
+      m.add(glock(D5, 0.55, 2.2), BEATS.time, 1, 0, 0.55);
+      // Its neighbours.
+      [[Fs5, 1.25, -0.3], [A5, 1.7, 0.35], [D6, 2.05, -0.15]].forEach(([n, at, pan]) => m.add(glock(n, 0.32, 1.6), at, 1, pan, 0.6));
+      // The flood: a heartbeat that quickens into a race.
+      let t = BEATS.someone;
+      let k = 0;
+      while (t < BEATS.you - 0.06) {
+        const p = (t - BEATS.someone) / (BEATS.you - BEATS.someone);
+        m.add(kick(0.35 + 0.45 * p, 1.4), t, 0.55, 0, 0.05);
+        if (k % 2 === 1) m.add(marimba([D4, Fs4, A4, B4, D5, E5, Fs5, A5][Math.min(7, Math.floor(p * 8))], 0.25 + 0.3 * p, 0.5), t, 1, (k % 4 === 1 ? -0.3 : 0.3), 0.3);
+        t += 0.62 - 0.48 * Math.pow(p, 0.8);
+        k++;
+      }
+      m.add(shepard(BEATS.you - BEATS.lakhs + 0.2, 0.55), BEATS.lakhs - 0.2, 0.45, 0, 0.3);
+      m.add(noiseRiser(1.6, 1), BEATS.you - 1.6, 0.35, 0, 0.3);
+      m.addStereo(shimmer([D5, A5, D6, Fs6], BEATS.you - BEATS.someone + 0.4, 0.07), BEATS.someone, 1, 0.6);
+      // "This one is you."
+      m.add(impact(0.9), BEATS.you, 0.8, 0, 0.15);
+      m.add(kick(0.9, 1.8), BEATS.you, 0.7, 0, 0);
+      m.addStereo(whoosh(0.9, 0.35, 0.5), BEATS.you - 0.35, 0.5, 0.3);
+      [D6, Fs6, A6].forEach((n, i) => m.add(glock(n, 0.6, 2.4), BEATS.you + 0.02 + i * 0.03, 1, (i - 1) * 0.4, 0.6));
+      m.sparkle(BEATS.you + 0.05, 2027, 0.9, 0.16);
+    },
+  },
+  wordmark: {
+    len: 2.8,
+    room: 0.8,
+    wet: 0.45,
+    build: m => {
+      m.add(kick(1, 1.9), 0, 0.85, 0, 0);
+      m.add(impact(0.7), 0, 0.6, 0, 0.1);
+      m.add(clap(0.5), 0.005, 0.5, 0, 0.35);
+      m.add(clunk(0.6), 0, 0.4, 0, 0.1);
+      [D5, A5, D6].forEach((n, k) => m.add(glock(n, 0.55, 2.0), 0.02 + k * 0.02, 1, (k - 1) * 0.35, 0.5));
+      m.sparkle(0.04, 77, 0.6, 0.12);
+    },
+  },
+  /* Exactly as long as the hold (onboarding/HoldToCommit.tsx, HOLD_MS), so
+     letting go early cuts it and holding to the end lands on `commit`. */
+  hold: {
+    len: 1.75,
+    room: 0.6,
+    wet: 0.35,
+    build: m => {
+      m.add(shepard(1.6, 0.8), 0, 0.5, 0, 0.2);
+      m.add(noiseRiser(1.6, 1), 0, 0.3, 0, 0.2);
+      const notes = [D4, E4, Fs4, A4, B4, D5, E5, Fs5, A5, B5, D6];
+      notes.forEach((n, k) => {
+        const at = 1.55 * Math.sqrt(k / notes.length);
+        m.add(marimba(n, 0.3 + (0.4 * k) / notes.length, 0.45), at, 1, -0.3 + (0.6 * k) / notes.length, 0.2);
+      });
+    },
+  },
+  commit: {
+    len: 3.4,
+    room: 0.85,
+    wet: 0.5,
+    build: m => {
+      m.add(kick(1, 1.9), 0, 0.9, 0, 0);
+      m.add(impact(1), 0, 0.75, 0, 0.15);
+      m.add(pop(0.9, 160, 900, 0.14), 0, 0.8, 0, 0.2);
+      m.addStereo(whoosh(0.8, 0.1, 0.6), 0, 0.6, 0.4);
+      [D5, Fs5, A5, D6, Fs6, A6].forEach((n, k) => m.add(glock(n, 0.55 - k * 0.04, 2.4), 0.03 + k * 0.028, 1, (k - 2.5) * 0.25, 0.55));
+      m.addStereo(shimmer([D6, A6, D7], 2.4, 0.07), 0.1, 1, 0.6);
+      m.sparkle(0.08, 4242, 1.2, 0.2);
+    },
+  },
+  'plan-reveal': {
+    len: 2.6,
+    room: 0.8,
+    wet: 0.5,
+    build: m => {
+      m.addStereo(whoosh(0.7, 0.32, 0.35), 0, 0.5, 0.4);
+      const land = m.run([D4, Fs4, A4, D5, Fs5], 0.28, 0.07, 0.55);
+      m.add(glock(A5, 0.6, 2.0), land + 0.05, 1, -0.2);
+      m.add(glock(D6, 0.6, 2.2), land + 0.08, 1, 0.2);
+      m.sparkle(land + 0.06, 31, 0.6, 0.12);
     },
   },
 };

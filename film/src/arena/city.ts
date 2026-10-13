@@ -26,9 +26,9 @@ export interface City {
 /** The window the film is about: the centre building, second floor. */
 export const HERO = { x: 0, y: 0.26, z: 0 };
 
-export const RADIUS = 380;
+export const RADIUS = 560;
 const BLOCK = 4.2;
-const AVENUE_EVERY = 3; // every third street is an avenue with lights
+const AVENUE_EVERY = 2; // every other street is an avenue with lights
 
 const WARM: [number, number, number][] = [
   [1.0, 0.74, 0.44],
@@ -43,8 +43,8 @@ const SODIUM: [number, number, number] = [1.0, 0.52, 0.18];
 
 /** Streets bend a little, so the grid reads as a real city and not graph paper. */
 const warp = (x: number, z: number): [number, number] => [
-  x + 3.2 * Math.sin(z * 0.019) + 1.4 * Math.sin(z * 0.061 + 1.3),
-  z + 3.2 * Math.sin(x * 0.017 + 0.7) + 1.4 * Math.sin(x * 0.057),
+  x + 4.5 * Math.sin(z * 0.012) + 0.35 * Math.sin(z * 0.061 + 1.3),
+  z + 4.5 * Math.sin(x * 0.011 + 0.7) + 0.35 * Math.sin(x * 0.057),
 ];
 
 /** The river: a band of dark water winding across the city. */
@@ -88,7 +88,10 @@ export const buildCity = (): City => {
       if (riverAt(cx, cz)) continue;
       const core = Math.exp(-r / 85);
       const centre = i === 0 && j === 0;
-      if (!centre && rnd() > 0.55 + 0.45 * core) continue; // some lots are dark
+      // Thins out towards the edge so the city dissolves into the haze
+      // instead of stopping at a line.
+      const edge = 1 - Math.pow(Math.min(1, r / RADIUS), 3);
+      if (!centre && rnd() > (0.5 + 0.5 * core) * edge) continue; // some lots are dark
       const buildings = centre ? 5 : 2 + Math.floor(rnd() * 4);
       for (let b = 0; b < buildings; b++) {
         const bx = cx + (rnd() - 0.5) * (BLOCK - 1.4);
@@ -100,11 +103,11 @@ export const buildCity = (): City => {
           const x = bx + (rnd() - 0.5) * 0.7;
           const z = bz + (rnd() - 0.5) * 0.7;
           const id = n;
-          const cool = hash01(id, 7) < 0.3;
+          const cool = hash01(id, 7) < 0.18;
           const pal = cool ? COOL : WARM;
           const c = pal[Math.floor(hash01(id, 11) * pal.length)];
           const onAt = 1.15 + reach(x, z) * 3.6 + rnd() * 0.9;
-          push(x, 0.05 + f * 0.13, z, c, 1.6 + rnd() * 2.2, 0.05 + rnd() * 0.03, onAt);
+          push(x, 0.05 + f * 0.13, z, c, 1.3 + rnd() * 1.6, 0.05 + rnd() * 0.03, onAt);
         }
       }
     }
@@ -114,14 +117,15 @@ export const buildCity = (): City => {
   const lamp = (x: number, z: number) => {
     if (Math.hypot(x, z) > RADIUS || riverAt(x, z)) return;
     const onAt = 2.1 + reach(x, z) * 2.8 + rnd() * 0.5;
-    push(x, 0.03, z, SODIUM, 1.4 + rnd() * 0.5, 0.06, onAt);
+    const edge = 1 - Math.pow(Math.min(1, Math.hypot(x, z) / RADIUS), 2);
+    push(x, 0.03, z, SODIUM, (2.1 + rnd() * 0.6) * (0.4 + 0.6 * edge), 0.055, onAt);
   };
   for (let i = -cells; i <= cells; i++) {
     if (((i % AVENUE_EVERY) + AVENUE_EVERY) % AVENUE_EVERY !== 0) continue;
     const g = (i + 0.5) * BLOCK;
-    for (let s = -RADIUS; s <= RADIUS; s += 1.3) {
-      const density = Math.exp(-Math.abs(s) / 260) * Math.exp(-Math.abs(g) / 260);
-      if (rnd() > 0.35 + 0.65 * density) continue;
+    for (let s = -RADIUS; s <= RADIUS; s += 0.85) {
+      const density = Math.exp(-Math.abs(s) / 300) * Math.exp(-Math.abs(g) / 300);
+      if (rnd() > 0.45 + 0.55 * density) continue;
       lamp(...warp(g, s));
       lamp(...warp(s, g));
     }

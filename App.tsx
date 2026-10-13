@@ -9,7 +9,7 @@ import { buildExperiment } from './insight/observe';
 import AnalysisIntro from './analysis/AnalysisIntro';
 import ObservatoryTab from './analysis/ObservatoryTab';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations, nextReward } from './rewards/engine';
-import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
+import { EMPTY_SCHEDULE, mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
 import { wallpaperById } from './rewards/wallpapers';
 import WallpaperLayer from './rewards/WallpaperLayer';
@@ -35,11 +35,13 @@ import { CardPeriod } from './share/types';
    a user who never shares never pays for it. Decks (the scheduler, the deck
    file reader, the editor) is fetched when the tab is first opened. */
 const ShareModal = React.lazy(() => import('./share/ShareModal'));
+/* Seen once per device: the flow, its stylesheet and its film stay out of the bundle everyone downloads. */
+const OnboardingFlow = React.lazy(() => import('./onboarding/OnboardingFlow'));
 const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
-import OnboardingFlow, { OnboardingSettings } from './onboarding/OnboardingFlow';
+import type { OnboardingResult } from './onboarding/OnboardingFlow';
 import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
@@ -740,14 +742,23 @@ const App: React.FC = () => {
     });
   };
 
-  /* Written once, when the calibration act completes. Skipping writes nothing. */
-  const applyOnboardingSettings = (s: OnboardingSettings) => {
+  /* Onboarding's one write, when the pledge is held to the end. Skipping
+     writes nothing. The starter plan only lands on an empty Plan tab: a
+     student who already has blocks never gets a second set laid over them. */
+  const applyOnboarding = (r: OnboardingResult) => {
     setState(prev => {
-      const next = {
+      const schedule = prev.schedule || EMPTY_SCHEDULE;
+      const empty = !schedule.rules.length && !schedule.blocks.length;
+      const today = getISTDateString();
+      const next: AppState = {
         ...prev,
-        examPreference: s.examPreference,
-        currentClass: s.currentClass,
-        dailyGoalHours: s.dailyGoalHours,
+        examPreference: r.examPreference,
+        currentClass: r.currentClass,
+        dailyGoalHours: r.dailyGoalHours,
+        timerMode: r.timerMode,
+        schedule: r.rules && empty
+          ? { ...schedule, rules: r.rules.map(rule => ({ ...rule, id: generateId(), from: today, until: null })) }
+          : schedule,
         lastUpdated: Date.now(),
       };
       stateRef.current = next;
@@ -763,6 +774,10 @@ const App: React.FC = () => {
     }
     setNeedsOnboarding(false);
   };
+
+  /* The exam picked on the landing page's toggle, carried into onboarding so
+     a NEET student who said NEET is not asked as if they hadn't. */
+  const landingExam = useRef<ExamPreference | null>(null);
 
   /* ── What a new log sounds like ──
      Read from `stateRef` before the write lands, so "first log today" and
@@ -1075,6 +1090,60 @@ const App: React.FC = () => {
     ready: syncSettled,
   });
 
+  /* ── Leaving onboarding ──
+     Three ways out, all landing on Today. The pledge has already written the
+     answers by the time any of these can be reached, except Skip, which by
+     design writes nothing. */
+  const finishOnboarding = () => {
+    completeOnboarding();
+    handleTabChangeAndExitProfile('Today');
+  };
+
+  /* The first session, started from onboarding's last screen in whichever
+     mode the student chose. A session already running (a returning student)
+     is left alone: they land on it instead. */
+  const startFirstSession = (subject: Subject) => {
+    const current = stateRef.current;
+    if (!stopwatchArmed(current.timer) && pomodoroIsIdle(current.pomodoro)) {
+      if (current.timerMode === 'pomodoro') {
+        pomodoro.start(subject);
+      } else {
+        sfx.play('session-start');
+        setState(prev => {
+          const next: AppState = {
+            ...prev,
+            timer: { isRunning: true, startTime: Date.now(), accumulatedMs: 0, subject, chapter: undefined, blockId: undefined },
+            lastUpdated: Date.now(),
+          };
+          stateRef.current = next;
+          return next;
+        });
+      }
+    }
+    finishOnboarding();
+  };
+
+  /* An account from inside onboarding: Google goes straight to Google (the
+     page navigates away and comes back signed in); anything else opens the
+     sign-in sheet, which onboarding steps aside for. */
+  const signInFromOnboarding = (how: 'google' | 'modal') => {
+    finishOnboarding();
+    if (how === 'google') {
+      void supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+        .then(({ error }) => { if (error) setIsAuthModalOpen(true); });
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  /* A student signing in on a new device already has a history: they are not
+     new, and asking them to set up again would be noise. Decided after the
+     cloud pull, which is what brings the history in. */
+  useEffect(() => {
+    if (needsOnboarding && syncSettled && user && state.logs.length > 0) completeOnboarding();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsOnboarding, syncSettled, user?.id, state.logs.length]);
+
   /* Mounted here for the same reason, and it is the whole of the deadline
      feature for a signed-out user: nothing in this engine touches Supabase.
      Push (below) is an additional delivery channel, not a dependency. */
@@ -1340,23 +1409,6 @@ const App: React.FC = () => {
     () => buildExperiment(analysis, state.logs, sleep.logs),
     [analysis, state.logs, sleep.logs],
   );
-
-  /* Throw away an in-progress session without logging it. Used by onboarding:
-     a running timer hides the goal card the tour needs to point at, and a
-     few seconds started mid-tour isn't real study data worth keeping. */
-  const discardActiveSession = () => {
-    setState(prev => {
-      if (!stopwatchArmed(prev.timer)) {
-        return prev;
-      }
-      const nextState = {
-        ...prev,
-        timer: { ...prev.timer, ...STOPWATCH_CLEARED },
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  };
 
   /* ── Tasks ────────────────────────────────────────────────────────
      Every mutator here is wrapped in useCallback with empty deps. That is not
@@ -2235,9 +2287,11 @@ const App: React.FC = () => {
   if (showLanding) {
     return (
       <LandingPage
-        onCtaClick={() => {
+        onCtaClick={(exam: ExamPreference) => {
+          /* Into onboarding, not a sign-up form: an account is offered at
+             the end, once there is a plan worth keeping. */
+          landingExam.current = exam;
           setShowLanding(false);
-          setIsAuthModalOpen(true);
         }}
       />
     );
@@ -2667,17 +2721,24 @@ const App: React.FC = () => {
       )}
 
       {showOnboarding && (
-        <OnboardingFlow
-          initial={{
-            examPreference: state.examPreference || 'JEE',
-            currentClass: state.currentClass,
-            dailyGoalHours: state.dailyGoalHours,
-          }}
-          onApplySettings={applyOnboardingSettings}
-          onNavigateToToday={() => handleTabChange('Today')}
-          onDiscardSession={discardActiveSession}
-          onComplete={completeOnboarding}
-        />
+        <React.Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#050506' }} />}>
+          <OnboardingFlow
+            initial={{
+              examPreference: landingExam.current ?? state.examPreference ?? 'JEE',
+              currentClass: state.currentClass,
+              dailyGoalHours: state.dailyGoalHours,
+              timerMode: state.timerMode,
+              pomodoroSettings: state.pomodoroSettings,
+              progress: state.progress,
+              hasPlan: !!(state.schedule && (state.schedule.rules.length || state.schedule.blocks.length)),
+              signedIn: !!user,
+            }}
+            onApply={applyOnboarding}
+            onSignIn={signInFromOnboarding}
+            onStart={startFirstSession}
+            onComplete={finishOnboarding}
+          />
+        </React.Suspense>
       )}
     </div>
   );

@@ -145,7 +145,7 @@ const draw = (w: number, h: number, radius: number, bezel: number): Maps => {
 };
 
 interface Props extends React.HTMLAttributes<HTMLElement> {
-  as?: 'div' | 'aside' | 'nav';
+  as?: 'div' | 'aside' | 'nav' | 'button';
   dark: boolean;
   /** Corner radius in px. The rim is shaped around it. */
   radius: number;

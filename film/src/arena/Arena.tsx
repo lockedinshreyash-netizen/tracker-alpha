@@ -9,7 +9,8 @@ import { ArenaScene } from './ArenaScene';
  * adds its own grain, which also keeps the video small: noise is the most
  * expensive thing a codec can be asked to keep.
  *
- *   npx remotion render Arena ../public/onboarding/arena.mp4 …  (see README of onboarding)
+ * Rendered to public/onboarding/arena-{portrait,landscape}.mp4; the command is
+ * in onboarding/arena.ts.
  */
 export const Arena: React.FC = () => {
   const frame = useCurrentFrame();

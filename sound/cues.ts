@@ -88,6 +88,11 @@ export const CUES = {
   ignite: cue('onboarding', 0.55, 'Ignite', 'Onboarding spotlight turns on', { stereo: true }),
   riser: cue('onboarding', 0.45, 'Riser', 'Under the days-remaining count-up', { stereo: true }),
   lock: cue('onboarding', 0.55, 'Lock in', 'The final "Lock in" button of onboarding', { stereo: true }),
+  arena: cue('onboarding', 0.7, 'Arena', 'Under the cold open: one lamp, then the whole city', { stereo: true }),
+  wordmark: cue('onboarding', 0.6, 'Wordmark', 'LOCK IN. lands after the cold open', { stereo: true }),
+  hold: cue('onboarding', 0.5, 'Hold', 'Charging while the pledge button is held down', { stereo: true, choke: true }),
+  commit: cue('onboarding', 0.7, 'Commit', 'The pledge locks in', { stereo: true }),
+  'plan-reveal': cue('onboarding', 0.55, 'Plan reveal', 'Your day is built and shown', { stereo: true }),
 } satisfies Record<string, CueDef>;
 
 export type Cue = keyof typeof CUES;
