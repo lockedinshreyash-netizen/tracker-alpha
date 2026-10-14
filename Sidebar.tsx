@@ -178,13 +178,14 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
       </LiquidGlass>
 
       {/* Phone overlay. Dims without blurring: the menu's glass has to have
-          something sharp behind it to bend. */}
-      {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/30"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+          something sharp behind it to bend. Always mounted so it can fade
+          out with the menu instead of vanishing under it. */}
+      <div
+        className="nav-scrim md:hidden fixed inset-0 z-40 bg-black/30"
+        data-open={mobileOpen}
+        aria-hidden="true"
+        onClick={() => setMobileOpen(false)}
+      />
 
       {/* The rail: an inset glass panel on a laptop, the menu hanging under the
           capsule on a phone. Geometry in index.css (.nav-rail). */}
@@ -199,29 +200,36 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
         data-open={mobileOpen}
         data-collapsed={collapsed}
       >
-        {/* Logo + Collapse Toggle */}
-        <div className={`hidden md:flex items-center h-16 px-4 border-b shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
-          {!collapsed && (
-            <span className={`text-sm logo-text flex-1 ${dark ? 'text-white' : 'text-[#17150F]'}`}>
-              LOCK IN
-            </span>
-          )}
+        {/* Logo + Collapse Toggle. Nothing in the rail changes position when
+            it collapses: everything is laid out for the narrow rail and the
+            wide one only reveals more of it, so the width animation is the
+            whole motion. The toggle rides the right edge (14px in, which is
+            dead centre at 56px), the wordmark fades and is clipped. */}
+        <div className={`hidden md:flex relative items-center h-16 px-4 border-b shrink-0 overflow-hidden ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
+          <span
+            className={`text-sm logo-text whitespace-nowrap rail-fade ${dark ? 'text-white' : 'text-[#17150F]'}`}
+            data-hidden={collapsed}
+            aria-hidden={collapsed}
+          >
+            LOCK IN
+          </span>
           <button
             onClick={onToggleCollapsed}
-            className={`hidden md:flex p-1.5 rounded-md transition-all ${collapsed ? 'mx-auto' : ''} ${dark ? 'text-zinc-400 hover:text-white hover:bg-white/[0.08]' : 'text-zinc-500 hover:text-zinc-900 hover:bg-black/[0.05]'}`}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`absolute top-1/2 -translate-y-1/2 right-[14px] flex p-1.5 rounded-md transition-colors ${dark ? 'text-zinc-400 hover:text-white hover:bg-white/[0.08]' : 'text-zinc-500 hover:text-zinc-900 hover:bg-black/[0.05]'}`}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              {collapsed ? (
-                <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
-              ) : (
-                <><polyline points="15 18 9 12 15 6" /></>
-              )}
+            <svg
+              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className="rail-chevron"
+              data-collapsed={collapsed}
+            >
+              <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-1 px-2 py-3 md:py-4">
+        <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar flex flex-col gap-1 px-2 py-3 md:py-4">
           {tabs.map(tab => {
             const isActive = activeTab === tab;
             return (
@@ -231,7 +239,7 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
                   before the click. */}
               {tab === 'Admin' && (
                 <div
-                  className={`my-2 ${collapsed ? 'mx-3' : 'mx-4'}`}
+                  className="my-2 mx-3"
                   style={{ height: 1, background: dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)' }}
                   aria-hidden="true"
                 />
@@ -239,8 +247,10 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
               <button
                 onClick={() => handleTabClick(tab)}
                 data-onboarding-target={tab === 'Syllabus' ? 'syllabus-nav' : tab === 'Streak' ? 'streak-nav' : tab === 'Plan' ? 'plan-nav' : undefined}
-                className={`flex items-center gap-3 rounded-lg transition-all duration-200 group relative
-                  ${collapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'}
+                /* px-[11px] in both states: it puts the icon dead centre of the
+                   collapsed rail (8 + 11 + 9 = 28 of 56), so expanding only
+                   reveals the label beside it and nothing slides. */
+                className={`flex items-center gap-3 rounded-lg transition-colors duration-200 group relative px-[11px] py-3
                   ${isActive
                     ? (dark ? 'bg-white/[0.09] text-white' : 'bg-black/[0.05] text-[#17150F]')
                     : (dark ? 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05]' : 'text-zinc-500 hover:text-[#17150F] hover:bg-black/[0.04]')
@@ -254,23 +264,24 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
 
                 <TabIcon tab={tab} className="flex-shrink-0" />
 
-                {!collapsed && (
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? (dark ? 'text-white' : 'text-[#17150F]') : ''}`}>
-                    {tab}
-                  </span>
-                )}
+                <span
+                  className={`rail-fade text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap font-ui ${isActive ? (dark ? 'text-white' : 'text-[#17150F]') : ''}`}
+                  data-hidden={collapsed}
+                >
+                  {tab}
+                </span>
 
                 {tab === 'Groups' && groupsUnread > 0 && (
-                  collapsed ? (
-                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#E10600]" aria-label={`${groupsUnread} unread`} />
-                  ) : (
+                  <>
+                    <span className="rail-fade-in absolute top-2 left-[31px] w-2 h-2 rounded-full bg-[#E10600]" data-hidden={!collapsed} aria-hidden="true" />
                     <span
-                      className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#E10600] text-white text-[9px] font-black font-ui flex items-center justify-center"
+                      className="rail-fade ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[#E10600] text-white text-[9px] font-black font-ui flex items-center justify-center"
+                      data-hidden={collapsed}
                       aria-label={`${groupsUnread} unread`}
                     >
                       {groupsUnread > 99 ? '99+' : groupsUnread}
                     </span>
-                  )
+                  </>
                 )}
 
                 {/* Tooltip on collapsed */}
@@ -289,35 +300,35 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             rather than the public card RanksTab/RaceChat open on someone
             else's identity; see profile/EditProfile.tsx. Falls back to the
             plain footer until there's a profile to show. */}
-        <div className={`px-4 py-4 border-t shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
+        <div className={`px-2 py-4 border-t shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
           {ownProfile ? (
             <button
               onClick={onOpenAccount}
               data-onboarding-target="account-nav"
-              className={`w-full flex items-center gap-2.5 rounded-lg transition-all group relative ${collapsed ? 'justify-center py-1' : 'px-1 py-1'} ${dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'}`}
+              /* 8 + 6 puts the 28px avatar dead centre of the collapsed rail, in both states. */
+              className={`w-full flex items-center gap-2.5 rounded-lg transition-colors group relative px-[6px] py-1 ${dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'}`}
             >
               <Avatar
                 profile={ownProfile}
                 size={28}
                 className="ring-1 ring-inset ring-white/10 rounded-full flex-shrink-0"
               />
-              {!collapsed && (
-                <span className={`text-[11px] font-bold font-ui truncate ${dark ? 'text-white' : 'text-[#17150F]'}`}>
-                  {ownProfile.display_name}
-                </span>
-              )}
+              <span className={`rail-fade min-w-0 text-[11px] font-bold font-ui truncate ${dark ? 'text-white' : 'text-[#17150F]'}`} data-hidden={collapsed}>
+                {ownProfile.display_name}
+              </span>
               {collapsed && (
                 <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-[#17150F] text-[#F2F0EC]'}`}>
                   {ownProfile.display_name}
                 </div>
               )}
             </button>
-          ) : !collapsed ? (
-            <p className={`text-[8px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
-              Tracker Alpha
-            </p>
           ) : (
-            <div className={`w-2 h-2 rounded-full mx-auto ${dark ? 'bg-zinc-700' : 'bg-[#D6D1C5]'}`} />
+            <div className="relative h-3 overflow-hidden">
+              <p className={`rail-fade absolute left-2 top-0 whitespace-nowrap text-[8px] leading-3 font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`} data-hidden={collapsed}>
+                Tracker Alpha
+              </p>
+              <div className={`rail-fade-in absolute left-[16px] top-[2px] w-2 h-2 rounded-full ${dark ? 'bg-zinc-700' : 'bg-[#D6D1C5]'}`} data-hidden={!collapsed} />
+            </div>
           )}
         </div>
       </LiquidGlass>

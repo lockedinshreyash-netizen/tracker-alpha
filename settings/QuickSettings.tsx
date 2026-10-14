@@ -7,9 +7,10 @@
    away, not in front of the content.
 
    Both the button and the pane are liquid glass (ui/LiquidGlass.tsx). The
-   pane's dimming is a SIBLING behind it, never an ancestor, and it enters
-   with `lg-pop` (a transform), never a fade: opacity on an ancestor would
-   make it a backdrop root and the glass would refract nothing. The pane
+   pane's dimming is a SIBLING behind it, never an ancestor, and it grows out
+   of the gear with `qs-pop` (a transform) and shrinks back into it on close,
+   never a fade: opacity on an ancestor would make it a backdrop root and the
+   glass would refract nothing. The pane
    scrolls on an inner wrapper so the glass layers stay put. Geometry lives in
    index.css (`.qs-*`) for the reason the feedback dock gives. */
 
@@ -17,7 +18,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import * as sfx from '../audio';
 import { useSound } from '../sound/useSound';
-import LiquidGlass from '../ui/LiquidGlass';
+import LiquidGlass, { prewarmGlass } from '../ui/LiquidGlass';
+import { usePresence } from '../ui/usePresence';
 import { Segmented, Switch } from '../ui/kit';
 import { Avatar } from '../profile/Avatar';
 import type { Profile } from '../profile/profileApi';
@@ -104,6 +106,8 @@ const QuickSettings: React.FC<Props> = ({
   const dark = theme === 'dark';
   const sound = useSound();
   const [open, setOpen] = useState(false);
+  const { mounted, closing } = usePresence(open, 260);
+  useEffect(() => { prewarmGlass(28, 18); }, []);
   const [permission, setPermission] = useState<PermissionState>(notificationPermission);
   const [busy, setBusy] = useState(false);
   const [iosSteps, setIosSteps] = useState(false);
@@ -174,20 +178,21 @@ const QuickSettings: React.FC<Props> = ({
         </LiquidGlass>
       </div>
 
-      {open && (
+      {mounted && (
         <>
-          <div className="qs-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="qs-scrim glass-scrim" data-closing={closing} onClick={() => setOpen(false)} aria-hidden="true" />
           <LiquidGlass
             dark={dark}
             radius={28}
             variant="panel"
             bezel={18}
             strength={20}
-            className="qs-panel lg-pop"
+            className="qs-panel qs-pop"
+            data-closing={closing}
             role="dialog"
             aria-label="Settings"
           >
-            <div ref={panelRef} tabIndex={-1} className="qs-scroll outline-none no-scrollbar">
+            <div ref={panelRef} tabIndex={-1} className="qs-scroll glass-body outline-none no-scrollbar">
               <div className="flex items-center justify-between px-1 pb-3">
                 <h2 className={`font-display text-[22px] leading-none ${ink}`}>Settings</h2>
               </div>

@@ -222,12 +222,22 @@ const TodayTab: React.FC<Props> = ({
         <PageHeader
           dark={dark}
           title="Today"
+          /* The date alone until something is logged. After that the status
+             gets its own line on a phone, strictly under the date; on a wider
+             screen it follows the date on one line. */
           subtitle={
             totalToday === 0
-              ? `${todayLabel}. Nothing logged yet. The clock is waiting.`
-              : remaining > 0
-                ? `${todayLabel}. ${totalToday.toFixed(1)}h done, ${remaining.toFixed(1)}h to go.`
-                : `${todayLabel}. Target hit. Everything now is extra.`
+              ? todayLabel
+              : (
+                <>
+                  {todayLabel}
+                  <span className="hidden md:inline">. </span>
+                  <br className="md:hidden" />
+                  {remaining > 0
+                    ? `${totalToday.toFixed(1)}h done, ${remaining.toFixed(1)}h to go.`
+                    : 'Target hit. Everything now is extra.'}
+                </>
+              )
           }
           /* The exam countdown: it lived in the old web header above every
              tab, and belongs here at the top of the day it is counting. */

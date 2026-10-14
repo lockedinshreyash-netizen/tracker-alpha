@@ -1047,20 +1047,44 @@ html.android-app body { overscroll-behavior-y: none; }
   display: flex;
   flex-direction: column;
   transform: translateX(calc(-100% - 24px));
-  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), width 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform var(--rail-dur) var(--rail-ease), width var(--rail-dur) var(--rail-ease);
 }
 .nav-rail[data-open='true'] { transform: none; }
-.nav-rail[data-collapsed='true'] { width: 56px; }
+
+/* One curve for everything that moves when the rail opens or collapses: the
+   rail's width, the page's margin beside it (.shell-rail) and the feedback
+   dock riding its edge. On different curves the gap between them breathes
+   mid-animation, which is most of what read as "not smooth". iOS's sheet
+   curve: quick out of the gate, a long soft landing, no overshoot (an
+   overshooting width would reflow the page past its target and back). */
+:root { --rail-dur: 0.42s; --rail-ease: cubic-bezier(0.32, 0.72, 0, 1); }
+
+.nav-scrim { opacity: 0; pointer-events: none; transition: opacity var(--rail-dur) var(--rail-ease); }
+.nav-scrim[data-open='true'] { opacity: 1; pointer-events: auto; }
+
+/* Labels in the rail never mount or unmount with the collapse: they fade, and
+   the rail's own width clips them. Going away they leave at once, so nothing
+   is seen being squeezed; coming in they wait for the width to make room. */
+.rail-fade, .rail-fade-in { transition: opacity 0.22s ease 0.1s; }
+.rail-chevron { transition: transform var(--rail-dur) var(--rail-ease); }
 
 /* The capsule is hidden on a laptop by Tailwind's md:hidden on the element:
    the CDN's `.flex` is injected after this file and would beat a display
-   rule here. */
+   rule here. Collapsing is a laptop thing: the phone's menu is always full. */
 @media (min-width: 768px) {
   .nav-rail { top: calc(var(--safe-top) + 8px); transform: none; }
+  .nav-rail[data-collapsed='true'] { width: 56px; }
+  .rail-fade[data-hidden='true'], .rail-fade-in[data-hidden='true'] { opacity: 0; transition: opacity 0.12s ease; }
+  .rail-chevron[data-collapsed='true'] { transform: rotate(180deg); }
+  .shell-rail { transition: margin-left var(--rail-dur) var(--rail-ease); }
+  .fb-dock { transition: left var(--rail-dur) var(--rail-ease); }
+}
+@media (max-width: 767.98px) {
+  .rail-fade-in { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nav-rail { transition: none; }
+  .nav-rail, .nav-scrim, .rail-fade, .rail-fade-in, .rail-chevron, .shell-rail, .fb-dock { transition: none !important; }
 }
 
 /* Glass that can be seen through is a choice some people turn off. */
@@ -1069,13 +1093,61 @@ html.android-app body { overscroll-behavior-y: none; }
   .lg-tint { background: var(--lg-solid, #141418) !important; }
 }
 
-/* Glass enters by moving, never by fading: opacity below 1 makes an element
-   a backdrop root, and the glass would show nothing until the fade ended. */
-/* Today's countdown pane growing out of its calendar (today/ExamCountdown).
-   Transform only: glass cannot be faded in. */
-@keyframes cd-pop { from { transform: translateY(-6px) scale(0.55); } to { transform: none; } }
-.cd-pop { animation: cd-pop 0.42s cubic-bezier(0.32, 0.72, 0, 1) both; transform-origin: top right; }
-@media (prefers-reduced-motion: reduce) { .cd-pop { animation: none; } }
-@keyframes lg-pop { from { transform: translateY(12px) scale(0.97); } to { transform: none; } }
-.lg-pop { animation: lg-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
-@media (prefers-reduced-motion: reduce) { .lg-pop { animation: none; } }
+/* ── Glass in motion ──
+   Glass enters by moving, never by fading: opacity below 1 makes an element
+   a backdrop root, and the glass would show nothing until the fade ended. It
+   leaves the same way, shrinking back into whatever opened it while its
+   contents fade (the contents are not an ancestor of the glass, so they may).
+   `data-closing` is set by ui/usePresence for the length of the exit.
+
+   --spring is a real spring (response 0.5s, a 1% overshoot) sampled into
+   linear(), the curve SwiftUI's default spring draws: fast off the mark and
+   settling with a hint of give, where a cubic-bezier can only decelerate.
+   The sampled curve runs 0.8s, but everything after ~0.45s is the last
+   half-percent settling, so it reads as a half-second animation. Browsers
+   without linear() get iOS's sheet curve instead. */
+:root {
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --spring-dur: 0.5s;
+  --glass-out: cubic-bezier(0.4, 0, 0.9, 0.6);
+}
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(0, 0.0275, 0.0958, 0.1876, 0.2902, 0.3947, 0.4951, 0.5876, 0.67, 0.7416, 0.8024, 0.8527, 0.8937, 0.9263, 0.9517, 0.971, 0.9852, 0.9954, 1.0024, 1.0069, 1.0096, 1.0108, 1.0111, 1.0107, 1.0099, 1.0088, 1.0077, 1.0065, 1.0054, 1.0044, 1.0035, 1.0028, 1.0021, 1.0016, 1.0011, 1.0008, 1.0005, 1.0003, 1.0001, 1, 1);
+    --spring-dur: 0.8s;
+  }
+}
+
+/* Today's countdown pane growing out of its calendar (today/ExamCountdown). */
+@keyframes cd-pop { from { transform: translateY(-8px) scale(0.5); } to { transform: none; } }
+/* Quick settings growing out of the gear (settings/QuickSettings). */
+@keyframes qs-pop { from { transform: translateY(8px) scale(0.5); } to { transform: none; } }
+/* Centred modals (sign-in, the streak moment) rising into place. */
+@keyframes lg-pop { from { transform: translateY(16px) scale(0.94); } to { transform: none; } }
+
+.cd-pop { animation: cd-pop var(--spring-dur) var(--spring) both; transform-origin: top right; }
+.qs-pop { animation: qs-pop var(--spring-dur) var(--spring) both; transform-origin: bottom right; }
+.lg-pop { animation: lg-pop var(--spring-dur) var(--spring) both; }
+
+@keyframes cd-out { to { transform: translateY(-6px) scale(0.32); } }
+@keyframes qs-out { to { transform: translateY(6px) scale(0.32); } }
+@keyframes lg-out { to { transform: translateY(10px) scale(0.92); } }
+.cd-pop[data-closing='true'] { animation: cd-out 0.26s var(--glass-out) both; pointer-events: none; }
+.qs-pop[data-closing='true'] { animation: qs-out 0.26s var(--glass-out) both; pointer-events: none; }
+/* A centred modal has nothing to shrink into, so it drops away a little and
+   is gone before the movement could be read as slow. */
+.lg-pop[data-closing='true'] { animation: lg-out 0.2s var(--glass-out) both; pointer-events: none; }
+
+.glass-body { transition: opacity 0.16s ease; }
+[data-closing='true'] > .glass-body { opacity: 0; }
+
+/* The dimming behind glass is a sibling, so it can fade both ways. */
+@keyframes glass-scrim-in { from { opacity: 0; } }
+@keyframes glass-scrim-out { to { opacity: 0; } }
+.glass-scrim { animation: glass-scrim-in 0.3s ease-out both; }
+.glass-scrim[data-closing='true'] { animation: glass-scrim-out 0.24s ease-in both; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-pop, .qs-pop, .lg-pop, .glass-scrim { animation: none !important; }
+  .glass-body { transition: none; }
+}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
 import LiquidGlass from './ui/LiquidGlass';
+import { usePresence } from './ui/usePresence';
 
 interface Props {
   isOpen: boolean;
@@ -30,6 +31,7 @@ const AuthModal: React.FC<Props> = ({
 }) => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { mounted, closing } = usePresence(isOpen, 220);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -47,7 +49,7 @@ const AuthModal: React.FC<Props> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!mounted) return null;
 
   const dark = theme === 'dark';
   const muted = dark ? 'text-zinc-400' : 'text-zinc-500';
@@ -60,7 +62,8 @@ const AuthModal: React.FC<Props> = ({
     <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 py-6">
       <div
         aria-hidden="true"
-        className="absolute inset-0 mk-fade"
+        className="absolute inset-0 glass-scrim"
+        data-closing={closing}
         style={{ background: dark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(20, 20, 24, 0.26)' }}
         onClick={onClose}
       />
@@ -71,6 +74,7 @@ const AuthModal: React.FC<Props> = ({
         bezel={20}
         strength={24}
         className="lg-pop relative w-full max-w-sm max-h-full flex flex-col"
+        data-closing={closing}
         role="dialog"
         aria-modal="true"
         aria-label="Sign in"
