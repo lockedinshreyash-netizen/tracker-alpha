@@ -111,19 +111,6 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <line x1="10.5" y1="12.5" x2="14.5" y2="12.5" />
         </svg>
       );
-    /* A subject inscribed in a circle with the construction lines left in —
-       the Vitruvian method rather than the picture, and the only icon here
-       that is a diagram rather than a pictogram. It should not look like the
-       others; the room it opens is not like the others. */
-    case 'Observatory':
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="9" />
-          <line x1="12" y1="3" x2="12" y2="21" strokeWidth={0.9} />
-          <line x1="3" y1="12" x2="21" y2="12" strokeWidth={0.9} />
-          <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
-        </svg>
-      );
     /* A key. Nothing about the study loop, and it should not pretend to be. */
     case 'Admin':
       return (
@@ -142,11 +129,10 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
 
   /* Appended, never inserted: the tabs the student uses keep the positions
      their muscle memory knows, and the console arrives at the bottom. Groups
-     went in after Review for the same reason — above the Observatory's rule,
-     because it is a place you go to do something, but below everything that
-     was already there. Decks followed Groups the same way. */
+     went in after Review for the same reason, below everything that was
+     already there. Decks followed Groups the same way. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Decks', 'Observatory',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Decks',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';
@@ -240,13 +226,10 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             const isActive = activeTab === tab;
             return (
               <React.Fragment key={tab}>
-              {/* A rule above the Observatory, and above the console for an
-                  administrator. The seven at the top are places you go to do
-                  something; the Observatory is the room you step into to look
-                  at what all of it added up to, and the console is not part of
-                  the student's app at all. Both deserve saying before the
-                  click. */}
-              {(tab === 'Observatory' || tab === 'Admin') && (
+              {/* A rule above the console, for an administrator: it is not
+                  part of the student's app at all, and that deserves saying
+                  before the click. */}
+              {tab === 'Admin' && (
                 <div
                   className={`my-2 ${collapsed ? 'mx-3' : 'mx-4'}`}
                   style={{ height: 1, background: dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)' }}

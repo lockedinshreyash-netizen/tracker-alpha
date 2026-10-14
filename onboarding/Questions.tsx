@@ -1,15 +1,14 @@
 /* ── The questions ──
-   Five screens, each asking one thing and showing what the answer does.
+   Four screens, each asking one thing and showing what the answer does.
    Single choices advance themselves a beat after the tap (the tile has to be
    seen to light up first); the two with a number to set have a button. */
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
-import { SUBJECT_COLORS, ACTIVITY_BASE } from '../schedule/colors';
-import { DAY_MINUTES } from '../schedule/schedule';
-import type { DayMinute, ExamPreference, PomodoroSettings, TimerMode } from '../types';
-import { Eyebrow, Glass, haptic, Rise, Tile, TimeButton } from './kit';
-import { type Answers, daysLeft, examLabel, formatHours, freeMinutes, freeWindows } from './plan';
+import { SUBJECT_COLORS } from '../schedule/colors';
+import type { ExamPreference, PomodoroSettings, TimerMode } from '../types';
+import { Eyebrow, haptic, Rise, Tile } from './kit';
+import { type Answers, daysLeft, examLabel } from './answers';
 
 export const ADVANCE_MS = 420;
 
@@ -48,8 +47,8 @@ export const QExam: React.FC<Q> = ({ a, set, next }) => {
     <div className="ob-col">
       <Head n={1} label="The exam" title="Choose your *exam.*" />
       <div className="ob-choices">
-        <Tile selected={a.exam === 'JEE'} onClick={() => pick('JEE')} title="JEE" sub="Main and Advanced · Physics, Chemistry, Maths" dots={[dot('Physics'), dot('Chemistry'), dot('Maths')]} delay={260} />
-        <Tile selected={a.exam === 'NEET'} onClick={() => pick('NEET')} title="NEET" sub="UG · Physics, Chemistry, Biology" dots={[dot('Physics'), dot('Chemistry'), dot('Biology')]} delay={340} />
+        <Tile selected={a.exam === 'JEE'} onClick={() => pick('JEE')} title="JEE" sub="Main and Advanced · Physics, Chemistry, Maths" dots={[dot('Physics'), dot('Chemistry'), dot('Maths')]} delay={160} />
+        <Tile selected={a.exam === 'NEET'} onClick={() => pick('NEET')} title="NEET" sub="UG · Physics, Chemistry, Biology" dots={[dot('Physics'), dot('Chemistry'), dot('Biology')]} delay={220} />
       </div>
     </div>
   );
@@ -64,120 +63,14 @@ export const QClass: React.FC<Q> = ({ a, set, next }) => {
     <div className="ob-col">
       <Head n={2} label="Your class" title="Which class are you in?" />
       <div className="ob-choices">
-        <Tile selected={a.cls === 11} onClick={() => pick(11)} title="Class 11" sub="The Class 11 syllabus comes first." delay={260} />
-        <Tile selected={a.cls === 12} onClick={() => pick(12)} title="Class 12" sub="Taking a drop year? Pick this one." delay={340} />
+        <Tile selected={a.cls === 11} onClick={() => pick(11)} title="Class 11" sub="The Class 11 syllabus comes first." delay={160} />
+        <Tile selected={a.cls === 12} onClick={() => pick(12)} title="Class 12" sub="Taking a drop year? Pick this one." delay={220} />
       </div>
     </div>
   );
 };
 
-/* ── 3 · The day ── */
-
-const Icon: React.FC<{ d: string; color: string }> = ({ d, color }) => (
-  <span className="ob-row-icon" style={{ background: `${color}26`, color }}>
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
-  </span>
-);
-const SUN = 'M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4L7 17M17 7l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z';
-const MOON = 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z';
-const BOOK = 'M4 5a2 2 0 012-2h12v16H6a2 2 0 00-2 2V5zM4 19a2 2 0 012-2h12';
-const CAP = 'M2 9l10-5 10 5-10 5L2 9zM6 11v5c3 2 9 2 12 0v-5';
-
-/** The whole day as one bar: sleep, school, coaching, and what is left for study. */
-const DayBar: React.FC<{ a: Answers }> = ({ a }) => {
-  const pct = (m: number) => `${(m / DAY_MINUTES) * 100}%`;
-  const segs: Array<{ s: number; e: number; c: string; key: string }> = [];
-  if (a.sleep > a.wake) {
-    segs.push({ s: a.sleep, e: DAY_MINUTES, c: ACTIVITY_BASE.sleep, key: 'sleep-night' });
-    segs.push({ s: 0, e: a.wake, c: ACTIVITY_BASE.sleep, key: 'sleep-morning' });
-  } else {
-    segs.push({ s: a.sleep, e: a.wake, c: ACTIVITY_BASE.sleep, key: 'sleep' });
-  }
-  if (a.school.on) segs.push({ s: a.school.start, e: a.school.end, c: ACTIVITY_BASE.class, key: 'school' });
-  if (a.coaching.on) segs.push({ s: a.coaching.start, e: a.coaching.end, c: '#7C93FF', key: 'coaching' });
-  const free = freeWindows(a);
-  return (
-    <>
-      <div className="ob-daybar" aria-hidden="true">
-        {free.map(([s, e], i) => (
-          <i key={`free-${i}`} style={{ left: pct(s), width: pct(e - s), background: 'linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25)' }} />
-        ))}
-        {segs.map(g => (
-          <i key={g.key} style={{ left: pct(g.s), width: pct(Math.max(0, g.e - g.s)), background: `${g.c}cc` }} />
-        ))}
-      </div>
-      <div className="ob-daybar-axis" aria-hidden="true">
-        <span>4 AM</span><span>10 AM</span><span>4 PM</span><span>10 PM</span><span>4 AM</span>
-      </div>
-    </>
-  );
-};
-
-/* Module level, not inside QDay: defined in render it would be a new component
-   type on every change, remounting each row (and redrawing its glass) per tap. */
-const Row: React.FC<{ icon: React.ReactNode; label: string; sub: string; children: React.ReactNode; delay: number }> = ({ icon, label, sub, children, delay }) => (
-  <div className="ob-fade" style={{ animationDelay: `${delay}ms` }}>
-    <Glass className="ob-row" radius={20}>
-      {icon}
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span className="ob-row-label" style={{ display: 'block' }}>{label}</span>
-        <span className="ob-row-sub" style={{ display: 'block' }}>{sub}</span>
-      </span>
-      {children}
-    </Glass>
-  </div>
-);
-
-export const QDay: React.FC<Q> = ({ a, set, next }) => {
-  const free = freeMinutes(a);
-  const busy = (key: 'school' | 'coaching', label: string, d: string, color: string, delay: number) => {
-    const b = a[key];
-    return (
-      <Row icon={<Icon d={d} color={color} />} label={label} sub={b.on ? 'Mon to Sat' : 'Not on my day'} delay={delay}>
-        {b.on && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TimeButton label={`${label} starts`} value={b.start} onChange={m => set({ [key]: { ...b, start: m, end: Math.max(b.end, m + 30) } } as Partial<Answers>)} />
-            <span style={{ color: 'var(--ob-faint)' }}>–</span>
-            <TimeButton label={`${label} ends`} value={b.end} onChange={m => set({ [key]: { ...b, end: Math.max(m, b.start + 30) } } as Partial<Answers>)} />
-          </span>
-        )}
-        <button
-          type="button"
-          className="ob-toggle"
-          role="switch"
-          aria-checked={b.on}
-          aria-label={label}
-          onClick={() => { choose(); set({ [key]: { ...b, on: !b.on } } as Partial<Answers>); }}
-        />
-      </Row>
-    );
-  };
-  return (
-    <div className="ob-col">
-      <Head n={3} label="Your day" title="Map your *day.*" lead="We fit your study around everything else." />
-      <DayBar a={a} />
-      <div className="ob-free ob-fade" style={{ animationDelay: '260ms' }}>
-        <b>{formatHours(free)}</b>
-        <span>free on a school day</span>
-      </div>
-      <div className="ob-rows">
-        <Row icon={<Icon d={SUN} color="#FAB005" />} label="Wake up" sub="Most days" delay={300}>
-          <TimeButton label="Wake up" value={a.wake} onChange={(m: DayMinute) => set({ wake: m })} />
-        </Row>
-        {busy('school', 'School', CAP, ACTIVITY_BASE.class, 360)}
-        {busy('coaching', 'Coaching', BOOK, '#7C93FF', 420)}
-        <Row icon={<Icon d={MOON} color={ACTIVITY_BASE.sleep} />} label="Sleep" sub="Lights out" delay={480}>
-          <TimeButton label="Sleep" value={a.sleep} onChange={(m: DayMinute) => set({ sleep: m })} />
-        </Row>
-      </div>
-      <div className="ob-actions">
-        <button className="ob-primary" onClick={() => { sfx.select(); haptic.select(); next(); }}>Continue</button>
-      </div>
-    </div>
-  );
-};
-
-/* ── 4 · Hours ── */
+/* ── 3 · Hours ── */
 
 const TIERS: Array<[number, string, string]> = [
   [3, 'Warming up', 'rgba(255,255,255,0.08)'],
@@ -252,14 +145,12 @@ const Ruler: React.FC<{ value: number; onChange: (h: number) => void }> = ({ val
   );
 };
 
-export const QHours: React.FC<Q & { plannable: boolean }> = ({ a, set, next, plannable }) => {
+export const QHours: React.FC<Q> = ({ a, set, next }) => {
   const [, label, bg] = tierOf(a.hours);
   const days = daysLeft(a.exam);
-  const free = freeMinutes(a);
-  const over = plannable && a.hours * 60 > free;
   return (
     <div className="ob-col">
-      <Head n={4} label="Your target" title="How many hours *a day?*" />
+      <Head n={3} label="Your target" title="How many hours *a day?*" />
       <div className="ob-hours">
         <div className="ob-hours-num" aria-live="polite">
           <span key={a.hours} className="ob-fade" style={{ animationDuration: '260ms' }}>{a.hours}</span>
@@ -270,7 +161,6 @@ export const QHours: React.FC<Q & { plannable: boolean }> = ({ a, set, next, pla
         <p className="ob-total">
           {a.hours}h a day is <b>{(a.hours * days).toLocaleString('en-IN')} hours</b><br />before {examLabel(a.exam)}.
         </p>
-        {over && <p className="ob-warn">More than your free time ({formatHours(free)}). We&apos;ll plan what fits.</p>}
       </div>
       <div className="ob-actions">
         <button className="ob-primary" onClick={() => { sfx.select(); haptic.select(); next(); }}>Set {a.hours} hours</button>
@@ -279,17 +169,17 @@ export const QHours: React.FC<Q & { plannable: boolean }> = ({ a, set, next, pla
   );
 };
 
-/* ── 5 · Style ── */
+/* ── 4 · Style ── */
 
 export const QStyle: React.FC<Q & { pomodoro: PomodoroSettings }> = ({ a, set, next, pomodoro }) => {
   const advance = useAutoAdvance(next);
   const pick = (style: TimerMode) => { choose(); set({ style }); advance(); };
   return (
     <div className="ob-col">
-      <Head n={5} label="Your style" title="How do you *focus* best?" />
+      <Head n={4} label="Your style" title="How do you *focus* best?" />
       <div className="ob-choices">
-        <Tile selected={a.style === 'stopwatch'} onClick={() => pick('stopwatch')} title="Long stretches" sub="Start the clock. Stop when you're done." delay={260} />
-        <Tile selected={a.style === 'pomodoro'} onClick={() => pick('pomodoro')} title="Sprints" sub={`${pomodoro.workMinutes} minutes on, ${pomodoro.shortBreakMinutes} off. Repeat.`} delay={340} />
+        <Tile selected={a.style === 'stopwatch'} onClick={() => pick('stopwatch')} title="Long stretches" sub="Start the clock. Stop when you're done." delay={160} />
+        <Tile selected={a.style === 'pomodoro'} onClick={() => pick('pomodoro')} title="Sprints" sub={`${pomodoro.workMinutes} minutes on, ${pomodoro.shortBreakMinutes} off. Repeat.`} delay={220} />
       </div>
     </div>
   );

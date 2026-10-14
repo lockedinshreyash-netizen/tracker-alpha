@@ -215,12 +215,17 @@ export const PageHeader: React.FC<{
   subtitle?: React.ReactNode;
   dark: boolean;
   right?: React.ReactNode;
+  /** Small, beside the title and never wrapped under it (Today's countdown). */
+  aside?: React.ReactNode;
   className?: string;
-}> = ({ title, subtitle, dark, right, className = '' }) => (
+}> = ({ title, subtitle, dark, right, aside, className = '' }) => (
   <div className={`mk-rise flex flex-wrap items-end justify-between gap-4 ${className}`}>
-    <div className="min-w-0">
-      <h1 className={`font-display text-[32px] md:text-[40px] leading-none ${dark ? 'text-white' : 'text-zinc-900'}`}>{title}</h1>
-      {subtitle && <p className={`text-[13px] font-ui mt-2 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>{subtitle}</p>}
+    <div className={`min-w-0 ${aside ? 'flex-1 flex items-start justify-between gap-4' : ''}`}>
+      <div className="min-w-0">
+        <h1 className={`font-display text-[32px] md:text-[40px] leading-none ${dark ? 'text-white' : 'text-zinc-900'}`}>{title}</h1>
+        {subtitle && <p className={`text-[13px] font-ui mt-2 ${dark ? 'text-zinc-500' : 'text-zinc-500'}`}>{subtitle}</p>}
+      </div>
+      {aside}
     </div>
     {right}
   </div>

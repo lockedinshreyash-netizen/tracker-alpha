@@ -1,4 +1,9 @@
-/* ── The Arena: the onboarding's cold open ──
+/* ── The Arena: the onboarding's former cold open ──
+   No longer played by the app: onboarding opens on a demo of the app itself
+   (onboarding/Demo.tsx), because the film said nothing about what the app
+   does. Kept because the film project (film/src/arena, render-sfx's `arena`
+   cue) still reads these numbers. What follows describes how it was used.
+
    One film, two readers. The film project renders it (film/src/arena) into
    public/onboarding/arena.{mp4,webm}; the app plays it and lays its words over
    the top in sync (onboarding/ColdOpen.tsx). Both read these numbers, so the

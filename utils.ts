@@ -1,5 +1,6 @@
 
 import { DailyLog, Subject } from './types';
+import { ledgerFromDates, type StreakLedger } from './streak/firewood';
 import { SYLLABUS_DATA } from './constants';
 
 export const generateId = (): string => {
@@ -58,34 +59,34 @@ export const getDaysRemaining = (target: Date): number => {
   return diffDays > 0 ? diffDays : 0;
 };
 
-const streakFromDates = (loggedDates: Set<string>): number => {
-  if (loggedDates.size === 0) return 0;
+/* ── Streaks ──
+   Every streak number in the app comes from one replay of the history
+   (streak/firewood.ts): days studied in a row, held through missed days by
+   firewood while the bank lasts. Cached per log array and day, because App
+   re-renders ten times a second while a session runs and reads the streak on
+   every render. */
+const ledgerCache = new WeakMap<DailyLog[], Map<string, StreakLedger>>();
 
-  const today = getISTDateString();
-  const yesterday = getISTDateString(new Date(Date.now() - 86400000));
-
-  if (!loggedDates.has(today) && !loggedDates.has(yesterday)) {
-    return 0;
-  }
-
-  let streak = 0;
-  let currentDate = loggedDates.has(today) ? new Date(today) : new Date(yesterday);
-
-  while (true) {
-    const checkDateStr = getISTDateString(currentDate);
-    if (loggedDates.has(checkDateStr)) {
-      streak++;
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-
-  return streak;
+/**
+ * The live streak, the longest it has stood, and the firewood bank.
+ * `verified` replays only days the app timed itself (see
+ * `calculateVerifiedStreak`), with its own bank earned in timed weeks.
+ */
+export const streakLedger = (logs: DailyLog[], opts: { verified?: boolean; today?: string } = {}): StreakLedger => {
+  const today = opts.today ?? getISTDateString();
+  const key = `${opts.verified ? 'v' : 'a'}|${today}`;
+  let byKey = ledgerCache.get(logs);
+  const hit = byKey?.get(key);
+  if (hit) return hit;
+  const source = opts.verified ? logs.filter(isVerifiedLog) : logs;
+  const ledger = ledgerFromDates(source.map(l => l.date), today);
+  if (!byKey) { byKey = new Map(); ledgerCache.set(logs, byKey); }
+  byKey.set(key, ledger);
+  return ledger;
 };
 
-export const calculateStreak = (logs: DailyLog[]): number =>
-  streakFromDates(new Set(logs.map(l => l.date)));
+/** Days studied in a row. A missed day burns firewood instead of ending it. */
+export const calculateStreak = (logs: DailyLog[]): number => streakLedger(logs).streak;
 
 /** A log the app measured itself, rather than one typed in after the fact. */
 export const isVerifiedLog = (log: DailyLog): boolean =>
@@ -100,7 +101,7 @@ export const isVerifiedLog = (log: DailyLog): boolean =>
  * the same stance the leaderboard already takes on `LogSource`.
  */
 export const calculateVerifiedStreak = (logs: DailyLog[]): number =>
-  streakFromDates(new Set(logs.filter(isVerifiedLog).map(l => l.date)));
+  streakLedger(logs, { verified: true }).streak;
 
 /* Study-day strings are plain calendar dates, so stepping between them is
    exact UTC arithmetic — no timezone, no DST, no clock in it at all. */
@@ -140,38 +141,23 @@ export const istInstant = (date: string, minute: number): number =>
   dateValue(date) + (DAY_START_HOUR * 60 + minute) * 60_000 - IST_OFFSET_MS;
 
 /**
- * The longest unbroken run of logged days anywhere in the history.
+ * The highest the streak has ever stood, anywhere in the history.
  *
- * `calculateStreak` only ever sees the run that reaches today, which makes it
- * the wrong thing to earn a reward with: a month-long run that ended in March
- * is a month the student actually did. Rewards are receipts for days survived,
- * so they are derived from the whole history, not from whichever moment the
- * app happened to be open.
+ * `calculateStreak` only sees the run alive today, which is the wrong thing to
+ * earn a reward with: a month-long run that ended in March is a month the
+ * student actually did. Rewards are receipts for days survived, so they come
+ * from the whole history. Firewood holds a run through missed days but never
+ * adds to it, so this is still a count of days studied.
  *
  * Dates in the future are ignored — a device with a wrong clock must not be
  * able to write itself a streak.
  */
-const longestRunFromDates = (loggedDates: Set<string>, today: string = getISTDateString()): number => {
-  const days = [...loggedDates]
-    .filter(d => DATE_RE.test(d) && d <= today)
-    .sort();
-  if (days.length === 0) return 0;
-
-  let best = 1;
-  let run = 1;
-  for (let i = 1; i < days.length; i++) {
-    run = dateValue(days[i]) - dateValue(days[i - 1]) === 86_400_000 ? run + 1 : 1;
-    if (run > best) best = run;
-  }
-  return best;
-};
-
 export const longestStreak = (logs: DailyLog[], today?: string): number =>
-  longestRunFromDates(new Set(logs.map(l => l.date)), today);
+  streakLedger(logs, { today }).longest;
 
 /** Same, over days the app timed itself. See `calculateVerifiedStreak`. */
 export const longestVerifiedStreak = (logs: DailyLog[], today?: string): number =>
-  longestRunFromDates(new Set(logs.filter(isVerifiedLog).map(l => l.date)), today);
+  streakLedger(logs, { verified: true, today }).longest;
 
 export const getLast7DaysStats = (
   logs: DailyLog[],

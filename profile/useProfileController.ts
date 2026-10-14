@@ -6,7 +6,9 @@
 
    Owns three small things:
      · ensure_profile(), once per signed-in session — creates a new profile or
-       silently returns the existing one; see supabase/profiles.sql.
+       silently returns the existing one; see supabase/profiles.sql. A brand-new
+       account then takes the name and avatar picked in onboarding
+       (profile/draft.ts).
      · the compact modal's open/closed user id.
      · a dependency-free /u/:handle route. This app has no router (see
        CLAUDE.md) and doesn't need one just for this — pushState plus a
@@ -14,8 +16,31 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { Profile, ensureProfile } from './profileApi';
+import { Profile, ensureProfile, updateProfile, validateDisplayName } from './profileApi';
 import { setCachedProfile } from './profileCache';
+import { clearProfileDraft, isNewAccount, readProfileDraft } from './draft';
+import { getAlphaAvatar } from './alphaAvatars';
+
+/* The onboarding draft, written onto an account made just now; any other
+   account keeps its own profile and the draft is dropped. */
+const adoptDraft = async (userId: string, p: Profile): Promise<Profile> => {
+  const draft = readProfileDraft();
+  if (!draft) return p;
+  clearProfileDraft();
+  const name = validateDisplayName(draft.name);
+  if (!name || !isNewAccount(p)) return p;
+  try {
+    return await updateProfile(userId, {
+      display_name: name,
+      bio: p.bio ?? '',
+      avatar_type: 'alpha',
+      avatar_id: getAlphaAvatar(draft.avatarId).id,
+      avatar_url: null,
+    });
+  } catch {
+    return p; // the account works without it; Edit profile is one tap away
+  }
+};
 
 const HANDLE_RE = /^\/u\/([a-z0-9]{6,16})\/?$/;
 
@@ -54,7 +79,9 @@ export const useProfileController = (user: User | null): ProfileController => {
     if (!user) { setOwnProfile(null); ensuredForRef.current = null; return; }
     if (ensuredForRef.current === user.id) return;
     ensuredForRef.current = user.id;
+    const uid = user.id;
     void ensureProfile()
+      .then(p => adoptDraft(uid, p))
       .then(p => { setOwnProfile(p); setCachedProfile(p); })
       .catch(() => { ensuredForRef.current = null; });
   }, [user]);

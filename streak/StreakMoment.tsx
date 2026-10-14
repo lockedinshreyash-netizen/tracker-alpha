@@ -4,6 +4,9 @@ import type { RewardProgress } from '../rewards/engine';
 import { addDays, getISTDateString, weekdayOf } from '../utils';
 import * as sfx from '../audio';
 import { STREAK_MILESTONES, streakCue } from '../sound/cues';
+import LiquidGlass from '../ui/LiquidGlass';
+import { daysHeld, type StreakLedger } from './firewood';
+import { FIREWOOD, FirewoodIcon } from './FirewoodCard';
 
 /* ── The streak moment ──
    Once a day, the first time a session is logged on this device, the app
@@ -11,10 +14,15 @@ import { STREAK_MILESTONES, streakCue } from '../sound/cues';
    the Streak tab before this, and a number you have to go and look at is not
    a reason to come back tomorrow.
 
-   It shares UnlockModal's shell — same scrim, radius, entrance and footer —
-   because the two are the only things allowed to stop you on arrival, and two
-   interruptions that look different are two interruptions. When both are due
-   (day 30), this one goes first and the reward follows. */
+   It is liquid glass (ui/LiquidGlass.tsx) over a light, unblurred scrim that
+   is its SIBLING, never its parent, and it enters with `lg-pop`, a transform:
+   blur or opacity on an ancestor would leave the glass nothing to refract.
+   When it and a reward are both due (day 30), this one goes first and the
+   reward follows.
+
+   After a gap, it says what kept the streak alive: the days firewood held it
+   (streak/firewood.ts), shown amber in the week, and what is left in the
+   bank. Firewood never adds a day, so the number still rolls by exactly one. */
 
 const STORE_KEY = 'streak_moment_v1';
 
@@ -68,6 +76,7 @@ const DAY_INITIAL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 interface Props {
   streak: number;
+  ledger: StreakLedger;
   logs: DailyLog[];
   /** The next reward still to earn, if any. */
   next?: RewardProgress;
@@ -75,7 +84,7 @@ interface Props {
   onClose: () => void;
 }
 
-const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) => {
+const StreakMoment: React.FC<Props> = ({ streak, ledger, logs, next, theme, onClose }) => {
   const dark = theme === 'dark';
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const [rolled, setRolled] = useState(!!reduced);
@@ -117,6 +126,8 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
   const today = getISTDateString();
   const studied = new Set(logs.map(l => l.date));
   const week = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  const burned = new Set(ledger.burned);
+  const held = daysHeld(ledger, today);
 
   const ink = dark ? 'text-white' : 'text-black';
   const muted = dark ? 'text-zinc-400' : 'text-zinc-600';
@@ -124,22 +135,26 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-      onClick={onClose}
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`Streak: ${streak} ${streak === 1 ? 'day' : 'days'}`}
     >
-      <div
-        onClick={e => e.stopPropagation()}
-        className={`w-full max-w-md rounded-2xl border overflow-hidden animate-in zoom-in-95 duration-300 ${dark ? 'bg-[#111114] border-white/[0.08]' : 'bg-white border-zinc-200'}`}
+      <div className="absolute inset-0" style={{ background: 'rgba(0, 0, 0, 0.5)' }} onClick={onClose} aria-hidden="true" />
+      <LiquidGlass
+        dark={dark}
+        radius={28}
+        variant="panel"
+        bezel={20}
+        strength={22}
+        className="lg-pop relative w-full max-w-md overflow-hidden"
       >
         <div
           className="px-8 pt-10 pb-8 text-center"
           style={{
             background: dark
-              ? 'radial-gradient(120% 90% at 50% 0%, rgba(225,6,0,0.22) 0%, transparent 65%)'
-              : 'radial-gradient(120% 90% at 50% 0%, rgba(225,6,0,0.10) 0%, transparent 65%)',
+              ? 'radial-gradient(120% 90% at 50% 0%, rgba(225,6,0,0.18) 0%, transparent 65%)'
+              : 'radial-gradient(120% 90% at 50% 0%, rgba(225,6,0,0.08) 0%, transparent 65%)',
           }}
         >
           <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#E10600] mb-6 font-ui">
@@ -165,6 +180,13 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
             {streak === 1 ? 'day' : 'days'} in a row
           </p>
 
+          {held > 0 && (
+            <p className="flex items-center justify-center gap-1.5 text-[13px] font-bold font-ui mt-4" style={{ color: FIREWOOD }}>
+              <FirewoodIcon size={16} />
+              Firewood held it for {held} {held === 1 ? 'day' : 'days'}.
+            </p>
+          )}
+
           <div className="accent-line mt-5 mb-6" />
 
           <h2 className={`text-xl font-black tracking-tight leading-snug mb-6 ${ink}`}>{streakLine(streak)}</h2>
@@ -173,6 +195,7 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
             {week.map(d => {
               const isToday = d === today;
               const on = studied.has(d);
+              const wood = !on && burned.has(d);
               return (
                 <div key={d} className="flex flex-col items-center gap-1.5">
                   <span
@@ -180,8 +203,8 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
                     style={{
                       width: 22,
                       height: 22,
-                      background: isToday ? '#E10600' : on ? (dark ? '#F4F4F5' : '#18181B') : 'transparent',
-                      border: on || isToday ? 'none' : `1.5px solid ${dark ? 'rgba(255,255,255,0.14)' : '#D4D4D8'}`,
+                      background: isToday ? '#E10600' : on ? (dark ? '#F4F4F5' : '#18181B') : wood ? `${FIREWOOD}33` : 'transparent',
+                      border: on || isToday ? 'none' : wood ? `1.5px solid ${FIREWOOD}` : `1.5px solid ${dark ? 'rgba(255,255,255,0.14)' : '#D4D4D8'}`,
                       transform: isToday && rolled && !reduced ? 'scale(1)' : isToday && !reduced ? 'scale(0.4)' : 'scale(1)',
                       transition: reduced ? 'none' : 'transform 420ms cubic-bezier(0.3, 1.6, 0.5, 1) 120ms',
                     }}
@@ -199,9 +222,13 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
                 : `${next.daysLeft} days to ${next.def.title}.`
               : 'Every reward is yours. Keep the run alive anyway.'}
           </p>
+          <p className={`flex items-center justify-center gap-1.5 text-[12px] font-ui mt-2 ${faint}`}>
+            <FirewoodIcon size={14} />
+            {ledger.bank} firewood in the bank
+          </p>
         </div>
 
-        <div className={`px-8 py-5 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
+        <div className={`px-8 py-5 border-t ${dark ? 'border-white/[0.08]' : 'border-black/[0.06]'}`}>
           <button
             autoFocus
             onClick={onClose}
@@ -210,7 +237,7 @@ const StreakMoment: React.FC<Props> = ({ streak, logs, next, theme, onClose }) =
             Keep going
           </button>
         </div>
-      </div>
+      </LiquidGlass>
     </div>
   );
 };

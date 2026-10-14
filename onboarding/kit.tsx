@@ -2,10 +2,8 @@
    The stage everything sits on, the chrome above it, and the few primitives
    every scene uses. Styles are in onboarding.css. */
 
-import React, { useMemo, useRef } from 'react';
+import React from 'react';
 import LiquidGlass from '../ui/LiquidGlass';
-import { formatClock, fromClockValue, toClockValue } from '../schedule/schedule';
-import type { DayMinute } from '../types';
 
 /* ── Device ──────────────────────────────────────────────────────────── */
 
@@ -19,25 +17,12 @@ const nav = (): Nav => (typeof navigator === 'undefined' ? {} : (navigator as un
 export const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
-/** A phone that should not be asked to animate a field of lights behind glass. */
+/** A phone that should not be asked for the heavier glass and motion. */
 export const isLite = (): boolean => {
   const n = nav();
   return (n.hardwareConcurrency !== undefined && n.hardwareConcurrency <= 4)
     || (n.deviceMemory !== undefined && n.deviceMemory <= 2)
     || n.connection?.saveData === true;
-};
-
-/**
- * Whether to play the cold open at all. Data Saver and 2G mean several
- * megabytes the student did not ask for; reduced motion means a camera move
- * they asked not to see. Both get the questions straight away.
- */
-export const shouldPlayFilm = (): boolean => {
-  const n = nav();
-  if (prefersReducedMotion()) return false;
-  if (n.connection?.saveData) return false;
-  if (n.connection?.effectiveType && /(^|-)2g$/.test(n.connection.effectiveType)) return false;
-  return true;
 };
 
 /* ── Haptics ─────────────────────────────────────────────────────────── */
@@ -54,59 +39,22 @@ export const haptic = {
 
 /* ── The stage ───────────────────────────────────────────────────────── */
 
-const mulberry = (seed: number) => () => {
-  seed = (seed + 0x6d2b79f5) >>> 0;
-  let t = seed;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-const WARM = ['255,186,112', '255,210,150', '255,228,190', '255,160,90'];
-const COOL = ['190,210,255', '214,226,255'];
-
-/** One layer of out-of-focus city lights: many flat discs, one element. */
-const bokehLayer = (seed: number, count: number, rMin: number, rMax: number, aMin: number, aMax: number): string => {
-  const rnd = mulberry(seed);
-  const discs: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const c = rnd() < 0.24 ? COOL[Math.floor(rnd() * COOL.length)] : WARM[Math.floor(rnd() * WARM.length)];
-    const r = Math.round(rMin + rnd() * (rMax - rMin));
-    const a = aMin + rnd() * (aMax - aMin);
-    // The lights sit low in the frame, where the city was in the film.
-    const x = Math.round(rnd() * 100);
-    const y = Math.round(30 + Math.pow(rnd(), 0.7) * 72);
-    discs.push(`radial-gradient(circle ${r}px at ${x}% ${y}%, rgba(${c},${a.toFixed(3)}) 0%, rgba(${c},${(a * 0.92).toFixed(3)}) 72%, rgba(${c},0) 100%)`);
-  }
-  return discs.join(',');
-};
-
 const GRAIN = `url("data:image/svg+xml;utf8,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>",
 )}")`;
 
 /**
- * The city from the film, thrown out of focus: three layers of discs at
- * three depths drifting at three speeds. Only `transform` moves, so this is
- * three composited layers and no repaint. `dim` is how far the stage steps
- * back behind the words (0 = full city, 1 = a whisper of it).
+ * What every scene sits on: near-black, one soft neutral light from above and
+ * a fine grain, so the black has depth without competing with the words.
+ * Static, so it costs one paint and nothing per frame. (It used to be a
+ * drifting field of blurred orange city lights from the old opening film.)
  */
-export const Stage: React.FC<{ dim: number }> = ({ dim }) => {
-  const layers = useMemo(() => [
-    bokehLayer(11, 10, 90, 180, 0.05, 0.12),
-    bokehLayer(23, 22, 34, 80, 0.08, 0.2),
-    bokehLayer(37, 46, 6, 22, 0.18, 0.42),
-  ], []);
-  return (
-    <>
-      <div className="ob-bokeh c" style={{ backgroundImage: layers[2] }} />
-      <div className="ob-bokeh b" style={{ backgroundImage: layers[1] }} />
-      <div className="ob-bokeh a" style={{ backgroundImage: layers[0] }} />
-      <div className="ob-dim" style={{ opacity: 0.35 + 0.65 * dim }} />
-      <div className="ob-grain" style={{ backgroundImage: GRAIN }} />
-    </>
-  );
-};
+export const Stage: React.FC = () => (
+  <>
+    <div className="ob-light-top" />
+    <div className="ob-grain" style={{ backgroundImage: GRAIN }} />
+  </>
+);
 
 /* ── Chrome ──────────────────────────────────────────────────────────── */
 
@@ -222,39 +170,3 @@ export const Glass: React.FC<{ className?: string; style?: React.CSSProperties; 
     {children}
   </LiquidGlass>
 );
-
-/* ── Time ────────────────────────────────────────────────────────────── */
-
-/**
- * A time on the study-day axis, shown as "6:30 AM", edited by the system's
- * own picker (the clock dialog on Android). The input is real and focusable;
- * the button only dresses it.
- */
-export const TimeButton: React.FC<{ value: DayMinute; onChange: (m: DayMinute) => void; label: string }> = ({ value, onChange, label }) => {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <button
-      type="button"
-      className="ob-time"
-      aria-label={`${label}: ${formatClock(value)}`}
-      onClick={() => {
-        const el = input.current;
-        if (!el) return;
-        try { el.showPicker?.(); } catch { el.focus(); }
-      }}
-    >
-      {formatClock(value)}
-      <input
-        ref={input}
-        type="time"
-        tabIndex={-1}
-        aria-hidden="true"
-        value={toClockValue(value)}
-        onChange={e => {
-          const m = fromClockValue(e.target.value);
-          if (m !== null) onChange(m);
-        }}
-      />
-    </button>
-  );
-};

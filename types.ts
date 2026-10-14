@@ -174,11 +174,10 @@ export interface ChapterProgress {
   lastRevisedAt?: string; // YYYY-MM-DD (IST)
 }
 
-/* `Observatory` is a destination, not another productivity tab. Alpha proper
-   is the execution environment — do the work, plan the work, review the work —
-   and the Observatory is the room you step into to look at what all of that
-   has added up to. The separation is the point: the other seven ask you to do
-   something, this one asks you to look. */
+/* `Observatory` was removed (it added clutter for little use). A saved
+   `lastUsedTab` of 'Observatory' falls back to Today on load (App.tsx). Its
+   data (`analysis`, `sleep`, `ai`) still rides AppState untouched, so nothing
+   anybody recorded is lost. */
 /* `Admin` is the one member of this union that is not a place in the product.
    It is the staff console, it is absent from the rail for everybody else, and
    — because a tab in a union is not a permission — every query it makes is
@@ -192,7 +191,7 @@ export interface ChapterProgress {
 /* `Decks` (spaced-repetition flashcards) is server state end to end, like
    Groups: decks, cards and review history live in supabase/decks.sql, never in
    AppState. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Decks' | 'Observatory' | 'Admin';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Decks' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {

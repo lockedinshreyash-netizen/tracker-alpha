@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
 import { Eyebrow, haptic, Rise } from './kit';
-import { type Answers, examLabel } from './plan';
+import { type Answers, examLabel } from './answers';
 
 /** Matches the `hold` cue's length (film/scripts/render-sfx.ts). */
 export const HOLD_MS = 1600;

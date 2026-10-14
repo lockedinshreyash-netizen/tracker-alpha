@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AiInsight, AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, ExamPreference, ErrorEntry, MockTest, MocksState, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs, SleepLog } from './types';
-import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, JEE_2027_DATE, NEET_2027_DATE, STATUS_CYCLE, SYLLABUS_DATA, STATUS_LABELS } from './constants';
-import { getISTDateString, getDaysRemaining, calculateStreak, calculateVerifiedStreak, calculateLockInScore, generateId, addDays } from './utils';
+import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, ExamPreference, ErrorEntry, MockTest, MocksState, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs } from './types';
+import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, STATUS_CYCLE } from './constants';
+import { getISTDateString, calculateStreak, calculateVerifiedStreak, streakLedger, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, DEFAULT_SLEEP, DEFAULT_ANALYSIS, DEFAULT_AI, MAX_AI_CACHE, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
-import { buildExperiment } from './insight/observe';
-import AnalysisIntro from './analysis/AnalysisIntro';
-import ObservatoryTab from './analysis/ObservatoryTab';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations, nextReward } from './rewards/engine';
-import { EMPTY_SCHEDULE, mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
+import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
 import { wallpaperById } from './rewards/wallpapers';
 import WallpaperLayer from './rewards/WallpaperLayer';
 import UnlockModal from './rewards/UnlockModal';
 import StreakMoment, { markStreakMoment, streakMomentDue } from './streak/StreakMoment';
 import * as sfx from './audio';
-import { comboSemitones, loggedCue } from './sound/cues';
+import { loggedCue } from './sound/cues';
 import { useSoundHotkey } from './sound/useSound';
 import { soundForTaskMove } from './sound/moments';
 import BookReader from './rewards/BookReader';
@@ -28,7 +25,7 @@ import LandingPage from './LandingPage';
 import { landingWillShow } from './landing/gate';
 import { readDeepLink, settleDeepLink } from './landing/deeplink';
 import AuthModal from './AuthModal';
-import Header from './Header';
+import QuickSettings from './settings/QuickSettings';
 import TodayTab from './today/TodayTab';
 import { CardPeriod } from './share/types';
 /* Lazy boundaries. The share renderer is fetched on the click, not on the tab:
@@ -37,27 +34,31 @@ import { CardPeriod } from './share/types';
 const ShareModal = React.lazy(() => import('./share/ShareModal'));
 /* Seen once per device: the flow, its stylesheet and its film stay out of the bundle everyone downloads. */
 const OnboardingFlow = React.lazy(() => import('./onboarding/OnboardingFlow'));
+/* One-time: asks students to join the Play Store closed test. See playtest/. */
+const PlaytestMoment = React.lazy(() => import('./playtest/PlaytestMoment'));
 const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
-import type { OnboardingResult } from './onboarding/OnboardingFlow';
+import type { OnboardingResult, ProfilePick } from './onboarding/OnboardingFlow';
+import { shouldShowPlaytest } from './playtest/gate';
 import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
 import { RaceStrip } from './leaderboard/RaceControl';
 import { useProfileController } from './profile/useProfileController';
+import { updateProfile } from './profile/profileApi';
+import { setCachedProfile } from './profile/profileCache';
+import { DEFAULT_ALPHA_AVATAR_ID } from './profile/alphaAvatars';
 import { ProfileModal, ProfilePage } from './profile/ProfileView';
 import EditProfile from './profile/EditProfile';
 import ToastHost from './notify/ToastHost';
 import { moveCard, nextOrder } from './board/board';
 import { useReminders } from './reminders/useReminders';
 import { materializeDay } from './schedule/schedule';
-import VoiceControl, { VoiceFeedback } from './voice/VoiceControl';
-import { VoiceIntent, toQSubject } from './voice/commands';
-import { PHASE_LABEL, isIdle as pomodoroIsIdle, isPaused as pomodoroIsPaused, heldMode, effectiveMode } from './today/pomodoro';
+import { isIdle as pomodoroIsIdle, heldMode, effectiveMode } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
-import { CLEARED as STOPWATCH_CLEARED, isArmed as stopwatchArmed, isPaused as stopwatchPaused, pauseRun, resumeRun, sessionSpan } from './today/stopwatch';
+import { isArmed as stopwatchArmed } from './today/stopwatch';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
@@ -79,60 +80,6 @@ import { forgetAnalyticsOnDevice } from './analytics/track';
 import { deleteAccount } from './account/deleteAccount';
 
 const ONBOARDING_KEY = 'onboarding_complete';
-
-/* Ending a session by voice can't stop to ask for a focus rating, so it logs
-   at the same neutral 4 the Pomodoro pending-block flush uses. */
-const VOICE_QUALITY = 4;
-
-type ChapterHit =
-  | { ok: true; subject: Subject; chapter: string }
-  | { ok: false; reason: 'none' | 'ambiguous' };
-
-/**
- * Voice gives a rough chapter name ("rotational motion"), never the exact title
- * ("System of Particles & Rotational Motion").
- *
- * Every spoken word must appear in the title, and exactly one chapter may
- * qualify — "thermodynamics" is a real chapter in both Physics and Chemistry,
- * and silently picking one would quietly corrupt syllabus progress.
- */
-const findChapter = (spoken: string, classId: 11 | 12, subjects: Subject[]): ChapterHit => {
-  const words = spoken.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-  if (!words.length) return { ok: false, reason: 'none' };
-
-  const matches: { subject: Subject; chapter: string }[] = [];
-  for (const subject of subjects) {
-    if (subject === 'General') continue;
-    const chapters = SYLLABUS_DATA[classId][subject as 'Physics' | 'Chemistry' | 'Maths' | 'Biology'] || [];
-    for (const chapter of chapters) {
-      const title = chapter.toLowerCase();
-      if (words.every(w => title.includes(w))) matches.push({ subject, chapter });
-    }
-  }
-
-  if (!matches.length) return { ok: false, reason: 'none' };
-  if (matches.length > 1) return { ok: false, reason: 'ambiguous' };
-  return { ok: true, ...matches[0] };
-};
-
-/** Loosest-to-tightest match of a spoken phrase against a task list. */
-const findTask = (spoken: string, tasks: Task[]): Task | null => {
-  const query = spoken.toLowerCase().trim();
-  if (!query) return null;
-
-  const exact = tasks.find(t => t.text.toLowerCase() === query);
-  if (exact) return exact;
-
-  const contains = tasks.find(t => {
-    const text = t.text.toLowerCase();
-    return text.includes(query) || query.includes(text);
-  });
-  if (contains) return contains;
-
-  const words = query.split(/\s+/).filter(w => w.length > 2);
-  if (!words.length) return null;
-  return tasks.find(t => words.every(w => t.text.toLowerCase().includes(w))) ?? null;
-};
 
 // --- Main App Component ---
 
@@ -206,6 +153,8 @@ const App: React.FC = () => {
       merged.mocks = normalizeMocks(parsed.mocks);
       /* The Questions tab became Mocks and took its slot in the rail. */
       if ((parsed.lastUsedTab as string) === 'Questions') merged.lastUsedTab = 'Mocks';
+      // The Observatory was removed; anyone who left the app there lands on Today.
+      if ((parsed.lastUsedTab as string) === 'Observatory') merged.lastUsedTab = 'Today';
         return merged;
       } catch (e) {
         return DEFAULT_STATE;
@@ -219,17 +168,6 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(deepLink?.tab ?? state.lastUsedTab);
   useEffect(() => { if (deepLink) settleDeepLink(); }, [deepLink]);
-  /* True for the length of the Observatory entry transition, then cleared.
-     Alpha's chrome falls away, the paper comes up, the geometry resolves.
-     Deliberately short (~700ms): the point is psychological separation, and a
-     door you have to wait for stops being a door and becomes an obstacle. */
-  const [entering, setEntering] = useState(false);
-  const enterTimer = useRef<number | null>(null);
-  const beginEntry = () => {
-    setEntering(true);
-    if (enterTimer.current) window.clearTimeout(enterTimer.current);
-    enterTimer.current = window.setTimeout(() => setEntering(false), 760);
-  };
   /* Which period the share sheet opened on, or null when it is closed. The
      entry point decides: Today opens on the day, Streak on the week. */
   const [sharePeriod, setSharePeriod] = useState<CardPeriod | null>(null);
@@ -253,6 +191,8 @@ const App: React.FC = () => {
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  /* The Play Store ask (playtest/): decided once per load, closed for good once seen. */
+  const [playtestOpen, setPlaytestOpen] = useState(shouldShowPlaytest);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
     try {
       return localStorage.getItem(ONBOARDING_KEY) !== 'true';
@@ -655,12 +595,6 @@ const App: React.FC = () => {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
-    /* Arriving in the Observatory is a change of mode rather than a route
-       change, so it gets a transition — and it gets it here, in the one
-       navigation path, so the door on Today and the item in the sidebar feel
-       identical. Leaving needs none: returning to Alpha is returning to the
-       normal state of things. */
-    if (tab === 'Observatory') beginEntry();
   };
 
   /* ── Rewards ──────────────────────────────────────────────────────────── */
@@ -743,22 +677,16 @@ const App: React.FC = () => {
   };
 
   /* Onboarding's one write, when the pledge is held to the end. Skipping
-     writes nothing. The starter plan only lands on an empty Plan tab: a
-     student who already has blocks never gets a second set laid over them. */
+     writes nothing. It never touches the Plan tab: the student lays out their
+     own day there. */
   const applyOnboarding = (r: OnboardingResult) => {
     setState(prev => {
-      const schedule = prev.schedule || EMPTY_SCHEDULE;
-      const empty = !schedule.rules.length && !schedule.blocks.length;
-      const today = getISTDateString();
       const next: AppState = {
         ...prev,
         examPreference: r.examPreference,
         currentClass: r.currentClass,
         dailyGoalHours: r.dailyGoalHours,
         timerMode: r.timerMode,
-        schedule: r.rules && empty
-          ? { ...schedule, rules: r.rules.map(rule => ({ ...rule, id: generateId(), from: today, until: null })) }
-          : schedule,
         lastUpdated: Date.now(),
       };
       stateRef.current = next;
@@ -1123,16 +1051,16 @@ const App: React.FC = () => {
     finishOnboarding();
   };
 
-  /* An account from inside onboarding: Google goes straight to Google (the
-     page navigates away and comes back signed in); anything else opens the
-     sign-in sheet, which onboarding steps aside for. */
-  const signInFromOnboarding = (how: 'google' | 'modal') => {
-    finishOnboarding();
-    if (how === 'google') {
-      void supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
-        .then(({ error }) => { if (error) setIsAuthModalOpen(true); });
-    } else {
-      setIsAuthModalOpen(true);
+  /* Google, the only way in (onboarding and the settings pane). The page
+     navigates away and comes back signed in; onboarding, if it was still
+     running, picks up where it left off. Resolves only if Google could not
+     be reached. */
+  const signInWithGoogle = async (): Promise<string | null> => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+      return error ? 'Could not reach Google. Try again.' : null;
+    } catch {
+      return 'Could not reach Google. Try again.';
     }
   };
 
@@ -1247,168 +1175,6 @@ const App: React.FC = () => {
       return nextState;
     });
   }, []);
-
-  /* ── The analysis ────────────────────────────────────────────────
-     The experiment has a genuine beginning. `startedAt` is both the
-     psychological anchor — a date the student can point at — and the
-     analytical boundary: `observedSince` counts nothing before it, so a user
-     with two years of history who begins today is honestly on day 1 with zero
-     observations. Conscripting that history would make the day counter a
-     decoration rather than a fact. */
-  const analysis = state.analysis ?? DEFAULT_ANALYSIS;
-  const sleep = state.sleep ?? DEFAULT_SLEEP;
-  const [introOpen, setIntroOpen] = useState(false);
-
-  useEffect(() => () => {
-    if (enterTimer.current) window.clearTimeout(enterTimer.current);
-  }, []);
-
-  const beginAnalysis = useCallback(() => {
-    setState(prev => {
-      /* Already running: pressing begin again must not restart the clock and
-         wipe out the days already observed. */
-      if (prev.analysis?.startedAt) return prev;
-      const now = Date.now();
-      const nextState: AppState = {
-        ...prev,
-        analysis: { startedAt: now, startedOn: getISTDateString(new Date(now)), introSeen: true },
-        lastUpdated: now,
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-    setIntroOpen(false);
-  }, []);
-
-  const markIntroSeen = useCallback(() => {
-    setState(prev => {
-      if (prev.analysis?.introSeen) return prev;
-      const nextState: AppState = {
-        ...prev,
-        analysis: { ...(prev.analysis ?? DEFAULT_ANALYSIS), introSeen: true },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  /* One night per study day, replacing whatever was there — the card offers
-     "Change" rather than a second entry, and two rows for one night would
-     double-count it in every average. */
-  const logSleep = useCallback((log: SleepLog) => {
-    setState(prev => {
-      const current = prev.sleep ?? DEFAULT_SLEEP;
-      const nextState: AppState = {
-        ...prev,
-        sleep: {
-          ...current,
-          logs: [...current.logs.filter(l => l.date !== log.date), log]
-            .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
-        },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  const clearNight = useCallback((date: string) => {
-    setState(prev => {
-      const current = prev.sleep ?? DEFAULT_SLEEP;
-      const nextState: AppState = {
-        ...prev,
-        sleep: { ...current, logs: current.logs.filter(l => l.date !== date) },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  /* Turning it off stops collection; it does not delete. Erasing months of
-     someone's record because they tapped a switch would be the wrong default
-     in the one direction that cannot be undone — deletion is its own button. */
-  const setSleepEnabled = useCallback((enabled: boolean) => {
-    setState(prev => {
-      const current = prev.sleep ?? DEFAULT_SLEEP;
-      const nextState: AppState = {
-        ...prev,
-        sleep: { ...current, enabled },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  const ai = state.ai ?? DEFAULT_AI;
-
-  /* Turning it off deletes what it wrote, on the device and in the cloud. The
-     student owns this text; leaving it behind after they opted out would be the
-     one thing the consent copy promises does not happen. */
-  const setAiEnabled = useCallback((enabled: boolean) => {
-    setState(prev => {
-      const nextState: AppState = {
-        ...prev,
-        ai: enabled
-          ? { ...(prev.ai ?? DEFAULT_AI), enabled: true }
-          : { enabled: false, cache: {} },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-
-    if (!enabled && user) {
-      /* Best effort and deliberately not awaited — the switch must flip
-         instantly, and a failed cleanup is retried the next time it is
-         toggled. RLS restricts this to the caller's own rows. */
-      supabase.from('ai_insights').delete().eq('user_id', user.id)
-        .then(({ error }) => { if (error) console.error('AI cleanup:', error.message); });
-    }
-  }, [user]);
-
-  const cacheInsight = useCallback((hash: string, insight: AiInsight) => {
-    setState(prev => {
-      const current = prev.ai ?? DEFAULT_AI;
-      /* Newest kept when the cap bites. An old week is the one nobody reopens,
-         and this rides in the synced blob. */
-      const entries = (Object.entries({ ...current.cache, [hash]: insight }) as [string, AiInsight][])
-        .sort((a, b) => b[1].at - a[1].at)
-        .slice(0, MAX_AI_CACHE);
-      const nextState: AppState = {
-        ...prev,
-        ai: { ...current, cache: Object.fromEntries(entries) },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  const deleteAllSleep = useCallback(() => {
-    if (!window.confirm('DELETE EVERY NIGHT RECORDED? This cannot be undone.')) return;
-    setState(prev => {
-      const current = prev.sleep ?? DEFAULT_SLEEP;
-      const nextState: AppState = {
-        ...prev,
-        sleep: { ...current, logs: [] },
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  }, []);
-
-  /* Memoised on the three inputs it actually reads. App re-renders ten times a
-     second while a stopwatch runs (today/TodayTab.tsx keeps a 100ms interval),
-     and this walks every log to bucket it — recomputing that per tick would
-     cost the app's core loop for a panel that cannot have changed. */
-  const experiment = useMemo(
-    () => buildExperiment(analysis, state.logs, sleep.logs),
-    [analysis, state.logs, sleep.logs],
-  );
 
   /* ── Tasks ────────────────────────────────────────────────────────
      Every mutator here is wrapped in useCallback with empty deps. That is not
@@ -1959,6 +1725,28 @@ const App: React.FC = () => {
      leaderboard row or a chat bubble on the Ranks tab, and reachable directly
      by /u/:handle regardless of which tab was last active. */
   const profileCtl = useProfileController(user);
+
+  /* The profile built in onboarding. The name also becomes the Ranks name,
+     so joining the race later starts from it (joining stays opt-in). Signed
+     in, it is written to the profile now; signed out, it waits as a draft
+     for the account (profile/draft.ts). */
+  const applyOnboardingProfile = (p: ProfilePick) => {
+    setState(prev => {
+      if (prev.leaderboard.enabled) return prev;
+      const next = { ...prev, leaderboard: { ...prev.leaderboard, displayName: p.name }, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+    const own = profileCtl.ownProfile;
+    if (!user || !own) return;
+    void updateProfile(user.id, {
+      display_name: p.name,
+      bio: own.bio ?? '',
+      avatar_type: 'alpha',
+      avatar_id: p.avatarId,
+      avatar_url: null,
+    }).then(saved => { setCachedProfile(saved); profileCtl.onSaved(saved); }, () => { /* Edit profile is one tap away */ });
+  };
   /* Every logged hour, any source — the same figure Header's own tooltip and
      the Review tab already show. Memoized because it otherwise re-sums the
      full log history on every render, including the ones a running timer
@@ -1972,270 +1760,9 @@ const App: React.FC = () => {
     handleTabChange(tab);
   };
 
-  /* Voice sets a chapter status outright. Deliberately separate from
-     toggleChapterStatus, whose tap-to-cycle behaviour must stay exactly as is. */
-  const setChapterStatus = (classId: 11 | 12, subject: Subject, chapter: string, status: SyllabusStatus) => {
-    if (status === 'completed') sfx.play('chapter-complete');
-    setState(prev => {
-      const existing = prev.progress.find(p => p.classId === classId && p.subject === subject && p.chapter === chapter);
-      const filtered = prev.progress.filter(p => !(p.classId === classId && p.subject === subject && p.chapter === chapter));
-      const nextState = {
-        ...prev,
-        progress: [...filtered, { classId, subject, chapter, status, notes: existing?.notes }],
-        lastUpdated: Date.now(),
-      };
-      stateRef.current = nextState;
-      return nextState;
-    });
-  };
-
-  /* ── Voice commands ──
-     The parser is pure and exam-agnostic, so every check that depends on live
-     state — which subjects are active, what's already running — happens here.
-     Reads go through stateRef so a command fired moments after another still
-     sees the result of the first. */
-  const executeVoiceCommand = (intent: VoiceIntent): VoiceFeedback => {
-    const current = stateRef.current;
-    // What the Today tab is showing, so "pause" reaches the block on screen.
-    const mode = effectiveMode(current);
-
-    /* "Start" and "resume" said to a paused stopwatch both land here, so the
-       two cannot disagree about a pause that crossed the study day. */
-    const resumeStopwatch = (): VoiceFeedback => {
-      const t = current.timer;
-      const { bank, update } = resumeRun(t);
-      if (bank) logStudy(t.subject, bank.hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, bank.startedAt, bank.endedAt);
-      updateTimer(update);
-      return { ok: true, message: `SESSION LIVE: ${t.subject.toUpperCase()}.` };
-    };
-    const exam = current.examPreference || 'JEE';
-
-    switch (intent.kind) {
-      case 'navigate':
-        handleTabChange(intent.tab);
-        return { ok: true, message: `OPENED ${intent.tab.toUpperCase()}.` };
-
-      case 'startSession': {
-        if (intent.subject && !activeSubjects.includes(intent.subject)) {
-          return { ok: false, message: `${intent.subject.toUpperCase()} ISN'T IN YOUR ${exam} TRACK.` };
-        }
-        handleTabChange('Today');
-
-        if (mode === 'pomodoro') {
-          if (current.pomodoro.isRunning) return { ok: false, message: 'A BLOCK IS ALREADY RUNNING.' };
-          const phase = current.pomodoro.phase;
-          const resuming = pomodoroIsPaused(current.pomodoro);
-          // The subject only means anything for a work block.
-          pomodoro.start(phase === 'work' ? intent.subject : undefined);
-          return {
-            ok: true,
-            message: `${PHASE_LABEL[phase].toUpperCase()} ${resuming ? 'RESUMED' : 'STARTED'}.`,
-          };
-        }
-
-        if (current.timer.isRunning) return { ok: false, message: 'SESSION ALREADY RUNNING.' };
-        if (stopwatchPaused(current.timer)) {
-          // A different subject is a different session; this one ends first.
-          if (intent.subject && intent.subject !== current.timer.subject) {
-            return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
-          }
-          return resumeStopwatch();
-        }
-        const subject = intent.subject ?? current.timer.subject;
-        updateTimer({ isRunning: true, startTime: Date.now(), subject });
-        return { ok: true, message: `SESSION LIVE: ${subject.toUpperCase()}.` };
-      }
-
-      case 'endSession': {
-        if (mode === 'pomodoro') {
-          if (pomodoroIsIdle(current.pomodoro)) return { ok: false, message: 'NOTHING RUNNING.' };
-          const wasWork = current.pomodoro.phase === 'work';
-          // Ending early still banks every minute that was served.
-          const { hours } = pomodoro.end();
-          if (!wasWork) return { ok: true, message: 'BREAK ENDED.' };
-          return hours > 0
-            ? { ok: true, message: `BLOCK ENDED. LOGGED ${hours.toFixed(2)}H ${current.pomodoro.subject.toUpperCase()}.` }
-            : { ok: true, message: 'BLOCK ENDED. TOO SHORT TO LOG.' };
-        }
-
-        const t = current.timer;
-        if (!stopwatchArmed(t)) return { ok: false, message: 'NOTHING RUNNING.' };
-        /* Ending by voice still ends a stopwatch the app timed itself, so it
-           carries the same interval the button would have recorded. Stopping a
-           session by speaking rather than tapping must not make it invisible to
-           the analysis. */
-        const { hours, startedAt, endedAt } = sessionSpan(t);
-        logStudy(t.subject, hours, VOICE_QUALITY, 0, 'timer', t.chapter, t.blockId, startedAt, endedAt);
-        updateTimer(STOPWATCH_CLEARED);
-        return { ok: true, message: `LOGGED ${hours.toFixed(2)}H ${t.subject.toUpperCase()}.` };
-      }
-
-      case 'addTask': {
-        const subject = activeSubjects.includes(intent.subject) ? intent.subject : 'General';
-        addTask(intent.text, subject);
-        return { ok: true, message: `TASK ADDED: ${intent.text.toUpperCase().slice(0, 32)}` };
-      }
-
-      case 'logQuestions': {
-        const qSubject = toQSubject(intent.subject);
-        if (!qSubject || !coreQSubjects.includes(qSubject)) {
-          return { ok: false, message: `${intent.subject.toUpperCase()} ISN'T TRACKED FOR QUESTIONS IN ${exam}.` };
-        }
-        logQuestions(qSubject, intent.count);
-        return { ok: true, message: `+${intent.count} ${intent.subject.toUpperCase()} QUESTIONS.` };
-      }
-
-      case 'setGoal': {
-        const hours = Math.min(24, Math.max(1, Math.round(intent.hours)));
-        updateDailyGoal(hours);
-        return { ok: true, message: `DAILY TARGET: ${hours}H.` };
-      }
-
-      case 'adjustGoal': {
-        const hours = Math.min(24, Math.max(1, current.dailyGoalHours + Math.round(intent.delta)));
-        if (hours === current.dailyGoalHours) return { ok: false, message: `TARGET STAYS AT ${hours}H.` };
-        updateDailyGoal(hours);
-        return { ok: true, message: `DAILY TARGET: ${hours}H.` };
-      }
-
-      case 'logHours': {
-        const subject = intent.subject ?? current.timer.subject;
-        if (!activeSubjects.includes(subject)) {
-          return { ok: false, message: `${subject.toUpperCase()} ISN'T IN YOUR ${exam} TRACK.` };
-        }
-        const hours = Math.round(intent.hours * 100) / 100;
-        if (hours <= 0) return { ok: false, message: 'HOW LONG? TRY “LOG 2 HOURS OF PHYSICS”.' };
-        /* Backfilled by voice, not measured — 'manual', so it counts towards the
-           user's own totals but never towards the leaderboard. */
-        logStudy(subject, hours, VOICE_QUALITY, 0, 'manual');
-        return { ok: true, message: `LOGGED ${hours}H ${subject.toUpperCase()}.` };
-      }
-
-      case 'pauseTimer': {
-        if (mode !== 'pomodoro') {
-          if (!current.timer.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
-          sfx.select();
-          updateTimer(pauseRun(current.timer));
-          return { ok: true, message: 'PAUSED. THE CLOCK IS HELD.' };
-        }
-        if (!current.pomodoro.isRunning) return { ok: false, message: 'NOTHING RUNNING.' };
-        pomodoro.pause();
-        // Paused, not abandoned — the time served is still on the clock.
-        return { ok: true, message: 'PAUSED. THE CLOCK IS HELD.' };
-      }
-
-      case 'resumeTimer': {
-        if (mode !== 'pomodoro') {
-          if (current.timer.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
-          if (!stopwatchPaused(current.timer)) return { ok: false, message: 'SAY “START SESSION” TO BEGIN.' };
-          return resumeStopwatch();
-        }
-        if (current.pomodoro.isRunning) return { ok: false, message: 'ALREADY RUNNING.' };
-        const phase = current.pomodoro.phase;
-        pomodoro.start();
-        return { ok: true, message: `${PHASE_LABEL[phase].toUpperCase()} RUNNING.` };
-      }
-
-      case 'resetPomodoro': {
-        if (mode !== 'pomodoro') return { ok: false, message: 'NOT IN POMODORO MODE.' };
-        // Resets the set, not the day: focus already served is logged first.
-        const { hours } = pomodoro.reset();
-        return {
-          ok: true,
-          message: hours > 0 ? `SET RESET. LOGGED ${hours.toFixed(2)}H FIRST.` : 'SET RESET.',
-        };
-      }
-
-      case 'setTimerMode': {
-        if (mode === intent.mode) return { ok: false, message: `ALREADY IN ${intent.mode.toUpperCase()}.` };
-        if (current.pomodoro.isRunning || stopwatchArmed(current.timer)) {
-          return { ok: false, message: 'FINISH THE RUNNING SESSION FIRST.' };
-        }
-        handleTabChange('Today');
-        setTimerMode(intent.mode);
-        return { ok: true, message: `${intent.mode.toUpperCase()} MODE.` };
-      }
-
-      case 'setTheme': {
-        if (current.theme === intent.theme) return { ok: false, message: `ALREADY ${intent.theme.toUpperCase()}.` };
-        setState(prev => ({ ...prev, theme: intent.theme }));
-        return { ok: true, message: `${intent.theme.toUpperCase()} MODE.` };
-      }
-
-      case 'completeTask': {
-        const open = current.tasks.filter(t => !t.completed);
-        const hit = findTask(intent.query, open);
-        if (!hit) return { ok: false, message: `NO OPEN TASK MATCHING “${intent.query.slice(0, 24)}”.` };
-        toggleTask(hit.id);
-        return { ok: true, message: `DONE: ${hit.text.toUpperCase().slice(0, 30)}` };
-      }
-
-      case 'deleteTask': {
-        const hit = findTask(intent.query, current.tasks);
-        if (!hit) return { ok: false, message: `NO TASK MATCHING “${intent.query.slice(0, 24)}”.` };
-        deleteTask(hit.id);
-        return { ok: true, message: `WIPED: ${hit.text.toUpperCase().slice(0, 30)}` };
-      }
-
-      case 'setChapterStatus': {
-        const hit: ChapterHit = findChapter(intent.chapter, current.currentClass, activeSubjects);
-        if (hit.ok === false) {
-          return hit.reason === 'ambiguous'
-            ? { ok: false, message: `“${intent.chapter.toUpperCase()}” MATCHES MORE THAN ONE CHAPTER. NAME THE SUBJECT.` }
-            : { ok: false, message: `NO CLASS ${current.currentClass} CHAPTER MATCHING “${intent.chapter.slice(0, 24)}”.` };
-        }
-        setChapterStatus(current.currentClass, hit.subject, hit.chapter, intent.status);
-        return { ok: true, message: `${hit.chapter.toUpperCase()} → ${STATUS_LABELS[intent.status].toUpperCase()}.` };
-      }
-
-      case 'query': {
-        const today = getISTDateString();
-        switch (intent.topic) {
-          case 'streak': {
-            const streak = calculateStreak(current.logs);
-            return { ok: true, message: streak > 0 ? `STREAK: ${streak} DAY${streak === 1 ? '' : 'S'}.` : 'NO STREAK. LOG TODAY.' };
-          }
-          case 'hoursToday': {
-            const hours = current.logs.filter(l => l.date === today).reduce((a, l) => a + l.hours, 0);
-            return { ok: true, message: `${hours.toFixed(1)}H TODAY, TARGET ${current.dailyGoalHours}H.` };
-          }
-          case 'goal': {
-            const hours = current.logs.filter(l => l.date === today).reduce((a, l) => a + l.hours, 0);
-            const left = current.dailyGoalHours - hours;
-            return {
-              ok: true,
-              message: left <= 0
-                ? `TARGET HIT. ${hours.toFixed(1)}H DONE.`
-                : `${left.toFixed(1)}H SHORT OF TODAY'S ${current.dailyGoalHours}H.`,
-            };
-          }
-          case 'questionsToday': {
-            const log = current.questionTracking.dailyQuestionsLog.find(l => l.date === today);
-            const counts = (log?.counts ?? {}) as Partial<Record<QSubject, number>>;
-            const total = (Object.keys(counts) as QSubject[]).reduce((a, k) => a + (counts[k] ?? 0), 0);
-            return { ok: true, message: `${total} QUESTION${total === 1 ? '' : 'S'} TODAY.` };
-          }
-          case 'score': {
-            const score = calculateLockInScore(current.logs, current.currentClass, current.progress, activeSubjects);
-            return { ok: true, message: `LOCK-IN SCORE: ${score}/100.` };
-          }
-          case 'daysLeft': {
-            const days = getDaysRemaining(exam === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE);
-            return { ok: true, message: `${days} DAYS TO ${exam} 2027.` };
-          }
-          default:
-            return { ok: false, message: 'UNKNOWN QUESTION.' };
-        }
-      }
-
-      default:
-        return { ok: false, message: 'UNKNOWN COMMAND.' };
-    }
-  };
-
-  const targetExamDate = state.examPreference === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE;
-  const daysRemaining = getDaysRemaining(targetExamDate);
-  const streakCount = calculateStreak(state.logs);
+  /* One replay of the history (streak/firewood.ts), cached per log array. */
+  const ledger = streakLedger(state.logs);
+  const streakCount = ledger.streak;
   const verifiedStreakCount = calculateVerifiedStreak(state.logs);
   const lockInScore = calculateLockInScore(state.logs, state.currentClass, state.progress, activeSubjects);
 
@@ -2324,11 +1851,6 @@ const App: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         theme={theme}
-        onAuthSuccess={() => {
-          isInitialSyncDone.current = false;
-          setSyncSettled(false);
-          setSyncStatus('syncing');
-        }}
       />
 
       <ProfileModal
@@ -2353,21 +1875,6 @@ const App: React.FC = () => {
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
       <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
-        <Header
-          currentClass={state.currentClass}
-          onClassChange={(c) => setState(p => ({ ...p, currentClass: c }))}
-          daysRemaining={daysRemaining}
-          theme={theme}
-          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
-          installPrompt={install.mode === 'prompt' ? true : null}
-          onInstall={() => { void install.install(); }}
-          syncStatus={syncStatus}
-          user={user}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
-          logs={state.logs}
-          examPreference={state.examPreference || 'JEE'}
-          targetExamDate={targetExamDate}
-        />
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
           {profileCtl.routeHandle ? (
@@ -2411,9 +1918,6 @@ const App: React.FC = () => {
               onStartBlock={startBlock}
               onOpenPlan={() => handleTabChange('Plan')}
               onShare={() => setSharePeriod('daily')}
-              experiment={experiment}
-              sleep={sleep}
-              onEnterObservatory={() => handleTabChange('Observatory')}
               unreadAnnouncements={announcements.open ? 0 : announcements.queue.length}
               onOpenAnnouncement={announcements.reopen}
             />
@@ -2454,6 +1958,7 @@ const App: React.FC = () => {
             <StreakTab
               streak={streakCount}
               verifiedStreak={verifiedStreakCount}
+              ledger={ledger}
               logs={state.logs}
               dailyGoalHours={state.dailyGoalHours}
               theme={theme}
@@ -2553,53 +2058,10 @@ const App: React.FC = () => {
           {activeTab === 'Admin' && isAdmin && user && (
             <AdminTab adminId={user.id} theme={theme} onOpenDeck={id => { if (id) setDeckToOpen(id); handleTabChange('Decks'); }} />
           )}
-          {activeTab === 'Observatory' && (
-            <ObservatoryTab
-              experiment={experiment}
-              logs={state.logs}
-              sleep={sleep}
-              theme={theme}
-              analysisStartedAt={analysis.startedAt}
-              arriving={entering}
-              onReadIntro={() => setIntroOpen(true)}
-              onBegin={beginAnalysis}
-              onToggleSleep={setSleepEnabled}
-              onDeleteAllSleep={deleteAllSleep}
-              onLogSleep={logSleep}
-              onClearNight={clearNight}
-              ai={ai}
-              signedIn={!!user}
-              onToggleAi={setAiEnabled}
-              onCacheInsight={cacheInsight}
-            />
-          )}
           </>
           )}
         </main>
       </div>
-
-      {/* Alpha falling away as the Observatory comes up. Painted above the
-          whole app rather than inside the tab, because what it is covering is
-          the transition between two modes of the application. */}
-      {entering && <div className={`obs ${theme === 'dark' ? 'obs-dark' : ''} o-veil`} aria-hidden="true" />}
-
-      {/* The opening plates. Full-screen and above everything, because the
-          whole point of the first run is that it is not a widget on a page —
-          it is the instrument powering on. Suppressed during the tour, which
-          owns the screen. */}
-      {!showOnboarding && introOpen && (
-        <AnalysisIntro
-          theme={theme}
-          alreadyStarted={analysis.startedAt !== null}
-          onBegin={beginAnalysis}
-          onClose={() => { markIntroSeen(); setIntroOpen(false); }}
-        />
-      )}
-
-      {/* Kept out of the way of the tour's spotlight and of Lock-In. */}
-      {!showOnboarding && (
-        <VoiceControl theme={theme} onCommand={executeVoiceCommand} />
-      )}
 
       {/* Everything the app says on screen, from any feature, in one place.
           Suppressed during the tour, which owns the screen. Renders nothing at
@@ -2612,7 +2074,7 @@ const App: React.FC = () => {
           once is one interruption nobody reads.
 
           Only on Today. An announcement that could open over the Plan grid or
-          mid-way through the Observatory would be a modal that follows you
+          mid-way through a mock would be a modal that follows you
           around the app, which is the thing this feature is deliberately not. */}
       {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
         && activeTab === 'Today' && announcements.current && (
@@ -2635,7 +2097,7 @@ const App: React.FC = () => {
           the screen, and the news keeps until the block is done), and
           queued behind the other full-screen moments, including an
           announcement already open on Today. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
@@ -2653,14 +2115,14 @@ const App: React.FC = () => {
           for the same reason everything else here is: the first run already has
           a landing page and a tour, and a third thing asking for a tap on top
           of those is how all three get dismissed unread. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
         <InstallBanner install={install} theme={theme} />
       )}
 
-      {/* "Need help? Tell us." Bottom-left, clear of the mic in the opposite
-          corner, and gone during any full-screen moment — a floating bubble
-          over the reward modal or the book is a bubble in the way. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !introOpen && (
+      {/* "Need help? Tell us." Bottom-left, clear of the settings gear in the
+          opposite corner, and gone during any full-screen moment — a floating
+          bubble over the reward modal or the book is a bubble in the way. */}
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
         <FeedbackWidget
           user={user}
           theme={theme}
@@ -2670,12 +2132,34 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* The gear, bottom-right, and the glass pane of quick settings it opens.
+          It replaced the web-style header that held the same switches above
+          every tab. Same suppression as the feedback launcher. */}
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
+        <QuickSettings
+          theme={theme}
+          onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
+          currentClass={state.currentClass}
+          onClassChange={c => setState(p => ({ ...p, currentClass: c }))}
+          reminders={reminderPrefs}
+          onChangeReminders={setReminderPrefs}
+          user={user}
+          profile={profileCtl.ownProfile}
+          syncStatus={syncStatus}
+          onSignIn={() => { void signInWithGoogle().then(err => { if (err) setIsAuthModalOpen(true); }); }}
+          onOpenProfile={profileCtl.openEditProfile}
+          install={install}
+          onOpenAll={() => handleTabChangeAndExitProfile('Review')}
+        />
+      )}
+
       {/* The daily streak moment: once a day, after the first session logged on
           this device. It goes before a reward unlock — on day 30 the streak
           lands first and the wallpaper pack follows when it is closed. */}
       {!showOnboarding && !isBookOpen && !sharePeriod && streakMoment !== null && (
         <StreakMoment
           streak={streakMoment}
+          ledger={ledger}
           logs={state.logs}
           next={nextReward(rewards, streakCount, verifiedStreakCount)}
           theme={theme}
@@ -2720,6 +2204,16 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Waits behind onboarding, every other full-screen moment and a
+          running session: it is a favour, so it never interrupts work. */}
+      {playtestOpen && showLanding === false && !needsOnboarding && !isBookOpen && !celebration
+        && streakMoment === null && !sharePeriod && !isAuthModalOpen
+        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
+        <React.Suspense fallback={null}>
+          <PlaytestMoment onClose={() => setPlaytestOpen(false)} />
+        </React.Suspense>
+      )}
+
       {showOnboarding && (
         <React.Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#050506' }} />}>
           <OnboardingFlow
@@ -2730,11 +2224,14 @@ const App: React.FC = () => {
               timerMode: state.timerMode,
               pomodoroSettings: state.pomodoroSettings,
               progress: state.progress,
-              hasPlan: !!(state.schedule && (state.schedule.rules.length || state.schedule.blocks.length)),
               signedIn: !!user,
+              profile: profileCtl.ownProfile
+                ? { name: profileCtl.ownProfile.display_name, avatarId: profileCtl.ownProfile.avatar_id ?? DEFAULT_ALPHA_AVATAR_ID }
+                : null,
             }}
             onApply={applyOnboarding}
-            onSignIn={signInFromOnboarding}
+            onProfile={applyOnboardingProfile}
+            onGoogle={signInWithGoogle}
             onStart={startFirstSession}
             onComplete={finishOnboarding}
           />

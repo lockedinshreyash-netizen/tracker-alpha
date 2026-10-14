@@ -8,11 +8,15 @@ import RewardsVault from '../rewards/RewardsVault';
 import { nextReward } from '../rewards/engine';
 import ShareButton from '../share/ShareButton';
 import { Card, Eyebrow, PageHeader, tokens } from '../ui/kit';
+import { FirewoodCard } from './FirewoodCard';
+import type { StreakLedger } from './firewood';
 
 interface Props {
   streak: number;
   /** Streak counting only app-timed days — what the paid rewards run on. */
   verifiedStreak: number;
+  /** The firewood bank and whether it is holding the streak right now. */
+  ledger: StreakLedger;
   logs: DailyLog[];
   dailyGoalHours: number;
   theme: 'dark' | 'light';
@@ -30,6 +34,7 @@ interface Props {
 const StreakTab: React.FC<Props> = ({
   streak,
   verifiedStreak,
+  ledger,
   logs,
   dailyGoalHours,
   theme,
@@ -59,7 +64,9 @@ const StreakTab: React.FC<Props> = ({
       <PageHeader
         dark={dark}
         title="Streak"
-        subtitle={streak > 0 ? `${streak} ${streak === 1 ? 'day' : 'days'} in a row. Don’t be the one who breaks it.` : 'Log a session today to start a run.'}
+        subtitle={ledger.holding
+          ? `${streak} ${streak === 1 ? 'day' : 'days'}, held by firewood. ${ledger.bank} left. Study today.`
+          : streak > 0 ? `${streak} ${streak === 1 ? 'day' : 'days'} in a row. Don’t be the one who breaks it.` : 'Log a session today to start a run.'}
         right={<ShareButton onClick={onShare} theme={theme} />}
       />
 
@@ -99,6 +106,8 @@ const StreakTab: React.FC<Props> = ({
           </div>
         </div>
       </Card>
+
+      <FirewoodCard ledger={ledger} logs={logs} dark={dark} delay={90} />
 
       <RewardsVault
         rewards={rewards}

@@ -81,13 +81,28 @@ const sdf = (x: number, y: number, w: number, h: number, r: number) => {
 interface Maps { displacement: string; specular: string; w: number; h: number; r: number }
 interface Size { w: number; h: number }
 
-const draw = (w: number, h: number, radius: number, bezel: number): Maps => {
+/* The PNG encode is the slow half (hundreds of ms on a phone for a wide
+   panel), so it goes through toBlob, which encodes off the main thread. */
+const encode = (c: HTMLCanvasElement): Promise<string> =>
+  new Promise((resolve, reject) => {
+    c.toBlob(blob => {
+      if (!blob) { reject(new Error('encode')); return; }
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    }, 'image/png');
+  });
+
+const draw = async (w: number, h: number, radius: number, bezel: number): Promise<Maps> => {
   const r = Math.min(radius, w / 2, h / 2);
 
   // Displacement, at CSS-pixel resolution: the field is smooth.
   const dc = document.createElement('canvas');
   dc.width = w; dc.height = h;
-  const dctx = dc.getContext('2d')!;
+  // CPU-backed: these canvases are only written and encoded, and encoding a
+  // GPU canvas waits on a readback behind whatever the GPU is painting.
+  const dctx = dc.getContext('2d', { willReadFrequently: true })!;
   const dimg = dctx.createImageData(w, h);
   const dd = dimg.data;
 
@@ -96,7 +111,7 @@ const draw = (w: number, h: number, radius: number, bezel: number): Maps => {
   const sw = Math.round(w * dpr), sh = Math.round(h * dpr);
   const sc = document.createElement('canvas');
   sc.width = sw; sc.height = sh;
-  const sctx = sc.getContext('2d')!;
+  const sctx = sc.getContext('2d', { willReadFrequently: true })!;
   const simg = sctx.createImageData(sw, sh);
   const sd = simg.data;
 
@@ -141,7 +156,38 @@ const draw = (w: number, h: number, radius: number, bezel: number): Maps => {
   }
   sctx.putImageData(simg, 0, 0);
 
-  return { displacement: dc.toDataURL('image/png'), specular: sc.toDataURL('image/png'), w, h, r: radius };
+  const [displacement, specular] = await Promise.all([encode(dc), encode(sc)]);
+  return { displacement, specular, w, h, r: radius };
+};
+
+/* Same size, same glass: two tiles of one width share one map, and a screen
+   that comes back finds its maps already drawn. Settled sizes only (resizes
+   are debounced), so this stays small; the cap is a backstop. */
+const cache = new Map<string, Promise<Maps>>();
+const CACHE_MAX = 64;
+const mapsFor = (w: number, h: number, radius: number, bezel: number): Promise<Maps> => {
+  const key = `${w}x${h}/${radius}/${bezel}/${window.devicePixelRatio || 1}`;
+  const have = cache.get(key);
+  if (have) return have;
+  const p = draw(w, h, radius, bezel);
+  p.catch(() => cache.delete(key));
+  cache.set(key, p);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
+  return p;
+};
+
+/* A new glass element draws its map when the page is idle, not in the frame
+   it appears in: the pixel loops are tens of ms on a phone, and a screen full
+   of tiles stalled its own entrance for over half a second. It is frosted
+   until then, which is what it would be in Safari anyway. */
+const idle = (fn: () => void): (() => void) => {
+  const w = window as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+  if (w.requestIdleCallback) {
+    const id = w.requestIdleCallback(fn, { timeout: 500 });
+    return () => w.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(fn, 60);
+  return () => window.clearTimeout(id);
 };
 
 interface Props extends React.HTMLAttributes<HTMLElement> {
@@ -189,25 +235,28 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
     const el = local.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     let timer = 0;
+    let alive = true;
+    let cancelIdle = () => {};
     const read = (): Size => ({ w: Math.round(el.offsetWidth), h: Math.round(el.offsetHeight) });
     const settle = () => {
       const s = read();
       if (s.w < 8 || s.h < 8) return; // display: none (the phone bar on a laptop)
-      setMaps(prev => {
-        if (prev && prev.w === s.w && prev.h === s.h && prev.r === radius) return prev;
-        try { return draw(s.w, s.h, radius, bezel); } catch { return null; }
-      });
+      let p: Promise<Maps>;
+      try { p = mapsFor(s.w, s.h, radius, bezel); } catch { return; }
+      p.then(m => {
+        if (alive) setMaps(prev => (prev && prev.w === m.w && prev.h === m.h && prev.r === m.r ? prev : m));
+      }, () => { /* canvas refused: stays frosted */ });
     };
     const ro = new ResizeObserver(() => {
       const s = read();
       setSize(prev => (prev && prev.w === s.w && prev.h === s.h ? prev : s));
       window.clearTimeout(timer);
-      timer = window.setTimeout(settle, 140);
+      timer = window.setTimeout(() => { cancelIdle(); cancelIdle = idle(settle); }, 140);
     });
     ro.observe(el);
     setSize(read());
-    settle();
-    return () => { ro.disconnect(); window.clearTimeout(timer); };
+    cancelIdle = idle(settle);
+    return () => { alive = false; ro.disconnect(); window.clearTimeout(timer); cancelIdle(); };
   }, [radius, bezel]);
 
   const fresh = !!maps && !!size && maps.w === size.w && maps.h === size.h;

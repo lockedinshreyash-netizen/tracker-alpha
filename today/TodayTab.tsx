@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, SleepState, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
+import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
+import ExamCountdown from './ExamCountdown';
 import { isIdle as pomodoroIsIdle, effectiveMode } from './pomodoro';
 import { CLEARED, isArmed, isPaused, pauseRun, resumeRun, sessionSpan } from './stopwatch';
 import * as sfx from '../audio';
@@ -8,10 +9,7 @@ import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
 import { Recommendation } from './recommend';
-import ObservatoryStrip from '../analysis/ObservatoryStrip';
-import SleepReminder from '../analysis/SleepReminder';
 import NoticeLine from '../notify/NoticeLine';
-import { ExperimentState } from '../insight/observe';
 import NextUpStrip from '../schedule/NextUpStrip';
 import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
@@ -42,10 +40,6 @@ interface Props {
   onOpenPlan: () => void;
   /** Opens the share sheet on today's card. */
   onShare: () => void;
-  experiment: ExperimentState;
-  sleep: SleepState;
-  /** The door into the Observatory. Today never shows the room itself. */
-  onEnterObservatory: () => void;
   /* Set only when an app-wide announcement is live, unread, and the user has
      closed its modal without acknowledging it. The modal is the notice; this
      line is the way back to one that was waved off, so nothing published is
@@ -77,9 +71,6 @@ const TodayTab: React.FC<Props> = ({
   onStartBlock,
   onOpenPlan,
   onShare,
-  experiment,
-  sleep,
-  onEnterObservatory,
   unreadAnnouncements,
   onOpenAnnouncement,
 }) => {
@@ -224,6 +215,9 @@ const TodayTab: React.FC<Props> = ({
                 ? `${todayLabel}. ${totalToday.toFixed(1)}h done, ${remaining.toFixed(1)}h to go.`
                 : `${todayLabel}. Target hit. Everything now is extra.`
           }
+          /* The exam countdown: it lived in the old web header above every
+             tab, and belongs here at the top of the day it is counting. */
+          aside={<ExamCountdown exam={state.examPreference || 'JEE'} dark={dark} />}
         />
       )}
       {/* Only while idle — mid-session the last thing anyone needs is a second
@@ -237,34 +231,7 @@ const TodayTab: React.FC<Props> = ({
           onOpenPlan={onOpenPlan}
         />
       )}
-      {/* The door into the Observatory, where the coach card used to sit — one
-          line of invitation and, once the study is running, the day count.
-          Nothing else: Today answers "what do I need to do today", and a
-          longitudinal chart here answers a question nobody asked while a timer
-          is waiting to be started.
-
-          Hidden mid-session for the same reason everything else here is — the
-          last thing anyone needs while a clock is running is somewhere else to
-          go. */}
-      {!stopwatchBusy && !pomodoroBusy && (
-        <ObservatoryStrip
-          experiment={experiment}
-          theme={theme}
-          onEnter={onEnterObservatory}
-        />
-      )}
-
-      {/* The only thing sleep leaves on Today: a single dismissable line, and
-          only on a morning it has not been logged. The entry itself lives in
-          the Observatory, beside the one thing that reads it — Today is for
-          what you need to do today, and sleep is an input to a study rather
-          than a task. */}
-      {!stopwatchBusy && !pomodoroBusy && (
-        <SleepReminder sleep={sleep} theme={theme} onOpen={onEnterObservatory} />
-      )}
-
-      {/* The same line, for the same reason: something to read that is not a
-          task for today. No cross on this one — an announcement is dismissed by
+      {/* A line, not a card: something to read that is not a task for today. No cross on this one — an announcement is dismissed by
           reading it, and a line that could be flicked away without opening it
           would be a notice that never arrived.
 

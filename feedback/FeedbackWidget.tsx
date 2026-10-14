@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import LiquidGlass from '../ui/LiquidGlass';
 import type { User } from '@supabase/supabase-js';
 import {
   CATEGORIES, Category, CategoryDef, Draft, MESSAGE_MAX, STATUS_LABEL,
@@ -157,13 +158,19 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
        itself. */
     <div style={{ ['--rail' as any]: `${railPx}px` }}>
       <div className="fb-dock">
-        <button
+        {/* Liquid glass, the gear's twin in the other corner (settings/
+            QuickSettings). Geometry is .fb-button in index.css. */}
+        <LiquidGlass
+          as="button"
+          dark={dark}
+          radius={24}
+          variant="bar"
+          bezel={12}
+          strength={12}
           onClick={toggle}
           aria-expanded={open}
           aria-label={open ? 'Close feedback' : 'Send feedback'}
-          className={`w-12 h-12 rounded-full border flex items-center justify-center shadow-lg transition-all active:scale-95 ${open
-            ? 'bg-[#E10600] border-[#E10600] text-white'
-            : `${panel} ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'}`}`}
+          className={`fb-button flex items-center justify-center transition-transform active:scale-95 ${dark ? 'text-white' : 'text-zinc-900'}`}
         >
           {open ? (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -175,7 +182,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
               <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.3 9.3 0 0 1-3.3-.6L3 21l1.8-4.5A8.1 8.1 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z" />
             </svg>
           )}
-        </button>
+        </LiquidGlass>
       </div>
 
       {open && (

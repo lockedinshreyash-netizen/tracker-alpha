@@ -1,142 +1,51 @@
-/* ── The opening: gate → film → wordmark ──
-   One component, because the three share one <video>. It is mounted under
-   the gate from the first frame with preload="auto", so the film buffers
-   while the student reads two lines and decides about sound; by the time they
-   tap, it is usually ready. If it is not, the gate waits a moment and then
-   moves on without it. The film never blocks the app.
-
-   The film (onboarding/arena.ts) ends on one red light at the exact centre of
-   the frame. The app puts its own red dot on that spot, cuts the video, and
-   flies the dot into the full stop of LOCK IN. The red light was "you"; the
-   full stop is too. */
+/* ── The opening: gate → demo → wordmark ──
+   The gate asks one thing, sound or not, and that tap is the gesture that
+   unlocks audio at all. Then the demo (Demo.tsx) shows the app in three
+   beats, and the wordmark lands: a red dot flies from the centre into the
+   full stop of LOCK IN. */
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
-import { BEATS } from './arena';
-import { haptic, shouldPlayFilm } from './kit';
+import Demo, { DEMO_SOUNDS } from './Demo';
+import { haptic, prefersReducedMotion } from './kit';
 
-type Phase = 'gate' | 'waiting' | 'film' | 'mark';
+type Phase = 'gate' | 'waiting' | 'demo' | 'mark';
 
 /* Where the dot is going, measured once the wordmark has laid out. */
 interface Flight { x: number; y: number; s: number }
 
-const READY_TIMEOUT_MS = 2600;
-
-const clockNow = (): string =>
-  new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
-    .format(new Date())
-    .replace(/\s?(am|pm)$/i, (_m, p: string) => ` ${p.toLowerCase()}`);
-
-const LINES: Array<{ at: number; until: number; text: (clock: string) => string; you?: boolean }> = [
-  { at: BEATS.time, until: BEATS.someone - 0.15, text: c => `It's ${c}.` },
-  { at: BEATS.someone, until: BEATS.lakhs - 0.15, text: () => 'Somewhere, someone just opened a book.' },
-  { at: BEATS.lakhs, until: BEATS.you - 0.12, text: () => 'Lakhs of them. All after your seat.' },
-  { at: BEATS.you, until: BEATS.out + 0.5, text: () => 'This one is you.', you: true },
-];
-
-const filmSrc = (): string =>
-  typeof window !== 'undefined' && window.innerHeight >= window.innerWidth
-    ? '/onboarding/arena-portrait.mp4'
-    : '/onboarding/arena-landscape.mp4';
+/** How long the gate waits for the demo's sounds before starting without them. */
+const SOUND_WAIT_MS = 1200;
 
 interface Props {
   onDone: () => void;
+  /** "Already have an account?": straight to Google. */
   onSignIn: () => void;
 }
 
 const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
   const [phase, setPhase] = useState<Phase>('gate');
-  const [line, setLine] = useState(-1);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [landed, setLanded] = useState(false);
-  const [film] = useState(shouldPlayFilm);
-  const [src] = useState(filmSrc);
-  const [clock] = useState(clockNow);
-  const video = useRef<HTMLVideoElement>(null);
   const period = useRef<HTMLSpanElement>(null);
-  const scored = useRef(false);
 
-  // The score and the stings, downloading while the gate is read.
-  useEffect(() => { sfx.prefetch(['arena', 'wordmark', 'hold', 'commit', 'plan-reveal']); }, []);
-
-  // Free the decoder and the buffer the moment the film is not needed.
-  useEffect(() => () => {
-    const v = video.current;
-    if (!v) return;
-    v.pause();
-    v.removeAttribute('src');
-    v.load();
-  }, []);
-
-  const toMark = () => {
-    const v = video.current;
-    if (v) v.pause();
-    setLine(-1);
-    setPhase('mark');
-  };
+  // The demo's sounds and the stings after it, downloading while the gate is read.
+  useEffect(() => { sfx.prefetch([...DEMO_SOUNDS, 'wordmark', 'hold', 'commit']); }, []);
 
   const begin = (withSound: boolean) => {
-    // This tap is the gesture that unlocks audio and haptics at all.
     sfx.setSoundEnabled(withSound);
     haptic.select();
-    const v = video.current;
-    if (!film || !v) { toMark(); return; }
-    // The picture can play once enough of it has arrived; the score once it
-    // is decoded. Wait for both, briefly: a film without its music is fine,
-    // a gate that never opens is not.
-    const pictureReady = v.readyState >= 3
-      ? Promise.resolve(true)
-      : new Promise<boolean>(resolve => {
-        const timer = window.setTimeout(() => { v.removeEventListener('canplay', ok); resolve(false); }, READY_TIMEOUT_MS);
-        function ok() { window.clearTimeout(timer); resolve(true); }
-        v.addEventListener('canplay', ok, { once: true });
-      });
-    const scoreReady = withSound ? sfx.ready('arena', 1500) : Promise.resolve(false);
-    if (v.readyState < 3) setPhase('waiting');
-    void Promise.all([pictureReady, scoreReady]).then(([ok]) => {
-      if (!ok) { toMark(); return; }
-      setPhase('film');
-      v.currentTime = 0;
-      void v.play().catch(toMark);
-    });
+    // Reduced motion gets the wordmark, not a reel of moving cards.
+    if (prefersReducedMotion()) { setPhase('mark'); return; }
+    if (!withSound) { setPhase('demo'); return; }
+    /* Decoded before the reel starts, so the first block lands with its
+       sound. Briefly: a demo without sound is fine, a gate that never opens
+       is not. */
+    setPhase('waiting');
+    const wait = new Promise<void>(resolve => window.setTimeout(resolve, SOUND_WAIT_MS));
+    void Promise.race([Promise.all(DEMO_SOUNDS.map(c => sfx.ready(c, SOUND_WAIT_MS))), wait])
+      .then(() => setPhase('demo'));
   };
-
-  /* Words follow the video's own clock, not a timer started beside it: a
-     stalled frame holds the words with it. requestVideoFrameCallback where it
-     exists (Chromium, Safari 15.4+), animation frames elsewhere. */
-  useEffect(() => {
-    if (phase !== 'film') return;
-    const v = video.current as (HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number; cancelVideoFrameCallback?: (id: number) => void }) | null;
-    if (!v) return;
-    let id = 0;
-    let rvfc = false;
-    const tick = () => {
-      const t = v.currentTime;
-      const idx = LINES.findIndex(l => t >= l.at && t < l.until);
-      setLine(prev => (prev === idx ? prev : idx));
-      if (t >= BEATS.end - 0.06 || v.ended) { toMark(); return; }
-      if (v.requestVideoFrameCallback) { rvfc = true; id = v.requestVideoFrameCallback(tick); } else id = requestAnimationFrame(tick);
-    };
-    const onPlaying = () => {
-      if (scored.current) return;
-      scored.current = true;
-      sfx.play('arena', { late: 400 });
-    };
-    v.addEventListener('playing', onPlaying);
-    v.addEventListener('ended', toMark);
-    tick();
-    return () => {
-      v.removeEventListener('playing', onPlaying);
-      v.removeEventListener('ended', toMark);
-      if (rvfc) v.cancelVideoFrameCallback?.(id); else cancelAnimationFrame(id);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
-
-  // A haptic on "This one is you", where the red light turns.
-  useEffect(() => {
-    if (line >= 0 && LINES[line].you) haptic.heavy();
-  }, [line]);
 
   /* The wordmark: lay it out with its full stop invisible, measure where that
      full stop is, and fly the dot there from the centre. */
@@ -154,41 +63,17 @@ const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
     return () => window.clearTimeout(land);
   }, [phase]);
 
-  const skipFilm = () => {
+  const toMark = () => {
     sfx.stopAll();
-    toMark();
+    setPhase('mark');
   };
 
   return (
-    <div className="ob-scene center" style={{ padding: 0 }} onClick={phase === 'film' ? skipFilm : undefined}>
-      {film && (
-        <video
-          ref={video}
-          className="ob-film"
-          src={src}
-          muted
-          playsInline
-          preload="auto"
-          disablePictureInPicture
-          disableRemotePlayback
-          aria-hidden="true"
-          /* Fades in, but cuts out: the film's last frame is the red light at
-             the centre, and the app's own dot takes over on that exact spot.
-             A fade would show both dots for half a second. */
-          style={{ opacity: phase === 'film' ? 1 : 0, transition: phase === 'film' ? 'opacity 500ms ease' : 'none' }}
-        />
-      )}
-
-      {phase === 'film' && (
+    <div className="ob-scene center" style={{ padding: 0 }}>
+      {phase === 'demo' && (
         <>
-          <div className="ob-film-words" aria-live="polite">
-            {line >= 0 && (
-              <p key={line} className={`ob-film-line ${LINES[line].you ? 'you' : ''}`}>
-                {LINES[line].text(clock)}
-              </p>
-            )}
-          </div>
-          <button className="ob-film-skip" onClick={e => { e.stopPropagation(); skipFilm(); }}>Skip</button>
+          <Demo onDone={() => setPhase('mark')} />
+          <button className="ob-reel-skip" onClick={toMark}>Skip</button>
         </>
       )}
 
@@ -211,7 +96,7 @@ const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
             style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 18px)', fontSize: 14, animationDelay: '900ms' }}
             onClick={onSignIn}
           >
-            Already have an account? <span style={{ color: 'var(--ob-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign in</span>
+            Already have an account? <span style={{ color: 'var(--ob-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}>Sign in with Google</span>
           </button>
         </div>
       )}
@@ -235,7 +120,7 @@ const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
             {landed && (
               <>
                 <p className="ob-serif ob-fade" style={{ fontSize: 'clamp(20px, 5.4vw, 28px)', marginTop: 22, color: 'var(--ob-muted)', animationDelay: '300ms' }}>
-                  Let&apos;s build your plan.
+                  Let&apos;s set you up.
                 </p>
                 <div className="ob-fade" style={{ width: '100%', maxWidth: 360, marginTop: 'clamp(48px, 10vh, 84px)', animationDelay: '700ms' }}>
                   <button className="ob-primary" style={{ width: '100%' }} onClick={() => { haptic.select(); sfx.select(); onDone(); }}>

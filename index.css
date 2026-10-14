@@ -605,16 +605,19 @@ button:active,
    phone. `--rail` is set inline by the widget from the sidebar's own collapsed
    state, so the button tracks the rail as it opens and closes.
 
-   Bottom LEFT, deliberately. The mic lives bottom-right (voice/VoiceControl),
-   and two floating circles in the same corner is how a product ends up with a
-   thumb that cannot reach either. */
+   Bottom LEFT, deliberately. Settings lives bottom-right (settings/
+   QuickSettings), and two floating circles in the same corner is how a
+   product ends up with a thumb that cannot reach either. Both buttons are
+   liquid glass, 48px, sized here because LiquidGlass takes its geometry from
+   CSS, never from Tailwind classes. */
 
 .fb-dock {
   position: fixed;
   left: 16px;
-  bottom: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   z-index: 40;
 }
+.fb-button, .qs-button { position: relative; width: 48px; height: 48px; }
 
 .fb-scrim {
   position: fixed;
@@ -650,6 +653,39 @@ button:active,
   /* On desktop the scrim exists only to catch the click that closes the
      panel. Dimming the whole app for a 23rem popover would be theatre. */
   .fb-scrim { background: transparent; }
+}
+
+/* ── Quick settings (settings/QuickSettings.tsx) ──
+   The pane hangs above the gear. Its dimming is a sibling (.qs-scrim), light
+   and unblurred: blur or opacity on an ancestor of glass would leave it
+   nothing to refract. It scrolls on .qs-scroll, inside the glass. */
+.qs-dock {
+  position: fixed;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  z-index: 40;
+}
+.qs-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(0, 0, 0, 0.32);
+}
+.qs-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  z-index: 76;
+  max-height: min(78vh, 40rem);
+  display: flex;
+  flex-direction: column;
+  transform-origin: bottom right;
+}
+.qs-scroll { overflow-y: auto; padding: 18px 14px 14px; min-height: 0; }
+@media (min-width: 768px) {
+  .qs-panel { left: auto; right: 16px; width: 22rem; }
+  .qs-scrim { background: transparent; }
 }
 
 @keyframes fb-pop {
@@ -1035,6 +1071,11 @@ html.android-app body { overscroll-behavior-y: none; }
 
 /* Glass enters by moving, never by fading: opacity below 1 makes an element
    a backdrop root, and the glass would show nothing until the fade ended. */
+/* Today's countdown pane growing out of its calendar (today/ExamCountdown).
+   Transform only: glass cannot be faded in. */
+@keyframes cd-pop { from { transform: translateY(-6px) scale(0.55); } to { transform: none; } }
+.cd-pop { animation: cd-pop 0.42s cubic-bezier(0.32, 0.72, 0, 1) both; transform-origin: top right; }
+@media (prefers-reduced-motion: reduce) { .cd-pop { animation: none; } }
 @keyframes lg-pop { from { transform: translateY(12px) scale(0.97); } to { transform: none; } }
 .lg-pop { animation: lg-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @media (prefers-reduced-motion: reduce) { .lg-pop { animation: none; } }

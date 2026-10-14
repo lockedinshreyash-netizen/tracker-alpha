@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-13';
-const EFFECTIVE_LONG = '13 October 2026';
+const POLICY_EFFECTIVE = '2026-10-14';
+const EFFECTIVE_LONG = '14 October 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -109,17 +109,17 @@ const privacyPage = (): SitePage => {
 
               <h3>Your account</h3>
               <p>
-                Your email address and a password. The password is stored hashed by our sign-in provider, never as
-                text, and we can’t read it. If you sign in with Google, Google shares your name, email address and
-                profile picture with us. We email you only about your account, like confirming it or resetting
-                your password.
+                You sign in with Google. Google shares your name, email address and profile picture with us, and
+                you never give us a password. Accounts made earlier with an email and a password keep that email
+                address, and the password stays stored hashed by our sign-in provider, never as text. We can’t
+                read it. We email you only about your account.
               </p>
 
               <h3>Your study data</h3>
               <p>
                 When you’re signed in, a copy of what you track is stored on our servers so it can sync: study
                 sessions and their focus scores, your plan, syllabus progress, tasks, mock tests, your error
-                notebook, sleep times you enter, streak and settings.
+                notebook, sleep times you entered in an earlier version of the app, streak and settings.
               </p>
 
               <h3>Your profile</h3>
@@ -133,7 +133,6 @@ const privacyPage = (): SitePage => {
                 <li><b>Reminders.</b> To remind you when the app is closed: your device’s push address, its browser type, and the reminder itself (the task and when it’s due).</li>
                 <li><b>Feedback and reports.</b> What you write to us, and your email so we can reply.</li>
                 <li><b>Polls.</b> Your answer. Nobody, including us, can see who voted for what. We only see totals.</li>
-                <li><b>Written notes</b> in the Observatory, where available. We send a summary of numbers (counts and averages, with no names, logs, tasks or account details) to Anthropic, which writes the note. We keep the note and a count of how many you’ve asked for.</li>
                 <li><b>Voice commands.</b> In Chrome and Edge, your browser sends your voice to Google’s or Microsoft’s speech service to turn it into text. We never receive or keep the audio.</li>
               </ul>
 
@@ -170,9 +169,8 @@ const privacyPage = (): SitePage => {
               <ul className="plain">
                 <li><b>Supabase</b> stores your account, synced data and files, and handles sign-in.</li>
                 <li><b>Vercel</b> hosts the website, and sees requests like any web host.</li>
-                <li><b>Google</b> runs Analytics, Google sign-in (if you use it), and push delivery for Chrome and Android.</li>
+                <li><b>Google</b> runs Analytics, Google sign-in, and push delivery for Chrome and Android.</li>
                 <li><b>Apple and Mozilla</b> deliver reminders on Safari and Firefox, if you turn them on there.</li>
-                <li><b>Anthropic</b> gets the summary of numbers behind a written note, only when you ask for one.</li>
                 <li><b>Font and code services</b> (Google Fonts, cdnfonts.com, the Tailwind CSS CDN) see your IP address when your browser loads them.</li>
                 <li><b>YouTube</b>, through its privacy-enhanced player, only after you press play on a video we post.</li>
               </ul>
@@ -206,7 +204,8 @@ const privacyPage = (): SitePage => {
 
             <Section id="security" title="Security">
               <p>
-                Everything travels over HTTPS. Passwords are hashed. Our database checks every request, so an
+                Everything travels over HTTPS. Sign-in is through Google, and the few older passwords are stored
+                hashed. Our database checks every request, so an
                 account can read only its own private data. No system is perfect, though. If something ever goes
                 wrong, we’ll tell the people affected.
               </p>
