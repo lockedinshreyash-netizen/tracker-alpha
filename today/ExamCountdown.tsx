@@ -12,8 +12,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
-import LiquidGlass, { prewarmGlass } from '../ui/LiquidGlass';
-import { usePresence } from '../ui/usePresence';
+import LiquidGlass from '../ui/LiquidGlass';
 import { Overlay } from '../ui/kit';
 import { getDaysRemaining } from '../utils';
 import { JEE_2027_DATE, NEET_2027_DATE } from '../constants';
@@ -69,10 +68,6 @@ const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ top: number; right: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const { mounted, closing } = usePresence(open, 260);
-
-  // The pane's glass is drawn before anyone taps, so it opens on its first frame.
-  useEffect(() => { prewarmGlass(28, 18); }, []);
 
   const show = () => {
     const r = button.current?.getBoundingClientRect();
@@ -83,7 +78,6 @@ const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam
   };
 
   // Escape, a scroll or a resize closes it: a pane pinned to a widget that moved is in the wrong place.
-  // It closes the way it opened, shrinking back into the calendar (usePresence keeps it for that).
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
@@ -113,9 +107,9 @@ const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam
         <Page days={days} size="sm" dark={dark} />
       </button>
 
-      {mounted && at && (
+      {open && at && (
         <Overlay>
-          <div className="fixed inset-0 z-[80] glass-scrim" data-closing={closing} style={{ background: 'rgba(0,0,0,0.25)' }} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="fixed inset-0 z-[80]" style={{ background: 'rgba(0,0,0,0.25)' }} onClick={() => setOpen(false)} aria-hidden="true" />
           <LiquidGlass
             dark={dark}
             radius={28}
@@ -123,12 +117,11 @@ const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam
             bezel={18}
             strength={20}
             className="cd-pop"
-            data-closing={closing}
             role="dialog"
             aria-label={`${days} days till ${info.name}`}
             style={{ position: 'fixed', top: at.top, right: at.right, width: 'min(320px, calc(100vw - 24px))', zIndex: 81 }}
           >
-            <div className="glass-body p-6 flex flex-col items-center text-center">
+            <div className="p-6 flex flex-col items-center text-center">
               <Page days={days} size="lg" dark={dark} />
               <p className={`font-display text-[26px] leading-tight mt-5 ${ink}`}>
                 {days} {days === 1 ? 'day' : 'days'} till {info.name}<span style={{ color: RED }}>.</span>

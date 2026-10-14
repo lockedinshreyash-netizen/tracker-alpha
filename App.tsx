@@ -1874,7 +1874,7 @@ const App: React.FC = () => {
 
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
-      <div className={`shell-offset shell-rail ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
+      <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
           {profileCtl.routeHandle ? (
