@@ -99,7 +99,7 @@ const StreakTab: React.FC<Props> = ({
             <div className={`rounded-xl border p-4 flex items-center justify-between ${t.inset}`}>
               <div>
                 <p className={`text-[12px] font-ui font-bold ${t.heading}`}>Timed streak</p>
-                <p className={`text-[11px] font-ui ${t.muted}`}>Days the app clocked you</p>
+                <p className={`text-[11px] font-ui ${t.muted}`}>Days the app clocked you. No firewood.</p>
               </div>
               <span className={`num-stat text-[24px] ${t.heading}`}>{verifiedStreak}</span>
             </div>

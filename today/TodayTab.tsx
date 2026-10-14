@@ -16,6 +16,8 @@ import ShareButton from '../share/ShareButton';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { Card, Chip, Eyebrow, PageHeader, Segmented, btn, tokens } from '../ui/kit';
 
+const TARGET_OPEN_KEY = 'today_target_open';
+
 interface Props {
   state: AppState;
   onLog: (subject: Subject, hours: number, quality: number, distractions: number, source?: LogSource, chapter?: string, blockId?: string, startedAt?: number, endedAt?: number) => void;
@@ -169,6 +171,18 @@ const TodayTab: React.FC<Props> = ({
 
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  /* Today's target folds down to one line: the hours done today, and Share.
+     Remembered per device, not in AppState: a disclosure is a preference, and
+     in AppState it would fire a sync every time somebody tapped it. */
+  const [targetOpen, setTargetOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem(TARGET_OPEN_KEY) !== 'false'; } catch { return true; }
+  });
+  const toggleTarget = () => setTargetOpen(open => {
+    const next = !open;
+    try { localStorage.setItem(TARGET_OPEN_KEY, String(next)); } catch { /* this session only */ }
+    return next;
+  });
+
   const todayLogs = useMemo(() =>
     logs.filter((l) => l.date === getISTDateString()).reverse(),
     [logs]);
@@ -244,8 +258,36 @@ const TodayTab: React.FC<Props> = ({
           onOpen={onOpenAnnouncement}
         />
       )}
-      {!stopwatchBusy && (
-        <Card dark={dark} delay={60} className="p-6 md:p-8">
+      {!stopwatchBusy && !targetOpen && (
+        /* Folded: the hours done today, Share, and the way back open. */
+        <Card dark={dark} delay={60} className="px-5 py-4 md:px-6">
+          <div className="flex items-center gap-3 w-full" data-onboarding-target="daily-target">
+            <button
+              type="button"
+              onClick={toggleTarget}
+              aria-expanded={false}
+              aria-label="Show today's target"
+              className="flex-1 min-w-0 flex items-center gap-3 text-left"
+            >
+              <span className="min-w-0">
+                <Eyebrow dark={dark}>Today</Eyebrow>
+                <span className={`block num-stat text-[28px] leading-none mt-1.5 ${t.heading}`}>
+                  {totalToday.toFixed(1)}<span className={`font-ui font-bold text-[14px] ml-1 ${t.muted}`}>h done</span>
+                </span>
+              </span>
+            </button>
+            <ShareButton onClick={onShare} theme={theme} label="Share" small />
+            <button type="button" onClick={toggleTarget} aria-label="Show today's target" className={`w-8 h-8 flex items-center justify-center rounded-lg ${t.muted} ${t.hover}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+            </button>
+          </div>
+        </Card>
+      )}
+      {!stopwatchBusy && targetOpen && (
+        <Card dark={dark} delay={60} className="relative p-6 md:p-8">
+          <button type="button" onClick={toggleTarget} aria-expanded aria-label="Collapse today's target" className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg ${t.muted} ${t.hover}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6" /></svg>
+          </button>
           <div className="flex flex-row gap-6 md:gap-10 items-center w-full" data-onboarding-target="daily-target">
             <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100" aria-hidden="true">

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysHeld, ledgerFromDates } from '../firewood';
+import { daysHeld, FIREWOOD_SINCE, ledgerFromDates as ledgerAt, NO_FIREWOOD } from '../firewood';
+
+/* The mechanics, with firewood live for the whole history. The launch-day
+   boundary has its own tests below. */
+const ALWAYS = '2000-01-01';
+const ledgerFromDates = (dates: string[], today: string) => ledgerAt(dates, today, ALWAYS);
 
 /** `n` consecutive study days from `from`. */
 const days = (from: string, n: number): string[] =>
@@ -56,4 +61,47 @@ test('unused firewood stays in the bank', () => {
 
 test('dates after today are ignored', () => {
   assert.equal(ledgerFromDates(['2026-10-14', '2026-12-01'], '2026-10-14').streak, 1);
+});
+
+/* ── The launch day ── */
+
+test('before launch, a missed day still ends the streak (old rule, no backdating)', () => {
+  const run = [...days('2026-09-01', 20), ...days('2026-09-23', 5)]; // gap on 09-21, 09-22
+  const L = ledgerAt(run, '2026-09-27', '2026-10-15');
+  assert.equal(L.streak, 5);
+  assert.equal(L.longest, 20);
+  assert.equal(L.bank, 0);
+});
+
+test('history before launch earns no firewood', () => {
+  const L = ledgerAt(days('2026-01-05', 280), '2026-10-11', '2026-10-15'); // ~40 weeks of study
+  assert.equal(L.bank, 0);
+  assert.equal(L.streak, 280);
+});
+
+test('the bank starts at 0 and fills from the first study day after launch', () => {
+  const run = [...days('2026-10-01', 15)]; // 10-01 .. 10-15 (a Thursday)
+  const L = ledgerAt(run, '2026-10-15', '2026-10-15');
+  assert.equal(L.bank, 3);
+  assert.equal(L.streak, 15);
+});
+
+test('a missed day after launch burns firewood instead of breaking', () => {
+  const run = [...days('2026-10-01', 15)]; // ends 10-15
+  const L = ledgerAt(run, '2026-10-17', '2026-10-15'); // 10-16 missed
+  assert.equal(L.streak, 15);
+  assert.equal(L.bank, 2);
+  assert.equal(L.holding, true);
+});
+
+test('the shipped launch day is a fixed date', () => {
+  assert.match(FIREWOOD_SINCE, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('the timed streak never gets firewood: a missed day ends it', () => {
+  const run = [...days('2026-10-15', 10), '2026-10-27']; // 10-25, 10-26 missed
+  const L = ledgerAt(run, '2026-10-27', NO_FIREWOOD);
+  assert.equal(L.streak, 1);
+  assert.equal(L.longest, 10);
+  assert.equal(L.bank, 0);
 });

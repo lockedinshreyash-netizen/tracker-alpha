@@ -1,6 +1,6 @@
 
 import { DailyLog, Subject } from './types';
-import { ledgerFromDates, type StreakLedger } from './streak/firewood';
+import { ledgerFromDates, NO_FIREWOOD, type StreakLedger } from './streak/firewood';
 import { SYLLABUS_DATA } from './constants';
 
 export const generateId = (): string => {
@@ -70,7 +70,8 @@ const ledgerCache = new WeakMap<DailyLog[], Map<string, StreakLedger>>();
 /**
  * The live streak, the longest it has stood, and the firewood bank.
  * `verified` replays only days the app timed itself (see
- * `calculateVerifiedStreak`), with its own bank earned in timed weeks.
+ * `calculateVerifiedStreak`) and gets NO firewood: the book and the hamper
+ * cost real money and need an unbroken run, so a missed day always ends it.
  */
 export const streakLedger = (logs: DailyLog[], opts: { verified?: boolean; today?: string } = {}): StreakLedger => {
   const today = opts.today ?? getISTDateString();
@@ -79,7 +80,7 @@ export const streakLedger = (logs: DailyLog[], opts: { verified?: boolean; today
   const hit = byKey?.get(key);
   if (hit) return hit;
   const source = opts.verified ? logs.filter(isVerifiedLog) : logs;
-  const ledger = ledgerFromDates(source.map(l => l.date), today);
+  const ledger = ledgerFromDates(source.map(l => l.date), today, opts.verified ? NO_FIREWOOD : undefined);
   if (!byKey) { byKey = new Map(); ledgerCache.set(logs, byKey); }
   byKey.set(key, ledger);
   return ledger;

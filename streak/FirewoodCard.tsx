@@ -11,7 +11,7 @@ import React from 'react';
 import { Card, Eyebrow, tokens } from '../ui/kit';
 import { addDays, getISTDateString, weekdayOf } from '../utils';
 import type { DailyLog } from '../types';
-import { FIREWOOD_PER_WEEK, type StreakLedger } from './firewood';
+import { FIREWOOD_PER_WEEK, FIREWOOD_SINCE, type StreakLedger } from './firewood';
 
 export const FIREWOOD = '#F59F00';
 
@@ -23,10 +23,11 @@ export const FirewoodIcon: React.FC<{ size?: number; color?: string }> = ({ size
   </svg>
 );
 
-/** Has the student studied yet in this Monday-to-Sunday week? */
+/** Has this week's firewood been earned: a study day this week, on or after launch? */
 const studiedThisWeek = (logs: DailyLog[], today: string): boolean => {
   const monday = addDays(today, -((weekdayOf(today) + 6) % 7));
-  return logs.some(l => l.date >= monday && l.date <= today);
+  const from = monday > FIREWOOD_SINCE ? monday : FIREWOOD_SINCE;
+  return logs.some(l => l.date >= from && l.date <= today);
 };
 
 

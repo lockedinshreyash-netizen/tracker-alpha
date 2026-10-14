@@ -15,11 +15,29 @@
        Today never burns: it is not over yet.
      · An empty bank on a missed day ends the streak, exactly as before.
 
+   It starts on a fixed launch day, FIREWOOD_SINCE. Before it, the old rule
+   applies: a missed day ends the streak, nothing burns and nothing is
+   earned. So every streak, longest run and reward on launch day comes out
+   exactly as it did before firewood existed (old gaps still break, no
+   surprise unlocks), and nobody arrives with a bank inherited from history.
+   From that day the bank starts at 0 and the rules above apply. It must stay
+   a fixed date: "today" would move the boundary every day.
+
    Pure and React-free, and deliberately free of imports from utils.ts, which
    imports this file. Replaying the history day by day is cheap (a few hundred
    steps for a year of use) and makes every number a fact about the log. */
 
 export const FIREWOOD_PER_WEEK = 3;
+
+/** The first study day firewood exists. Set to the day it shipped; never move it. */
+export const FIREWOOD_SINCE = '2026-10-15';
+
+/**
+ * Pass as `since` for a streak firewood must never touch: the timed streak,
+ * which the costly rewards (the book, the hamper) run on. Those need an
+ * unbroken run of timed days, so a missed day always ends it.
+ */
+export const NO_FIREWOOD = '9999-12-31';
 
 export interface StreakLedger {
   /** Days studied in the live run. Firewood days are not counted. */
@@ -51,7 +69,7 @@ const weekOf = (date: string): string => step(date, -((new Date(value(date)).get
  * study-day string; dates after it are ignored, so a device with a wrong clock
  * cannot write itself a streak.
  */
-export const ledgerFromDates = (dates: Iterable<string>, today: string): StreakLedger => {
+export const ledgerFromDates = (dates: Iterable<string>, today: string, since: string = FIREWOOD_SINCE): StreakLedger => {
   const studied = new Set<string>();
   for (const d of dates) if (DATE_RE.test(d) && d <= today) studied.add(d);
   if (!studied.size) return EMPTY_LEDGER;
@@ -64,16 +82,17 @@ export const ledgerFromDates = (dates: Iterable<string>, today: string): StreakL
   let burned: string[] = [];
 
   for (let d = first; d <= today; d = step(d, 1)) {
+    const live = d >= since; // firewood exists on this day
     if (studied.has(d)) {
       const week = weekOf(d);
-      if (!credited.has(week)) {
+      if (live && !credited.has(week)) {
         credited.add(week);
         bank += FIREWOOD_PER_WEEK;
       }
       streak += 1;
       if (streak > longest) longest = streak;
     } else if (d < today && streak > 0) {
-      if (bank > 0) {
+      if (live && bank > 0) {
         bank -= 1;
         burned.push(d);
       } else {
