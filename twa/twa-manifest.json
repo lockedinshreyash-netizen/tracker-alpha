@@ -41,6 +41,10 @@
     {
       "name": "Upload key",
       "value": "8F:1A:43:AD:21:2C:B6:96:44:BC:77:73:C3:13:77:BF:7C:51:1F:69:10:D0:B2:89:AE:4F:38:A5:1C:C1:B8:4B"
+    },
+    {
+      "name": "Play app signing key",
+      "value": "21:09:9C:B1:52:F2:C5:E2:E6:BC:5A:D7:1B:B3:41:BE:E7:E1:29:47:55:AD:AA:F1:7C:B5:C6:ED:6D:B4:B1:D3"
     }
   ],
   "additionalTrustedOrigins": [],

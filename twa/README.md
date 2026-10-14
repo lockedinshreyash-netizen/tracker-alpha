@@ -59,10 +59,13 @@ set up on this Mac.
 5. **Trust Google's key.** This is the step that, if skipped, leaves Play
    installs showing the address bar. Play Console → Test and release → App
    integrity → App signing → copy the **App signing key certificate**
-   SHA-256 (not the upload key's), then:
+   SHA-256 (not the upload key's), then run this with the fingerprint pasted
+   over `PASTE_SHA256_HERE`. It is 32 pairs like `8F:1A:43:…:4B`; keep the
+   quotes. Angle brackets (`<SHA-256>`) would break here: zsh reads `<` as
+   "read from a file".
 
    ```bash
-   npm run android:fingerprint -- <SHA-256> "Play app signing key"
+   npm run android:fingerprint -- 'PASTE_SHA256_HERE' "Play app signing key"
    ```
 
    Deploy the site again.
