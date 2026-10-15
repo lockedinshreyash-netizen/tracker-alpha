@@ -196,6 +196,39 @@ export const listMine = async (userId: string): Promise<Ticket[]> => {
   return (data ?? []) as Ticket[];
 };
 
+/**
+ * Ids of the caller's tickets with a reply they have not seen yet — what puts
+ * the red dot on the launcher (supabase/admin.sql §6b).
+ *
+ * Never throws. Before §6b has been run the column does not exist and the
+ * select fails; that, a dropped connection or a signed-out session all mean
+ * "no dot", which is the safe side of being wrong.
+ */
+export const listUnseenReplies = async (userId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('feedback_tickets')
+      .select('id,responded_at,reply_seen_at')
+      .eq('user_id', userId)
+      .not('admin_response', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error || !data) return [];
+    return (data as Array<{ id: string; responded_at: string | null; reply_seen_at: string | null }>)
+      .filter(t => t.responded_at !== null
+        && (t.reply_seen_at === null || Date.parse(t.reply_seen_at) < Date.parse(t.responded_at)))
+      .map(t => t.id);
+  } catch {
+    return [];
+  }
+};
+
+/** The student has had these replies on screen. Their own rows only, at the database. */
+export const ackReplies = async (ids: string[]): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase.rpc('ack_feedback_replies', { p_ids: ids });
+  if (error) throw error;
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    The inbox
@@ -232,9 +265,9 @@ export const setStatus = async (id: string, status: TicketStatus): Promise<void>
  *
  * Deliberately not a thread. The submitter reads this under their own ticket in
  * the widget and cannot answer it — a second message from them is a second
- * ticket. That keeps the whole feature one table, one direction, and no
- * unread-state problem; a real conversation belongs in email, and the inbox
- * shows the address.
+ * ticket. That keeps the whole feature one table and one direction; the only
+ * unread state is whether the submitter has seen the reply (§6b). A real
+ * conversation belongs in email, and the inbox shows the address.
  */
 export const respond = async (
   id: string,

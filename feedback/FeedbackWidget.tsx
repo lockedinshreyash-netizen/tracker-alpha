@@ -3,7 +3,7 @@ import LiquidGlass from '../ui/LiquidGlass';
 import type { User } from '@supabase/supabase-js';
 import {
   CATEGORIES, Category, CategoryDef, Draft, MESSAGE_MAX, STATUS_LABEL,
-  SUBJECT_MAX, Ticket, categoryLabel, humanError, listMine, submit, validate,
+  SUBJECT_MAX, Ticket, ackReplies, categoryLabel, humanError, listMine, listUnseenReplies, submit, validate,
 } from './api';
 
 interface Props {
@@ -32,6 +32,14 @@ type View = 'menu' | 'form' | 'sent' | 'mine';
  *
  * Three views and a success state. A ticket list is the fourth, and it exists
  * only because admins can reply: a reply nobody can read is not a reply.
+ *
+ * And a reply nobody knows about is not read either: while one is waiting the
+ * launcher wears a red dot, and tapping it opens straight onto Your messages.
+ * The dot goes once the list with that reply in it has been on screen
+ * (`ack_feedback_replies`, supabase/admin.sql §6b), on every device, because
+ * "seen" is kept on the ticket. Checked on arrival and when the app comes back
+ * to the foreground, at most every two minutes; a reply is not urgent enough to
+ * poll for.
  */
 const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAuth }) => {
   const dark = theme === 'dark';
@@ -53,6 +61,56 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
   const [mine, setMine] = useState<Ticket[] | null>(null);
   const [mineError, setMineError] = useState<string | null>(null);
 
+  /* Tickets with a reply the student has not seen: the red dot. */
+  const [unseen, setUnseen] = useState<string[]>([]);
+  /* Replies that were new when the list opened, tagged "New" until it closes. */
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  /* Bumped on every acknowledgement, so a check that was already in flight
+     cannot put back a dot the student has just cleared. */
+  const ackGenRef = useRef(0);
+  const lastCheckRef = useRef(0);
+  const uid = user?.id ?? null;
+
+  useEffect(() => {
+    setUnseen([]);
+    if (!uid) return;
+    let alive = true;
+    const check = (force: boolean) => {
+      const now = Date.now();
+      if (!force && now - lastCheckRef.current < 120_000) return;
+      lastCheckRef.current = now;
+      const gen = ackGenRef.current;
+      void listUnseenReplies(uid).then(ids => {
+        if (alive && gen === ackGenRef.current) setUnseen(ids);
+      });
+    };
+    check(true);
+    const onBack = () => { if (document.visibilityState === 'visible') check(false); };
+    document.addEventListener('visibilitychange', onBack);
+    window.addEventListener('focus', onBack);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onBack);
+      window.removeEventListener('focus', onBack);
+    };
+  }, [uid]);
+
+  /* Seen = the list holding the reply is on screen. Cleared here at once and
+     acknowledged on the server; if that write fails, the next check simply
+     brings the dot back. */
+  useEffect(() => {
+    if (!open || view !== 'mine' || !mine || unseen.length === 0) return;
+    const shown = new Set(mine.map(t => t.id));
+    const ids = unseen.filter(id => shown.has(id));
+    if (ids.length === 0) return;
+    ackGenRef.current += 1;
+    setFresh(prev => new Set([...prev, ...ids]));
+    setUnseen(prev => prev.filter(id => !shown.has(id)));
+    void ackReplies(ids).catch(() => { /* shows again on the next check */ });
+  }, [open, view, mine, unseen]);
+
+  const hasUnseen = !!user && unseen.length > 0;
+
   const panelRef = useRef<HTMLDivElement>(null);
 
   /* Escape closes, from anywhere in the panel. */
@@ -72,14 +130,17 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
   const close = () => {
     setOpen(false);
     setError(null);
+    setFresh(new Set());
   };
 
   /* Reopening after a send lands back on the menu rather than on the receipt
      for a ticket they already read. */
   const toggle = () => {
     if (open) { close(); return; }
-    if (view === 'sent') setView('menu');
     setOpen(true);
+    /* A reply is waiting: that is what the dot promised, so go straight to it. */
+    if (hasUnseen) { void openMine(); return; }
+    if (view === 'sent') setView('menu');
   };
 
   const reset = () => {
@@ -134,7 +195,10 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
   const openMine = async () => {
     setView('mine');
     setMineError(null);
-    if (mine || !user) return;
+    if (!user) return;
+    /* A cached list predates the reply the dot is about. */
+    if (mine && !hasUnseen) return;
+    if (hasUnseen) setMine(null);
     try {
       setMine(await listMine(user.id));
     } catch (e) {
@@ -169,7 +233,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
           strength={12}
           onClick={toggle}
           aria-expanded={open}
-          aria-label={open ? 'Close feedback' : 'Send feedback'}
+          aria-label={open ? 'Close feedback' : hasUnseen ? 'Send feedback. You have a new reply.' : 'Send feedback'}
           className={`fb-button flex items-center justify-center transition-transform active:scale-95 ${dark ? 'text-white' : 'text-zinc-900'}`}
         >
           {open ? (
@@ -183,6 +247,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
             </svg>
           )}
         </LiquidGlass>
+        {hasUnseen && !open && <span className={`fb-dot ${dark ? '' : 'light'}`} aria-hidden="true" />}
       </div>
 
       {open && (
@@ -257,9 +322,10 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
 
                   <button
                     onClick={openMine}
-                    className={`mt-1 text-left px-4 py-2 text-[10px] font-bold uppercase tracking-[0.08em] font-ui transition-colors ${muted} hover:text-[#E10600]`}
+                    className={`mt-1 flex items-center gap-2 text-left px-4 py-2 text-[10px] font-bold uppercase tracking-[0.08em] font-ui transition-colors ${hasUnseen ? ink : muted} hover:text-[#E10600]`}
                   >
-                    Your messages →
+                    {hasUnseen && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] shrink-0" aria-hidden="true" />}
+                    {hasUnseen ? `Your messages · ${unseen.length === 1 ? 'new reply' : `${unseen.length} new replies`} →` : 'Your messages →'}
                   </button>
                 </div>
               ) : view === 'form' ? (
@@ -359,7 +425,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                       <p className={`mt-1 text-[12.5px] font-bold font-ui leading-snug ${ink}`}>{t.subject}</p>
                       {t.admin_response && (
                         <p className={`mt-2 pt-2 border-t text-[11.5px] font-ui leading-relaxed ${dark ? 'border-white/[0.06] text-zinc-400' : 'border-zinc-200 text-zinc-600'}`}>
-                          <span className="font-bold text-[#E10600]">Reply · </span>
+                          <span className="font-bold text-[#E10600]">{fresh.has(t.id) ? 'New reply · ' : 'Reply · '}</span>
                           {t.admin_response}
                         </p>
                       )}
