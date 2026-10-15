@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-14';
-const EFFECTIVE_LONG = '14 October 2026';
+const POLICY_EFFECTIVE = '2026-10-15';
+const EFFECTIVE_LONG = '15 October 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -140,8 +140,13 @@ const privacyPage = (): SitePage => {
               <p>
                 When you’re signed in, we record which days you opened the app and a few numbers: hours studied,
                 number of sessions, your device type, whether the app is installed, and which features you’ve used.
-                These are numbers, never what you wrote. We look at them only as totals across everyone, to see what
-                is working.
+                These are numbers, never what you wrote. We mostly look at them as totals across everyone, to see
+                what is working.
+              </p>
+              <p>
+                Our admins can also see a list of the newest accounts. It shows each one’s profile (name, handle,
+                bio and avatar), when they joined, their exam and class, and the numbers above. It never shows your
+                email, your study log or anything you wrote.
               </p>
               <p>
                 Our website and app also use Google Analytics, which uses cookies to count visits, the pages

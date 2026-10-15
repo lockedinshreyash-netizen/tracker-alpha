@@ -2,17 +2,19 @@
    Who is using the app, how often, how much they study, whether they come
    back, and which parts of it they use — from one `admin_analytics()` call.
 
-   Aggregates only, by construction: the database function returns counts and
-   sums, and there is no endpoint behind this screen that names a student.
-   Every definition lives in supabase/analytics.sql §6; the copy here says the
-   same thing in fewer words.
+   Aggregates, with one exception: `admin_analytics()` returns counts and sums
+   only. The Latest sign-ups list (RecentUsers.tsx) is the one part that names
+   students, and it asks its own admin-only function for that. Every
+   definition lives in supabase/analytics.sql §6; the copy here says the same
+   thing in fewer words.
 
    Loaded lazily from AdminTab, so none of it reaches a student's bundle. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Segmented, btn, deltaTone, tokens } from '../ui/kit';
 import { humanError } from '../feedback/api';
-import { Analytics, Range, fetchAnalytics, isAnalyticsMissing } from './api';
+import { Analytics, Range, RecentUser, fetchAnalytics, isAnalyticsMissing } from './api';
+import RecentUsers from './RecentUsers';
 import {
   ChartCard, CohortGrid, ColumnChart, HBars, Legend, LineChart, SplitBar,
   chartColors, compact, fmt, longDate, shortDate, yearDate,
@@ -22,6 +24,7 @@ interface Props {
   theme: 'dark' | 'light';
   /** The design board's fixtures; the real console always asks the database. */
   load?: (range: Range) => Promise<Analytics>;
+  loadUsers?: (before: string | null) => Promise<RecentUser[]>;
 }
 
 const RANGES: Array<{ value: `${Range}`; label: string }> = [
@@ -70,7 +73,7 @@ const Kpi: React.FC<{ dark: boolean; label: string; value: React.ReactNode; sub?
   );
 };
 
-const AnalyticsAdmin: React.FC<Props> = ({ theme, load = fetchAnalytics }) => {
+const AnalyticsAdmin: React.FC<Props> = ({ theme, load = fetchAnalytics, loadUsers }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   const c = chartColors(dark);
@@ -198,6 +201,9 @@ const AnalyticsAdmin: React.FC<Props> = ({ theme, load = fetchAnalytics }) => {
         <Kpi dark={dark} delay={240} label="Per student, per day" value={v.hoursPerStudyDay === null ? '—' : `${fmt(v.hoursPerStudyDay, 1)}h`} sub={<>On days they studied · {fmt(d.study.studiers_7)} studied this week</>} />
         <Kpi dark={dark} delay={270} label="Timed, not typed" value={pctText(v.trackedShare)} sub={<>Of this week's hours came from the stopwatch or Pomodoro</>} />
       </div>
+
+      {/* ── Who just arrived ── */}
+      <RecentUsers theme={theme} delay={300} load={loadUsers} />
 
       {/* ── Active users ── */}
       <ChartCard

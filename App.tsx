@@ -47,7 +47,7 @@ import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
 import { RaceStrip } from './leaderboard/RaceControl';
 import { useProfileController } from './profile/useProfileController';
-import { updateProfile } from './profile/profileApi';
+import { updateProfile, validateBio } from './profile/profileApi';
 import { setCachedProfile } from './profile/profileCache';
 import { DEFAULT_ALPHA_AVATAR_ID } from './profile/alphaAvatars';
 import { ProfileModal, ProfilePage } from './profile/ProfileView';
@@ -1741,7 +1741,8 @@ const App: React.FC = () => {
     if (!user || !own) return;
     void updateProfile(user.id, {
       display_name: p.name,
-      bio: own.bio ?? '',
+      // The builder started from their current bio, so an empty one was cleared on purpose.
+      bio: validateBio(p.bio) ?? own.bio ?? '',
       avatar_type: 'alpha',
       avatar_id: p.avatarId,
       avatar_url: null,
@@ -2226,7 +2227,7 @@ const App: React.FC = () => {
               progress: state.progress,
               signedIn: !!user,
               profile: profileCtl.ownProfile
-                ? { name: profileCtl.ownProfile.display_name, avatarId: profileCtl.ownProfile.avatar_id ?? DEFAULT_ALPHA_AVATAR_ID }
+                ? { name: profileCtl.ownProfile.display_name, avatarId: profileCtl.ownProfile.avatar_id ?? DEFAULT_ALPHA_AVATAR_ID, bio: profileCtl.ownProfile.bio ?? '' }
                 : null,
             }}
             onApply={applyOnboarding}

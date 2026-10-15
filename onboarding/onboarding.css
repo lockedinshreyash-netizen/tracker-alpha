@@ -313,7 +313,7 @@
   touch-action: none;
   -webkit-touch-callout: none;
 }
-.ob-hold svg { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); transform: rotate(-90deg); pointer-events: none; }
+.ob-hold > svg { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); transform: rotate(-90deg); pointer-events: none; }
 .ob-hold-core {
   width: 64px;
   height: 64px;
@@ -446,6 +446,30 @@
 }
 .ob-field input::placeholder { color: var(--ob-faint); font-weight: 500; }
 .ob-field input:focus { border-color: rgba(255, 255, 255, 0.42); background: rgba(255, 255, 255, 0.08); }
+.ob-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ob-ink);
+  font: inherit;
+  /* 16px or more, or iOS zooms the page on focus. */
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.ob-field textarea::placeholder { color: var(--ob-faint); }
+.ob-field textarea:focus { border-color: rgba(255, 255, 255, 0.42); background: rgba(255, 255, 255, 0.08); }
+.ob-field > span.ob-field-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ob-field-row > span { margin: 0; }
+.ob-field-row i { font-style: normal; font-weight: 600; letter-spacing: 0.04em; text-transform: none; color: var(--ob-faint); margin-left: 6px; }
+.ob-field-count { font-weight: 600; letter-spacing: 0; color: var(--ob-faint); font-variant-numeric: tabular-nums; }
 .ob-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 8px; }
 .ob-badge { display: grid; place-items: center; padding: 2px; border-radius: 99px; box-shadow: 0 0 0 2px transparent; transition: box-shadow 200ms ease, transform 200ms var(--ob-spring); }
 .ob-badge:active { transform: scale(0.92); }
@@ -465,6 +489,10 @@
 .ob-pv-ghost { width: 30px; height: 30px; border-radius: 99px; background: rgba(255, 255, 255, 0.12); flex-shrink: 0; }
 .ob-pv-chat { display: flex; align-items: flex-end; gap: 10px; margin-top: 12px; }
 .ob-pv-sender { display: block; margin: 0 0 4px 2px; font-size: 11px; font-weight: 700; color: var(--ob-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ob-pv-wide { grid-column: 1 / -1; }
+.ob-pv-card-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.ob-pv-bio { display: block; margin-top: 3px; font-size: 13px; line-height: 1.4; font-style: italic; color: var(--ob-muted); overflow-wrap: anywhere; }
+.ob-pv-bio.empty { font-style: normal; color: var(--ob-faint); }
 .ob-pv-bubble { display: inline-block; padding: 9px 13px; border-radius: 16px 16px 16px 4px; background: rgba(255, 255, 255, 0.09); font-size: 14px; line-height: 1.35; }
 .ob-save-card { display: flex; align-items: center; gap: 16px; padding: 18px; }
 .ob-save-card b { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

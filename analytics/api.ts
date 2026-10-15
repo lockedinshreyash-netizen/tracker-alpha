@@ -106,3 +106,43 @@ export const isAnalyticsMissing = (e: unknown): boolean => {
   const err = e as { code?: string; message?: string } | null;
   return err?.code === 'PGRST202' || err?.code === '42883' || /could not find the function/i.test(err?.message ?? '');
 };
+
+/* ── The newest accounts, by name ──
+   `admin_recent_users(limit, before)` (analytics.sql §6b): the one console
+   reader that names people. Profile fields are null for an account that has
+   never had a profile made; the usage fields are null until it has visited. */
+
+export interface RecentUser {
+  user_id: string;
+  joined_at: string;
+  handle: string | null;
+  display_name: string | null;
+  bio: string | null;
+  avatar_type: 'alpha' | 'upload' | null;
+  avatar_id: string | null;
+  avatar_url: string | null;
+  exam: 'JEE' | 'NEET' | null;
+  class_level: 11 | 12 | null;
+  goal_hours: number | null;
+  streak: number | null;
+  /** Study day, 'YYYY-MM-DD'. */
+  last_active: string | null;
+  days_active: number;
+  hours: number;
+  platform: 'ios' | 'android' | 'desktop' | 'other' | null;
+  installed: boolean;
+}
+
+export const RECENT_PAGE = 25;
+
+/** `before` = the oldest `joined_at` already shown, for the next page. */
+export const fetchRecentUsers = async (before: string | null = null): Promise<RecentUser[]> => {
+  const { data, error } = await supabase.rpc('admin_recent_users', { p_limit: RECENT_PAGE, p_before: before });
+  if (error) throw error;
+  /* numeric columns come back as JSON numbers or strings depending on scale. */
+  return ((data ?? []) as RecentUser[]).map(u => ({
+    ...u,
+    hours: Number(u.hours) || 0,
+    goal_hours: u.goal_hours === null ? null : Number(u.goal_hours),
+  }));
+};

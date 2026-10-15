@@ -1,5 +1,5 @@
 /* ── The profile picked before there is an account ──
-   Onboarding builds a profile (a name and an Alpha Avatar) before the student
+   Onboarding builds a profile (a name, an Alpha Avatar and an optional bio) before the student
    has signed in, and signing in is a round trip through Google that reloads
    the page. So the choice waits here, on this device, and is written to the
    student's `profiles` row the first time a signed-in session finds it.
@@ -20,6 +20,8 @@ const NEW_ACCOUNT_MS = 30 * 60_000;
 export interface ProfileDraft {
   name: string;
   avatarId: string;
+  /** Empty means none. Drafts saved before the bio existed have no field. */
+  bio: string;
 }
 
 export const readProfileDraft = (): ProfileDraft | null => {
@@ -28,7 +30,7 @@ export const readProfileDraft = (): ProfileDraft | null => {
     if (!raw) return null;
     const d = JSON.parse(raw) as Partial<ProfileDraft>;
     if (typeof d.name !== 'string' || typeof d.avatarId !== 'string') return null;
-    return { name: d.name, avatarId: d.avatarId };
+    return { name: d.name, avatarId: d.avatarId, bio: typeof d.bio === 'string' ? d.bio : '' };
   } catch {
     return null;
   }

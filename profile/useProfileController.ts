@@ -7,7 +7,7 @@
    Owns three small things:
      · ensure_profile(), once per signed-in session — creates a new profile or
        silently returns the existing one; see supabase/profiles.sql. A brand-new
-       account then takes the name and avatar picked in onboarding
+       account then takes the name, avatar and bio picked in onboarding
        (profile/draft.ts).
      · the compact modal's open/closed user id.
      · a dependency-free /u/:handle route. This app has no router (see
@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { Profile, ensureProfile, updateProfile, validateDisplayName } from './profileApi';
+import { Profile, ensureProfile, updateProfile, validateBio, validateDisplayName } from './profileApi';
 import { setCachedProfile } from './profileCache';
 import { clearProfileDraft, isNewAccount, readProfileDraft } from './draft';
 import { getAlphaAvatar } from './alphaAvatars';
@@ -32,7 +32,8 @@ const adoptDraft = async (userId: string, p: Profile): Promise<Profile> => {
   try {
     return await updateProfile(userId, {
       display_name: name,
-      bio: p.bio ?? '',
+      // An over-long bio (never from the builder, which caps it) is dropped, not the profile.
+      bio: validateBio(draft.bio) || (p.bio ?? ''),
       avatar_type: 'alpha',
       avatar_id: getAlphaAvatar(draft.avatarId).id,
       avatar_url: null,

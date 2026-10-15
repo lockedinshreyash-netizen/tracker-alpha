@@ -13,10 +13,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import AnalyticsAdmin from './AnalyticsAdmin';
-import { fixtureAnalytics } from './fixtures';
+import { fixtureAnalytics, fixtureRecentUsers } from './fixtures';
 import { useActivityPing } from './useActivityPing';
 import type { Ping } from './track';
-import type { Analytics, Range } from './api';
+import type { Analytics, Range, RecentUser } from './api';
 import type { AppState, DailyLog } from '../types';
 import { getISTDateString } from '../utils';
 
@@ -50,6 +50,13 @@ const DebugAnalytics: React.FC = () => {
     return fixtureAnalytics(range, state === 'fresh' ? 'fresh' : 'full');
   }, [state]);
 
+  const loadUsers = useMemo(() => async (before: string | null): Promise<RecentUser[]> => {
+    await wait(state === 'slow' ? 3000 : 250);
+    if (state === 'missing') throw { code: 'PGRST202', message: 'Could not find the function public.admin_recent_users(p_before, p_limit) in the schema cache' };
+    if (state === 'error') throw { message: 'Failed to fetch' };
+    return fixtureRecentUsers(before, state === 'fresh' ? 'fresh' : 'full');
+  }, [state]);
+
   return (
     <div className={`min-h-screen font-ui ${dark ? 'text-white' : 'text-zinc-900'}`}>
       <div className={`sticky top-0 z-30 border-b px-4 md:px-8 py-3 flex flex-wrap items-center gap-3 ${dark ? 'bg-[#0B0B0D]/90 border-white/[0.06]' : 'bg-[#F2F0EC]/90 border-zinc-200'} backdrop-blur`}>
@@ -72,7 +79,7 @@ const DebugAnalytics: React.FC = () => {
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
         {state === 'pings'
           ? <React.StrictMode><PingInspector dark={dark} /></React.StrictMode>
-          : <AnalyticsAdmin key={state} theme={theme} load={load} />}
+          : <AnalyticsAdmin key={state} theme={theme} load={load} loadUsers={loadUsers} />}
       </div>
     </div>
   );

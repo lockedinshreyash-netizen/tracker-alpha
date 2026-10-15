@@ -45,7 +45,7 @@ export interface OnboardingInitial {
   pomodoroSettings: PomodoroSettings;
   progress: ChapterProgress[];
   signedIn: boolean;
-  /** A signed-in student's current name and badge, to start the builder from. */
+  /** A signed-in student's current name, badge and bio, to start the builder from. */
   profile: ProfilePick | null;
 }
 
@@ -94,7 +94,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
   // Coming back from Google means the pledge was already held.
   const [applied, setApplied] = useState(resumed !== null);
   const [lite] = useState(isLite);
-  const [pick, setPick] = useState<ProfilePick>(() => initial.profile ?? { name: '', avatarId: DEFAULT_ALPHA_AVATAR_ID });
+  const [pick, setPick] = useState<ProfilePick>(() => initial.profile ?? { name: '', avatarId: DEFAULT_ALPHA_AVATAR_ID, bio: '' });
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
 
@@ -164,7 +164,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
   }, [applied, a, onApply]);
 
   const confirmProfile = () => {
-    const p = { name: pick.name.trim().replace(/\s+/g, ' '), avatarId: pick.avatarId };
+    const p = { name: pick.name.trim().replace(/\s+/g, ' '), avatarId: pick.avatarId, bio: pick.bio.trim().replace(/\s+/g, ' ') };
     // Held on the device until there is an account to write it to.
     if (!initial.signedIn) saveProfileDraft(p);
     onProfile(p);

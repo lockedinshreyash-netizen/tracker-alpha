@@ -4,7 +4,7 @@
    weekday rhythm, a sign-up spike, decaying cohorts, and live tracking that
    began partway through the range so the "rebuilt from history" note shows. */
 
-import type { Analytics, Range, SeriesDay } from './api';
+import { RECENT_PAGE, type Analytics, type Range, type RecentUser, type SeriesDay } from './api';
 import { addDays, getISTDateString, weekdayOf } from '../utils';
 
 const rng = (seed: number) => () => {
@@ -174,4 +174,55 @@ export const fixtureAnalytics = (days: Range, kind: FixtureKind = 'full'): Analy
       ai_users_month: Math.round(160 * scale),
     },
   };
+};
+
+/* ── Latest sign-ups, for the same board ──
+   A page of 25 at a time, newest first, so "Show more" pages like the real
+   one. A mix of the shapes the list has to draw: a full profile with a bio,
+   no bio, an uploaded photo that fails to load, no profile at all, and an
+   account that has never opened the app. */
+
+const NAMES = ['Aarav', 'Meera', 'Ishaan', 'Diya', 'Kabir', 'Ananya', 'Vihaan', 'Saanvi', 'Arjun', 'Riya', 'Reyansh', 'Myra'];
+const BIOS = [
+  'JEE 27. Physics first, always.',
+  'NEET or nothing. 6 hours a day.',
+  'Kota → IIT Bombay. Hopefully.',
+  'Organic chemistry is my villain arc.',
+  null,
+  'Dropper. Not stopping this time.',
+  null,
+];
+const AVATAR_IDS = ['alpha_01', 'alpha_02', 'alpha_03', 'alpha_04', 'alpha_05', 'alpha_06'];
+
+export const fixtureRecentUsers = (before: string | null, kind: FixtureKind = 'full'): RecentUser[] => {
+  const total = kind === 'full' ? 60 : 3;
+  const r = rng(99);
+  const now = Date.now();
+  const all: RecentUser[] = Array.from({ length: total }, (_, i) => {
+    const joined = new Date(now - (i * i * 47 + i * 23 + 3) * 60_000).toISOString();
+    const hasProfile = i % 9 !== 4;
+    const seen = i % 7 !== 2;
+    const days = seen ? 1 + Math.floor(r() * Math.min(30, i + 1)) : 0;
+    return {
+      user_id: `fixture-${i}`,
+      joined_at: joined,
+      handle: hasProfile ? `a${(100000 + i * 7919).toString(36)}` : null,
+      display_name: hasProfile ? NAMES[i % NAMES.length] : null,
+      bio: hasProfile ? BIOS[i % BIOS.length] : null,
+      avatar_type: hasProfile ? 'alpha' : null,
+      avatar_id: hasProfile ? AVATAR_IDS[i % AVATAR_IDS.length] : null,
+      avatar_url: null,
+      exam: seen ? (i % 3 === 1 ? 'NEET' : 'JEE') : null,
+      class_level: seen ? (i % 2 ? 12 : 11) : null,
+      goal_hours: seen ? 4 + (i % 5) : null,
+      streak: seen ? Math.floor(r() * days) : null,
+      last_active: seen ? getISTDateString(new Date(now - Math.floor(r() * 3) * 86_400_000)) : null,
+      days_active: days,
+      hours: seen ? Math.round(days * (1 + r() * 5) * 10) / 10 : 0,
+      platform: seen ? (['android', 'ios', 'desktop'] as const)[i % 3] : null,
+      installed: seen && i % 4 === 0,
+    };
+  });
+  const from = before === null ? 0 : all.findIndex(u => u.joined_at < before);
+  return from < 0 ? [] : all.slice(from, from + RECENT_PAGE);
 };

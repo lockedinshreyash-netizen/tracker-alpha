@@ -21,10 +21,11 @@
 -- PRIVACY. Neither table below has a single client policy, and both have
 -- their grants revoked: no client may read or write them directly, not even
 -- an administrator. Rows are written by `track_activity()` (definer, about
--- `auth.uid()` only), and read by `admin_analytics()`, which returns counts
--- and sums and nothing else. There is deliberately no endpoint that answers
--- "what did this person do" — the console does not want one, and most of
--- these users are minors.
+-- `auth.uid()` only), and read by two admin-only definer functions:
+-- `admin_analytics()`, which returns counts and sums and nothing else, and
+-- `admin_recent_users()` (§6b), the newest accounts by name with their public
+-- profile and these same numbers — never study content, never an email. Most
+-- of these users are minors, so nothing here answers more than that.
 --
 -- Two kinds of row live in `activity_days`, told apart by `opens`:
 --   opens >= 1  the app reported itself open that day (live tracking).
@@ -909,6 +910,101 @@ $$;
 
 revoke all on function public.admin_analytics(int) from public, anon;
 grant execute on function public.admin_analytics(int) to authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 6b. The newest accounts, by name — administrators only
+--
+-- The one reader here that names people, and it was asked for on purpose:
+-- staff want to see who just arrived. It returns the newest accounts with
+-- what is already public on their profile (name, handle, bio, avatar) plus
+-- the numbers this file already keeps about them (exam, class, goal, streak,
+-- days active, hours, device). Never study content, never the synced blob,
+-- never an email address: it reads `profiles`, `usage_snapshots` and
+-- `activity_days`, and nothing else besides `auth.users.created_at`.
+--
+-- Keyset-paged on `created_at` (`p_before` = the oldest row already shown),
+-- at most 100 a page. plpgsql, so a project without profiles.sql still
+-- installs this file; calling it there fails, and the console says so.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+drop function if exists public.admin_recent_users(int, timestamptz);
+create function public.admin_recent_users(p_limit int default 25, p_before timestamptz default null)
+returns table (
+  user_id      uuid,
+  joined_at    timestamptz,
+  handle       text,
+  display_name text,
+  bio          text,
+  avatar_type  text,
+  avatar_id    text,
+  avatar_url   text,
+  exam         text,
+  class_level  smallint,
+  goal_hours   numeric,
+  streak       int,
+  last_active  date,
+  days_active  int,
+  hours        numeric,
+  platform     text,
+  installed    boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  return query
+  with newest as (
+    select au.id, au.created_at
+    from auth.users au
+    where p_before is null or au.created_at < p_before
+    order by au.created_at desc
+    limit least(greatest(coalesce(p_limit, 25), 1), 100)
+  )
+  select
+    n.id,
+    n.created_at,
+    p.handle,
+    p.display_name,
+    p.bio,
+    p.avatar_type,
+    p.avatar_id,
+    p.avatar_url,
+    s.exam,
+    s.class_level,
+    s.goal_hours::numeric,
+    s.streak,
+    a.last_active,
+    coalesce(a.days_active, 0)::int,
+    coalesce(a.hours, 0)::numeric,
+    a.platform,
+    coalesce(a.installed, false)
+  from newest n
+  left join public.profiles p        on p.user_id = n.id
+  left join public.usage_snapshots s on s.user_id = n.id
+  left join lateral (
+    select
+      max(d.day)                                                             as last_active,
+      count(*)                                                               as days_active,
+      sum(d.hours)                                                           as hours,
+      (array_agg(d.platform order by d.day desc) filter (where d.platform is not null))[1] as platform,
+      bool_or(d.installed)                                                   as installed
+    from public.activity_days d
+    where d.user_id = n.id
+  ) a on true
+  order by n.created_at desc;
+end;
+$$;
+
+revoke all on function public.admin_recent_users(int, timestamptz) from public, anon;
+grant execute on function public.admin_recent_users(int, timestamptz) to authenticated;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
