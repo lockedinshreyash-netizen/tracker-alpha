@@ -51,6 +51,20 @@
     })();
   </script>
 
+  <!-- Install. Chrome hands the page its install prompt (beforeinstallprompt)
+       once, whenever it decides the site qualifies, and that can be before
+       React has mounted a listener, in which case it is gone for the visit.
+       Caught here instead, held on window, and picked up by
+       install/useInstall.ts. preventDefault keeps Chrome's own mini-infobar
+       away, so onboarding's Install step is the one place it is offered. -->
+  <script>
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__installPrompt = e;
+    });
+    window.addEventListener('appinstalled', function () { window.__installPrompt = null; });
+  </script>
+
   <!-- ══════════════════════════════════════════════════════════════════════
        Search and social
        ───────────────────────────────────────────────────────────────────────

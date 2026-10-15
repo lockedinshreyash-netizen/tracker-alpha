@@ -13,6 +13,10 @@
   "background_color": "#0B0B0D",
   "theme_color": "#0B0B0D",
   "categories": ["education", "productivity"],
+  "related_applications": [
+    { "platform": "webapp", "url": "https://trackeralpha.in/manifest.json" }
+  ],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",

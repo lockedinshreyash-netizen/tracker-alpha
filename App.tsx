@@ -2231,6 +2231,7 @@ const App: React.FC = () => {
             }}
             onApply={applyOnboarding}
             onProfile={applyOnboardingProfile}
+            installSupported={install.supported}
             installAvailable={install.mode === 'prompt'}
             onInstall={install.install}
             onGoogle={signInWithGoogle}

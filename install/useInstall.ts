@@ -27,6 +27,22 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+declare global {
+  interface Window {
+    /** Caught by the inline script in index.html, before React exists. */
+    __installPrompt?: BeforeInstallPromptEvent | null;
+  }
+}
+
+const earlyPrompt = (): BeforeInstallPromptEvent | null =>
+  (typeof window !== 'undefined' ? window.__installPrompt ?? null : null);
+
+/** A Chromium browser (Chrome, Edge, Samsung Internet, Opera, Brave): one that
+    hands pages a real install prompt. Safari and Firefox (and every browser on
+    iOS, all WebKit underneath) have no such event, so this is the whole test. */
+const canPrompt = (): boolean =>
+  typeof window !== 'undefined' && 'onbeforeinstallprompt' in window;
+
 export type InstallMode =
   /** Chromium handed us a real prompt. One tap installs it. */
   | 'prompt'
@@ -41,6 +57,9 @@ const DISMISS_KEY = 'alpha_install_banner_dismissed_v1';
    points — the long-standing sniff, and still the only one that works. */
 export const isIOS = (): boolean => {
   if (typeof navigator === 'undefined') return false;
+  /* A touch device announcing Android is not an iPad, whatever its platform
+     string says (devtools' phone emulation on a Mac reports MacIntel). */
+  if (/android/i.test(navigator.userAgent)) return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
@@ -76,6 +95,14 @@ const wasDismissed = (): boolean => {
 
 export interface InstallApi {
   mode: InstallMode;
+  /**
+   * This browser can install with one tap and the app is not installed yet,
+   * whether or not the prompt has arrived. Chrome sends it only after the
+   * visitor has spent 30 seconds on the site, so a quick onboarding often
+   * reaches its end first: the install step is decided by this, and waits for
+   * the prompt itself.
+   */
+  supported: boolean;
   /** True once the app is running from the home screen. */
   installed: boolean;
   /** The banner's own state — `mode` says whether install is possible at all. */
@@ -92,8 +119,12 @@ export interface InstallApi {
 }
 
 export const useInstall = (): InstallApi => {
-  const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(earlyPrompt);
   const [installed, setInstalled] = useState(isStandalone);
+  /* Installed already, seen from a browser tab: the manifest lists the web app
+     itself under related_applications, which is what lets Chrome answer. A
+     device that has it never gets a prompt, and must not be asked to wait. */
+  const [installedElsewhere, setInstalledElsewhere] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(wasDismissed);
 
   useEffect(() => {
@@ -101,12 +132,19 @@ export const useInstall = (): InstallApi => {
       /* Without preventDefault Chrome shows its own mini-infobar and the event
          cannot be replayed later from our own button. */
       e.preventDefault();
+      window.__installPrompt = e as BeforeInstallPromptEvent;
       setPromptEvent(e as BeforeInstallPromptEvent);
     };
     const onInstalled = () => {
+      window.__installPrompt = null;
       setPromptEvent(null);
       setInstalled(true);
     };
+    /* index.html may have caught it between the first render and now. */
+    if (window.__installPrompt) setPromptEvent(window.__installPrompt);
+
+    const related = (navigator as unknown as { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps;
+    related?.call(navigator).then(apps => { if (apps.length > 0) setInstalledElsewhere(true); }, () => { /* unknown is not installed */ });
 
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
@@ -140,16 +178,18 @@ export const useInstall = (): InstallApi => {
     if (!promptEvent) return 'unavailable';
     try {
       await promptEvent.prompt();
-      const { outcome } = await promptEvent.userChoice;
-      /* Single-use by specification: an event that has been prompted cannot be
-         prompted again, so keeping it would leave a button that silently does
-         nothing the second time. */
-      setPromptEvent(null);
-      return outcome;
     } catch {
-      setPromptEvent(null);
-      return 'dismissed';
+      /* Refused before anything was shown (no user gesture left, most often).
+         The event was not spent, so it is kept for the next tap. */
+      return 'unavailable';
     }
+    const { outcome } = await promptEvent.userChoice;
+    /* Single-use by specification: an event that has been prompted cannot be
+       prompted again, so keeping it would leave a button that silently does
+       nothing the second time. */
+    window.__installPrompt = null;
+    setPromptEvent(null);
+    return outcome;
   }, [promptEvent]);
 
   const mode: InstallMode = installed
@@ -160,5 +200,7 @@ export const useInstall = (): InstallApi => {
         ? 'ios'
         : 'none';
 
-  return { mode, installed, bannerDismissed, dismissBanner, install };
+  const supported = !installed && !installedElsewhere && (promptEvent !== null || canPrompt());
+
+  return { mode, supported, installed, bannerDismissed, dismissBanner, install };
 };

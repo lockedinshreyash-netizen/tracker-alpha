@@ -6,8 +6,8 @@
      pledge    hold to lock in: THE one write                (Commit.tsx)
      profile   name and badge, shown as Ranks and Groups do  (Profile.tsx)
      save      Google or guest, only if signed out           (Profile.tsx)
-     install   put it on the home screen, only where one tap  (Install.tsx)
-               really installs it
+     install   put it on the home screen, wherever one tap    (Install.tsx)
+               really installs it and it is not installed yet
      start     the first session, started from here          (Finish.tsx)
 
    Everything the student answers is held here and written to AppState once,
@@ -66,7 +66,10 @@ interface Props {
   /** The profile is chosen. App prefills the Ranks name, and writes the
    *  profile at once if there is an account to write it to. */
   onProfile: (p: ProfilePick) => void;
-  /** The browser has handed over a one-tap install prompt (install/useInstall). */
+  /** This browser installs with one tap and the app is not on the device yet
+   *  (`useInstall().supported`). Decides whether the step is in the flow. */
+  installSupported: boolean;
+  /** The prompt itself has arrived, so the button can install right now. */
   installAvailable: boolean;
   onInstall: () => Promise<'accepted' | 'dismissed' | 'unavailable'>;
   /** Leaves for Google. Resolves with an error message if it could not. */
@@ -91,7 +94,7 @@ const takeResume = (): Scene | null => {
   }
 };
 
-const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installAvailable, onInstall, onGoogle, onStart, onComplete }) => {
+const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installSupported, installAvailable, onInstall, onGoogle, onStart, onComplete }) => {
   const [a, setA] = useState<Answers>(() =>
     DEFAULT_ANSWERS(initial.examPreference, initial.currentClass, initial.dailyGoalHours, initial.timerMode));
   const [resumed] = useState(takeResume);
@@ -103,10 +106,10 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installA
   const [pick, setPick] = useState<ProfilePick>(() => initial.profile ?? { name: '', avatarId: DEFAULT_ALPHA_AVATAR_ID, bio: '' });
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  /* Latched: the prompt can arrive at any point in the flow, and the step must
-     not vanish from under the student once installing has used it up. */
-  const [offerInstall, setOfferInstall] = useState(installAvailable || resumed === 'install');
-  useEffect(() => { if (installAvailable) setOfferInstall(true); }, [installAvailable]);
+  /* Latched: installing turns `supported` off while the step is on screen,
+     and the step must not vanish from under the student when it does. */
+  const [offerInstall, setOfferInstall] = useState(installSupported || installAvailable || resumed === 'install');
+  useEffect(() => { if (installSupported || installAvailable) setOfferInstall(true); }, [installSupported, installAvailable]);
 
   const set = useCallback((patch: Partial<Answers>) => setA(prev => ({ ...prev, ...patch })), []);
 
@@ -185,9 +188,8 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installA
   const google = async () => {
     setGoogleBusy(true);
     setGoogleError(null);
-    /* Back to the install step only where this browser can install: the page
-       reloads, and the prompt it hands over again is what the step needs. */
-    try { sessionStorage.setItem(RESUME_KEY, installAvailable ? 'install' : 'start'); } catch { /* comes back to the start of the flow instead */ }
+    /* Back to the install step only where this browser can install. */
+    try { sessionStorage.setItem(RESUME_KEY, installSupported ? 'install' : 'start'); } catch { /* comes back to the start of the flow instead */ }
     const err = await onGoogle();
     // Still here: Google could not be reached.
     if (err !== null) {
