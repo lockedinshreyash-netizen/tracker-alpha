@@ -2223,7 +2223,6 @@ const App: React.FC = () => {
               currentClass: state.currentClass,
               dailyGoalHours: state.dailyGoalHours,
               timerMode: state.timerMode,
-              pomodoroSettings: state.pomodoroSettings,
               progress: state.progress,
               signedIn: !!user,
               profile: profileCtl.ownProfile
@@ -2232,6 +2231,8 @@ const App: React.FC = () => {
             }}
             onApply={applyOnboarding}
             onProfile={applyOnboardingProfile}
+            installAvailable={install.mode === 'prompt'}
+            onInstall={install.install}
             onGoogle={signInWithGoogle}
             onStart={startFirstSession}
             onComplete={finishOnboarding}

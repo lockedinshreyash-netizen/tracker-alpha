@@ -1,12 +1,12 @@
 /* ── The questions ──
-   Four screens, each asking one thing and showing what the answer does.
+   Three screens, each asking one thing and showing what the answer does.
    Single choices advance themselves a beat after the tap (the tile has to be
    seen to light up first); the two with a number to set have a button. */
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
 import { SUBJECT_COLORS } from '../schedule/colors';
-import type { ExamPreference, PomodoroSettings, TimerMode } from '../types';
+import type { ExamPreference } from '../types';
 import { Eyebrow, haptic, Rise, Tile } from './kit';
 import { type Answers, daysLeft, examLabel } from './answers';
 
@@ -164,22 +164,6 @@ export const QHours: React.FC<Q> = ({ a, set, next }) => {
       </div>
       <div className="ob-actions">
         <button className="ob-primary" onClick={() => { sfx.select(); haptic.select(); next(); }}>Set {a.hours} hours</button>
-      </div>
-    </div>
-  );
-};
-
-/* ── 4 · Style ── */
-
-export const QStyle: React.FC<Q & { pomodoro: PomodoroSettings }> = ({ a, set, next, pomodoro }) => {
-  const advance = useAutoAdvance(next);
-  const pick = (style: TimerMode) => { choose(); set({ style }); advance(); };
-  return (
-    <div className="ob-col">
-      <Head n={4} label="Your style" title="How do you *focus* best?" />
-      <div className="ob-choices">
-        <Tile selected={a.style === 'stopwatch'} onClick={() => pick('stopwatch')} title="Long stretches" sub="Start the clock. Stop when you're done." delay={160} />
-        <Tile selected={a.style === 'pomodoro'} onClick={() => pick('pomodoro')} title="Sprints" sub={`${pomodoro.workMinutes} minutes on, ${pomodoro.shortBreakMinutes} off. Repeat.`} delay={220} />
       </div>
     </div>
   );

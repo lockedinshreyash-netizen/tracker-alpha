@@ -2,10 +2,12 @@
    The first minute of the app, and the only part of it every student sees.
 
      opening   the gate, a demo of the app, LOCK IN.         (Opening.tsx, Demo.tsx)
-     exam → class → hours → style                            (Questions.tsx)
+     exam → class → hours                                    (Questions.tsx)
      pledge    hold to lock in: THE one write                (Commit.tsx)
      profile   name and badge, shown as Ranks and Groups do  (Profile.tsx)
      save      Google or guest, only if signed out           (Profile.tsx)
+     install   put it on the home screen, only where one tap  (Install.tsx)
+               really installs it
      start     the first session, started from here          (Finish.tsx)
 
    Everything the student answers is held here and written to AppState once,
@@ -15,7 +17,8 @@
    there. A plan guessed from a few questions was never one anybody kept.
 
    Google sign-in leaves the page and comes back. A session flag brings the
-   student back to the first-session screen instead of the start of the flow,
+   student back to the install step (or the first session, where there is
+   none) instead of the start of the flow,
    and the profile they built is applied once the account exists
    (profile/draft.ts).
 
@@ -24,15 +27,16 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './onboarding.css';
-import type { ChapterProgress, ExamPreference, PomodoroSettings, Subject, TimerMode } from '../types';
+import type { ChapterProgress, ExamPreference, Subject, TimerMode } from '../types';
 import { DEFAULT_ALPHA_AVATAR_ID } from '../profile/alphaAvatars';
 import { saveProfileDraft } from '../profile/draft';
 import { isLite, Stage, TopBar } from './kit';
 import Opening from './Opening';
-import { QClass, QExam, QHours, QStyle } from './Questions';
+import { QClass, QExam, QHours } from './Questions';
 import { Pledge } from './Commit';
 import { ProfileBuilder, type ProfilePick, SaveProfile } from './Profile';
 import { FirstSession } from './Finish';
+import { InstallStep } from './Install';
 import { type Answers, DEFAULT_ANSWERS, startHere } from './answers';
 
 export type { ProfilePick } from './Profile';
@@ -42,7 +46,6 @@ export interface OnboardingInitial {
   currentClass: 11 | 12;
   dailyGoalHours: number;
   timerMode: TimerMode;
-  pomodoroSettings: PomodoroSettings;
   progress: ChapterProgress[];
   signedIn: boolean;
   /** A signed-in student's current name, badge and bio, to start the builder from. */
@@ -63,13 +66,16 @@ interface Props {
   /** The profile is chosen. App prefills the Ranks name, and writes the
    *  profile at once if there is an account to write it to. */
   onProfile: (p: ProfilePick) => void;
+  /** The browser has handed over a one-tap install prompt (install/useInstall). */
+  installAvailable: boolean;
+  onInstall: () => Promise<'accepted' | 'dismissed' | 'unavailable'>;
   /** Leaves for Google. Resolves with an error message if it could not. */
   onGoogle: () => Promise<string | null>;
   onStart: (subject: Subject) => void;
   onComplete: () => void;
 }
 
-type Scene = 'opening' | 'exam' | 'class' | 'hours' | 'style' | 'pledge' | 'profile' | 'save' | 'start';
+type Scene = 'opening' | 'exam' | 'class' | 'hours' | 'pledge' | 'profile' | 'save' | 'install' | 'start';
 
 const LEAVE_MS = 260;
 
@@ -79,13 +85,13 @@ const takeResume = (): Scene | null => {
   try {
     const v = sessionStorage.getItem(RESUME_KEY);
     sessionStorage.removeItem(RESUME_KEY);
-    return v === 'start' ? 'start' : null;
+    return v === 'start' || v === 'install' ? v : null;
   } catch {
     return null;
   }
 };
 
-const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle, onStart, onComplete }) => {
+const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installAvailable, onInstall, onGoogle, onStart, onComplete }) => {
   const [a, setA] = useState<Answers>(() =>
     DEFAULT_ANSWERS(initial.examPreference, initial.currentClass, initial.dailyGoalHours, initial.timerMode));
   const [resumed] = useState(takeResume);
@@ -97,6 +103,10 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
   const [pick, setPick] = useState<ProfilePick>(() => initial.profile ?? { name: '', avatarId: DEFAULT_ALPHA_AVATAR_ID, bio: '' });
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  /* Latched: the prompt can arrive at any point in the flow, and the step must
+     not vanish from under the student once installing has used it up. */
+  const [offerInstall, setOfferInstall] = useState(installAvailable || resumed === 'install');
+  useEffect(() => { if (installAvailable) setOfferInstall(true); }, [installAvailable]);
 
   const set = useCallback((patch: Partial<Answers>) => setA(prev => ({ ...prev, ...patch })), []);
 
@@ -104,9 +114,10 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
 
   /* The order, without the scenes that do not apply to this student. */
   const order = useMemo<Scene[]>(() => [
-    'opening', 'exam', 'class', 'hours', 'style', 'pledge', 'profile',
-    ...(initial.signedIn ? [] : ['save' as const]), 'start',
-  ], [initial.signedIn]);
+    'opening', 'exam', 'class', 'hours', 'pledge', 'profile',
+    ...(initial.signedIn ? [] : ['save' as const]),
+    ...(offerInstall ? ['install' as const] : []), 'start',
+  ], [initial.signedIn, offerInstall]);
   const progressSteps = order.filter(s => s !== 'opening' && s !== 'start');
   const at = progressSteps.indexOf(scene);
 
@@ -129,8 +140,8 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
   /* Back, where it means something: not into the demo, not back across the
      pledge, not out of the first session. */
   const backTarget = useMemo<Scene | null>(() => {
-    if (scene === 'opening' || scene === 'exam' || scene === 'profile' || scene === 'start') return null;
-    if (scene === 'pledge') return applied ? null : 'style';
+    if (scene === 'opening' || scene === 'exam' || scene === 'profile' || scene === 'install' || scene === 'start') return null;
+    if (scene === 'pledge') return applied ? null : 'hours';
     const i = order.indexOf(scene);
     return i > 0 ? order[i - 1] : null;
   }, [scene, order, applied]);
@@ -174,7 +185,9 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
   const google = async () => {
     setGoogleBusy(true);
     setGoogleError(null);
-    try { sessionStorage.setItem(RESUME_KEY, 'start'); } catch { /* comes back to the start of the flow instead */ }
+    /* Back to the install step only where this browser can install: the page
+       reloads, and the prompt it hands over again is what the step needs. */
+    try { sessionStorage.setItem(RESUME_KEY, installAvailable ? 'install' : 'start'); } catch { /* comes back to the start of the flow instead */ }
     const err = await onGoogle();
     // Still here: Google could not be reached.
     if (err !== null) {
@@ -188,7 +201,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
      be skipped (straight to the first session); the rest has its own "later". */
   const skip = scene === 'opening' ? undefined
     : !applied ? onComplete
-    : scene === 'profile' ? () => go('start')
+    : scene === 'profile' || scene === 'install' ? () => go('start')
     : undefined;
 
   const render = (): React.ReactNode => {
@@ -198,10 +211,10 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, onGoogle
       case 'exam': return <QExam {...q} />;
       case 'class': return <QClass {...q} />;
       case 'hours': return <QHours {...q} />;
-      case 'style': return <QStyle {...q} pomodoro={initial.pomodoroSettings} />;
       case 'pledge': return <Pledge a={a} onCommit={commit} onDone={next} />;
       case 'profile': return <ProfileBuilder pick={pick} onChange={setPick} onNext={confirmProfile} />;
       case 'save': return <SaveProfile pick={pick} busy={googleBusy} error={googleError} onGoogle={() => { void google(); }} onGuest={next} />;
+      case 'install': return <InstallStep available={installAvailable} onInstall={onInstall} onNext={next} />;
       case 'start': return <FirstSession a={a} first={first} onStart={onStart} onLater={onComplete} />;
     }
   };
