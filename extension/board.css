@@ -1,0 +1,125 @@
+/* Design board chrome. Neutral on purpose, so the extension inside the window
+   is the only thing on screen with Alpha's look. */
+
+@font-face { font-family: 'Satoshi'; src: url('fonts/satoshi-500.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Satoshi'; src: url('fonts/satoshi-700.woff2') format('woff2'); font-weight: 700; }
+@font-face { font-family: 'Satoshi'; src: url('fonts/satoshi-900.woff2') format('woff2'); font-weight: 900; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: grid; grid-template-columns: 340px 1fr; background: #141416; color: #e8e6e2; font-family: 'Satoshi', system-ui, sans-serif; font-size: 14px; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+/* ── Rail ── */
+.rail { border-right: 1px solid #26262a; display: flex; flex-direction: column; min-height: 0; background: #0f0f11; }
+.rail-head { display: flex; gap: 12px; align-items: center; padding: 18px 18px 14px; }
+.rail-head img { border-radius: 7px; }
+.rail-title { margin: 0; font-weight: 900; font-size: 15px; }
+.rail-sub { margin: 2px 0 0; font-size: 12px; color: #77767d; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 14px 10px; padding: 4px; border-radius: 12px; background: #1b1b1f; }
+.mode { height: 34px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #8d8c93; }
+.mode.on { background: #2b2b31; color: #fff; }
+.panel { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 20px; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; counter-reset: s; }
+.steps li button { width: 100%; text-align: left; display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px; border-radius: 12px; transition: background 120ms; }
+.steps li button:hover { background: #18181c; }
+.steps li.on button { background: #1f1f24; box-shadow: inset 0 0 0 1px #34343b; }
+.steps .num { width: 26px; height: 26px; border-radius: 99px; display: grid; place-items: center; font-size: 12px; font-weight: 900; background: #222227; color: #9b9aa1; }
+.steps li.on .num { background: #e10600; color: #fff; }
+.steps li.done .num { background: #2a3a2c; color: #8ce99a; }
+.steps .t { display: block; font-weight: 700; font-size: 14px; color: #f1efeb; }
+.steps .w { display: block; margin-top: 2px; font-size: 12px; color: #7d7c83; }
+
+/* ── Playground ── */
+.controls { display: grid; gap: 14px; padding: 6px 6px 0; }
+.ctl { display: grid; gap: 6px; }
+.ctl > span { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #a9a8ae; }
+.ctl > span em { font-style: normal; color: #fff; }
+.ctl input[type=range] { width: 100%; accent-color: #e10600; }
+.ctl input[type=text], .ctl select { height: 34px; border-radius: 9px; border: 1px solid #2c2c32; background: #18181c; color: #fff; padding: 0 10px; font: inherit; }
+.ctl-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c9c8cd; }
+.ctl-row input { accent-color: #e10600; }
+.ctl-h { margin: 8px 0 -4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #6c6b72; }
+
+/* ── Stage ── */
+.stagearea { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 24px; padding: 18px 24px 14px; border-bottom: 1px solid #222226; }
+.narration { flex: 1 1 380px; min-width: 0; max-width: 760px; }
+.n-step { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #ff5a4f; }
+.n-title { margin: 4px 0 0; font-size: 22px; font-weight: 900; letter-spacing: -0.01em; }
+.n-body { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: #b9b8be; }
+.n-check { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: #8ce99a; }
+.n-check:empty { display: none; }
+.toolbar-right { display: grid; gap: 10px; justify-items: end; align-content: start; flex-shrink: 0; }
+.toolbar-row { display: flex; gap: 8px; align-items: center; }
+.palette-pick { height: 34px; border-radius: 10px; border: 0; background: #1b1b1f; color: #fff; padding: 0 10px; font: inherit; font-size: 12px; font-weight: 700; }
+.theme { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #8d8c93; }
+.theme.on { background: #2b2b31; color: #fff; }
+.sizes { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: #1b1b1f; }
+.size { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #8d8c93; }
+.size.on { background: #2b2b31; color: #fff; }
+.nav { display: flex; gap: 6px; }
+.nav button { height: 36px; padding: 0 14px; border-radius: 10px; background: #1f1f24; font-weight: 700; }
+.nav .primary { background: #e10600; color: #fff; }
+.nav button:disabled { opacity: 0.35; cursor: default; }
+
+.fit { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.window { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px #2c2c31; background: #0b0b0d; }
+
+/* A neutral dark browser, close enough to read as "my browser". */
+.chrome { background: #202124; }
+.tabs { display: flex; align-items: flex-end; gap: 6px; height: 40px; padding: 0 10px; }
+.lights { display: flex; gap: 7px; align-self: center; margin-right: 10px; }
+.lights i { width: 12px; height: 12px; border-radius: 99px; background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.tab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; min-width: 200px; border-radius: 10px 10px 0 0; font-size: 12px; color: #c4c7c5; }
+.tab.on { background: #35363a; color: #fff; }
+.tab b { margin-left: auto; font-weight: 500; color: #9aa0a6; }
+.tab img { border-radius: 3px; }
+.tab-plus { align-self: center; color: #9aa0a6; font-size: 18px; padding: 0 6px; }
+.omni { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; background: #35363a; }
+.omni-nav { color: #9aa0a6; letter-spacing: 6px; font-size: 14px; }
+.omnibox { flex: 1; height: 32px; border-radius: 99px; background: #202124; display: flex; align-items: center; padding: 0 16px; font-size: 13px; color: #9aa0a6; font-family: system-ui, sans-serif; }
+.omnibox.typed { color: #e8eaed; }
+.omni-ext img { display: block; border-radius: 3px; }
+.viewport { position: relative; }
+.viewport iframe { display: block; width: 100%; height: 100%; border: 0; background: #0b0b0d; }
+
+/* ── Chrome's own dialogs, mocked so the scary moments can be rehearsed ── */
+.overlay { position: absolute; inset: 0; z-index: 2; }
+.ov-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.dialog { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); width: 440px; padding: 22px 24px 18px; border-radius: 12px; background: #292a2d; color: #e8eaed; font-family: system-ui, sans-serif; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); }
+.dialog h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.dialog h2 img { border-radius: 4px; }
+.dialog p { margin: 14px 0 6px; font-size: 13px; color: #bdc1c6; }
+.dialog ul { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; color: #e8eaed; }
+.dialog .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dialog .row span { height: 34px; padding: 0 16px; border-radius: 99px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; border: 1px solid #5f6368; color: #8ab4f8; }
+.dialog .row span.blue { background: #8ab4f8; border-color: #8ab4f8; color: #202124; }
+.bubble { position: absolute; right: 120px; top: 8px; width: 340px; padding: 16px 18px 14px; border-radius: 10px; background: #292a2d; color: #e8eaed; font-family: system-ui, sans-serif; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); }
+.bubble::before { content: ''; position: absolute; top: -7px; right: 40px; width: 14px; height: 14px; background: #292a2d; transform: rotate(45deg); }
+.bubble h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.bubble p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: #bdc1c6; }
+.bubble .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.bubble .row span { height: 30px; padding: 0 14px; border-radius: 99px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600; border: 1px solid #5f6368; color: #8ab4f8; }
+.bubble .row span.blue { background: #8ab4f8; border-color: #8ab4f8; color: #202124; }
+.callout { position: absolute; z-index: 3; max-width: 260px; padding: 10px 12px; border-radius: 10px; background: #e10600; color: #fff; font-size: 12.5px; font-weight: 700; line-height: 1.35; box-shadow: 0 10px 30px rgba(225, 6, 0, 0.4); }
+.store { position: absolute; inset: 0; background: #202124; display: grid; place-items: center; font-family: system-ui, sans-serif; }
+.store-card { width: 620px; padding: 28px; border-radius: 16px; background: #292a2d; display: grid; grid-template-columns: 96px 1fr; gap: 20px; align-items: center; }
+.store-card img { width: 96px; height: 96px; border-radius: 20px; }
+.store-card h2 { margin: 0; font-size: 20px; color: #fff; }
+.store-card p { margin: 6px 0 0; color: #bdc1c6; font-size: 13px; line-height: 1.5; }
+.store-card span { display: inline-flex; margin-top: 14px; height: 34px; padding: 0 16px; border-radius: 99px; align-items: center; background: #8ab4f8; color: #202124; font-weight: 600; font-size: 13px; }
+.oldtab { position: absolute; inset: 0; background: #202124; display: grid; place-items: center; font-family: system-ui, sans-serif; }
+.oldtab-box { width: 560px; display: grid; gap: 22px; justify-items: center; }
+.oldtab-box p { margin: 0; font-size: 40px; font-weight: 600; color: #e8eaed; letter-spacing: -0.02em; }
+.oldtab-box div { width: 100%; height: 46px; border-radius: 99px; background: #303134; color: #9aa0a6; display: flex; align-items: center; padding: 0 20px; font-size: 14px; }
+
+/* A narrow screen: the rail goes on top and scrolls on its own. */
+@media (max-width: 980px) {
+  body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; }
+  .rail { max-height: 34vh; border-right: 0; border-bottom: 1px solid #26262a; }
+  .stagearea { min-height: 70vh; }
+}

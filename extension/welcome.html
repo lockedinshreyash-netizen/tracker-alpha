@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Welcome to Tracker Alpha</title>
+  <link rel="icon" href="icons/icon-32.png" />
+  <link rel="stylesheet" href="newtab.css" />
+  <script src="palettes.js"></script>
+</head>
+<body>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="bar">
+    <a class="mark" href="https://trackeralpha.in/?open=today" aria-label="Open Tracker Alpha">
+      <img src="icons/icon-48.png" alt="" width="22" height="22" />
+      <span>Alpha</span>
+    </a>
+  </header>
+
+  <main class="wl">
+    <img class="wl-icon rise" src="icons/icon-128.png" alt="" width="76" height="76" />
+    <h1 class="wl-title rise" style="--d: 120ms">Every new tab is now<br /><em>your day</em><i>.</i></h1>
+    <p class="wl-lead rise" style="--d: 220ms">Your streak, today’s hours and one button to start. Everything else in your browser works exactly like before.</p>
+
+    <section class="rise" style="--d: 320ms">
+      <p class="wl-h">What changed</p>
+      <div class="group">
+        <div class="row"><span class="badge red"></span><span><b>Your new tab page.</b> It shows your Alpha day instead of a blank page. That’s the only thing.</span></div>
+      </div>
+    </section>
+
+    <section class="rise" style="--d: 400ms">
+      <p class="wl-h">What didn’t</p>
+      <div class="group">
+        <div class="row"><span class="badge green"></span><span><b>Search.</b> The address bar and the search box use your usual search engine. Same results.</span></div>
+        <div class="row"><span class="badge green"></span><span><b>Bookmarks, history and passwords.</b> Untouched.</span></div>
+        <div class="row"><span class="badge green"></span><span><b>Every other website.</b> We can’t see them, and we don’t look.</span></div>
+        <div class="row"><span class="badge green"></span><span><b>Your settings and other extensions.</b> Untouched.</span></div>
+      </div>
+    </section>
+
+    <section class="rise" style="--d: 480ms">
+      <p class="wl-h">Good to know</p>
+      <div class="group">
+        <div class="row"><span class="badge info">i</span><span>Chrome said this can <b>“replace the page you see when opening a new tab”</b>. That’s the whole point. It also said it can <b>“read your data on trackeralpha.in”</b>. That’s only so your day can be copied from Alpha to this tab, on this computer. Nothing is sent anywhere.</span></div>
+        <div class="row"><span class="badge info">i</span><span>If Chrome asks <b>“Change back to Google?”</b> on your next tab, click <b>Keep it</b>. It asks that for every new-tab extension.</span></div>
+        <div class="row"><span class="badge info">i</span><span>Changed your mind? <b>Remove extension</b> is in the menu (•••) on every new tab. Your old new tab comes straight back, and your Alpha data stays in Alpha.</span></div>
+      </div>
+    </section>
+
+    <div class="wl-actions rise" style="--d: 560ms">
+      <a class="go" id="connect" href="https://trackeralpha.in/?open=today">Open Alpha to connect <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+      <a class="ghost" id="try" href="newtab.html">Open a new tab</a>
+    </div>
+    <p class="wl-steps rise" style="--d: 620ms">Open Alpha once in this browser, then open a new tab. Your day is there.</p>
+  </main>
+
+  <script src="ascii.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

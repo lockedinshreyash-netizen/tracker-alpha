@@ -50,3 +50,6 @@ twa/local.properties
 twa/*.apk
 twa/*.aab
 twa/*.idsig
+
+# The packed new-tab extension (npm run extension:build)
+dist-extension/

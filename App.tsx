@@ -72,6 +72,7 @@ import FeedbackWidget from './feedback/FeedbackWidget';
 import { useInstall } from './install/useInstall';
 import KeepBanner from './install/KeepBanner';
 import { usePresence } from './install/usePresence';
+import { buildSummary, publishSummary } from './install/extensionSummary';
 import GroupsTab from './groups/GroupsTab';
 import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
@@ -1867,6 +1868,18 @@ const App: React.FC = () => {
     () => state.logs.reduce((sum, l) => (l.date === todayKey ? sum + l.hours : sum), 0),
     [state.logs, todayKey],
   );
+  /* The new-tab extension's view of the day (install/extensionSummary). One
+     localStorage key, debounced, written whatever tab is open; a timer tick
+     does not change any input here, so a running session writes nothing. */
+  const summaryName = profileCtl.ownProfile?.display_name ?? state.leaderboard?.displayName ?? null;
+  useEffect(() => {
+    if (showLanding !== false) return;
+    const t = window.setTimeout(() => {
+      publishSummary(buildSummary(stateRef.current, summaryName));
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [showLanding, state.logs, state.tasks, state.timer, state.pomodoro, state.dailyGoalHours, state.examPreference, summaryName]);
+
   usePresence({
     active: showLanding === false && !showOnboarding,
     streak: streakCount,

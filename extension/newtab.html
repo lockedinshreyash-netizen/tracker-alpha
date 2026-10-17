@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>New Tab</title>
+  <link rel="icon" href="icons/icon-32.png" />
+  <link rel="stylesheet" href="newtab.css" />
+  <script src="palettes.js"></script>
+</head>
+<body>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="bar">
+    <a class="mark" href="https://trackeralpha.in/?open=today" aria-label="Open Tracker Alpha">
+      <img src="icons/icon-48.png" alt="" width="22" height="22" />
+      <span>Alpha</span>
+    </a>
+    <div class="bar-right">
+      <time id="clock" class="clock"></time>
+      <button id="theme-btn" class="menu-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Change the new tab’s theme" title="Theme">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17Z" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button id="menu-btn" class="menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Alpha menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="app" class="stage"></main>
+
+  <script src="ascii.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>

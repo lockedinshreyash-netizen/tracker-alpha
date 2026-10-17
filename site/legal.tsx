@@ -131,6 +131,7 @@ const privacyPage = (): SitePage => {
                 <li><b>Groups.</b> The groups you’re in, the messages and reactions you send, and your hours and today’s tasks, only at the level you pick for each group.</li>
                 <li><b>Decks.</b> The decks and cards you make, images you add to them, and your review history.</li>
                 <li><b>Reminders.</b> To remind you when the app is closed: your device’s push address, its browser type, and the reminder itself (the task and when it’s due).</li>
+                <li><b>The new-tab extension.</b> If you install it: it copies a summary of your day (streak, today’s hours, goal, week, exam date, your open Focus Tasks, and any session running) from Alpha into your browser’s storage, so your new tab can show it. It stays on your device. The extension sends nothing anywhere.</li>
                 <li><b>Daily nudges.</b> If you turn them on: the time you usually study, and the next few days of nudges, each with today’s hours and goal in it (like “7.5h to go”). We hold only what is about to be sent, withdraw it when you log enough, and delete sent ones after a week. Turn them off and nothing more is sent.</li>
                 <li><b>Feedback and reports.</b> What you write to us, and your email so we can reply.</li>
                 <li><b>Polls.</b> Your answer. Nobody, including us, can see who voted for what. We only see totals.</li>

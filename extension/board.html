@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Extension board · Tracker Alpha</title>
+  <link rel="icon" href="icons/icon-32.png" />
+  <link rel="stylesheet" href="board.css" />
+</head>
+<!-- The design board for the new-tab extension. DEV ONLY: served by the dev
+     server at /extension/board.html and left out of the store zip
+     (scripts/extension.mjs). Walk the student's journey step by step, or play
+     with every number in the Playground. -->
+<body>
+  <aside class="rail">
+    <div class="rail-head">
+      <img src="icons/icon-48.png" alt="" width="26" height="26" />
+      <div>
+        <p class="rail-title">New-tab extension</p>
+        <p class="rail-sub">Design board · not shipped</p>
+      </div>
+    </div>
+
+    <div class="modes" role="tablist">
+      <button role="tab" class="mode on" data-mode="journey" aria-selected="true">Student journey</button>
+      <button role="tab" class="mode" data-mode="play" aria-selected="false">Playground</button>
+    </div>
+
+    <section id="journey" class="panel">
+      <ol id="steps" class="steps"></ol>
+    </section>
+
+    <section id="play" class="panel" hidden>
+      <form id="controls" class="controls"></form>
+    </section>
+  </aside>
+
+  <main class="stagearea">
+    <div class="toolbar">
+      <div id="narration" class="narration">
+        <p id="n-step" class="n-step"></p>
+        <h1 id="n-title" class="n-title"></h1>
+        <p id="n-body" class="n-body"></p>
+        <p id="n-check" class="n-check"></p>
+      </div>
+      <div class="toolbar-right">
+        <div class="toolbar-row">
+        <select id="palette" class="palette-pick" aria-label="New tab theme">
+          <option value="alpha">Alpha</option>
+          <option value="paper">Paper</option>
+          <option value="sky">Sky</option>
+          <option value="mint">Mint</option>
+          <option value="lilac">Lilac</option>
+          <option value="peach">Peach</option>
+          <option value="sunshine">Sunshine</option>
+          <option value="bubblegum">Bubblegum</option>
+          <option value="midnight">Midnight</option>
+          <option value="forest">Forest</option>
+        </select>
+        <div class="sizes" role="group" aria-label="Alpha light or dark">
+          <button class="theme on" data-theme="dark">Dark</button>
+          <button class="theme" data-theme="light">Light</button>
+        </div>
+        <div class="sizes" role="group" aria-label="Window size">
+          <button class="size on" data-w="1280" data-h="800">Laptop</button>
+          <button class="size" data-w="1024" data-h="680">Small laptop</button>
+          <button class="size" data-w="1440" data-h="900">Big screen</button>
+        </div>
+        </div>
+        <div class="nav">
+          <button id="prev" aria-label="Previous step">←</button>
+          <button id="next" class="primary">Next step →</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="fit" class="fit">
+      <div id="window" class="window">
+        <div class="chrome">
+          <div class="tabs">
+            <span class="lights"><i></i><i></i><i></i></span>
+            <span class="tab on"><img id="tab-icon" src="icons/icon-16.png" alt="" width="14" height="14" /><span id="tab-title">New Tab</span><b>×</b></span>
+            <span class="tab-plus">+</span>
+          </div>
+          <div class="omni">
+            <span class="omni-nav">‹ › ⟳</span>
+            <span id="omnibox" class="omnibox">Search Google or type a URL</span>
+            <span class="omni-ext" title="Tracker Alpha"><img src="icons/icon-16.png" alt="" width="16" height="16" /></span>
+          </div>
+        </div>
+        <div class="viewport">
+          <iframe id="frame" title="What the student sees"></iframe>
+          <div id="overlay" class="overlay" hidden></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="board.js"></script>
+</body>
+</html>

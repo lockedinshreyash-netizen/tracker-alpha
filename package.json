@@ -13,6 +13,7 @@
     "test:decks": "node scripts/test-decks.mjs",
     "test:streak": "node scripts/test-decks.mjs streak",
     "test:install": "node scripts/test-decks.mjs install",
+    "extension:build": "node scripts/extension.mjs",
     "test:nudges": "node scripts/test-decks.mjs reminders",
     "android:build": "node scripts/android.mjs build",
     "android:fingerprint": "node scripts/android.mjs fingerprint"
