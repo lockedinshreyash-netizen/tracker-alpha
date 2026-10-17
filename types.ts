@@ -588,6 +588,16 @@ export interface ReminderPrefs {
   push: boolean;
   /** "Coaching in 10 minutes", from the Plan timeline. Off by default. */
   planBlocks: boolean;
+  /* Daily nudges (reminders/nudges.ts): at the time the student said they
+     study, an evening goal check, and a last call for the streak. Opt-in, and
+     independent of `enabled`, which is deadline reminders. */
+  nudge?: boolean;
+  /** When the student usually sits down to study, on the study-day axis. */
+  studyMinute?: DayMinute;
+  /* Nudge keys already said somewhere, newest last and bounded. Synced on
+     purpose, like Task.remindedKey: a nudge shown on the laptop must not
+     arrive again as a push on the phone. */
+  nudged?: string[];
 }
 
 /* ────────────────────────────────────────────────────────────────

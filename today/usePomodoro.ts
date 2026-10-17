@@ -3,6 +3,7 @@ import { DailyLog, PomodoroRuntime, PomodoroSettings, Subject } from '../types';
 import { generateId, getISTDateString } from '../utils';
 import * as sfx from '../audio';
 import { deliver } from '../notify/deliver';
+import { holdTitle, idleTitle } from '../ui/tabTitle';
 import {
   MIN_LOGGABLE_MS,
   PHASE_LABEL,
@@ -349,9 +350,7 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
      The countdown belongs in the tab strip, where a backgrounded block is
      still visible. Written imperatively so a per-second redraw of the whole
      app is not the price of a ticking title. */
-  const baseTitle = useRef<string>(typeof document !== 'undefined' ? document.title : '');
   useEffect(() => {
-    const base = baseTitle.current;
     const waiting = active && (isPaused(runtime) || (isIdle(runtime) && runtime.completedBlocks > 0));
 
     if (runtime.isRunning) {
@@ -360,29 +359,24 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
         if (!p.isRunning) return;
         document.title = `${formatCountdown(leftMs(p, s))} · ${PHASE_LABEL[p.phase]}`;
       };
+      const release = holdTitle();
       paint();
       const id = window.setInterval(paint, 1000);
-      return () => { window.clearInterval(id); document.title = base; };
+      return () => { window.clearInterval(id); release(); };
     }
 
     if (waiting) {
       const message = runtime.phase === 'work' ? '⏰ Back to work' : '⏰ Break time';
       let on = true;
+      const release = holdTitle();
       document.title = message;
       const id = window.setInterval(() => {
         on = !on;
-        document.title = on ? message : base;
+        document.title = on ? message : idleTitle();
       }, 1200);
-      return () => { window.clearInterval(id); document.title = base; };
+      return () => { window.clearInterval(id); release(); };
     }
-
-    document.title = base;
   }, [runtime.isRunning, runtime.phase, runtime.phaseTotalMs, runtime.completedBlocks, active]);
-
-  useEffect(() => {
-    const base = baseTitle.current;
-    return () => { document.title = base; };
-  }, []);
 
   /* ── Legacy flush ──
      A block measured by the previous build was parked, unlogged, waiting for a

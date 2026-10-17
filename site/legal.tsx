@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-15';
-const EFFECTIVE_LONG = '15 October 2026';
+const POLICY_EFFECTIVE = '2026-10-17';
+const EFFECTIVE_LONG = '17 October 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -131,6 +131,7 @@ const privacyPage = (): SitePage => {
                 <li><b>Groups.</b> The groups you’re in, the messages and reactions you send, and your hours and today’s tasks, only at the level you pick for each group.</li>
                 <li><b>Decks.</b> The decks and cards you make, images you add to them, and your review history.</li>
                 <li><b>Reminders.</b> To remind you when the app is closed: your device’s push address, its browser type, and the reminder itself (the task and when it’s due).</li>
+                <li><b>Daily nudges.</b> If you turn them on: the time you usually study, and the next few days of nudges, each with today’s hours and goal in it (like “7.5h to go”). We hold only what is about to be sent, withdraw it when you log enough, and delete sent ones after a week. Turn them off and nothing more is sent.</li>
                 <li><b>Feedback and reports.</b> What you write to us, and your email so we can reply.</li>
                 <li><b>Polls.</b> Your answer. Nobody, including us, can see who voted for what. We only see totals.</li>
                 <li><b>Voice commands.</b> In Chrome and Edge, your browser sends your voice to Google’s or Microsoft’s speech service to turn it into text. We never receive or keep the audio.</li>
@@ -139,7 +140,8 @@ const privacyPage = (): SitePage => {
               <h3>How the app is used</h3>
               <p>
                 When you’re signed in, we record which days you opened the app and a few numbers: hours studied,
-                number of sessions, your device type, whether the app is installed, and which features you’ve used.
+                number of sessions, your device type, whether the app is installed (or bookmarked, or added to your
+                calendar from the app), whether daily nudges are on, and which features you’ve used.
                 These are numbers, never what you wrote. We mostly look at them as totals across everyone, to see
                 what is working.
               </p>

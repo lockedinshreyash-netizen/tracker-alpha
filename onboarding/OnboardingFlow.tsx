@@ -6,8 +6,11 @@
      pledge    hold to lock in: THE one write                (Commit.tsx)
      profile   name and badge, shown as Ranks and Groups do  (Profile.tsx)
      save      Google or guest, only if signed out           (Profile.tsx)
-     install   put it on the home screen, wherever one tap    (Install.tsx)
-               really installs it and it is not installed yet
+     remind    when do you study? the opt-in for daily nudges (Reminder.tsx)
+     install   keep it: one-tap install, a guided Add to Home  (Install.tsx)
+               Screen / Dock, a bookmark, or out of an in-app
+               browser; then a calendar block. Skipped only
+               where it is already installed.
      start     the first session, started from here          (Finish.tsx)
 
    Everything the student answers is held here and written to AppState once,
@@ -17,8 +20,7 @@
    there. A plan guessed from a few questions was never one anybody kept.
 
    Google sign-in leaves the page and comes back. A session flag brings the
-   student back to the install step (or the first session, where there is
-   none) instead of the start of the flow,
+   student back to the reminder step instead of the start of the flow,
    and the profile they built is applied once the account exists
    (profile/draft.ts).
 
@@ -37,6 +39,10 @@ import { Pledge } from './Commit';
 import { ProfileBuilder, type ProfilePick, SaveProfile } from './Profile';
 import { FirstSession } from './Finish';
 import { InstallStep } from './Install';
+import { ReminderStep } from './Reminder';
+import type { DayMinute, ReminderPrefs } from '../types';
+import type { KeepMethod } from '../install/platform';
+import { DEFAULT_STUDY_MINUTE } from '../install/calendar';
 import { type Answers, DEFAULT_ANSWERS, startHere } from './answers';
 
 export type { ProfilePick } from './Profile';
@@ -50,6 +56,8 @@ export interface OnboardingInitial {
   signedIn: boolean;
   /** A signed-in student's current name, badge and bio, to start the builder from. */
   profile: ProfilePick | null;
+  /** Their saved study time, if they set one before. */
+  studyMinute?: DayMinute;
 }
 
 /** The one write. */
@@ -66,19 +74,20 @@ interface Props {
   /** The profile is chosen. App prefills the Ranks name, and writes the
    *  profile at once if there is an account to write it to. */
   onProfile: (p: ProfilePick) => void;
-  /** This browser installs with one tap and the app is not on the device yet
-   *  (`useInstall().supported`). Decides whether the step is in the flow. */
-  installSupported: boolean;
+  /** How this device keeps Alpha close (`useInstall().keep`). 'none' skips the step. */
+  keepMethod: KeepMethod;
   /** The prompt itself has arrived, so the button can install right now. */
   installAvailable: boolean;
   onInstall: () => Promise<'accepted' | 'dismissed' | 'unavailable'>;
+  /** The nudge opt-in, written straight to the reminder prefs. */
+  onReminders: (patch: Partial<ReminderPrefs>) => void;
   /** Leaves for Google. Resolves with an error message if it could not. */
   onGoogle: () => Promise<string | null>;
   onStart: (subject: Subject) => void;
   onComplete: () => void;
 }
 
-type Scene = 'opening' | 'exam' | 'class' | 'hours' | 'pledge' | 'profile' | 'save' | 'install' | 'start';
+type Scene = 'opening' | 'exam' | 'class' | 'hours' | 'pledge' | 'profile' | 'save' | 'remind' | 'install' | 'start';
 
 const LEAVE_MS = 260;
 
@@ -88,13 +97,13 @@ const takeResume = (): Scene | null => {
   try {
     const v = sessionStorage.getItem(RESUME_KEY);
     sessionStorage.removeItem(RESUME_KEY);
-    return v === 'start' || v === 'install' ? v : null;
+    return v === 'start' || v === 'remind' ? v : null;
   } catch {
     return null;
   }
 };
 
-const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installSupported, installAvailable, onInstall, onGoogle, onStart, onComplete }) => {
+const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, keepMethod, installAvailable, onInstall, onReminders, onGoogle, onStart, onComplete }) => {
   const [a, setA] = useState<Answers>(() =>
     DEFAULT_ANSWERS(initial.examPreference, initial.currentClass, initial.dailyGoalHours, initial.timerMode));
   const [resumed] = useState(takeResume);
@@ -106,10 +115,13 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
   const [pick, setPick] = useState<ProfilePick>(() => initial.profile ?? { name: '', avatarId: DEFAULT_ALPHA_AVATAR_ID, bio: '' });
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  /* Latched: installing turns `supported` off while the step is on screen,
-     and the step must not vanish from under the student when it does. */
-  const [offerInstall, setOfferInstall] = useState(installSupported || installAvailable || resumed === 'install');
-  useEffect(() => { if (installSupported || installAvailable) setOfferInstall(true); }, [installSupported, installAvailable]);
+  /* Latched, method included: installing turns the method to 'none' while the
+     step is on screen, and the step must not vanish or change from under the
+     student when it does. */
+  const [method, setMethod] = useState<KeepMethod>(keepMethod);
+  useEffect(() => { if (keepMethod !== 'none') setMethod(m => (m === 'none' ? keepMethod : m)); }, [keepMethod]);
+  const offerInstall = method !== 'none';
+  const [studyMinute, setStudyMinute] = useState<DayMinute>(initial.studyMinute ?? DEFAULT_STUDY_MINUTE);
 
   const set = useCallback((patch: Partial<Answers>) => setA(prev => ({ ...prev, ...patch })), []);
 
@@ -118,7 +130,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
   /* The order, without the scenes that do not apply to this student. */
   const order = useMemo<Scene[]>(() => [
     'opening', 'exam', 'class', 'hours', 'pledge', 'profile',
-    ...(initial.signedIn ? [] : ['save' as const]),
+    ...(initial.signedIn ? [] : ['save' as const]), 'remind',
     ...(offerInstall ? ['install' as const] : []), 'start',
   ], [initial.signedIn, offerInstall]);
   const progressSteps = order.filter(s => s !== 'opening' && s !== 'start');
@@ -143,7 +155,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
   /* Back, where it means something: not into the demo, not back across the
      pledge, not out of the first session. */
   const backTarget = useMemo<Scene | null>(() => {
-    if (scene === 'opening' || scene === 'exam' || scene === 'profile' || scene === 'install' || scene === 'start') return null;
+    if (scene === 'opening' || scene === 'exam' || scene === 'profile' || scene === 'remind' || scene === 'install' || scene === 'start') return null;
     if (scene === 'pledge') return applied ? null : 'hours';
     const i = order.indexOf(scene);
     return i > 0 ? order[i - 1] : null;
@@ -188,8 +200,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
   const google = async () => {
     setGoogleBusy(true);
     setGoogleError(null);
-    /* Back to the install step only where this browser can install. */
-    try { sessionStorage.setItem(RESUME_KEY, installSupported ? 'install' : 'start'); } catch { /* comes back to the start of the flow instead */ }
+    try { sessionStorage.setItem(RESUME_KEY, 'remind'); } catch { /* comes back to the start of the flow instead */ }
     const err = await onGoogle();
     // Still here: Google could not be reached.
     if (err !== null) {
@@ -204,6 +215,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
   const skip = scene === 'opening' ? undefined
     : !applied ? onComplete
     : scene === 'profile' || scene === 'install' ? () => go('start')
+    : scene === 'remind' ? () => go(offerInstall ? 'install' : 'start')
     : undefined;
 
   const render = (): React.ReactNode => {
@@ -216,7 +228,27 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, installS
       case 'pledge': return <Pledge a={a} onCommit={commit} onDone={next} />;
       case 'profile': return <ProfileBuilder pick={pick} onChange={setPick} onNext={confirmProfile} />;
       case 'save': return <SaveProfile pick={pick} busy={googleBusy} error={googleError} onGoogle={() => { void google(); }} onGuest={next} />;
-      case 'install': return <InstallStep available={installAvailable} onInstall={onInstall} onNext={next} />;
+      case 'remind': return (
+        <ReminderStep
+          goalHours={a.hours}
+          studyMinute={studyMinute}
+          signedIn={initial.signedIn}
+          iosTab={method === 'ios-share'}
+          onChange={setStudyMinute}
+          onSave={onReminders}
+          onNext={next}
+        />
+      );
+      case 'install': return (
+        <InstallStep
+          method={method}
+          available={installAvailable}
+          onInstall={onInstall}
+          onNext={next}
+          goalHours={a.hours}
+          studyMinute={studyMinute}
+        />
+      );
       case 'start': return <FirstSession a={a} first={first} onStart={onStart} onLater={onComplete} />;
     }
   };

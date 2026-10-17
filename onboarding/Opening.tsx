@@ -2,14 +2,23 @@
    The gate asks one thing, sound or not, and that tap is the gesture that
    unlocks audio at all. Then the demo (Demo.tsx) shows the app in three
    beats, and the wordmark lands: a red dot flies from the centre into the
-   full stop of LOCK IN. */
+   full stop of LOCK IN.
+
+   Inside Instagram, WhatsApp or another app's browser, the gate is preceded
+   by the way out: those webviews cannot install Alpha and often throw its
+   storage away, so a student who onboards there can lose everything they set
+   up. "Continue here anyway" stays one tap away. */
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
 import Demo, { DEMO_SOUNDS } from './Demo';
 import { haptic, prefersReducedMotion } from './kit';
+import { InAppEscape } from '../install/Guides';
+import { isInApp } from '../install/platform';
 
-type Phase = 'gate' | 'waiting' | 'demo' | 'mark';
+type Phase = 'inapp' | 'gate' | 'waiting' | 'demo' | 'mark';
+
+const inWebview = (): boolean => typeof navigator !== 'undefined' && isInApp(navigator.userAgent);
 
 /* Where the dot is going, measured once the wordmark has laid out. */
 interface Flight { x: number; y: number; s: number }
@@ -24,7 +33,7 @@ interface Props {
 }
 
 const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
-  const [phase, setPhase] = useState<Phase>('gate');
+  const [phase, setPhase] = useState<Phase>(() => (inWebview() ? 'inapp' : 'gate'));
   const [flight, setFlight] = useState<Flight | null>(null);
   const [landed, setLanded] = useState(false);
   const period = useRef<HTMLSpanElement>(null);
@@ -75,6 +84,12 @@ const Opening: React.FC<Props> = ({ onDone, onSignIn }) => {
           <Demo onDone={() => setPhase('mark')} />
           <button className="ob-reel-skip" onClick={toMark}>Skip</button>
         </>
+      )}
+
+      {phase === 'inapp' && (
+        <div className="ob-col" style={{ justifyContent: 'center', padding: '0 24px' }}>
+          <InAppEscape ua={navigator.userAgent} onContinue={() => setPhase('gate')} />
+        </div>
       )}
 
       {(phase === 'gate' || phase === 'waiting') && (

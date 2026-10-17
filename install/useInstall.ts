@@ -19,7 +19,8 @@
    like they have solved it. So `mode` says which of the two a caller is getting
    rather than pretending they are the same. */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { KeepMethod, keepMethodFor, readEnv } from './platform';
 
 /** The event Chrome hands us. Not in lib.dom yet. */
 interface BeforeInstallPromptEvent extends Event {
@@ -51,7 +52,6 @@ export type InstallMode =
   /** Already on the home screen, or the browser cannot install at all. */
   | 'none';
 
-const DISMISS_KEY = 'alpha_install_banner_dismissed_v1';
 
 /* iPadOS 13+ reports itself as a Mac and is only distinguishable by the touch
    points — the long-standing sniff, and still the only one that works. */
@@ -83,15 +83,6 @@ export const isStandalone = (): boolean => {
     || (navigator as unknown as { standalone?: boolean }).standalone === true;
 };
 
-const wasDismissed = (): boolean => {
-  try {
-    return localStorage.getItem(DISMISS_KEY) === '1';
-  } catch {
-    /* A hardened browser refusing storage should see the banner, not lose the
-       feature. Showing it once more than intended is the cheaper failure. */
-    return false;
-  }
-};
 
 export interface InstallApi {
   mode: InstallMode;
@@ -103,11 +94,14 @@ export interface InstallApi {
    * the prompt itself.
    */
   supported: boolean;
+  /**
+   * How this device keeps Alpha in front of the student (install/platform.ts):
+   * the one-tap prompt, a guided path where no API exists, a bookmark, or an
+   * escape from an in-app browser. 'none' once it is installed.
+   */
+  keep: KeepMethod;
   /** True once the app is running from the home screen. */
   installed: boolean;
-  /** The banner's own state — `mode` says whether install is possible at all. */
-  bannerDismissed: boolean;
-  dismissBanner: () => void;
   /**
    * Show the browser's install dialog. Resolves to what the user chose.
    *
@@ -125,7 +119,6 @@ export const useInstall = (): InstallApi => {
      itself under related_applications, which is what lets Chrome answer. A
      device that has it never gets a prompt, and must not be asked to wait. */
   const [installedElsewhere, setInstalledElsewhere] = useState(false);
-  const [bannerDismissed, setBannerDismissed] = useState(wasDismissed);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -165,15 +158,6 @@ export const useInstall = (): InstallApi => {
     };
   }, []);
 
-  const dismissBanner = useCallback(() => {
-    try {
-      localStorage.setItem(DISMISS_KEY, '1');
-    } catch {
-      // The banner simply returns on the next load.
-    }
-    setBannerDismissed(true);
-  }, []);
-
   const install = useCallback(async (): Promise<'accepted' | 'dismissed' | 'unavailable'> => {
     if (!promptEvent) return 'unavailable';
     try {
@@ -202,5 +186,10 @@ export const useInstall = (): InstallApi => {
 
   const supported = !installed && !installedElsewhere && (promptEvent !== null || canPrompt());
 
-  return { mode, supported, installed, bannerDismissed, dismissBanner, install };
+  const keep = useMemo<KeepMethod>(
+    () => keepMethodFor(readEnv({ standalone: installed, installedElsewhere, canPrompt: promptEvent !== null || canPrompt() })),
+    [installed, installedElsewhere, promptEvent],
+  );
+
+  return { mode, supported, keep, installed, install };
 };

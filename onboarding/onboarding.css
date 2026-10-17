@@ -598,6 +598,67 @@
   50% { box-shadow: 0 18px 44px -12px rgba(225, 6, 0, 1), 0 0 0 10px rgba(225, 6, 0, 0), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
 }
 .ob-ins-later { height: 40px; font-size: 14px; color: var(--ob-faint); }
+/* ── Bookmark: a browser window with a place waiting on the bar ── */
+.ob-bm-window { width: min(100%, 360px); margin: 26px auto 0; border-radius: 14px; border: 1.5px solid rgba(255, 255, 255, 0.14); background: linear-gradient(180deg, #17171b, #0c0c0e); overflow: hidden; }
+.ob-bm-chrome { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.ob-bm-chrome i { width: 9px; height: 9px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); }
+.ob-bm-url { margin-left: 10px; flex: 1; height: 22px; border-radius: 99px; background: rgba(255, 255, 255, 0.06); font-size: 11px; line-height: 22px; padding: 0 10px; color: var(--ob-faint); }
+.ob-bm-bar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.ob-bm-ghost { height: 14px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
+.ob-bm-slot { position: relative; min-width: 104px; height: 22px; border-radius: 7px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.18); }
+.ob-bm-chip { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; background: #1f1f24; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.22), 0 0 22px rgba(225, 6, 0, 0.7); animation: ob-bm-hover 1.8s ease-in-out infinite; }
+@keyframes ob-bm-hover { 0%, 100% { transform: translateY(-10px); } 50% { transform: translateY(-14px); } }
+.ob-bm-chip img { border-radius: 4px; }
+.ob-bm-slot.landed .ob-bm-chip { animation: ob-bm-drop 620ms var(--ob-spring) both, ob-ins-glow 1.6s ease-out 620ms both; box-shadow: none; }
+@keyframes ob-bm-drop { from { transform: translateY(-14px) scale(1.15); } to { transform: none; } }
+.ob-bm-page { height: 70px; }
+.ob-bm-do { margin-top: 22px; display: grid; justify-items: center; gap: 10px; text-align: center; }
+.ob-bm-drag {
+  display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 16px;
+  background: #1a1a1f; color: #fff; font-size: 17px; font-weight: 800; text-decoration: none; cursor: grab;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.2), 0 0 34px rgba(225, 6, 0, 0.55);
+  animation: ob-ins-call 2.2s ease-in-out 900ms infinite;
+}
+.ob-bm-drag:active { cursor: grabbing; }
+.ob-bm-drag img { border-radius: 5px; }
+.ob-bm-hint { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ob-muted); max-width: 34ch; }
+.ob-bm-hint b { color: var(--ob-ink); }
+.ob-bm-or { margin: 0; font-size: 13px; color: var(--ob-faint); }
+.ob kbd { display: inline-block; min-width: 26px; padding: 3px 7px; border-radius: 7px; background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35); font: inherit; font-size: 13px; font-weight: 800; color: var(--ob-ink); text-align: center; }
+
+/* ── The nudge step's lock screen ── */
+.ob-time { font-variant-numeric: tabular-nums; }
+.ob-field input.ob-time { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; color-scheme: dark; }
+.ob-lock {
+  position: relative; padding: 22px 14px 18px; border-radius: 26px; overflow: hidden;
+  background: radial-gradient(120% 90% at 30% 0%, rgba(225, 6, 0, 0.28), transparent 60%), linear-gradient(180deg, #1a1a20, #0b0b0e);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ob-lock-time { margin: 0 0 14px; text-align: center; font-size: 52px; line-height: 1; font-weight: 800; letter-spacing: -0.03em; color: rgba(255, 255, 255, 0.92); font-variant-numeric: tabular-nums; }
+.ob-notif { display: flex; gap: 12px; padding: 12px 14px; align-items: flex-start; animation: ob-notif-in 700ms var(--ob-spring) 700ms both; }
+.ob-notif img { border-radius: 9px; flex-shrink: 0; }
+.ob-notif-body { display: grid; gap: 2px; min-width: 0; text-align: left; }
+.ob-notif-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ob-muted); }
+.ob-notif-top i { font-style: normal; }
+.ob-notif-title { font-size: 14px; font-weight: 800; color: #fff; }
+.ob-notif-text { font-size: 13px; line-height: 1.35; color: rgba(245, 243, 239, 0.75); }
+@keyframes ob-notif-in { from { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.96); } to { opacity: 1; transform: none; } }
+@media (max-height: 760px) {
+  .ob-lock { padding: 14px 12px 12px; }
+  .ob-lock-time { font-size: 36px; margin-bottom: 10px; }
+}
+
+/* ── The calendar line, after the step is answered ── */
+.ob-cal-wrap { display: grid; gap: 8px; margin-bottom: 4px; }
+.ob-cal-label { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ob-faint); text-align: center; }
+.ob-cal { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ob-cal-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: var(--ob-ink);
+  font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.ob-cal-btn:active { transform: scale(0.97); }
+
 /* Short phones (an SE is 667px): the button must be on screen without a
    scroll, so the picture gives up its height first. */
 @media (max-height: 760px) {

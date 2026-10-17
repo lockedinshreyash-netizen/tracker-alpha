@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { ReminderPrefs } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DailyLog, ReminderPrefs } from '../types';
+import { nudgePlan } from './nudgeState';
+import { DEFAULT_STUDY_MINUTE } from '../install/calendar';
+import CalendarButtons from '../install/CalendarButtons';
 import { Switch } from '../ui/kit';
 import { formatClock, fromClockValue, toClockValue } from '../schedule/schedule';
 import { PermissionState, notificationPermission, requestNotificationPermission, showSystem } from '../notify/system';
@@ -10,6 +13,9 @@ interface Props {
   /** Push needs an account to deliver to. Signed out, the toggle explains itself. */
   signedIn: boolean;
   onChange: (patch: Partial<ReminderPrefs>) => void;
+  /** For the nudge preview: what the next one would say, with today's numbers. */
+  logs?: DailyLog[];
+  goalHours?: number;
 }
 
 /* Push is only offered where it can actually work. A control that cannot do
@@ -21,7 +27,7 @@ const pushSupported = (): boolean =>
   && 'PushManager' in window
   && !!import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
-const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange }) => {
+const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange, logs = [], goalHours = 0 }) => {
   const dark = theme === 'dark';
   const [permission, setPermission] = useState<PermissionState>(notificationPermission);
   const [busy, setBusy] = useState(false);
@@ -74,6 +80,21 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
   useEffect(() => {
     if (prefs.push && permission === 'denied') onChange({ push: false });
   }, [prefs.push, permission, onChange]);
+
+  const studyMinute = prefs.studyMinute ?? DEFAULT_STUDY_MINUTE;
+  const nextNudge = useMemo(
+    () => (prefs.nudge ? nudgePlan(logs, goalHours, { ...prefs, studyMinute }, Date.now())[0] ?? null : null),
+    [prefs, logs, goalHours, studyMinute],
+  );
+
+  const toggleNudge = async (want: boolean) => {
+    if (!want) { onChange({ nudge: false }); return; }
+    setBusy(true);
+    const result = await requestNotificationPermission();
+    setPermission(result);
+    setBusy(false);
+    onChange({ nudge: true, studyMinute });
+  };
 
   const enable = async (want: boolean) => {
     if (!want) { onChange({ enabled: false, push: false }); return; }
@@ -221,12 +242,73 @@ const ReminderSettings: React.FC<Props> = ({ prefs, theme, signedIn, onChange })
             />
           </div>
 
+        </div>
+      )}
+
+      <div className={`mt-6 pt-6 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`} />
+
+      {/* ── Daily nudges ── reminders/nudges.ts. The one channel that speaks
+          without a deadline, so the switch says exactly what it will do. */}
+      <div className="flex justify-between items-start gap-6">
+        <div className="flex-1">
+          <h4 className={title}>Daily nudges</h4>
+          <p className={`text-[13px] font-ui font-semibold mt-1 ${muted}`}>
+            Up to 3 a day, only on days you haven&apos;t finished
+          </p>
+          <p className={rowNote}>
+            At your study time if nothing is logged, an evening check if your {goalHours ? `${goalHours}h ` : ''}goal isn&apos;t met, and a last call if your streak is about to go.
+          </p>
+        </div>
+        <Switch dark={dark} on={!!prefs.nudge} disabled={busy} onToggle={toggleNudge} label="Daily nudges" />
+      </div>
+
+      {prefs.nudge && (
+        <div className="mt-5 space-y-5">
+          <div className="flex justify-between items-center gap-6">
+            <div className="flex-1">
+              <p className="text-[11px] font-bold uppercase font-ui">I usually study at</p>
+              <p className={rowNote}>The first nudge comes at this time if nothing is logged yet.</p>
+            </div>
+            <input
+              type="time"
+              value={toClockValue(studyMinute)}
+              onChange={e => {
+                const m = fromClockValue(e.target.value);
+                if (m !== null) onChange({ studyMinute: m });
+              }}
+              aria-label="Study time"
+              className={`text-[12px] font-bold p-2.5 rounded-lg border focus:outline-none font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'}`}
+            />
+          </div>
+          <div className={`rounded-lg border px-4 py-3 ${dark ? 'bg-white/[0.025] border-white/[0.06]' : 'bg-zinc-50 border-zinc-100'}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`}>
+              {nextNudge ? `Next · ${new Date(nextNudge.at).toLocaleString('en-IN', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : 'Next'}
+            </p>
+            {nextNudge
+              ? (
+                <>
+                  <p className={`text-[13px] font-bold font-ui mt-1 ${dark ? 'text-white' : 'text-zinc-900'}`}>{nextNudge.copy.title}</p>
+                  <p className={`text-[12px] font-ui mt-0.5 ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>{nextNudge.copy.body}</p>
+                </>
+              )
+              : <p className={`text-[12px] font-ui mt-1 ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>Nothing left today. Goal met, or the day&apos;s nudges are done.</p>}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase font-ui">Also in your calendar</p>
+            <p className={rowNote}>A daily study block at {formatClock(studyMinute)}, with a link back here. Your calendar rings even with Alpha closed.</p>
+            <div className="mt-3"><CalendarButtons dark={dark} goalHours={goalHours} studyMinute={studyMinute} /></div>
+          </div>
+        </div>
+      )}
+
+      {(prefs.enabled || prefs.nudge) && (
+        <div className={`mt-6 pt-6 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
           <div className="flex justify-between items-center gap-6">
             <div className="flex-1">
               <p className="text-[11px] font-bold uppercase font-ui">When the app is closed</p>
               <p className={rowNote}>
                 {!signedIn
-                  ? 'Sign in to be reminded when the app is closed.'
+                  ? 'Sign in to get these with the app closed.'
                   : permission === 'denied'
                     ? 'Your browser is blocking notifications for this site. Change it in site settings.'
                     : !pushSupported()

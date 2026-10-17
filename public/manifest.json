@@ -17,6 +17,12 @@
     { "platform": "webapp", "url": "https://trackeralpha.in/manifest.json" }
   ],
   "prefer_related_applications": false,
+  "shortcuts": [
+    { "name": "Start a session", "short_name": "Start", "url": "/?open=today", "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Today's plan", "short_name": "Plan", "url": "/?open=plan", "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Review cards", "short_name": "Decks", "url": "/?open=decks", "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Your streak", "short_name": "Streak", "url": "/?open=streak", "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

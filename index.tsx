@@ -25,6 +25,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('sfx') === 'debug') {
   // Every sound effect through the real player, for tuning levels.
   import('./sound/DebugSounds').then(({ default: DebugSounds }) => ReactDOM.createRoot(rootElement).render(<DebugSounds />));
+} else if (import.meta.env.DEV && params.get('keep') === 'debug') {
+  // Every way Alpha keeps itself close: the keep step per platform, the nudge step and plan.
+  import('./install/DebugKeep').then(({ default: DebugKeep }) => ReactDOM.createRoot(rootElement).render(<DebugKeep />));
 } else if (import.meta.env.DEV && params.get('analytics') === 'debug') {
   // The console's Analytics section in every state, on fixtures, no database.
   import('./analytics/DebugAnalytics').then(({ default: DebugAnalytics }) => ReactDOM.createRoot(rootElement).render(<DebugAnalytics />));

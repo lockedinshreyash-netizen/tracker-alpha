@@ -12,6 +12,8 @@
     "qbank:chapters": "esbuild scripts/qbank/export-chapters.ts --bundle --platform=node --log-level=warning | node > scripts/qbank/chapters.json",
     "test:decks": "node scripts/test-decks.mjs",
     "test:streak": "node scripts/test-decks.mjs streak",
+    "test:install": "node scripts/test-decks.mjs install",
+    "test:nudges": "node scripts/test-decks.mjs reminders",
     "android:build": "node scripts/android.mjs build",
     "android:fingerprint": "node scripts/android.mjs fingerprint"
   },

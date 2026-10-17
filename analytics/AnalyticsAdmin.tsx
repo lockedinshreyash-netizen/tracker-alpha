@@ -497,6 +497,32 @@ const AnalyticsAdmin: React.FC<Props> = ({ theme, load = fetchAnalytics, loadUse
         </ChartCard>
       </div>
 
+      {/* ── Keeping Alpha close ── */}
+      {d.keep && d.keep.length > 0 && (
+        <ChartCard
+          dark={dark}
+          delay={615}
+          title="Kept close vs came back"
+          sub="Students seen in the last 30 days, by how their device can keep Alpha: installed, a guided home-screen add, a bookmark, a calendar block. Days active out of the last 30."
+          table={{
+            head: ['Device', 'Students', 'Kept it', 'Days · kept', 'Days · not'],
+            rows: d.keep.map(k => [KEEP_LABEL[k.method] ?? k.method, fmt(k.users), pctText(ratio(k.kept, k.users)), k.days_kept === null ? '—' : fmt(k.days_kept, 1), k.days_not === null ? '—' : fmt(k.days_not, 1)]),
+          }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {d.keep.map(k => (
+              <Mini
+                key={k.method}
+                dark={dark}
+                label={KEEP_LABEL[k.method] ?? k.method}
+                value={k.days_kept === null ? '—' : `${fmt(k.days_kept, 1)} vs ${k.days_not === null ? '—' : fmt(k.days_not, 1)}`}
+                sub={`${fmt(k.users)} students · ${pctText(ratio(k.kept, k.users))} kept it · days active, kept vs not`}
+              />
+            ))}
+          </div>
+        </ChartCard>
+      )}
+
       {/* ── Community and content ── */}
       {Object.keys(features).length > 0 && (
         <ChartCard dark={dark} delay={630} title="Groups, Race, Decks and the inbox" sub="Straight from each feature's own tables.">
@@ -530,6 +556,17 @@ const Mini: React.FC<{ dark: boolean; label: string; value: string; sub?: string
 };
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+const KEEP_LABEL: Record<string, string> = {
+  prompt: 'One-tap install',
+  'ios-share': 'iPhone / iPad',
+  'mac-dock': 'Safari on Mac',
+  'firefox-android': 'Firefox Android',
+  bookmark: 'Bookmark (desktop)',
+  inapp: 'In-app browser',
+  none: 'Already installed',
+  unknown: 'Older app version',
+};
 const hoursText = (h: number): string => `${fmt(h, h < 100 ? 1 : 0)}h`;
 
 /** Everything the screen says that is not a field read straight off the payload. */
@@ -578,6 +615,8 @@ const derive = (d: Analytics) => {
     { label: 'Ranks race', value: a.race, hint: 'Racing on the leaderboard.' },
     { label: 'Rewards', value: a.rewards, hint: 'Has unlocked a streak reward.' },
     { label: 'Closed-app reminders', value: a.reminders, hint: 'Push reminders switched on.' },
+    ...(a.nudges !== undefined ? [{ label: 'Daily nudges', value: a.nudges, hint: 'Opted into the daily study nudges.' }] : []),
+    ...(a.kept !== undefined ? [{ label: 'Kept Alpha close', value: a.kept, hint: 'Installed, bookmarked or added to their calendar on their last device.' }] : []),
   ].sort((x, y) => y.value - x.value);
 
   const st = d.setup;

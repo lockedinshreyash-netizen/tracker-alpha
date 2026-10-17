@@ -37,7 +37,7 @@
 /* Bumped when this file's behaviour changes. It also names the offline cache
    below, so bumping it retires the previous one — and it makes "which worker is
    running" answerable in DevTools without diffing source. */
-const VERSION = 'push-offline-v2';
+const VERSION = 'push-offline-v3';
 
 /* Bumped with VERSION so a new worker replaces the old page rather than
    inheriting it. One entry, and it is not the app shell. */
@@ -206,7 +206,7 @@ self.addEventListener('push', event => {
         badge: ICON,
         renotify: false,
         silent: true,
-        data: { url: payload.url || '/', key, taskId: payload.taskId },
+        data: { url: payload.url || '/', key, taskId: payload.taskId, channel: payload.channel },
       });
     }
 
@@ -220,7 +220,7 @@ self.addEventListener('push', event => {
       /* A deadline that auto-dismissed while the user was away is the whole
          feature failing. The sender only sets this for reminders. */
       requireInteraction: payload.requireInteraction !== false,
-      data: { url: payload.url || '/', key, taskId: payload.taskId },
+      data: { url: payload.url || '/', key, taskId: payload.taskId, channel: payload.channel },
     });
   })());
 });

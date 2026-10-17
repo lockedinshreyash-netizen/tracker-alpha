@@ -10,10 +10,11 @@
    The desired row set is a pure function of the tasks. Every cancellation then
    falls out of the diff with no code of its own. */
 
-import { ReminderPrefs, Task } from '../types';
+import { DailyLog, ReminderPrefs, Task } from '../types';
 import { supabase } from '../supabaseClient';
 import { dueInstant, fireKey } from './reminders';
 import { fireCopy } from './reminders';
+import { nudgePlan } from './nudgeState';
 
 /* The gap between when the app would fire locally and when the server is
    allowed to. An app that is open — or that gets reopened — fires at T and
@@ -72,9 +73,34 @@ export const desiredRows = (
   return rows;
 };
 
+/**
+ * The day's nudges, as rows. Recomputed on every log, so the copy always
+ * carries today's real numbers ("7.5H TO GO") and a goal met withdraws the
+ * rest of the day. Nudges already said on some device are left out.
+ */
+export const nudgeRows = (
+  logs: DailyLog[],
+  goalHours: number,
+  prefs: ReminderPrefs,
+  userId: string,
+  now: number,
+): ReminderRow[] => {
+  if (!prefs.nudge || !prefs.push) return [];
+  const said = new Set(prefs.nudged ?? []);
+  return nudgePlan(logs, goalHours, prefs, now)
+    .filter(n => !said.has(n.key))
+    .map(n => ({
+      id: n.key,
+      user_id: userId,
+      fire_at: new Date(n.at + PUSH_LAG_MS).toISOString(),
+      title: n.copy.title.slice(0, 120),
+      body: n.copy.body.slice(0, 200),
+    }));
+};
+
 /** A cheap identity for "have I already published exactly this?". */
 export const signatureOf = (rows: ReminderRow[]): string =>
-  rows.map(r => `${r.id}|${r.fire_at}|${r.title}`).sort().join('\n');
+  rows.map(r => `${r.id}|${r.fire_at}|${r.title}|${r.body}`).sort().join('\n');
 
 /**
  * Make the server hold exactly `desired`, and nothing else of this user's.

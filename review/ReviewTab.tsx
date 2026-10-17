@@ -24,6 +24,8 @@ interface Props {
   activeSubjects: Subject[];
   reminders: ReminderPrefs;
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
+  /** The daily goal, for the nudge preview. */
+  goalHours?: number;
 }
 
 /* One shape for every setting: what it is, where it stands, and its control.
@@ -76,7 +78,7 @@ const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) =
 
 const ReviewTab: React.FC<Props> = ({
   logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onDeleteAccount, onLog,
-  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders,
+  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders, goalHours,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
@@ -200,6 +202,8 @@ const ReviewTab: React.FC<Props> = ({
             theme={theme}
             signedIn={!!user}
             onChange={onChangeReminders}
+            logs={logs}
+            goalHours={goalHours}
           />
 
           <SoundRow dark={dark} delay={290} />

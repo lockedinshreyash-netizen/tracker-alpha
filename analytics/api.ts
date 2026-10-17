@@ -77,8 +77,12 @@ export interface Analytics {
     adoption: {
       plan: number; tasks: number; mocks: number; errors: number; syllabus: number;
       rewards: number; race: number; reminders: number; pomodoro: number;
+      /** Absent until analytics.sql is re-run with the keep columns. */
+      nudges?: number; kept?: number;
     };
   };
+  /** Keeping Alpha close, by method, against days active. Absent on an older SQL. */
+  keep?: Array<{ method: string; users: number; kept: number; days_kept: number | null; days_not: number | null }>;
   /** Each key present only when its feature's tables exist on this project. */
   features: Partial<{
     groups: number; group_members: number; groups_active_7: number; group_messages_7: number; group_chatters_30: number;

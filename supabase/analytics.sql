@@ -118,6 +118,18 @@ create table if not exists public.usage_snapshots (
 
 create index if not exists usage_snapshots_recent on public.usage_snapshots (updated_at);
 
+-- How this device keeps Alpha close (install/platform.ts), whether it has
+-- (installed, bookmarked, added to the calendar), and whether daily nudges are
+-- on. Added after the table first shipped, hence the ALTERs. Compared in the
+-- console against days active, to see which fallback brings students back.
+alter table public.usage_snapshots add column if not exists keep_method text;
+alter table public.usage_snapshots add column if not exists kept boolean not null default false;
+alter table public.usage_snapshots add column if not exists nudges boolean not null default false;
+alter table public.usage_snapshots drop constraint if exists usage_keep_valid;
+alter table public.usage_snapshots add constraint usage_keep_valid check (
+  keep_method is null or keep_method in ('prompt', 'ios-share', 'mac-dock', 'firefox-android', 'bookmark', 'inapp', 'none')
+);
+
 alter table public.usage_snapshots enable row level security;
 revoke all on public.usage_snapshots from anon, authenticated;
 
@@ -308,7 +320,8 @@ begin
     v_class := public.analytics_num(f, 'class', 0, 99);
     insert into public.usage_snapshots as s (
       user_id, exam, class_level, streak, goal_hours, timer_mode, theme, plan_items, tasks,
-      mocks, errors, chapters_started, chapters_done, rewards, race, reminders, updated_at
+      mocks, errors, chapters_started, chapters_done, rewards, race, reminders,
+      keep_method, kept, nudges, updated_at
     ) values (
       uid,
       public.analytics_text(f, 'exam', array['JEE', 'NEET']),
@@ -326,6 +339,9 @@ begin
       public.analytics_int(f, 'rewards', 1000),
       coalesce(public.analytics_bool(f, 'race'), false),
       coalesce(public.analytics_bool(f, 'reminders'), false),
+      public.analytics_text(f, 'keep', array['prompt', 'ios-share', 'mac-dock', 'firefox-android', 'bookmark', 'inapp', 'none']),
+      coalesce(public.analytics_bool(f, 'kept'), false),
+      coalesce(public.analytics_bool(f, 'nudges'), false),
       now()
     )
     on conflict (user_id) do update set
@@ -334,7 +350,8 @@ begin
       plan_items = excluded.plan_items, tasks = excluded.tasks, mocks = excluded.mocks,
       errors = excluded.errors, chapters_started = excluded.chapters_started,
       chapters_done = excluded.chapters_done, rewards = excluded.rewards, race = excluded.race,
-      reminders = excluded.reminders, updated_at = excluded.updated_at;
+      reminders = excluded.reminders, keep_method = excluded.keep_method, kept = excluded.kept,
+      nudges = excluded.nudges, updated_at = excluded.updated_at;
   end if;
 end;
 $$;
@@ -802,12 +819,39 @@ begin
       'rewards',   count(*) filter (where rewards > 0),
       'race',      count(*) filter (where race),
       'reminders', count(*) filter (where reminders),
-      'pomodoro',  count(*) filter (where timer_mode = 'pomodoro')
+      'pomodoro',  count(*) filter (where timer_mode = 'pomodoro'),
+      'nudges',    count(*) filter (where nudges),
+      'kept',      count(*) filter (where kept)
     )
   ) into part
   from public.usage_snapshots
   where updated_at > now() - interval '30 days';
   out := out || jsonb_build_object('setup', part);
+
+  -- ── Keeping Alpha close, against coming back ──
+  -- Per keep method: students seen in 30 days, how many kept Alpha close, and
+  -- the average days active in the last 30 for those who did and those who
+  -- did not. The question it answers: does a home-screen icon, a bookmark or a
+  -- calendar block actually bring a student back.
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'method', m, 'users', users, 'kept', kept, 'days_kept', days_kept, 'days_not', days_not
+    ) order by users desc), '[]'::jsonb)
+  into part
+  from (
+    select coalesce(s.keep_method, 'unknown') as m,
+           count(*) as users,
+           count(*) filter (where s.kept) as kept,
+           round(avg(a.n) filter (where s.kept), 1) as days_kept,
+           round(avg(a.n) filter (where not s.kept), 1) as days_not
+    from public.usage_snapshots s
+    left join lateral (
+      select count(*)::numeric as n from public.activity_days d
+      where d.user_id = s.user_id and d.day > today - 30
+    ) a on true
+    where s.updated_at > now() - interval '30 days'
+    group by 1
+  ) x;
+  out := out || jsonb_build_object('keep', part);
 
   -- ── Server-side features. Each optional, each on its own. ──
   part := '{}'::jsonb;

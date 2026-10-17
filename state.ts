@@ -166,8 +166,16 @@ export const normalizeReminders = (raw: unknown): ReminderPrefs => {
       : 0,
     push: r.push === true,
     planBlocks: r.planBlocks === true,
+    nudge: r.nudge === true,
+    studyMinute: r.studyMinute === undefined ? undefined : asMinute(r.studyMinute, 840),
+    nudged: Array.isArray(r.nudged)
+      ? r.nudged.filter((k): k is string => typeof k === 'string' && k.length <= 80).slice(-NUDGED_KEEP)
+      : [],
   };
 };
+
+/** Enough for a few days of three nudges a day, from two devices. */
+export const NUDGED_KEEP = 24;
 
 const TASK_COLUMNS: TaskColumn[] = ['todo', 'doing', 'done'];
 

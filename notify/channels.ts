@@ -8,22 +8,33 @@
    reasonable-sounding feature at a time.
 
    The app never invents a reason to interrupt you. What it may now do is hold
-   you to something you wrote down yourself.
+   you to something you wrote down yourself, or, if you asked for it, remind you
+   once a day of a time you chose, only on a day you haven't finished.
 
    A deadline reminder is not the app having an opinion about your evening. It
    is a commitment you typed, on a date you chose, read back at an hour you set.
    If you never set a due date, nothing here ever fires. Nothing is scheduled on
-   your behalf, nothing is inferred from a gap in the logs, and there is still
-   no daily digest, no streak-at-risk warning, no "you haven't opened the app in
-   three days". The day this app sends something the user did not author is the
+   your behalf, nothing is inferred from a gap in the logs, and there is no
+   daily digest and no "you haven't opened the app in three days".
+
+   The one exception is the nudge channel, and it is opt-in by design: the
+   student says when they study and asks to be reminded. Then, and only then,
+   up to three a day (reminders/nudges.ts): at their own start time if nothing
+   is logged, an evening check if the goal they set is not met ("7.5H TO GO"),
+   and a last call if a streak is about to go. A goal met silences the rest of
+   the day, a running session silences all of it, the three replace each other
+   on the lock screen, and a student who stops opening the app stops being
+   nudged within four days, because the server only ever holds what the app
+   last handed it. The day this app sends something the user did not author is the
    day it gets muted, and every one of the channels below stops working at once.
    There is no way to earn that permission back.
 
-   Five channels, five identities, each traceable to a real event:
+   Six channels, six identities, each traceable to a real event:
      race       — a place changing hands, on a board you asked to join.
      pomodoro   — a bell for a block you started. Asked for, by starting it.
      reminder   — a due date you wrote, on a task you wrote.
      plan       — a block you put on your own timeline, about to begin.
+     nudge      — a time you chose to study, on a day not yet done. Opt-in.
      moderation — a person removed you from a group or the race, and said why.
                   Not the app's opinion: somebody else's decision about you,
                   which you are owed hearing about from the app rather than
@@ -47,7 +58,7 @@
    hidden one gets a system notification, a closed app gets a push. Exactly one
    of the three. Never two. */
 
-export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'moderation';
+export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'nudge' | 'moderation';
 
 export interface ChannelDef {
   /** Notifications sharing a tag replace one another instead of stacking. */
@@ -65,6 +76,9 @@ export const CHANNELS: Record<Channel, ChannelDef> = {
   race: { tag: () => 'tracker-alpha-race', requireInteraction: false },
   pomodoro: { tag: () => 'tracker-alpha-pomodoro', requireInteraction: false },
   plan: { tag: () => 'tracker-alpha-plan', requireInteraction: false },
+  /* One per study day: the evening check replaces the start nudge on the lock
+     screen rather than joining it. Matches the sender's tag for `nudge:` rows. */
+  nudge: { tag: key => `tracker-alpha-nudge:${key.split(':')[2]?.split('@')[0] ?? ''}`, requireInteraction: false },
   /* Per notice: two removals are two different things to be told. */
   moderation: { tag: key => `tracker-alpha-moderation:${key}`, requireInteraction: false },
 

@@ -153,17 +153,36 @@ Deno.serve(async req => {
     if (!subs?.length) continue;
 
     for (const row of rows) {
-      const payload = JSON.stringify({
-        title: row.title,
-        body: row.body,
-        key: row.id,
-        /* Matches CHANNELS.reminder.tag in notify/channels.ts, so a push and a
-           local fire for the same task replace rather than stack. */
-        tag: `tracker-alpha-reminder:${row.id.split('@')[0]}`,
-        taskId: row.id.split('@')[0],
-        url: '/',
-        requireInteraction: true,
-      });
+      /* Two kinds of row share the table. A deadline is `taskId@instant`; a
+         daily nudge is `nudge:<kind>:<day>@instant` (reminders/nudges.ts). A
+         nudge is tagged per study day, so the evening check replaces the start
+         nudge on the lock screen, and it does not stay pinned there: it is a
+         prompt, not a deadline. */
+      const nudge = row.id.startsWith('nudge:');
+      const day = nudge ? (row.id.split(':')[2] ?? '').split('@')[0] : '';
+      const payload = JSON.stringify(nudge
+        ? {
+          title: row.title,
+          body: row.body,
+          key: row.id,
+          /* Matches CHANNELS.nudge.tag in notify/channels.ts. */
+          tag: `tracker-alpha-nudge:${day}`,
+          channel: 'nudge',
+          url: '/?open=today',
+          requireInteraction: false,
+        }
+        : {
+          title: row.title,
+          body: row.body,
+          key: row.id,
+          /* Matches CHANNELS.reminder.tag in notify/channels.ts, so a push and a
+             local fire for the same task replace rather than stack. */
+          tag: `tracker-alpha-reminder:${row.id.split('@')[0]}`,
+          channel: 'reminder',
+          taskId: row.id.split('@')[0],
+          url: '/',
+          requireInteraction: true,
+        });
 
       for (const sub of subs) {
         try {

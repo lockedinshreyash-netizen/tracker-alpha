@@ -1,34 +1,45 @@
-/* ── Install ──
-   The last thing before the first session: put the app on the home screen.
-   A study tracker that lives in a browser tab is forgotten by Thursday; one
-   on the home screen is opened every time the phone is.
+/* ── Keep it: the last thing before the first session ──
+   A study tracker that lives in a browser tab is forgotten by Thursday; one on
+   the home screen, the Dock or the bookmarks bar is in front of the student
+   every time they open their phone or browser. Every device gets the step, in
+   the form its platform allows (install/platform.ts):
 
-   Offered on every browser that can install with one tap (Chrome, Edge,
-   Samsung Internet: `useInstall().supported`) unless the app is already on
-   the device. The button really installs: one tap here, one tap on the
-   browser's own confirm sheet, and the icon is on the home screen. No browser
-   lets a page skip that confirm. iOS has no install API at all, and this step
-   is never offered there rather than becoming a page of Share-sheet
-   instructions.
+     prompt           One tap here, one on the browser's own confirm sheet.
+                      Live at once, without waiting for Chrome's prompt, which
+                      Chrome only sends after 30 seconds on the site: a tap
+                      before it holds for TAP_WAIT_MS (inside the browser's
+                      gesture window) and installs the moment it lands; past
+                      that it reads "Almost ready…", then "Ready. Tap Install."
+                      when it arrives, and offers Continue after GIVE_UP_MS.
+     ios-share /      No API exists. The same button opens the exact taps
+     mac-dock /       (install/Guides.tsx), with an arrow at the real Share or
+     firefox-android  File button. "I've added it" is the student's word.
+     bookmark         Desktop browsers that cannot install. The control is the
+                      bookmark itself: drag the chip onto the bookmarks bar, or
+                      press ⌘D / Ctrl+D, which we hear and answer.
+     inapp            Instagram, WhatsApp and friends: open it in the real
+                      browser first.
 
-   It does NOT wait for Chrome's prompt before showing. Chrome sends it only
-   after 30 seconds on the site, and a quick onboarding gets here sooner; when
-   the step waited for it, most students never saw the step. So the button is
-   live at once. Tapped before the prompt has arrived, it holds the tap for up
-   to TAP_WAIT_MS (inside the browser's ~5s window for a gesture) and installs
-   the moment the prompt lands; past that it says "almost ready" and comes back
-   as soon as it can, and only if nothing has come in GIVE_UP_MS does it let
-   the student carry on.
+   After it is done or declined, one more line offers a daily study block in
+   the student's own calendar, the fallback that rings on any device.
 
-   The picture is the promise: a home screen, with our icon dropping into it. */
+   The picture is the promise: a home screen (or a bookmarks bar) with our icon
+   dropping into it. */
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as sfx from '../audio';
 import { Eyebrow, haptic, Rise } from './kit';
+import type { DayMinute } from '../types';
+import type { KeepMethod } from '../install/platform';
+import { bookmarkKeys, readEnv } from '../install/platform';
+import { GuideSheet, InAppEscape, guideFor } from '../install/Guides';
+import CalendarButtons from '../install/CalendarButtons';
+import { markAsked, markKept } from '../install/keepState';
+import { holdTitle } from '../ui/tabTitle';
 
 const TAP_WAIT_MS = 4000;
 const GIVE_UP_MS = 30_000;
-const DONE_HOLD_MS = 1500;
+const APP_LINK = 'https://trackeralpha.in/?open=today';
 
 const onPhone = (): boolean =>
   typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
@@ -40,6 +51,8 @@ type Phase =
   | 'asking'
   /* Tapped too early. Back to 'ready' the moment the prompt arrives. */
   | 'almost'
+  /* Bookmark: the shortcut was pressed and the browser's box is open. */
+  | 'bookmarking'
   | 'done'
   | 'declined'
   /* The browser never offered it. */
@@ -72,50 +85,83 @@ const HomeScreen: React.FC<{ landed: boolean }> = ({ landed }) => (
   </div>
 );
 
+/* A browser window with an empty place on the bookmarks bar. */
+const BookmarksBar: React.FC<{ landed: boolean }> = ({ landed }) => (
+  <div className="ob-bm-window" aria-hidden="true">
+    <div className="ob-bm-chrome"><i /><i /><i /><span className="ob-bm-url">trackeralpha.in</span></div>
+    <div className="ob-bm-bar">
+      <span className="ob-bm-ghost" style={{ width: 54 }} />
+      <span className="ob-bm-ghost" style={{ width: 70 }} />
+      <span className={`ob-bm-slot ${landed ? 'landed' : ''}`}>
+        <span className="ob-bm-chip"><img src="/icon-192.png" alt="" width={14} height={14} draggable={false} />Tracker Alpha</span>
+      </span>
+      <span className="ob-bm-ghost" style={{ width: 46 }} />
+    </div>
+    <div className="ob-bm-page" />
+  </div>
+);
+
 const Check = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M5 12.5l4.5 4.5L19 7.5" />
   </svg>
 );
 
+const DownloadIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" />
+  </svg>
+);
+
 export const InstallStep: React.FC<{
+  method: KeepMethod;
   /** The browser has handed over a working install prompt. */
   available: boolean;
   onInstall: () => Promise<'accepted' | 'dismissed' | 'unavailable'>;
   onNext: () => void;
-}> = ({ available, onInstall, onNext }) => {
+  goalHours: number;
+  studyMinute: DayMinute;
+}> = ({ method, available, onInstall, onNext, goalHours, studyMinute }) => {
   const [phase, setPhase] = useState<Phase>('ready');
   /* Set once the prompt has turned up after an early tap: "tap again". */
   const [nowReady, setNowReady] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const phone = useRef(onPhone()).current;
-  const where = phone ? 'home screen' : 'desktop';
+  const env = useRef(readEnv()).current;
+  const keys = bookmarkKeys(env);
+  const where = method === 'mac-dock' ? 'Dock' : method === 'bookmark' ? 'bookmarks bar' : phone ? 'home screen' : 'desktop';
   const firing = useRef(false);
   const tappedAt = useRef(0);
+  const guide = guideFor(method, env.ua);
+
+  /* This is the first ask. KeepBanner waits its three days from here. */
+  useEffect(() => { markAsked(); }, []);
+
+  const finish = (via: 'install' | 'bookmark' | 'guide') => {
+    markKept(via);
+    haptic.heavy();
+    sfx.play('target-hit');
+    setPhase('done');
+  };
 
   const fire = async () => {
     if (firing.current) return;
     firing.current = true;
     const outcome = await onInstall();
     firing.current = false;
-    if (outcome === 'accepted') {
-      haptic.heavy();
-      sfx.play('target-hit');
-      setPhase('done');
-    } else if (outcome === 'dismissed') {
-      setPhase('declined');
-    } else {
-      setPhase('almost');
-    }
+    if (outcome === 'accepted') finish('install');
+    else if (outcome === 'dismissed') setPhase('declined');
+    else setPhase('almost');
   };
 
   /* A tap holds until the prompt arrives, as long as the gesture still counts. */
   useEffect(() => {
-    if (phase !== 'asking' || firing.current) return;
+    if (method !== 'prompt' || phase !== 'asking' || firing.current) return;
     if (available) { void fire(); return; }
     const left = Math.max(0, TAP_WAIT_MS - (Date.now() - tappedAt.current));
     const t = window.setTimeout(() => setPhase('almost'), left);
     return () => window.clearTimeout(t);
-  }, [phase, available]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, available, method]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Too early: back to the button as soon as the prompt lands, or give up. */
   useEffect(() => {
@@ -125,16 +171,28 @@ export const InstallStep: React.FC<{
     return () => window.clearTimeout(t);
   }, [phase, available]);
 
+  /* ── Bookmark: a short title for the bookmark, and the shortcut, heard ──
+     The bookmark takes the page title, and the app's is a search-result
+     sentence. While this step is up it is just "Tracker Alpha". */
   useEffect(() => {
-    if (phase !== 'done') return;
-    const t = window.setTimeout(onNext, DONE_HOLD_MS);
-    return () => window.clearTimeout(t);
-  }, [phase, onNext]);
+    if (method !== 'bookmark') return;
+    const release = holdTitle();
+    document.title = 'Tracker Alpha';
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
+        /* Not prevented: the browser's own bookmark box is the whole point. */
+        setPhase(p => (p === 'ready' ? 'bookmarking' : p));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); release(); };
+  }, [method]);
 
   const install = () => {
     if (phase !== 'ready') return;
     haptic.select();
     sfx.select();
+    if (method !== 'prompt') { setGuideOpen(true); return; }
     tappedAt.current = Date.now();
     setNowReady(false);
     setPhase('asking');
@@ -143,6 +201,25 @@ export const InstallStep: React.FC<{
   };
 
   const done = phase === 'done';
+  const after = done || phase === 'declined' || phase === 'unavailable';
+
+  if (method === 'inapp') {
+    return (
+      <div className="ob-col" style={{ justifyContent: 'center' }}>
+        <InAppEscape ua={env.ua} onContinue={onNext} />
+      </div>
+    );
+  }
+
+  const lead = done
+    ? `Tracker Alpha is on your ${where}. Open it from there tomorrow.`
+    : method === 'bookmark'
+      ? 'Pin it to your bookmarks bar so it’s one click away every time you open your browser, and you don’t forget it by tomorrow.'
+      : `${method === 'mac-dock' ? 'Put it in your Dock' : `Install it on your ${phone ? 'phone' : 'computer'}`} so you actually use it every day, and don’t forget it by tomorrow.`;
+
+  const buttonLabel = method === 'ios-share' ? 'Add to Home Screen'
+    : method === 'mac-dock' ? 'Add to Dock'
+      : phase === 'asking' ? 'Installing…' : phase === 'almost' ? 'Almost ready…' : 'Install app';
 
   return (
     <div className="ob-col">
@@ -150,38 +227,72 @@ export const InstallStep: React.FC<{
       <h1 className="ob-h1">
         <Rise text={done ? 'Done. *It’s yours.*' : 'Don’t lose it *in a tab.*'} delay={80} />
       </h1>
-      <p className="ob-lead ob-fade" style={{ animationDelay: '260ms' }}>
-        {done
-          ? `Tracker Alpha is on your ${where}. Open it from there tomorrow.`
-          : `Install it on your ${phone ? 'phone' : 'computer'} so you actually use it every day, and don’t forget it by tomorrow.`}
-      </p>
+      <p className="ob-lead ob-fade" style={{ animationDelay: '260ms' }}>{lead}</p>
 
       <div className="ob-fade" style={{ animationDelay: '340ms' }}>
-        <HomeScreen landed={done} />
+        {method === 'bookmark' ? <BookmarksBar landed={done} /> : <HomeScreen landed={done} />}
       </div>
 
-      {!done && (
+      {!after && method !== 'bookmark' && (
         <ul className="ob-ins-why ob-fade" style={{ animationDelay: '420ms' }}>
           <li><i><Check /></i>Opens in one tap, like any app</li>
           <li><i><Check /></i>Full screen. No browser, no tabs.</li>
-          <li><i><Check /></i>Free. Takes two seconds.</li>
+          <li><i><Check /></i>Free. Takes {method === 'prompt' ? 'two seconds' : 'ten seconds'}.</li>
         </ul>
       )}
 
-      <div className="ob-actions">
-        {phase === 'declined' || phase === 'unavailable' ? (
-          <>
-            <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ob-faint)', margin: 0 }}>
-              {phase === 'declined'
-                ? 'No problem. Install it any time from the settings gear.'
-                : 'Your browser isn’t offering it right now. Install it later from the settings gear.'}
+      {/* ── Bookmark: the chip is the control ── */}
+      {!after && method === 'bookmark' && (
+        <div className="ob-bm-do ob-fade" style={{ animationDelay: '420ms' }}>
+          {phase === 'bookmarking' ? (
+            <p className="ob-bm-hint" aria-live="polite">
+              In the box that opened, pick <b>Bookmarks bar</b>, then <b>Done</b>. Don’t see the bar? Press <kbd>{keys.bar}</kbd>.
             </p>
-            <button className="ob-primary" onClick={() => { sfx.select(); onNext(); }}>Continue</button>
+          ) : (
+            <>
+              <a
+                className="ob-bm-drag"
+                href={APP_LINK}
+                draggable
+                onClick={e => e.preventDefault()}
+                onDragEnd={e => { if (e.dataTransfer.dropEffect !== 'none') finish('bookmark'); }}
+                title="Drag me to your bookmarks bar"
+              >
+                <img src="/icon-192.png" alt="" width={18} height={18} draggable={false} />
+                Tracker Alpha
+              </a>
+              <p className="ob-bm-hint">Drag this up onto your bookmarks bar.</p>
+              <p className="ob-bm-or">or press <kbd>{keys.mod}</kbd> <kbd>D</kbd></p>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="ob-actions">
+        {after ? (
+          <>
+            {!done && (
+              <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ob-faint)', margin: 0 }}>
+                {phase === 'declined'
+                  ? 'No problem. Install it any time from the settings gear.'
+                  : 'Your browser isn’t offering it right now. Install it later from the settings gear.'}
+              </p>
+            )}
+            <div className="ob-cal-wrap">
+              <p className="ob-cal-label">One more: a daily study block in your calendar</p>
+              <CalendarButtons variant="ob" goalHours={goalHours} studyMinute={studyMinute} />
+            </div>
+            <button className="ob-primary" onClick={() => { sfx.select(); onNext(); }}>
+              {done ? <><Check /> Continue</> : 'Continue'}
+            </button>
           </>
-        ) : done ? (
-          <button className="ob-primary" onClick={onNext}>
-            <Check /> Installed
-          </button>
+        ) : method === 'bookmark' ? (
+          <>
+            <button className="ob-primary" onClick={() => finish('bookmark')}>
+              <Check /> {phase === 'bookmarking' ? 'Done, it’s bookmarked' : 'I’ve bookmarked it'}
+            </button>
+            <button className="ob-ghost ob-ins-later" onClick={() => { sfx.select(); setPhase('declined'); }}>Not now</button>
+          </>
         ) : (
           <>
             {(phase === 'almost' || nowReady) && (
@@ -195,15 +306,21 @@ export const InstallStep: React.FC<{
               disabled={phase !== 'ready'}
               data-ready={phase === 'ready'}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" />
-              </svg>
-              {phase === 'asking' ? 'Installing…' : phase === 'almost' ? 'Almost ready…' : 'Install app'}
+              <DownloadIcon />
+              {buttonLabel}
             </button>
-            <button className="ob-ghost ob-ins-later" onClick={() => { sfx.select(); onNext(); }}>Not now</button>
+            <button className="ob-ghost ob-ins-later" onClick={() => { sfx.select(); setPhase('declined'); }}>Not now</button>
           </>
         )}
       </div>
+
+      {guideOpen && guide && (
+        <GuideSheet
+          guide={guide}
+          onClose={() => setGuideOpen(false)}
+          onDone={() => { setGuideOpen(false); finish('guide'); }}
+        />
+      )}
     </div>
   );
 };

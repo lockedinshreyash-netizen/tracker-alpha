@@ -12,6 +12,20 @@ import { supabase } from '../supabaseClient';
 import type { AppState, DailyLog } from '../types';
 import { addDays, calculateStreak, getISTDateString, isVerifiedLog } from '../utils';
 import { isIOS, isStandalone } from '../install/useInstall';
+import { type KeepMethod, keepMethodFor, readEnv } from '../install/platform';
+import { readKeep } from '../install/keepState';
+
+/* Which way this device keeps Alpha close, and whether it has. Bookmarks and
+   calendar blocks are known only from the gesture that made them
+   (install/keepState.ts); a home-screen launch is known for certain. */
+const keepFacts = (): { keep: KeepMethod; kept: boolean } => {
+  if (typeof window === 'undefined') return { keep: 'none', kept: false };
+  const standalone = isStandalone();
+  return {
+    keep: keepMethodFor(readEnv({ standalone })),
+    kept: standalone || readKeep().via.length > 0,
+  };
+};
 
 export interface DayReport {
   day: string;
@@ -36,6 +50,11 @@ export interface UsageFacts {
   rewards: number;
   race: boolean;
   reminders: boolean;
+  /** How this device keeps Alpha close (install/platform.ts). */
+  keep: KeepMethod;
+  /** Installed, bookmarked or added to the calendar, on this device. */
+  kept: boolean;
+  nudges: boolean;
 }
 
 export type Platform = 'ios' | 'android' | 'desktop' | 'other';
@@ -97,6 +116,8 @@ export const usageFacts = (state: AppState): UsageFacts => {
     rewards: Object.keys(state.rewards?.unlocked ?? {}).length,
     race: !!state.leaderboard?.enabled,
     reminders: !!state.reminders?.push,
+    ...keepFacts(),
+    nudges: !!state.reminders?.nudge,
   };
 };
 

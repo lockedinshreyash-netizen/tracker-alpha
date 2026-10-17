@@ -24,6 +24,7 @@ import type { Profile } from '../profile/profileApi';
 import { notificationPermission, requestNotificationPermission, type PermissionState } from '../notify/system';
 import type { InstallApi } from '../install/useInstall';
 import { isAndroidApp } from '../install/useInstall';
+import { useKeepAction } from '../install/KeepAction';
 import type { ReminderPrefs, SyncStatus } from '../types';
 
 interface Props {
@@ -106,14 +107,12 @@ const QuickSettings: React.FC<Props> = ({
   const [open, setOpen] = useState(false);
   const [permission, setPermission] = useState<PermissionState>(notificationPermission);
   const [busy, setBusy] = useState(false);
-  const [iosSteps, setIosSteps] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Read fresh each time it opens: the permission can change in system settings.
   useEffect(() => {
     if (!open) return;
     setPermission(notificationPermission());
-    setIosSteps(false);
     panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
@@ -147,7 +146,11 @@ const QuickSettings: React.FC<Props> = ({
       ? 'Shown inside the app only'
       : 'Reminders for task deadlines';
 
-  const showInstall = install.mode !== 'none' && !install.installed && !isAndroidApp();
+  /* Every device that has some way to keep Alpha close, not only those with an
+     install prompt: a guided Add to Home Screen, the Dock, a bookmark, or out
+     of an in-app browser (install/KeepAction.tsx). */
+  const keepAction = useKeepAction(install);
+  const showInstall = !keepAction.none && !install.installed && !isAndroidApp();
 
   const ink = dark ? 'text-white' : 'text-zinc-900';
   const muted = 'text-zinc-500';
@@ -155,6 +158,7 @@ const QuickSettings: React.FC<Props> = ({
 
   return (
     <>
+      {keepAction.sheet}
       <div className="qs-dock">
         <LiquidGlass
           as="button"
@@ -252,13 +256,13 @@ const QuickSettings: React.FC<Props> = ({
               {/* ── Install, where the browser can ── */}
               {showInstall && (
                 <div className={`${group} mt-3`}>
-                  <Row dark={dark} first icon={DOWNLOAD} color="#22B8CF" label="Install the app" note={iosSteps ? 'Tap Share, then Add to Home Screen' : 'Full screen, from your home screen'}>
+                  <Row dark={dark} first icon={DOWNLOAD} color="#22B8CF" label={keepAction.label} note={keepAction.note}>
                     <button
                       type="button"
-                      onClick={() => { if (install.mode === 'ios') setIosSteps(true); else void install.install(); }}
+                      onClick={keepAction.run}
                       className={`h-8 px-3.5 rounded-full text-[13px] font-bold font-ui ${dark ? 'bg-white text-zinc-900' : 'bg-zinc-900 text-white'}`}
                     >
-                      {install.mode === 'ios' ? 'How' : 'Install'}
+                      {keepAction.button}
                     </button>
                   </Row>
                 </div>

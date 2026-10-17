@@ -4,7 +4,7 @@ import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject,
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, STATUS_CYCLE } from './constants';
 import { getISTDateString, calculateStreak, calculateVerifiedStreak, streakLedger, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
-import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
+import { DEFAULT_STATE, DEFAULT_POMODORO_SETTINGS, DEFAULT_LEADERBOARD, DEFAULT_COACH, DEFAULT_REMINDERS, NUDGED_KEEP, MAX_QUESTION_ENTRIES, normalizePomodoro, normalizeReminders, normalizeSchedule, normalizeTasks, normalizeSleep, normalizeAnalysis, normalizeAi, mergeSleep, mergeAnalysis, mergeAi } from './state';
 import { evaluate as evaluateRewards, normalizeRewards, mergeRewards, pendingCelebrations, nextReward } from './rewards/engine';
 import { mergeSchedule, instanceId, isInstanceId, parseInstanceId } from './schedule/schedule';
 import PlanTab from './schedule/PlanTab';
@@ -55,6 +55,7 @@ import EditProfile from './profile/EditProfile';
 import ToastHost from './notify/ToastHost';
 import { moveCard, nextOrder } from './board/board';
 import { useReminders } from './reminders/useReminders';
+import { useNudges } from './reminders/useNudges';
 import { materializeDay } from './schedule/schedule';
 import { isIdle as pomodoroIsIdle, heldMode, effectiveMode } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
@@ -69,7 +70,8 @@ import RemovalNoticeModal from './moderation/RemovalNoticeModal';
 import { humanError as moderationError, rejoinLeaderboard } from './moderation/api';
 import FeedbackWidget from './feedback/FeedbackWidget';
 import { useInstall } from './install/useInstall';
-import InstallBanner from './install/InstallBanner';
+import KeepBanner from './install/KeepBanner';
+import { usePresence } from './install/usePresence';
 import GroupsTab from './groups/GroupsTab';
 import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
@@ -1111,6 +1113,34 @@ const App: React.FC = () => {
     busy: stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro),
   });
 
+  /* ── Daily nudges ── (reminders/nudges.ts) Said here while the app is open;
+     published below for when it is not. */
+  const readNudges = useCallback(() => ({
+    logs: stateRef.current.logs,
+    goalHours: stateRef.current.dailyGoalHours,
+    prefs: stateRef.current.reminders ?? DEFAULT_REMINDERS,
+  }), []);
+
+  const commitNudged = useCallback((keys: string[]) => {
+    setState(prev => {
+      const r = prev.reminders ?? DEFAULT_REMINDERS;
+      const nudged = [...(r.nudged ?? []).filter(k => !keys.includes(k)), ...keys].slice(-NUDGED_KEEP);
+      const nextState = { ...prev, reminders: { ...r, nudged }, lastUpdated: Date.now() };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  }, []);
+
+  useNudges({
+    logs: state.logs,
+    goalHours: state.dailyGoalHours,
+    prefs: reminderPrefs,
+    read: readNudges,
+    commit: commitNudged,
+    ready: remindersReady,
+    busy: stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro),
+  });
+
   /* Publish what the server should be holding, so a deadline can still arrive
      with every tab shut.
 
@@ -1120,11 +1150,22 @@ const App: React.FC = () => {
      or one who never turned push on, never reaches Supabase at all. */
   const publishedRef = useRef<string>('');
   useEffect(() => {
-    if (!user || !reminderPrefs.enabled || !reminderPrefs.push || !isInitialSyncDone.current) return;
+    /* Not gated on the switches: turning nudges or push off has to withdraw
+       what is already on the server, and the row builders return nothing for
+       a channel that is off. A user who never turned anything on publishes an
+       empty set, which matches the empty signature and sends nothing. */
+    if (!user || !isInitialSyncDone.current) return;
 
     const timer = window.setTimeout(async () => {
-      const { desiredRows, reconcile, signatureOf } = await import('./reminders/publish');
-      const rows = desiredRows(stateRef.current.tasks, reminderPrefs, user.id, Date.now());
+      const { desiredRows, nudgeRows, reconcile, signatureOf } = await import('./reminders/publish');
+      const live = stateRef.current;
+      const now = Date.now();
+      /* One reconcile for both kinds: it deletes every unsent row it was not
+         handed, so publishing them separately would have each erase the other. */
+      const rows = [
+        ...desiredRows(live.tasks, reminderPrefs, user.id, now),
+        ...nudgeRows(live.logs, live.dailyGoalHours, reminderPrefs, user.id, now),
+      ];
       const signature = signatureOf(rows);
       if (signature === publishedRef.current) return;
       publishedRef.current = signature;
@@ -1132,7 +1173,20 @@ const App: React.FC = () => {
     }, 2_000);
 
     return () => window.clearTimeout(timer);
-  }, [state.tasks, reminderPrefs, user]);
+  }, [state.tasks, state.logs, state.dailyGoalHours, reminderPrefs, user]);
+
+  /* A guest who asked for nudges in onboarding could not get them with the app
+     closed: push needs an account to deliver to. Once they sign in, and the
+     browser already said yes to notifications, push is switched on for them
+     rather than left for them to find in settings. */
+  useEffect(() => {
+    if (!user || !reminderPrefs.nudge || reminderPrefs.push || !syncSettled) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    void import('./notify/push').then(async ({ enablePush, pushSupported }) => {
+      if (pushSupported() && await enablePush()) setReminderPrefs({ push: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, reminderPrefs.nudge, reminderPrefs.push, syncSettled]);
 
   /* ── Install to the home screen ──
      Moved wholesale into `install/useInstall`, which also serves the mobile
@@ -1157,7 +1211,7 @@ const App: React.FC = () => {
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type !== 'notification-click') return;
       const channel = event.data.data?.channel;
-      if (channel === 'reminder') handleTabChange('Today');
+      if (channel === 'reminder' || channel === 'nudge') handleTabChange('Today');
       if (channel === 'plan') handleTabChange('Plan');
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
@@ -1806,6 +1860,21 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInvite, showLanding, showOnboarding, user]);
 
+  /* The day in the tab strip, and on the home-screen icon (install/usePresence).
+     Above the early return below, like every hook here. */
+  const todayKey = getISTDateString();
+  const todayHours = useMemo(
+    () => state.logs.reduce((sum, l) => (l.date === todayKey ? sum + l.hours : sum), 0),
+    [state.logs, todayKey],
+  );
+  usePresence({
+    active: showLanding === false && !showOnboarding,
+    streak: streakCount,
+    todayHours,
+    goalHours: state.dailyGoalHours,
+    nudge: !!reminderPrefs.nudge,
+  });
+
   // While checking session, show nothing (prevents flash)
   if (showLanding === null) {
     return <div style={{ background: theme === 'dark' ? '#0B0B0D' : '#F2F0EC', width: '100vw', height: '100vh' }} />;
@@ -2050,6 +2119,7 @@ const App: React.FC = () => {
               activeSubjects={activeSubjects}
               reminders={reminderPrefs}
               onChangeReminders={setReminderPrefs}
+              goalHours={state.dailyGoalHours}
             />
           )}
           {/* Drawn only for an administrator, and `user` is guaranteed here
@@ -2112,12 +2182,13 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* One offer, on a phone, once. Held back behind every full-screen moment
-          for the same reason everything else here is: the first run already has
-          a landing page and a tour, and a third thing asking for a tap on top
-          of those is how all three get dismissed unread. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
-        <InstallBanner install={install} theme={theme} />
+      {/* Keep Alpha close, on every device, at most three times. Held back
+          behind every full-screen moment and any running session: the first
+          run already asked in onboarding, and a banner over a running clock is
+          the app interrupting the thing it exists for. */}
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
+        <KeepBanner install={install} theme={theme} />
       )}
 
       {/* "Need help? Tell us." Bottom-left, clear of the settings gear in the
@@ -2228,12 +2299,14 @@ const App: React.FC = () => {
               profile: profileCtl.ownProfile
                 ? { name: profileCtl.ownProfile.display_name, avatarId: profileCtl.ownProfile.avatar_id ?? DEFAULT_ALPHA_AVATAR_ID, bio: profileCtl.ownProfile.bio ?? '' }
                 : null,
+              studyMinute: reminderPrefs.studyMinute,
             }}
             onApply={applyOnboarding}
             onProfile={applyOnboardingProfile}
-            installSupported={install.supported}
+            keepMethod={install.keep}
             installAvailable={install.mode === 'prompt'}
             onInstall={install.install}
+            onReminders={setReminderPrefs}
             onGoogle={signInWithGoogle}
             onStart={startFirstSession}
             onComplete={finishOnboarding}

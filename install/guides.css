@@ -1,0 +1,77 @@
+/* ── Guided install paths (install/Guides.tsx) ──
+   Its own tokens, not the onboarding's or the app's: the same sheet opens over
+   onboarding (z 300) and over the app, always dark. */
+
+.kg-root { position: fixed; inset: 0; z-index: 420; display: flex; align-items: flex-end; justify-content: center; font-family: var(--font-ui, 'Satoshi', system-ui, sans-serif); color: #f5f3ef; }
+.kg-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); animation: kg-fade 240ms ease both; }
+.kg-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 10px calc(env(safe-area-inset-bottom, 0px) + 96px);
+  padding: 24px 22px 18px;
+  border-radius: 26px;
+  background: #121215;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: kg-rise 360ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+/* The arrow points up: keep the sheet clear of the top of the screen. */
+.kg-sheet-low { margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); }
+@media (min-width: 768px) { .kg-root { align-items: center; } .kg-sheet { margin: 0; } }
+
+.kg-eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #ff5247; }
+.kg-title { margin: 8px 0 0; font-size: 22px; line-height: 1.15; font-weight: 800; letter-spacing: -0.01em; }
+.kg-lead { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: rgba(245, 243, 239, 0.62); }
+.kg-steps { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.kg-steps li { display: flex; align-items: center; gap: 12px; }
+.kg-n { width: 20px; flex-shrink: 0; font-size: 12px; font-weight: 800; color: rgba(245, 243, 239, 0.38); text-align: center; font-variant-numeric: tabular-nums; }
+.kg-glyph { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; background: rgba(255, 255, 255, 0.07); color: #fff; }
+.kg-text { font-size: 15px; line-height: 1.35; color: rgba(245, 243, 239, 0.7); }
+.kg-text b { color: #fff; font-weight: 800; }
+.kg-text span svg { vertical-align: -3px; }
+.kg-note { margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: rgba(245, 243, 239, 0.45); }
+
+.kg-primary, .kg-ghost {
+  display: flex; width: 100%; align-items: center; justify-content: center;
+  font: inherit; cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
+}
+.kg-primary {
+  margin-top: 20px; height: 54px; border: 0; border-radius: 999px;
+  background: #e10600; color: #fff; font-size: 16px; font-weight: 700;
+  box-shadow: 0 14px 34px -14px rgba(225, 6, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.kg-primary:active { transform: scale(0.97); }
+.kg-ghost { margin-top: 6px; height: 44px; border: 0; background: none; color: rgba(245, 243, 239, 0.55); font-size: 14px; font-weight: 600; }
+.kg-ghost:hover { color: #fff; }
+
+/* ── The arrow at the real button ── */
+.kg-arrow { position: fixed; z-index: 1; color: #ff5247; filter: drop-shadow(0 0 12px rgba(225, 6, 0, 0.8)); pointer-events: none; }
+.kg-arrow-bottom-center { left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); margin-left: -17px; animation: kg-bob-down 1.1s ease-in-out infinite; }
+.kg-arrow-bottom-right { right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); animation: kg-bob-down 1.1s ease-in-out infinite; }
+.kg-arrow-top-right { right: 18px; top: 10px; transform: rotate(180deg); animation: kg-bob-up 1.1s ease-in-out infinite; }
+.kg-arrow-top-left { left: 40px; top: 6px; transform: rotate(180deg); animation: kg-bob-up 1.1s ease-in-out infinite; }
+@keyframes kg-bob-down { 0%, 100% { translate: 0 0; } 50% { translate: 0 8px; } }
+@keyframes kg-bob-up { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+@keyframes kg-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kg-rise { from { opacity: 0; transform: translate3d(0, 24px, 0); } to { opacity: 1; transform: none; } }
+
+/* ── The in-app escape, as a full card ── */
+.kg-inapp { width: 100%; max-width: 420px; margin: 0 auto; text-align: left; }
+.kg-inapp .kg-title { font-size: 28px; }
+.kg-inapp-compact .kg-title { font-size: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kg-scrim, .kg-sheet, .kg-arrow { animation: none !important; }
+}
+
+/* The draggable bookmark chip. */
+.kg-drag {
+  display: inline-flex; align-items: center; gap: 10px; padding: 13px 20px; border-radius: 16px;
+  background: #1c1c21; color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; cursor: grab;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.2), 0 0 30px rgba(225, 6, 0, 0.5);
+}
+.kg-drag:active { cursor: grabbing; }
+.kg-drag img { border-radius: 5px; }
+.kg-sheet b { color: #fff; }
