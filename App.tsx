@@ -63,6 +63,9 @@ import { isArmed as stopwatchArmed } from './today/stopwatch';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
+import { useFestiveTheme } from './festive/useFestiveTheme';
+/* Lazy: a student on an ordinary day downloads none of the festive artwork. */
+const FestiveLayer = React.lazy(() => import('./festive/FestiveLayer'));
 import { useAnnouncements } from './announce/useAnnouncements';
 import AnnouncementModal from './announce/AnnouncementModal';
 import { useModerationNotices } from './moderation/useModerationNotices';
@@ -215,6 +218,8 @@ const App: React.FC = () => {
      grant itself. This only decides whether the console is drawn; every query
      it makes is re-authorized in the database. See admin/useAdmin. */
   const { isAdmin, checked: adminChecked } = useAdmin(user);
+  /* The festive theme an administrator has switched on for everyone (festive/). */
+  const festive = useFestiveTheme();
 
   /* ── The private CBT ──
      Same stance as the console: asked of the server (`has_feature('cbt')`),
@@ -1917,6 +1922,12 @@ const App: React.FC = () => {
           className="fixed inset-0 z-0 pointer-events-none"
         />
       )}
+      {/* The festive theme, chosen for everyone from Console → Theme. */}
+      {festive !== 'none' && (
+        <React.Suspense fallback={null}>
+          <FestiveLayer theme={festive} dark={theme === 'dark'} railPx={sidebarCollapsed ? 72 : 212} />
+        </React.Suspense>
+      )}
 
       <Sidebar
         activeTab={activeTab}
@@ -1957,7 +1968,7 @@ const App: React.FC = () => {
 
       {/* Margin tracks the rail's width, so collapsing it gives the page the
           space back instead of leaving the app parked to the right of a gap. */}
-      <div className={`shell-offset transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
+      <div className={`shell-offset ${festive !== 'none' ? 'festive-pad' : ''} transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
 
         <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
           {profileCtl.routeHandle ? (
@@ -2003,6 +2014,7 @@ const App: React.FC = () => {
               onShare={() => setSharePeriod('daily')}
               unreadAnnouncements={announcements.open ? 0 : announcements.queue.length}
               onOpenAnnouncement={announcements.reopen}
+              festive={festive}
             />
           )}
           {activeTab === 'Plan' && (

@@ -3,6 +3,7 @@ import AnnouncementsAdmin from './AnnouncementsAdmin';
 import FeedbackInbox from './FeedbackInbox';
 import AdminRoster from './AdminRoster';
 import ModerationAdmin from './ModerationAdmin';
+import ThemeAdmin from './ThemeAdmin';
 
 /* Lazy so the Decks data layer stays out of the main bundle. */
 const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
@@ -16,11 +17,12 @@ interface Props {
   onOpenDeck: (id: string | null) => void;
 }
 
-type Section = 'analytics' | 'announce' | 'inbox' | 'moderation' | 'decks' | 'people';
+type Section = 'analytics' | 'announce' | 'theme' | 'inbox' | 'moderation' | 'decks' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'announce', label: 'Announcements' },
+  { id: 'theme', label: 'Theme' },
   { id: 'inbox', label: 'Feedback' },
   { id: 'moderation', label: 'Moderation' },
   { id: 'decks', label: 'Decks' },
@@ -30,7 +32,7 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
 /**
  * The console.
  *
- * Six sections behind one switch rather than six tabs in the rail: the rail
+ * Seven sections behind one switch rather than seven tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -68,6 +70,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
 
       {section === 'analytics' && <Suspense fallback={null}><AnalyticsAdmin theme={theme} /></Suspense>}
       {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
+      {section === 'theme' && <ThemeAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}
       {section === 'decks' && <Suspense fallback={null}><DecksAdmin theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}

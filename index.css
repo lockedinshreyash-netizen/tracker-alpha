@@ -1018,6 +1018,9 @@ button:active,
 /* The page, under the phone's fixed top bar (Sidebar.tsx). */
 .shell-offset { padding-top: calc(3.5rem + var(--safe-top)); }
 @media (min-width: 768px) { .shell-offset { padding-top: var(--safe-top); } }
+/* A festive theme hangs its string under the phone's capsule (festive/festive.css);
+   the page moves down by the string's drop so the title is not behind it. */
+@media (max-width: 767px) { .shell-offset.festive-pad { padding-top: calc(3.5rem + var(--safe-top) + 34px); } }
 
 /* Full-screen surfaces (CBT, error tests, the reader) keep their close buttons clear of it. */
 .safe-top { padding-top: var(--safe-top); }

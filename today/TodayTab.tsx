@@ -15,6 +15,7 @@ import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { Card, Chip, Eyebrow, PageHeader, Segmented, btn, tokens } from '../ui/kit';
+import { FESTIVE_GREETING, type FestiveTheme } from '../festive/useFestiveTheme';
 
 const TARGET_OPEN_KEY = 'today_target_open';
 
@@ -48,6 +49,8 @@ interface Props {
      ever lost to a stray tap on the scrim. */
   unreadAnnouncements: number;
   onOpenAnnouncement: () => void;
+  /** The festive theme everyone is seeing; adds one greeting to the date line. */
+  festive?: FestiveTheme;
 }
 
 const TodayTab: React.FC<Props> = ({
@@ -75,6 +78,7 @@ const TodayTab: React.FC<Props> = ({
   onShare,
   unreadAnnouncements,
   onOpenAnnouncement,
+  festive = 'none',
 }) => {
   const { timer, tasks, logs, dailyGoalHours, pomodoro, pomodoroSettings } = state;
   const pomodoroBusy = !pomodoroIsIdle(pomodoro);
@@ -215,6 +219,15 @@ const TodayTab: React.FC<Props> = ({
   const remaining = Math.max(0, dailyGoalHours - totalToday);
   const busy = stopwatchBusy || pomodoroBusy;
 
+  const greeting = festive !== 'none' ? FESTIVE_GREETING[festive] : null;
+  const dateLine = greeting ? (
+    <>
+      {todayLabel}
+      <span aria-hidden> · </span>
+      <span className="font-accent italic" style={{ color: dark ? greeting.dark : greeting.light }}>{greeting.text}</span>
+    </>
+  ) : todayLabel;
+
   return (
     <div className="space-y-6">
       {/* Mid-session the clock is the page; the header would only push it down. */}
@@ -227,10 +240,10 @@ const TodayTab: React.FC<Props> = ({
              screen it follows the date on one line. */
           subtitle={
             totalToday === 0
-              ? todayLabel
+              ? dateLine
               : (
                 <>
-                  {todayLabel}
+                  {dateLine}
                   <span className="hidden md:inline">. </span>
                   <br className="md:hidden" />
                   {remaining > 0
