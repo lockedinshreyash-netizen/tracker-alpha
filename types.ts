@@ -1,3 +1,4 @@
+import type { ReadingState } from './reader/model';
 
 export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'Biology' | 'General';
 
@@ -769,4 +770,7 @@ export interface AppState {
   ai?: AiPrefs;
   /* Optional for the same reason as `schedule`; `normalizeMocks` fills it. */
   mocks?: MocksState;
+  /* The day-100 book: highlights, notes, bookmarks, action steps ticked and
+     where the student is. `normalizeReading` (reader/model.ts) fills it. */
+  reading?: ReadingState;
 }

@@ -16,10 +16,13 @@ import * as sfx from './audio';
 import { loggedCue } from './sound/cues';
 import { useSoundHotkey } from './sound/useSound';
 import { soundForTaskMove } from './sound/moments';
-import BookReader from './rewards/BookReader';
+/* Lazy: the whole text of the day-100 book rides in this chunk, not the main bundle. */
+const BookReader = React.lazy(() => import('./rewards/BookReader'));
 import { Recommendation } from './today/recommend';
 import MocksTab from './mocks/MocksTab';
 import { applyAttempts, mergeMocks, normalizeMocks } from './mocks/model';
+import { mergeReading, normalizeReading, type ReadingState } from './reader/model';
+import { BOOK } from './content/book';
 import Sidebar from './Sidebar';
 import LandingPage from './LandingPage';
 import { landingWillShow } from './landing/gate';
@@ -157,6 +160,9 @@ const App: React.FC = () => {
       merged.analysis = normalizeAnalysis(parsed.analysis);
       merged.ai = normalizeAi(parsed.ai);
       merged.mocks = normalizeMocks(parsed.mocks);
+      /* The reader used to remember only a chapter index (rewards.bookChapter);
+         a student mid-book reopens in that chapter. */
+      merged.reading = normalizeReading(parsed.reading, BOOK.chapterIds[parsed.rewards?.bookChapter ?? -1] ?? null);
       /* The Questions tab became Mocks and took its slot in the rail. */
       if ((parsed.lastUsedTab as string) === 'Questions') merged.lastUsedTab = 'Mocks';
       // The Observatory was removed; anyone who left the app there lands on Today.
@@ -481,6 +487,10 @@ const App: React.FC = () => {
                result logged on the phone must survive; a mock deleted on the
                phone must still be able to reach the laptop. */
             mocks: mergeMocks(normalizeMocks(localState.mocks), normalizeMocks(remoteState.mocks)),
+            /* Same rule again for the book. Deleting a highlight leaves a
+               dated tombstone, so the union cannot bring it back; the newer
+               reading position wins; a chapter's furthest point only rises. */
+            reading: mergeReading(normalizeReading(localState.reading), normalizeReading(remoteState.reading)),
           };
         });
       }
@@ -649,13 +659,19 @@ const App: React.FC = () => {
     });
   };
 
-  const setBookChapter = (index: number) => {
+  /* Every change the book makes — a highlight, a note, a tick, the reading
+     position — is one AppState write through here. The reader batches the
+     position itself (reader/usePosition.ts), so scrolling is not a write. */
+  const withReading = useCallback((fn: (r: ReadingState) => ReadingState) => {
     setState(prev => {
-      const next = { ...prev, rewards: { ...normalizeRewards(prev.rewards), bookChapter: index }, lastUpdated: Date.now() };
+      const before = normalizeReading(prev.reading);
+      const after = fn(before);
+      if (after === before) return prev;
+      const next = { ...prev, reading: after, lastUpdated: Date.now() };
       stateRef.current = next;
       return next;
     });
-  };
+  }, []);
 
   /* Records that the user opened the claim. The actual conversation happens
      over email — the app never collects a postal address. */
@@ -1844,6 +1860,8 @@ const App: React.FC = () => {
   /* Same reason as `schedule`: the realtime path can spread a blob with no
      `mocks` in it, or one shaped by an older build. */
   const mocks = useMemo(() => normalizeMocks(state.mocks), [state.mocks]);
+  /* Same reason: the realtime path can spread a blob with no `reading`. */
+  const reading = useMemo(() => normalizeReading(state.reading), [state.reading]);
   /* Oldest un-shown tier first, so someone returning after a long absence is
      walked up their unlocks one at a time instead of seeing only the last. */
   const celebration = pendingCelebrations(rewards)[0];
@@ -2302,12 +2320,14 @@ const App: React.FC = () => {
       )}
 
       {isBookOpen && (
-        <BookReader
-          theme={theme}
-          chapter={rewards.bookChapter ?? 0}
-          onChapterChange={setBookChapter}
-          onClose={() => setIsBookOpen(false)}
-        />
+        <React.Suspense fallback={<div className={`fixed inset-0 z-[80] ${theme === 'dark' ? 'bg-[#0B0B0D]' : 'bg-[#F6F4F0]'}`} />}>
+          <BookReader
+            theme={theme}
+            reading={reading}
+            onReading={withReading}
+            onClose={() => setIsBookOpen(false)}
+          />
+        </React.Suspense>
       )}
 
       {/* Waits behind onboarding, every other full-screen moment and a

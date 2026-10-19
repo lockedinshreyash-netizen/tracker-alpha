@@ -163,7 +163,7 @@ const RewardsVault: React.FC<Props> = ({
               <div className={`px-6 pb-6 pt-4 border-t ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}>
                 <p className={`text-[13px] font-accent mb-1 ${heading}`}>{BOOK.title}</p>
                 <p className="text-[11px] text-zinc-500 font-ui mb-4">
-                  {BOOK.chapters.length} chapter{BOOK.chapters.length === 1 ? '' : 's'}
+                  {BOOK.chapterCount} chapter{BOOK.chapterCount === 1 ? '' : 's'}
                   {BOOK.complete ? '' : ' · still being written'} · yours permanently
                 </p>
                 <button

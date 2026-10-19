@@ -31,6 +31,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('analytics') === 'debug') {
   // The console's Analytics section in every state, on fixtures, no database.
   import('./analytics/DebugAnalytics').then(({ default: DebugAnalytics }) => ReactDOM.createRoot(rootElement).render(<DebugAnalytics />));
+} else if (import.meta.env.DEV && params.get('book') === 'debug') {
+  // The reader's design board: every state on phone and laptop, on fixtures, nothing written.
+  import('./reader/DebugReader').then(({ default: DebugReader }) => ReactDOM.createRoot(rootElement).render(<DebugReader />));
 } else if (import.meta.env.DEV && params.get('festive') === 'debug') {
   // Every festive theme in real device-width frames, with working fireworks.
   import('./festive/DebugFestive').then(({ default: DebugFestive }) => ReactDOM.createRoot(rootElement).render(<DebugFestive />));
