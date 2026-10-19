@@ -63,7 +63,7 @@ import { isArmed as stopwatchArmed } from './today/stopwatch';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
-import { useFestiveTheme } from './festive/useFestiveTheme';
+import { FESTIVE_LABEL, useFestiveOptOut, useFestiveTheme } from './festive/useFestiveTheme';
 /* Lazy: a student on an ordinary day downloads none of the festive artwork. */
 const FestiveLayer = React.lazy(() => import('./festive/FestiveLayer'));
 import { useAnnouncements } from './announce/useAnnouncements';
@@ -219,7 +219,10 @@ const App: React.FC = () => {
      it makes is re-authorized in the database. See admin/useAdmin. */
   const { isAdmin, checked: adminChecked } = useAdmin(user);
   /* The festive theme an administrator has switched on for everyone (festive/). */
-  const festive = useFestiveTheme();
+  const festiveLive = useFestiveTheme();
+  /* A student can turn the live theme off on this device (quick settings). */
+  const [festiveOff, setFestiveOff] = useFestiveOptOut(festiveLive);
+  const festive = festiveOff ? 'none' : festiveLive;
 
   /* ── The private CBT ──
      Same stance as the console: asked of the server (`has_feature('cbt')`),
@@ -2247,6 +2250,12 @@ const App: React.FC = () => {
           onOpenProfile={profileCtl.openEditProfile}
           install={install}
           onOpenAll={() => handleTabChangeAndExitProfile('Review')}
+          festive={festiveLive === 'none' ? null : {
+            theme: festiveLive,
+            label: FESTIVE_LABEL[festiveLive],
+            on: !festiveOff,
+            onToggle: on => setFestiveOff(!on),
+          }}
         />
       )}
 

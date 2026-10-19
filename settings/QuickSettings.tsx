@@ -42,6 +42,9 @@ interface Props {
   install: InstallApi;
   /** The full settings, on Review. */
   onOpenAll: () => void;
+  /** The festive theme an administrator has switched on, or null when none is
+   *  live — and then there is no row at all, because there is nothing to turn off. */
+  festive?: { theme: 'dussehra' | 'diwali' | 'christmas'; label: string; on: boolean; onToggle: (on: boolean) => void } | null;
 }
 
 /* ── Glyphs, in the rail's stroke language ── */
@@ -60,6 +63,7 @@ const MOON = 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z';
 const CAP = 'M2 9l10-5 10 5-10 5L2 9zM6 11v5c3 2 9 2 12 0v-5';
 const DOWNLOAD = 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3';
 const CHEVRON = 'M9 18l6-6-6-6';
+const SPARKLE = 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z';
 
 const GoogleMark = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -100,7 +104,7 @@ const SYNC_DOT: Record<SyncStatus, string> = {
 
 const QuickSettings: React.FC<Props> = ({
   theme, onToggleTheme, currentClass, onClassChange, reminders, onChangeReminders,
-  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll,
+  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, festive = null,
 }) => {
   const dark = theme === 'dark';
   const sound = useSound();
@@ -238,6 +242,19 @@ const QuickSettings: React.FC<Props> = ({
                 <Row dark={dark} icon={MOON} color="#7048E8" label="Dark mode">
                   <Switch dark={dark} label="Dark mode" on={dark} onToggle={() => { sfx.select(); onToggleTheme(); }} />
                 </Row>
+                {/* Only while a theme is live. Off holds for this theme on this
+                    device; the next theme asks again (festive/useFestiveTheme). */}
+                {festive && (
+                  <Row
+                    dark={dark}
+                    icon={SPARKLE}
+                    color={festive.theme === 'christmas' ? '#2F9E44' : '#F08C00'}
+                    label="Festive theme"
+                    note={festive.on ? `${festive.label} decorations` : `${festive.label} decorations are hidden`}
+                  >
+                    <Switch dark={dark} label="Festive theme" on={festive.on} onToggle={v => { sfx.select(); festive.onToggle(v); }} />
+                  </Row>
+                )}
               </div>
 
               {/* ── Class ── */}

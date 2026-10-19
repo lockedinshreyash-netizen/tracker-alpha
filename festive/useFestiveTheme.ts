@@ -29,7 +29,15 @@ export const FESTIVE_GREETING: Record<Exclude<FestiveTheme, 'none'>, { text: str
   christmas: { text: 'Merry Christmas', dark: '#F2C14E', light: '#1F5A3C' },
 };
 
+/** What the settings row calls each theme. */
+export const FESTIVE_LABEL: Record<Exclude<FestiveTheme, 'none'>, string> = {
+  dussehra: 'Dussehra',
+  diwali: 'Diwali',
+  christmas: 'Christmas & New Year',
+};
+
 const CACHE_KEY = 'alpha_festive_v1';
+const OFF_KEY = 'alpha_festive_off_v1';
 const RECHECK_MS = 2 * 60 * 1000;
 
 const isTheme = (v: unknown): v is FestiveTheme =>
@@ -132,4 +140,31 @@ export const useFestiveTheme = (): FestiveTheme => {
 
 export const announceLocalFlip = (t: FestiveTheme) => {
   window.dispatchEvent(new CustomEvent('alpha:festive', { detail: t }));
+};
+
+/* ── Turning it off on this device ──
+
+   A student may not want lanterns over their study session. The switch is in
+   quick settings and exists only while a theme is live.
+
+   It remembers WHICH theme was turned off, not "festive themes: off". Turning
+   off Diwali in November should not silently swallow Christmas in December:
+   a new theme is a new question, and the switch appears again to answer it.
+
+   Device-local (localStorage), like sound: a preference about this screen, and
+   kept out of AppState so flipping it never fires a sync. */
+const readOff = (): string | null => {
+  try { return localStorage.getItem(OFF_KEY); } catch { return null; }
+};
+
+export const useFestiveOptOut = (live: FestiveTheme): [boolean, (off: boolean) => void] => {
+  const [offFor, setOffFor] = useState<string | null>(readOff);
+  const set = useCallback((off: boolean) => {
+    const next = off && live !== 'none' ? live : null;
+    try {
+      if (next) localStorage.setItem(OFF_KEY, next); else localStorage.removeItem(OFF_KEY);
+    } catch { /* private window: it holds for this visit */ }
+    setOffFor(next);
+  }, [live]);
+  return [live !== 'none' && offFor === live, set];
 };
