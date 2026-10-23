@@ -99,7 +99,7 @@ export function ChapterPicker({ anchor, chapters, status, current, onPick, onClo
   );
 }
 
-export function PageMenu({ anchor, onClose, font, wide, linked, onFont, onWide, onLink, onSummary, onCopy, onMove, onTrash, info }: {
+export function PageMenu({ anchor, onClose, font, wide, linked, onFont, onWide, onLink, onSummary, onCopy, onMove, onTrash, onKeys, info }: {
   anchor: DOMRect;
   onClose: () => void;
   font: PageFont;
@@ -113,6 +113,7 @@ export function PageMenu({ anchor, onClose, font, wide, linked, onFont, onWide, 
   onCopy: () => void;
   onMove: () => void;
   onTrash: () => void;
+  onKeys?: () => void;
   info?: string;
 }) {
   const item = (glyph: string, label: string, run: () => void, hint?: string, danger = false, keepOpen = false) => (
@@ -138,6 +139,7 @@ export function PageMenu({ anchor, onClose, font, wide, linked, onFont, onWide, 
         <span className="nt-pop-rule" />
         {item('⇥', 'Move inside…', onMove, undefined, false, true)}
         {item('M↓', 'Copy as Markdown', onCopy)}
+        {onKeys && item('⌘', 'Keyboard shortcuts', onKeys, `${MOD}/`, false, true)}
         <span className="nt-pop-rule" />
         {item('×', 'Move to trash', onTrash, undefined, true)}
         {info && <p className="nt-pop-info">{info}</p>}
@@ -166,3 +168,69 @@ export const relTime = (ms: number, now = Date.now()): string => {
   if (d < 7 * 86_400_000) return `${Math.floor(d / 86_400_000)}d ago`;
   return new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
+
+/* ── Keyboard shortcuts (⌘/) ──
+   The same keys Notion uses, so a student's hands already know them. The list
+   is what keys.ts and TipTap's own keymaps actually bind; change one, change
+   the other. */
+
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = MAC ? '⌘' : 'Ctrl ';
+const ALT = MAC ? '⌥' : 'Alt ';
+const SHIFT = MAC ? '⇧' : 'Shift ';
+
+const KEYS: [string, [string, string][]][] = [
+  ['Write', [
+    ['Bold, italic, underline', `${MOD}B  ${MOD}I  ${MOD}U`],
+    ['Strikethrough', `${MOD}${SHIFT}S`],
+    ['Highlight', `${MOD}${SHIFT}H`],
+    ['Inline code', `${MOD}E`],
+    ['Link the selection', `${MOD}K`],
+    ['Equation', `${MOD}${SHIFT}M`],
+    ['New line in the same block', `${SHIFT}↵`],
+  ]],
+  ['Turn into', [
+    ['Text', `${MOD}${ALT}0`],
+    ['Heading 1, 2, 3', `${MOD}${ALT}1–3`],
+    ['To-do', `${MOD}${ALT}4`],
+    ['Bulleted list', `${MOD}${ALT}5`],
+    ['Numbered list', `${MOD}${ALT}6`],
+    ['Toggle', `${MOD}${ALT}7`],
+    ['Code', `${MOD}${ALT}8`],
+  ]],
+  ['Blocks', [
+    ['Indent, outdent', `Tab  ${SHIFT}Tab`],
+    ['Move up, down', `${MOD}${SHIFT}↑  ${MOD}${SHIFT}↓`],
+    ['Duplicate', `${MOD}D`],
+    ['Tick a to-do, open a toggle', `${MOD}↵`],
+  ]],
+  ['Anywhere', [
+    ['Search', `${MOD}K  ${MOD}P`],
+    ['Undo, redo', `${MOD}Z  ${MOD}${SHIFT}Z`],
+    ['This list', `${MOD}/`],
+  ]],
+  ['As you type', [
+    ['Headings', '#  ##  ###'],
+    ['Lists, to-do', '-  1.  []'],
+    ['Quote, code, divider', '>  ```  ---'],
+    ['Equation', '$x$  $$'],
+    ['Chapter, page, blocks', '@  [[  /'],
+  ]],
+];
+
+export function ShortcutsList({ anchor, onClose }: { anchor: DOMRect; onClose: () => void }) {
+  return (
+    <Popover anchor={anchor} onClose={onClose} width={340} align="right">
+      <div className="nt-keys">
+        {KEYS.map(([group, rows]) => (
+          <section key={group}>
+            <p className="nt-pop-group">{group}</p>
+            {rows.map(([label, keys]) => (
+              <div key={label} className="nt-keys-row"><span>{label}</span><kbd>{keys}</kbd></div>
+            ))}
+          </section>
+        ))}
+      </div>
+    </Popover>
+  );
+}

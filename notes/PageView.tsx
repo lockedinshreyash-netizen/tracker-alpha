@@ -18,7 +18,7 @@ import type * as Y from 'yjs';
 import type { NotesStore } from './store';
 import { descendants, pageSubject, type PageMeta, type PagePatch, type Tree } from './workspace';
 import type { ChapterOption, NotesEnv } from './editor/env';
-import { ChapterPicker, PageMenu, Popover, relTime } from './ui';
+import { ChapterPicker, PageMenu, Popover, ShortcutsList, relTime } from './ui';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { STATUS_LABELS } from '../constants';
 import { fold } from './text';
@@ -45,7 +45,7 @@ interface Props {
   onTyping: (typing: boolean) => void;
 }
 
-type Pop = { kind: 'chapter' | 'menu' | 'move'; rect: DOMRect } | null;
+type Pop = { kind: 'chapter' | 'menu' | 'move' | 'keys'; rect: DOMRect } | null;
 
 const clean = (s: string) => s.replace(/\s*\n\s*/g, ' ').slice(0, 300);
 
@@ -66,6 +66,7 @@ export default function PageView({ store, page, tree, env, dark, chapters, chapt
   const [bodyEmpty, setBodyEmpty] = useState(false);
   const [pop, setPop] = useState<Pop>(null);
   const editorRef = useRef<Editor | null>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dekRef = useRef<HTMLTextAreaElement>(null);
   const timers = useRef<Record<'title' | 'dek', ReturnType<typeof setTimeout> | null>>({ title: null, dek: null });
@@ -157,6 +158,15 @@ export default function PageView({ store, page, tree, env, dark, chapters, chapt
     try { await navigator.clipboard.writeText(head + ed.getMarkdown()); } catch { /* the browser refused */ }
   };
 
+  // ⌘/ from the editor (keys.ts) or anywhere on the page.
+  useEffect(() => {
+    const show = () => { const r = moreRef.current?.getBoundingClientRect(); if (r) setPop(p => (p?.kind === 'keys' ? null : { kind: 'keys', rect: r })); };
+    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === '/' && !e.defaultPrevented) { e.preventDefault(); show(); } };
+    window.addEventListener('nt-shortcuts', show);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('nt-shortcuts', show); window.removeEventListener('keydown', key); };
+  }, []);
+
   const open = (kind: NonNullable<Pop>['kind']) => (e: React.MouseEvent) => setPop({ kind, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() });
 
   return (
@@ -171,7 +181,7 @@ export default function PageView({ store, page, tree, env, dark, chapters, chapt
           onClick={() => onPatch({ favorite: !page.favorite })}>
           <PinIcon on={page.favorite} />
         </button>
-        <button type="button" className="nt-icon-btn" aria-label="More" onClick={open('menu')}><MoreIcon /></button>
+        <button ref={moreRef} type="button" className="nt-icon-btn" aria-label="More" onClick={open('menu')}><MoreIcon /></button>
       </header>
 
       <article className="nt-page" data-font={page.font} data-wide={page.wide}>
@@ -285,9 +295,11 @@ export default function PageView({ store, page, tree, env, dark, chapters, chapt
           onCopy={() => { void copyMarkdown(); }}
           onMove={() => setPop({ kind: 'move', rect: pop.rect })}
           onTrash={onTrash}
+          onKeys={() => setPop({ kind: 'keys', rect: pop.rect })}
           info={`${words} ${words === 1 ? 'word' : 'words'} · Edited ${relTime(page.updatedAt).toLowerCase()}`}
         />
       )}
+      {pop?.kind === 'keys' && <ShortcutsList anchor={pop.rect} onClose={() => setPop(null)} />}
       {pop?.kind === 'move' && (
         <MovePicker anchor={pop.rect} tree={tree} page={page} onPick={p => { onMove(p); setPop(null); }} onClose={() => setPop(null)} />
       )}

@@ -69,6 +69,8 @@ const suggestion = (
 
 export const Suggestions = Extension.create<{ env: NotesEnv; bus: SuggestBus }>({
   name: 'ntSuggestions',
+  // Above every keymap: with a menu open, Tab and Enter pick from it.
+  priority: 300,
   addOptions: () => ({ env: null as unknown as NotesEnv, bus: null as unknown as SuggestBus }),
   addProseMirrorPlugins() {
     const { env, bus } = this.options;

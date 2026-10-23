@@ -210,7 +210,16 @@ function Bubble({ editor, env }: { editor: Editor; env: NotesEnv }) {
     // Selection and content changes only: plugin-meta transactions are not ours to redraw on.
     editor.on('selectionUpdate', redraw);
     editor.on('update', redraw);
-    return () => { editor.off('selectionUpdate', redraw); editor.off('update', redraw); };
+    /* ⌘K with text selected (keys.ts) opens the link field here. A window
+       event carrying the editor, never editor.view: under StrictMode this
+       effect can run before the view is mounted, and touching it throws. */
+    const link = (e: Event) => {
+      if ((e as CustomEvent<Editor>).detail !== editor) return;
+      setHref(String(editor.getAttributes('link').href ?? ''));
+      setMode('link');
+    };
+    window.addEventListener('nt-link', link);
+    return () => { editor.off('selectionUpdate', redraw); editor.off('update', redraw); window.removeEventListener('nt-link', link); };
   }, [editor]);
 
   const defs = useMemo(() => blockDefs(env).filter(d => TURN_IDS.includes(d.id)), [env]);
@@ -478,16 +487,28 @@ function PhoneBar({ editor, env }: { editor: Editor; env: NotesEnv }) {
     };
   }, [editor, coarse]);
 
+  /* While writing, the floating buttons (settings, feedback, the notes pill)
+     step aside: the bar takes the bottom edge, and a bar over them covered
+     all three whenever the keyboard was down but the page still had focus. */
+  useEffect(() => {
+    if (!coarse) return;
+    const root = document.documentElement;
+    root.classList.toggle('nt-writing', focused);
+    return () => root.classList.remove('nt-writing');
+  }, [coarse, focused]);
+
   if (!coarse || !focused) return null;
   const run = (fn: () => void) => (e: React.MouseEvent) => { e.preventDefault(); fn(); };
   const btn = (label: string, glyph: React.ReactNode, fn: () => void) => (
     <button type="button" aria-label={label} onMouseDown={run(fn)}>{glyph}</button>
   );
   return createPortal(
-    <div className="nt-phonebar" style={{ bottom }}>
+    <div className="nt-phonebar" style={{ bottom: bottom > 0 ? bottom + 8 : 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
       {btn('Blocks', '/', () => editor.chain().focus().insertContent('/').run())}
       {btn('To-do', '☐', () => editor.chain().focus().toggleTaskList().run())}
       {btn('List', '•', () => editor.chain().focus().toggleBulletList().run())}
+      {btn('Indent', '⇥', () => editor.chain().focus().indent().run())}
+      {btn('Outdent', '⇤', () => editor.chain().focus().outdent().run())}
       {btn('Heading', 'H', () => editor.chain().focus().toggleHeading({ level: 2 }).run())}
       {btn('Bold', <b>B</b>, () => editor.chain().focus().toggleBold().run())}
       {btn('Equation', '∑', () => { env.mathPending = true; editor.chain().focus().insertContent({ type: 'mathInline', attrs: { latex: '' } }).run(); })}

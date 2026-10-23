@@ -33,10 +33,15 @@ export default function NotesHome({ tree, texts, subjects, onOpen, onTemplate }:
 
   const groups = useMemo(() => {
     const byKey = new Map<string, PageMeta[]>();
-    tree.live.forEach(p => {
-      // A subject folder the Syllabus tab made is a shelf, not a page to list.
-      const isFolder = !p.chapter && SUBJECT_NAMES.includes(p.title.trim()) && (tree.children.get(p.id)?.length ?? 0) > 0;
-      if (isFolder) return;
+    // A subject folder the Syllabus tab made is a shelf, not a page to list:
+    // its subject is the group heading, and its pages are listed in its place.
+    const isFolder = (p: PageMeta) => !p.parent && !p.chapter && SUBJECT_NAMES.includes(p.title.trim()) && (tree.children.get(p.id)?.length ?? 0) > 0;
+    const shown = [
+      ...(tree.children.get('') ?? []).filter(p => !isFolder(p)),
+      ...(tree.children.get('') ?? []).filter(isFolder).flatMap(f => tree.children.get(f.id) ?? []),
+    ];
+    // A page inside a page lives in its parent, not on Home.
+    shown.forEach(p => {
       const key = pageSubject(tree, p.id) ?? '';
       byKey.set(key, [...(byKey.get(key) ?? []), p]);
     });
@@ -80,7 +85,10 @@ export default function NotesHome({ tree, texts, subjects, onOpen, onTemplate }:
                   <li key={p.id}>
                     <button type="button" className="nt-row" onClick={() => onOpen(p.id)}>
                       <span className="nt-row-title">{p.title || 'Untitled'}</span>
-                      <span className="nt-row-date">{relTime(p.updatedAt)}</span>
+                      <span className="nt-row-date">
+                        {relTime(p.updatedAt)}
+                        {(tree.children.get(p.id)?.length ?? 0) > 0 && ` · ${tree.children.get(p.id)!.length} inside`}
+                      </span>
                       {preview && <span className="nt-row-preview">{preview}</span>}
                     </button>
                   </li>

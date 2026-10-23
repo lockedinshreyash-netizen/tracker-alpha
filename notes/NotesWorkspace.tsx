@@ -244,7 +244,10 @@ export default function NotesWorkspace({ user, onDisable, theme, examPreference,
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !e.shiftKey) {
+      // A ⌘K the editor already took (a link on the selection) is not a search.
+      if (e.defaultPrevented) return;
+      const k = e.key.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && (k === 'k' || k === 'p') && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         setSearch(s => !s);
       }

@@ -14,6 +14,7 @@ import { Markdown } from '@tiptap/markdown';
 import type * as Y from 'yjs';
 import { Callout, ChapterRef, MathBlock, MathInline, NoteImage, NoteTaskItem, PageLink, TodayTasks } from './nodes';
 import { Suggestions } from './suggest';
+import { Indent, NotionKeys } from './keys';
 import type { NotesEnv, SuggestBus } from './env';
 
 /** Nodes and marks only: what a document may contain. */
@@ -23,7 +24,7 @@ export const contentExtensions = (env: NotesEnv): AnyExtension[] => [
     heading: { levels: [1, 2, 3] },
     link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' } },
     dropcursor: { color: 'rgba(225, 6, 0, 0.55)', width: 2 },
-    codeBlock: { HTMLAttributes: { spellcheck: 'false' } },
+    codeBlock: { HTMLAttributes: { spellcheck: 'false' }, enableTabIndentation: true, tabSize: 2 },
   }),
   TaskList,
   NoteTaskItem,
@@ -39,6 +40,7 @@ export const contentExtensions = (env: NotesEnv): AnyExtension[] => [
   ChapterRef.configure({ env }),
   PageLink.configure({ env }),
   NoteImage.configure({ env }),
+  Indent,
 ];
 
 export const editorExtensions = (env: NotesEnv, bus: SuggestBus, doc: Y.Doc): AnyExtension[] => [
@@ -54,5 +56,6 @@ export const editorExtensions = (env: NotesEnv, bus: SuggestBus, doc: Y.Doc): An
   }),
   Collaboration.configure({ document: doc }),
   Suggestions.configure({ env, bus }),
+  NotionKeys,
   Extension.create({ name: 'ntToday', addProseMirrorPlugins: () => [TodayTasks(env)] }),
 ];
