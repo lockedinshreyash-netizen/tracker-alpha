@@ -37,14 +37,11 @@ import { CardPeriod } from './share/types';
 const ShareModal = React.lazy(() => import('./share/ShareModal'));
 /* Seen once per device: the flow, its stylesheet and its film stay out of the bundle everyone downloads. */
 const OnboardingFlow = React.lazy(() => import('./onboarding/OnboardingFlow'));
-/* One-time: asks students to join the Play Store closed test. See playtest/. */
-const PlaytestMoment = React.lazy(() => import('./playtest/PlaytestMoment'));
 const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
 import type { OnboardingResult, ProfilePick } from './onboarding/OnboardingFlow';
-import { shouldShowPlaytest } from './playtest/gate';
 import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
 import { useRace } from './leaderboard/useRace';
@@ -203,8 +200,6 @@ const App: React.FC = () => {
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  /* The Play Store ask (playtest/): decided once per load, closed for good once seen. */
-  const [playtestOpen, setPlaytestOpen] = useState(shouldShowPlaytest);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
     try {
       return localStorage.getItem(ONBOARDING_KEY) !== 'true';
@@ -2327,16 +2322,6 @@ const App: React.FC = () => {
             onReading={withReading}
             onClose={() => setIsBookOpen(false)}
           />
-        </React.Suspense>
-      )}
-
-      {/* Waits behind onboarding, every other full-screen moment and a
-          running session: it is a favour, so it never interrupts work. */}
-      {playtestOpen && showLanding === false && !needsOnboarding && !isBookOpen && !celebration
-        && streakMoment === null && !sharePeriod && !isAuthModalOpen
-        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
-        <React.Suspense fallback={null}>
-          <PlaytestMoment onClose={() => setPlaytestOpen(false)} />
         </React.Suspense>
       )}
 
