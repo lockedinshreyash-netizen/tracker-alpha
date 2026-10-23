@@ -192,7 +192,7 @@ export interface ChapterProgress {
 /* `Decks` (spaced-repetition flashcards) is server state end to end, like
    Groups: decks, cards and review history live in supabase/decks.sql, never in
    AppState. */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Decks' | 'Admin';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Groups' | 'Decks' | 'Notes' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {

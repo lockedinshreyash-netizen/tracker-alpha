@@ -3,6 +3,7 @@ import { TabType } from './types';
 import { Avatar } from './profile/Avatar';
 import { Profile } from './profile/profileApi';
 import LiquidGlass from './ui/LiquidGlass';
+import ClassSwitch from './settings/ClassSwitch';
 
 interface Props {
   activeTab: TabType;
@@ -24,6 +25,11 @@ interface Props {
   /* Unread group messages across every group. A count and nothing else —
      which group, and from whom, is the Groups tab's business. */
   groupsUnread?: number;
+  /* The class switch at the capsule's right end (settings/ClassSwitch.tsx),
+     on Syllabus only; other tabs have it in quick settings. On a laptop App
+     draws the same control in the corner instead. */
+  currentClass: 11 | 12;
+  onClassChange: (c: 11 | 12) => void;
 }
 
 /* ── Clean SVG icons — 18×18, stroke-based, modern ── */
@@ -111,6 +117,16 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <line x1="10.5" y1="12.5" x2="14.5" y2="12.5" />
         </svg>
       );
+    /* A page with its corner turned and a line of writing: notes, not a book. */
+    case 'Notes':
+      return (
+        <svg {...props}>
+          <path d="M6 3h9l4 4v14H6z" />
+          <path d="M15 3v4h4" />
+          <line x1="9" y1="12" x2="16" y2="12" />
+          <line x1="9" y1="16" x2="13.5" y2="16" />
+        </svg>
+      );
     /* A key. Nothing about the study loop, and it should not pretend to be. */
     case 'Admin':
       return (
@@ -124,15 +140,15 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0 }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0, currentClass, onClassChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /* Appended, never inserted: the tabs the student uses keep the positions
      their muscle memory knows, and the console arrives at the bottom. Groups
      went in after Review for the same reason, below everything that was
-     already there. Decks followed Groups the same way. */
+     already there. Decks followed Groups the same way, and Notes followed Decks. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Decks',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Review', 'Groups', 'Decks', 'Notes',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';
@@ -171,10 +187,14 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             )}
           </svg>
         </button>
-        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] font-ui ${dark ? 'text-zinc-200' : 'text-zinc-700'}`}>
+        {/* Centred on the capsule, not between its ends: the class switch on
+            the right is wider than the menu button on the left. */}
+        <span className={`absolute left-1/2 -translate-x-1/2 pointer-events-none text-[10px] font-bold uppercase tracking-[0.2em] font-ui ${dark ? 'text-zinc-200' : 'text-zinc-700'}`}>
           {activeTab}
         </span>
-        <div className="w-10" />
+        {activeTab === 'Syllabus'
+          ? <ClassSwitch placement="capsule" dark={dark} value={currentClass} onChange={onClassChange} />
+          : <div className="w-10" aria-hidden="true" />}
       </LiquidGlass>
 
       {/* Phone overlay. Dims without blurring: the menu's glass has to have

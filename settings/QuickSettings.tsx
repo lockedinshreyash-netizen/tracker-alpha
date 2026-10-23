@@ -2,7 +2,9 @@
    The gear in the bottom-right corner, where the voice mic used to be, and
    the glass pane it opens: the handful of switches people reach for mid-day
    (notifications, sound, dark mode, class), the account, and a way to the
-   rest. It replaced the web-page header that carried the same controls as a
+   rest. Class is here on every tab but Syllabus, which has its own switch in
+   the corner (ClassSwitch.tsx) because that is the tab it changes most. It
+   replaced the web-page header that carried the same controls as a
    row of bordered buttons over every tab: a native app keeps them one tap
    away, not in front of the content.
 
@@ -32,6 +34,8 @@ interface Props {
   onToggleTheme: () => void;
   currentClass: 11 | 12;
   onClassChange: (c: 11 | 12) => void;
+  /** False on Syllabus, where the corner switch is drawn instead. */
+  showClass?: boolean;
   reminders: ReminderPrefs;
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
   user: User | null;
@@ -103,7 +107,7 @@ const SYNC_DOT: Record<SyncStatus, string> = {
 };
 
 const QuickSettings: React.FC<Props> = ({
-  theme, onToggleTheme, currentClass, onClassChange, reminders, onChangeReminders,
+  theme, onToggleTheme, currentClass, onClassChange, showClass = true, reminders, onChangeReminders,
   user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, festive = null,
 }) => {
   const dark = theme === 'dark';
@@ -258,17 +262,19 @@ const QuickSettings: React.FC<Props> = ({
               </div>
 
               {/* ── Class ── */}
-              <div className={`${group} mt-3`}>
-                <Row dark={dark} first icon={CAP} color="#12B886" label="Class">
-                  <Segmented
-                    dark={dark}
-                    label="Class"
-                    value={String(currentClass) as '11' | '12'}
-                    options={[{ value: '11', label: '11' }, { value: '12', label: '12' }]}
-                    onChange={v => { sfx.select(); onClassChange(v === '12' ? 12 : 11); }}
-                  />
-                </Row>
-              </div>
+              {showClass && (
+                <div className={`${group} mt-3`}>
+                  <Row dark={dark} first icon={CAP} color="#12B886" label="Class">
+                    <Segmented
+                      dark={dark}
+                      label="Class"
+                      value={String(currentClass) as '11' | '12'}
+                      options={[{ value: '11', label: '11' }, { value: '12', label: '12' }]}
+                      onChange={v => { sfx.select(); onClassChange(v === '12' ? 12 : 11); }}
+                    />
+                  </Row>
+                </div>
+              )}
 
               {/* ── Install, where the browser can ── */}
               {showInstall && (

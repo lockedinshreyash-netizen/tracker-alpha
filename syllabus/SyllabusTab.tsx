@@ -6,6 +6,7 @@ import ChapterTest from './ChapterTest';
 import { hasCompleteTest } from '../content/questions';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { Card, Chip, Eyebrow, Overlay, PageHeader, Segmented, btn, tokens } from '../ui/kit';
+import { readChapterIndex } from '../notes/forget';
 
 interface Props {
   currentClass: 11 | 12;
@@ -15,17 +16,22 @@ interface Props {
   activeSubjects: Subject[];
   examPreference: ExamPreference;
   onTestFinished: (classId: 11 | 12, subject: Subject, chapter: string, results: Record<string, TopicMastery>, allSolid: boolean) => void;
+  /** Whose notes to look in (an account id, or 'guest') for chapters that already have a page. */
+  notesOwner?: string;
+  onOpenNotes?: (classId: 11 | 12, subject: Subject, chapter: string) => void;
 }
 
 type SortMode = 'damage' | 'syllabus';
 
-const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference, onTestFinished }) => {
+const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference, onTestFinished, notesOwner = 'guest', onOpenNotes }) => {
   const [activeSubject, setActiveSubject] = useState<Subject>('Physics');
   const [sortMode, setSortMode] = useState<SortMode>('damage');
   const [hideCompleted, setHideCompleted] = useState(false);
   const [testFor, setTestFor] = useState<string | null>(null);
 
   const dark = theme === 'dark';
+  // Written by the Notes tab; read once per visit, which is when it can have changed.
+  const notesIndex = useMemo(() => readChapterIndex(notesOwner), [notesOwner]);
   const chapters = useMemo(
     () => getChaptersFor(examPreference, currentClass, activeSubject),
     [examPreference, currentClass, activeSubject],
@@ -221,6 +227,7 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
               </div>
 
               <div className={`flex justify-between items-center mt-4 pt-3 border-t gap-2 ${t.rule}`}>
+                <span className="flex items-center gap-3">
                 {hasTest ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); setTestFor(chapter); }}
@@ -231,6 +238,19 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
                 ) : (
                   <span className={`text-[11px] font-ui ${t.faint}`}>Test coming soon</span>
                 )}
+                {onOpenNotes && (() => {
+                  const has = !!notesIndex[`${currentClass}|${activeSubject}|${chapter}`];
+                  return (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpenNotes(currentClass, activeSubject, chapter); }}
+                      className={`text-[11px] font-ui font-bold hover:underline ${has ? t.heading : t.muted}`}
+                      title={has ? 'Open your notes for this chapter' : 'Start a notes page for this chapter'}
+                    >
+                      {has ? 'Notes' : '+ Notes'}
+                    </button>
+                  );
+                })()}
+                </span>
                 <span className={`text-[10px] font-ui ${t.faint} opacity-0 group-hover:opacity-100 transition-opacity`}>Tap to update</span>
               </div>
             </div>

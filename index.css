@@ -706,6 +706,57 @@ button:active,
   .qs-scrim { background: transparent; }
 }
 
+/* ── The class switch (settings/ClassSwitch.tsx) ──
+   On a phone it sits at the right end of the capsule; on a laptop it is its
+   own glass pill in the top-right corner, right edge in line with the gear
+   and top edge with the rail. <main> starts lower on a laptop (App.tsx,
+   md:pt-16) so a tab's header never runs under it. The note hangs under it
+   and takes no pointer. */
+.cls-corner { display: none; }
+@media (min-width: 768px) {
+  .cls-corner {
+    position: fixed;
+    top: calc(var(--safe-top) + 8px);
+    right: 16px;
+    z-index: 40;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 5px 0 14px;
+  }
+}
+.cls-capsule { margin-right: 3px; }
+.cls-track { padding: 3px; }
+.cls-seg { width: 32px; height: 28px; border-radius: 999px; }
+.cls-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.cls-note {
+  position: fixed;
+  z-index: 55;
+  width: min(272px, calc(100vw - 20px));
+  pointer-events: none;
+}
+.cls-note--capsule { top: calc(var(--safe-top) + 68px); right: 10px; }
+.cls-note--corner { top: calc(var(--safe-top) + 60px); right: 16px; }
+/* Folds back into the switch it grew out of. Transform only, like cd-pop. */
+@keyframes cls-out { to { transform: translateY(-6px) scale(0.55); } }
+.cls-out { animation: cls-out 0.18s cubic-bezier(0.4, 0, 1, 1) both; transform-origin: top right; }
+/* The narrowest phones keep the two numbers and drop the word, so the
+   capsule's tab name is never run into. */
+@media (max-width: 359px) { .cls-word { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .cls-thumb { transition: none; }
+  .cls-out { animation: none; }
+}
+
 @keyframes fb-pop {
   from { opacity: 0; transform: translateY(10px) scale(0.97); }
   to   { opacity: 1; transform: none; }

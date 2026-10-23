@@ -29,6 +29,7 @@ import { landingWillShow } from './landing/gate';
 import { readDeepLink, settleDeepLink } from './landing/deeplink';
 import AuthModal from './AuthModal';
 import QuickSettings from './settings/QuickSettings';
+import ClassSwitch from './settings/ClassSwitch';
 import TodayTab from './today/TodayTab';
 import { CardPeriod } from './share/types';
 /* Lazy boundaries. The share renderer is fetched on the click, not on the tab:
@@ -38,6 +39,8 @@ const ShareModal = React.lazy(() => import('./share/ShareModal'));
 /* Seen once per device: the flow, its stylesheet and its film stay out of the bundle everyone downloads. */
 const OnboardingFlow = React.lazy(() => import('./onboarding/OnboardingFlow'));
 const DecksTab = React.lazy(() => import('./decks/DecksTab'));
+/* Notes: the store and Yjs arrive with the tab, the editor with the first page. */
+const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import ReviewTab from './review/ReviewTab';
@@ -81,6 +84,8 @@ import { useGroups } from './groups/useGroups';
 import { clearPendingInvite, takePendingInvite } from './groups/invite';
 import { forgetGroupsOnDevice } from './groups/publish';
 import { forgetDecksOnDevice } from './decks/forget';
+import { flushNotesBeforeSignOut, forgetNotesOnDevice } from './notes/forget';
+import type { NotesRequest } from './notes/NotesTab';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
 import { deleteAccount } from './account/deleteAccount';
@@ -200,6 +205,20 @@ const App: React.FC = () => {
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  /* Notes is a writing room: the rail folds to its icons on the way in and
+     goes back to however it was on the way out. Above every early return. */
+  const railBeforeNotes = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (activeTab === 'Notes') {
+      if (railBeforeNotes.current === null) {
+        railBeforeNotes.current = sidebarCollapsed;
+        setSidebarCollapsed(true);
+      }
+    } else if (railBeforeNotes.current !== null) {
+      setSidebarCollapsed(railBeforeNotes.current);
+      railBeforeNotes.current = null;
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
     try {
       return localStorage.getItem(ONBOARDING_KEY) !== 'true';
@@ -553,6 +572,7 @@ const App: React.FC = () => {
     localStorage.removeItem('locked_in_state_v2');
     forgetGroupsOnDevice();
     forgetDecksOnDevice();
+    forgetNotesOnDevice();
     forgetAnalyticsOnDevice();
   };
 
@@ -560,6 +580,8 @@ const App: React.FC = () => {
     if (window.confirm("SIGN OUT? Your session data on this device will be cleared for security. Your cloud record is safe.")) {
       try {
         preventSyncOnUpdate.current = true;
+        // Notes typed offline are only in the outbox; send them while the session can.
+        if (user) await flushNotesBeforeSignOut(user.id);
         await supabase.auth.signOut();
         forgetAccountOnDevice();
         setState(DEFAULT_STATE);
@@ -607,6 +629,15 @@ const App: React.FC = () => {
   /* A deck the admin console asked to open; DecksTab takes it and clears it. */
   const [deckToOpen, setDeckToOpen] = useState<string | null>(null);
   const clearDeckToOpen = useCallback(() => setDeckToOpen(null), []);
+
+  /* Syllabus → a chapter's notes page: Notes opens it, or makes it. */
+  const [notesRequest, setNotesRequest] = useState<NotesRequest | null>(null);
+  const clearNotesRequest = useCallback(() => setNotesRequest(null), []);
+  const openChapterNotes = useCallback((classId: 11 | 12, subject: Subject, chapter: string) => {
+    setNotesRequest({ key: `${classId}|${subject}|${chapter}`, chapter, subject, nonce: Date.now() });
+    handleTabChange('Notes');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const openSyllabusTab = useCallback(() => handleTabChange('Syllabus'), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -739,6 +770,8 @@ const App: React.FC = () => {
   const [streakMoment, setStreakMoment] = useState<number | null>(null);
   const pendingStreakMoment = useRef(false);
   const closeStreakMoment = useCallback(() => setStreakMoment(null), []);
+  /* The class switch, drawn twice (the phone's capsule and the laptop's corner). */
+  const setCurrentClass = useCallback((c: 11 | 12) => setState(p => ({ ...p, currentClass: c })), []);
   // The core sounds are fetched once the app is on screen, never under the landing page.
   useEffect(() => {
     if (showLanding === false) sfx.prefetchCore();
@@ -1955,6 +1988,8 @@ const App: React.FC = () => {
         ownProfile={profileCtl.ownProfile}
         onOpenAccount={profileCtl.openEditProfile}
         groupsUnread={groupsState.totalUnread}
+        currentClass={state.currentClass}
+        onClassChange={setCurrentClass}
       />
 
       <AuthModal
@@ -1986,7 +2021,7 @@ const App: React.FC = () => {
           space back instead of leaving the app parked to the right of a gap. */}
       <div className={`shell-offset ${festive !== 'none' ? 'festive-pad' : ''} transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[212px]'}`}>
 
-        <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 py-8 pb-16">
+        <main className="max-w-5xl mx-auto w-full relative z-20 px-4 md:px-6 pt-8 md:pt-16 pb-16">
           {profileCtl.routeHandle ? (
             <ProfilePage
               handle={profileCtl.routeHandle}
@@ -2063,6 +2098,8 @@ const App: React.FC = () => {
               activeSubjects={activeSubjects}
               examPreference={state.examPreference || 'JEE'}
               onTestFinished={recordTestResult}
+              notesOwner={user?.id ?? 'guest'}
+              onOpenNotes={openChapterNotes}
             />
           )}
           {activeTab === 'Streak' && (
@@ -2140,6 +2177,24 @@ const App: React.FC = () => {
                 onOpenAuth={() => setIsAuthModalOpen(true)}
                 openDeckId={deckToOpen}
                 onOpenedDeck={clearDeckToOpen}
+              />
+            </React.Suspense>
+          )}
+          {/* Lazy, and nothing in it reads or writes AppState except a to-do
+              sent to Today. Its pages live in IndexedDB (notes/store.ts). */}
+          {activeTab === 'Notes' && (
+            <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+              <NotesTab
+                user={user}
+                theme={theme}
+                examPreference={state.examPreference || 'JEE'}
+                progress={state.progress}
+                activeSubjects={activeSubjects}
+                railPx={sidebarCollapsed ? 72 : 212}
+                onAddTask={addTask}
+                onOpenSyllabus={openSyllabusTab}
+                request={notesRequest}
+                onRequestHandled={clearNotesRequest}
               />
             </React.Suspense>
           )}
@@ -2245,6 +2300,13 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Class 11 or 12, top-right on a laptop (the phone has it in the capsule,
+          Sidebar.tsx), on Syllabus only: every other tab has it in quick
+          settings. Same suppression as the gear below. */}
+      {activeTab === 'Syllabus' && !profileCtl.routeHandle && !showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
+        <ClassSwitch placement="corner" dark={theme === 'dark'} value={state.currentClass} onChange={setCurrentClass} />
+      )}
+
       {/* The gear, bottom-right, and the glass pane of quick settings it opens.
           It replaced the web-style header that held the same switches above
           every tab. Same suppression as the feedback launcher. */}
@@ -2253,7 +2315,8 @@ const App: React.FC = () => {
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
           currentClass={state.currentClass}
-          onClassChange={c => setState(p => ({ ...p, currentClass: c }))}
+          onClassChange={setCurrentClass}
+          showClass={activeTab !== 'Syllabus' || !!profileCtl.routeHandle}
           reminders={reminderPrefs}
           onChangeReminders={setReminderPrefs}
           user={user}

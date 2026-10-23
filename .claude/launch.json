@@ -30,6 +30,17 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "tracker-alpha-notes",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "3010",
+        "--strictPort"
+      ],
+      "port": 3010
     }
   ]
 }

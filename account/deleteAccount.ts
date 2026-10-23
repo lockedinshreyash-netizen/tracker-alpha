@@ -45,6 +45,7 @@ const emptyFolder = async (bucket: string, folder: string): Promise<void> => {
 const removeFiles = async (userId: string): Promise<void> => {
   await emptyFolder('avatars', userId);
   await emptyFolder('qbank', userId);
+  await emptyFolder('notes', userId);
 
   // Deck images live under the deck's id, not the person's.
   const { data: decks, error } = await supabase

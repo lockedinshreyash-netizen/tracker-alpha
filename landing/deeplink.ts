@@ -19,6 +19,7 @@ const TABS: Record<string, TabType> = {
   syllabus: 'Syllabus',
   mocks: 'Mocks',
   decks: 'Decks',
+  notes: 'Notes',
   groups: 'Groups',
   streak: 'Streak',
   // The "delete your account" page (site/legal.tsx) links to /?open=review#account.

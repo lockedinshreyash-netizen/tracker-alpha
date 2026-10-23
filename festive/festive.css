@@ -146,6 +146,11 @@
   transform-origin: 50% 0;
 }
 .fx-preview .fx-plaque { right: 12px; transform: scale(0.74); transform-origin: 100% 0; animation: none; }
+/* On a laptop the class switch (settings/ClassSwitch.tsx) holds the top-right
+   corner, so the plaque hangs from just under it instead of behind it. */
+@media (min-width: 768px) {
+  .fx-root:not(.fx-preview) .fx-plaque { top: calc(var(--fx-top) + 52px); }
+}
 .fx-plaque-thread {
   position: absolute;
   top: 0;

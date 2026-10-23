@@ -27,6 +27,18 @@
    frosted glass with the same rim, tint and shadow instead. There is no
    feature test for "renders it", which is why this sniffs brands.
 
+   Chromatic aberration (`chroma`, off unless asked for): real glass bends
+   blue more than red, so a lens splits light at its rim. Two halves, because
+   each alone fails somewhere:
+     - in the filter, R, G and B are displaced by three different amounts
+       (blue furthest) and added back together, so dark content passing
+       under the rim fringes red outside and cyan inside. Chromium only, and
+       invisible over a plain page: there is nothing there to split;
+     - a drawn iridescent band along the rim, magenta at the edge through
+       blue to cyan inward, strongest on the diagonal opposite the white
+       glint (top-right, bottom-left). This is what reads as "chromatic" over
+       an empty page, and it draws in every browser.
+
    Geometry must be inline or in index.css, never Tailwind: the CDN build does
    not see class names built in template literals. */
 
@@ -44,6 +56,20 @@ const REFRACTS: boolean = (() => {
 
 const N = 1.5;
 const LIGHT = { x: -Math.SQRT1_2, y: -Math.SQRT1_2 };
+/* The fringe catches on the other diagonal, so it never sits on the glint:
+   normals pointing up-right and down-left (canvas y runs down). */
+const FRINGE_TR = -Math.PI / 4;
+const FRINGE_BL = (3 * Math.PI) / 4;
+
+/* Hue in degrees to RGB at full saturation, lightness 0.5. */
+const hueRGB = (deg: number): [number, number, number] => {
+  const l = 0.5, c = (1 - Math.abs(2 * l - 1));
+  const h = ((deg % 360) + 360) % 360 / 60;
+  const x = c * (1 - Math.abs((h % 2) - 1));
+  const [r, g, b] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+  const m = l - c / 2;
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+};
 
 /* Sideways shift across the rim, t = 0 at the edge to 1 where the glass goes
    flat, normalised so the strongest is 1. Computed once. */
@@ -78,7 +104,7 @@ const sdf = (x: number, y: number, w: number, h: number, r: number) => {
   return qx > qy ? { d: qx - r, nx: sx, ny: 0 } : { d: qy - r, nx: 0, ny: sy };
 };
 
-interface Maps { displacement: string; specular: string; w: number; h: number; r: number }
+interface Maps { displacement: string; specular: string; chroma: string | null; w: number; h: number; r: number }
 interface Size { w: number; h: number }
 
 /* The PNG encode is the slow half (hundreds of ms on a phone for a wide
@@ -94,7 +120,7 @@ const encode = (c: HTMLCanvasElement): Promise<string> =>
     }, 'image/png');
   });
 
-const draw = async (w: number, h: number, radius: number, bezel: number): Promise<Maps> => {
+const draw = async (w: number, h: number, radius: number, bezel: number, chroma: number): Promise<Maps> => {
   const r = Math.min(radius, w / 2, h / 2);
 
   // Displacement, at CSS-pixel resolution: the field is smooth.
@@ -114,6 +140,14 @@ const draw = async (w: number, h: number, radius: number, bezel: number): Promis
   const sctx = sc.getContext('2d', { willReadFrequently: true })!;
   const simg = sctx.createImageData(sw, sh);
   const sd = simg.data;
+
+  // The iridescent rim, also at device resolution.
+  const cc = chroma > 0 ? document.createElement('canvas') : null;
+  if (cc) { cc.width = sw; cc.height = sh; }
+  const cctx = cc?.getContext('2d', { willReadFrequently: true }) ?? null;
+  const cimg = cctx?.createImageData(sw, sh) ?? null;
+  const cd = cimg?.data ?? null;
+  const band = Math.max(4, bezel * 0.55);
 
   const smooth = (a: number, b: number, v: number) => {
     const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -144,6 +178,28 @@ const draw = async (w: number, h: number, radius: number, bezel: number): Promis
       const e = -d;
       if (e < 0) continue;
       // Light from the top-left, and its exit glint bottom-right.
+      if (cd && e < band) {
+        /* Two crescents, not a ring: the colour lives where the rim turns
+           toward the fringe diagonal (top-right, and a little less
+           bottom-left) and is gone well before the straight edges. Both its
+           strength and its width taper, so each lobe is thick in the middle
+           and thins to nothing, the way a real lens catches light. */
+        const ang = Math.atan2(ny, nx);
+        const lobe = (t: number) => Math.max(0, Math.cos(ang - t));
+        const f = Math.max(Math.pow(lobe(FRINGE_TR), 14), 0.85 * Math.pow(lobe(FRINGE_BL), 14));
+        const width = band * f;
+        if (f > 0.02 && e < width) {
+          // Red-magenta at the very edge, through blue, to cyan inward.
+          const u = e / width;
+          const a = chroma * f * Math.pow(1 - u, 0.9) * smooth(0, 0.8, e);
+          if (a > 0.004) {
+            const [cr, cg, cb] = hueRGB(352 - u * 172);
+            const k = (y * sw + x) * 4;
+            cd[k] = cr; cd[k + 1] = cg; cd[k + 2] = cb;
+            cd[k + 3] = Math.round(Math.min(1, a) * 255);
+          }
+        }
+      }
       const facing = Math.pow(Math.abs(nx * LIGHT.x + ny * LIGHT.y), 3);
       const line = 1 - smooth(0.25, 1.35, e);
       const glow = (1 - smooth(0, bezel * 0.9, e)) * 0.09;
@@ -155,9 +211,10 @@ const draw = async (w: number, h: number, radius: number, bezel: number): Promis
     }
   }
   sctx.putImageData(simg, 0, 0);
+  if (cctx && cimg) cctx.putImageData(cimg, 0, 0);
 
-  const [displacement, specular] = await Promise.all([encode(dc), encode(sc)]);
-  return { displacement, specular, w, h, r: radius };
+  const [displacement, specular, chromaMap] = await Promise.all([encode(dc), encode(sc), cc ? encode(cc) : Promise.resolve(null)]);
+  return { displacement, specular, chroma: chromaMap, w, h, r: radius };
 };
 
 /* Same size, same glass: two tiles of one width share one map, and a screen
@@ -165,11 +222,11 @@ const draw = async (w: number, h: number, radius: number, bezel: number): Promis
    are debounced), so this stays small; the cap is a backstop. */
 const cache = new Map<string, Promise<Maps>>();
 const CACHE_MAX = 64;
-const mapsFor = (w: number, h: number, radius: number, bezel: number): Promise<Maps> => {
-  const key = `${w}x${h}/${radius}/${bezel}/${window.devicePixelRatio || 1}`;
+const mapsFor = (w: number, h: number, radius: number, bezel: number, chroma: number): Promise<Maps> => {
+  const key = `${w}x${h}/${radius}/${bezel}/${chroma}/${window.devicePixelRatio || 1}`;
   const have = cache.get(key);
   if (have) return have;
-  const p = draw(w, h, radius, bezel);
+  const p = draw(w, h, radius, bezel, chroma);
   p.catch(() => cache.delete(key));
   cache.set(key, p);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
@@ -201,6 +258,8 @@ interface Props extends React.HTMLAttributes<HTMLElement> {
   bezel?: number;
   /** Largest sideways shift at the rim, px. */
   strength?: number;
+  /** Chromatic aberration at the rim, 0 (none) to 1. */
+  chroma?: number;
 }
 
 /* Light enough that the bending is the thing you see; heavy enough that a
@@ -212,7 +271,7 @@ const TINT = {
 };
 
 const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
-  { as = 'div', dark, radius, variant = 'bar', bezel = 16, strength = 18, className = '', style, children, ...rest },
+  { as = 'div', dark, radius, variant = 'bar', bezel = 16, strength = 18, chroma = 0, className = '', style, children, ...rest },
   forwarded,
 ) {
   const local = useRef<HTMLElement | null>(null);
@@ -242,9 +301,9 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
       const s = read();
       if (s.w < 8 || s.h < 8) return; // display: none (the phone bar on a laptop)
       let p: Promise<Maps>;
-      try { p = mapsFor(s.w, s.h, radius, bezel); } catch { return; }
+      try { p = mapsFor(s.w, s.h, radius, bezel, chroma); } catch { return; }
       p.then(m => {
-        if (alive) setMaps(prev => (prev && prev.w === m.w && prev.h === m.h && prev.r === m.r ? prev : m));
+        if (alive) setMaps(prev => (prev && prev.w === m.w && prev.h === m.h && prev.r === m.r && prev.chroma === m.chroma ? prev : m));
       }, () => { /* canvas refused: stays frosted */ });
     };
     const ro = new ResizeObserver(() => {
@@ -257,7 +316,7 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
     setSize(read());
     cancelIdle = idle(settle);
     return () => { alive = false; ro.disconnect(); window.clearTimeout(timer); cancelIdle(); };
-  }, [radius, bezel]);
+  }, [radius, bezel, chroma]);
 
   const fresh = !!maps && !!size && maps.w === size.w && maps.h === size.h;
   const tint = TINT[variant][dark ? 'dark' : 'light'];
@@ -306,11 +365,41 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
         boxShadow: maps ? undefined : `inset 0 0 0 1px rgba(255,255,255,${dark ? 0.14 : 0.5})`,
       }}
     />,
+    /* The iridescent rim. Screened on dark glass so it reads as light, not
+       paint; this layer is inside the glass (isolated), so the blend never
+       reaches the page. */
+    maps?.chroma && (
+      <span
+        aria-hidden="true"
+        className="lg-chroma"
+        style={{
+          ...layer,
+          backgroundImage: `url(${maps.chroma})`,
+          backgroundSize: '100% 100%',
+          mixBlendMode: dark ? 'screen' : 'normal',
+          opacity: dark ? 0.95 : 1,
+        }}
+      />
+    ),
     REFRACTS && fresh && maps && (
       <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
         <filter id={id} x="0" y="0" width={maps.w} height={maps.h} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
           <feImage href={maps.displacement} x="0" y="0" width={maps.w} height={maps.h} preserveAspectRatio="none" result="map" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={strength * 2} xChannelSelector="R" yChannelSelector="G" result="refracted" />
+          {chroma > 0 ? (
+            <>
+              {/* Dispersion: blue bends most, red least, each pulled from its own displacement. */}
+              <feDisplacementMap in="SourceGraphic" in2="map" scale={strength * 2 * (1 - 0.32 * chroma)} xChannelSelector="R" yChannelSelector="G" result="dr" />
+              <feDisplacementMap in="SourceGraphic" in2="map" scale={strength * 2} xChannelSelector="R" yChannelSelector="G" result="dg" />
+              <feDisplacementMap in="SourceGraphic" in2="map" scale={strength * 2 * (1 + 0.32 * chroma)} xChannelSelector="R" yChannelSelector="G" result="db" />
+              <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr" />
+              <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg" />
+              <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb" />
+              <feComposite in="cr" in2="cg" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="crg" />
+              <feComposite in="crg" in2="cb" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="refracted" />
+            </>
+          ) : (
+            <feDisplacementMap in="SourceGraphic" in2="map" scale={strength * 2} xChannelSelector="R" yChannelSelector="G" result="refracted" />
+          )}
           <feGaussianBlur in="refracted" stdDeviation={frost} edgeMode="duplicate" result="frosted" />
           {/* B → alpha: the frost mask. */}
           <feColorMatrix in="map" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0" result="mask" />
