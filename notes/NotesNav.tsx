@@ -24,6 +24,7 @@ interface Props {
   onPurge: (id: string) => void;
   onImport: (files: File[]) => void;
   sync: { state: string; label: string };
+  onDisable: () => void;
 }
 
 type Drop = { id: string; where: 'in' | 'above' | 'below' } | null;
@@ -44,7 +45,7 @@ const Dot = ({ tree, id }: { tree: Tree; id: string }) => {
 };
 
 export default function NotesNav(props: Props) {
-  const { tree, openId, expanded, onToggle, onOpen, onNew, onMove, onRestore, onPurge, onImport, sync } = props;
+  const { tree, openId, expanded, onToggle, onOpen, onNew, onMove, onRestore, onPurge, onImport, sync, onDisable } = props;
   const [drag, setDrag] = useState<string | null>(null);
   const [drop, setDrop] = useState<Drop>(null);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -192,7 +193,17 @@ export default function NotesNav(props: Props) {
         </div>
       )}
 
-      <p className="nt-sync" data-state={sync.state}><i />{sync.label}</p>
+      <p className="nt-sync" data-state={sync.state}>
+        <i />{sync.label}
+        <button
+          type="button"
+          className="nt-link-btn"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => { if (window.confirm('Turn off Notes? Your pages stay saved. Turn it back on any time and they are all here.')) onDisable(); }}
+        >
+          Turn off
+        </button>
+      </p>
     </nav>
   );
 }

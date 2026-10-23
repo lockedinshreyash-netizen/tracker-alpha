@@ -85,6 +85,7 @@ import { clearPendingInvite, takePendingInvite } from './groups/invite';
 import { forgetGroupsOnDevice } from './groups/publish';
 import { forgetDecksOnDevice } from './decks/forget';
 import { flushNotesBeforeSignOut, forgetNotesOnDevice } from './notes/forget';
+import { mergeNotesPref, notesOn } from './notes/pref';
 import type { NotesRequest } from './notes/NotesTab';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
@@ -344,6 +345,7 @@ const App: React.FC = () => {
               // Keep UI only state local
               lastUsedTab: prev.lastUsedTab,
               theme: prev.theme,
+              notes: mergeNotesPref(prev.notes, remoteState.notes),
               // A push from another device must not reach in and restart or
               // rewind a timer running here…
               timer: prev.timer,
@@ -410,6 +412,7 @@ const App: React.FC = () => {
               // Preserve UI‑only preferences from the current device.
               lastUsedTab: localState.lastUsedTab,
               theme: localState.theme,
+              notes: mergeNotesPref(localState.notes, remoteState.notes),
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
               pomodoro: localState.pomodoro,
@@ -456,6 +459,7 @@ const App: React.FC = () => {
             // Preserve UI‑only preferences from the current device.
             lastUsedTab: localState.lastUsedTab,
             theme: localState.theme,
+            notes: mergeNotesPref(localState.notes, remoteState.notes),
             /* Running timers belong to the device running them, never to the
                account. Taking these from the server resurrected an already
                flushed Pomodoro block on every reload — it was logged locally,
@@ -638,6 +642,17 @@ const App: React.FC = () => {
     handleTabChange('Notes');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const openSyllabusTab = useCallback(() => handleTabChange('Syllabus'), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Notes is opt-in: until it is on, the tab is its cover page and nothing
+     of the workspace (its database, the editor, sync) is loaded. */
+  const notesEnabled = notesOn(state.notes);
+  const setNotesEnabled = useCallback((on: boolean) => {
+    setState(prev => {
+      const next = { ...prev, notes: { on, at: Date.now() }, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  }, []);
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -2099,7 +2114,7 @@ const App: React.FC = () => {
               examPreference={state.examPreference || 'JEE'}
               onTestFinished={recordTestResult}
               notesOwner={user?.id ?? 'guest'}
-              onOpenNotes={openChapterNotes}
+              onOpenNotes={notesEnabled ? openChapterNotes : undefined}
             />
           )}
           {activeTab === 'Streak' && (
@@ -2185,6 +2200,9 @@ const App: React.FC = () => {
           {activeTab === 'Notes' && (
             <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
               <NotesTab
+                enabled={notesEnabled}
+                onEnable={() => setNotesEnabled(true)}
+                onDisable={() => setNotesEnabled(false)}
                 user={user}
                 theme={theme}
                 examPreference={state.examPreference || 'JEE'}

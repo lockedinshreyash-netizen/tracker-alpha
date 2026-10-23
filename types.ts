@@ -773,4 +773,7 @@ export interface AppState {
   /* The day-100 book: highlights, notes, bookmarks, action steps ticked and
      where the student is. `normalizeReading` (reader/model.ts) fills it. */
   reading?: ReadingState;
+  /* Notes is opt-in (notes/pref.ts): absent until the student turns it on.
+     A dated decision so every merge path keeps the latest one. */
+  notes?: import('./notes/pref').NotesPref;
 }

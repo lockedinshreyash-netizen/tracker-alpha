@@ -41,6 +41,7 @@ interface Props {
   onPurge: (id: string) => void;
   onImport: (files: File[]) => void;
   sync: { state: string; label: string };
+  onDisable: () => void;
 }
 
 const icon = {
@@ -97,6 +98,7 @@ export default function WorkspaceBar(props: Props) {
                 onPurge={props.onPurge}
                 onImport={files => { props.onImport(files); onPanel(false); }}
                 sync={sync}
+                onDisable={() => { onPanel(false); props.onDisable(); }}
               />
             </div>
           </LiquidGlass>
