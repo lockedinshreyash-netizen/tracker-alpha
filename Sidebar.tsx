@@ -4,6 +4,7 @@ import { Avatar } from './profile/Avatar';
 import { Profile } from './profile/profileApi';
 import LiquidGlass from './ui/LiquidGlass';
 import ClassSwitch from './settings/ClassSwitch';
+import { STORE_LAUNCHED } from './store/launch';
 
 interface Props {
   activeTab: TabType;
@@ -21,6 +22,9 @@ interface Props {
   /* Null until signed in and ensure_profile() resolves — the account row
      falls back to the plain "Tracker Alpha" footer until then. */
   ownProfile: Profile | null;
+  /* Until the Alpha Store launches (store/launch.ts) the account button opens
+     Edit profile, as it always did. After, it opens the Profile page. */
+  onOpenAccount: () => void;
   /* Unread group messages across every group. A count and nothing else —
      which group, and from whom, is the Groups tab's business. */
   groupsUnread?: number;
@@ -88,6 +92,14 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <path d="M8.5 21h7l-.5-3h-6l-.5 3z" />
         </svg>
       );
+    case 'Review':
+      return (
+        <svg {...props}>
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      );
     /* A shopping bag: the one tab where things are taken, not done. */
     case 'Store':
       return (
@@ -147,16 +159,17 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
   }
 };
 
-const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, groupsUnread = 0, currentClass, onClassChange }) => {
+const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, onToggleCollapsed, isAdmin, ownProfile, onOpenAccount, groupsUnread = 0, currentClass, onClassChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /* Appended, never inserted: the tabs the student uses keep the positions
      their muscle memory knows, and the console arrives at the bottom. Groups
      went in after Review for the same reason, below everything that was
      already there. Decks followed Groups the same way, and Notes followed Decks.
-     Store took Review's slot when Review moved into the profile page. */
+     Store takes Review's slot once the Alpha Store launches (store/launch.ts),
+     and Review moves into the profile page. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', 'Store', 'Groups', 'Decks', 'Notes',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', STORE_LAUNCHED ? 'Store' : 'Review', 'Groups', 'Decks', 'Notes',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';
@@ -313,6 +326,8 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
           })}
         </nav>
 
+        {STORE_LAUNCHED ? (
+        <>
         {/* Your own page: the profile and, under it, what was the Review tab
             (score, the hand-written log, settings). Signed out it is still a
             button, because Reset device, Exam and Sound live there too. */}
@@ -354,6 +369,46 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
             )}
           </button>
         </div>
+        </>
+        ) : (
+        <>
+        {/* Account — the one entry point that opens straight into editing
+            rather than the public card RanksTab/RaceChat open on someone
+            else's identity; see profile/EditProfile.tsx. Falls back to the
+            plain footer until there's a profile to show. */}
+        <div className={`px-4 py-4 border-t shrink-0 ${dark ? 'border-white/[0.07]' : 'border-black/[0.06]'}`}>
+          {ownProfile ? (
+            <button
+              onClick={onOpenAccount}
+              data-onboarding-target="account-nav"
+              className={`w-full flex items-center gap-2.5 rounded-lg transition-all group relative ${collapsed ? 'justify-center py-1' : 'px-1 py-1'} ${dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'}`}
+            >
+              <Avatar
+                profile={ownProfile}
+                size={28}
+                className="ring-1 ring-inset ring-white/10 rounded-full flex-shrink-0"
+              />
+              {!collapsed && (
+                <span className={`text-[11px] font-bold font-ui truncate ${dark ? 'text-white' : 'text-[#17150F]'}`}>
+                  {ownProfile.display_name}
+                </span>
+              )}
+              {collapsed && (
+                <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 font-ui ${dark ? 'bg-zinc-800 text-white' : 'bg-[#17150F] text-[#F2F0EC]'}`}>
+                  {ownProfile.display_name}
+                </div>
+              )}
+            </button>
+          ) : !collapsed ? (
+            <p className={`text-[8px] font-medium uppercase tracking-[0.06em] ${dark ? 'text-zinc-700' : 'text-[#B5AFA0]'}`}>
+              Tracker Alpha
+            </p>
+          ) : (
+            <div className={`w-2 h-2 rounded-full mx-auto ${dark ? 'bg-zinc-700' : 'bg-[#D6D1C5]'}`} />
+          )}
+        </div>
+        </>
+        )}
       </LiquidGlass>
     </>
   );

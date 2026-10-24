@@ -4,6 +4,7 @@ import FeedbackInbox from './FeedbackInbox';
 import AdminRoster from './AdminRoster';
 import ModerationAdmin from './ModerationAdmin';
 import ThemeAdmin from './ThemeAdmin';
+import { STORE_LAUNCHED } from '../store/launch';
 
 /* Lazy so the Decks data layer stays out of the main bundle. */
 const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
@@ -28,14 +29,15 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'inbox', label: 'Feedback' },
   { id: 'moderation', label: 'Moderation' },
   { id: 'decks', label: 'Decks' },
-  { id: 'store', label: 'Store' },
+  // The Alpha Store's console, once it launches (store/launch.ts).
+  ...(STORE_LAUNCHED ? [{ id: 'store' as Section, label: 'Store' }] : []),
   { id: 'people', label: 'Administrators' },
 ];
 
 /**
  * The console.
  *
- * Eight sections behind one switch rather than eight tabs in the rail: the rail
+ * Seven sections (eight once the store launches) behind one switch rather than tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -77,7 +79,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}
       {section === 'decks' && <Suspense fallback={null}><DecksAdmin theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
-      {section === 'store' && <Suspense fallback={null}><StoreAdmin adminId={adminId} theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
+      {STORE_LAUNCHED && section === 'store' && <Suspense fallback={null}><StoreAdmin adminId={adminId} theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
       {section === 'people' && <AdminRoster adminId={adminId} theme={theme} />}
     </div>
   );

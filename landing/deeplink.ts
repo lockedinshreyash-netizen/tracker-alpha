@@ -12,6 +12,7 @@
    shared address bar does not re-apply them. */
 
 import type { ExamPreference, TabType } from '../types';
+import { STORE_LAUNCHED } from '../store/launch';
 
 const TABS: Record<string, TabType> = {
   today: 'Today',
@@ -22,11 +23,10 @@ const TABS: Record<string, TabType> = {
   notes: 'Notes',
   groups: 'Groups',
   streak: 'Streak',
-  store: 'Store',
-  profile: 'Profile',
   // The "delete your account" page (site/legal.tsx) links to /?open=review#account.
-  // Review's contents live on the profile page now.
-  review: 'Profile',
+  // Once the Alpha Store launches, Review's contents live on the profile page.
+  review: STORE_LAUNCHED ? 'Profile' : 'Review',
+  ...(STORE_LAUNCHED ? { store: 'Store' as TabType, profile: 'Profile' as TabType } : {}),
 };
 
 export interface DeepLink {

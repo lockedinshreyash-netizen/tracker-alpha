@@ -192,11 +192,12 @@ export interface ChapterProgress {
 /* `Decks` (spaced-repetition flashcards) is server state end to end, like
    Groups: decks, cards and review history live in supabase/decks.sql, never in
    AppState. */
-/* `Store` took Review's slot in the rail, and Review's contents moved into
-   the student's own page, `Profile`, opened from the account button at the
-   bottom of the rail (it is not listed in the rail itself). A saved
-   `lastUsedTab` of 'Review' is mapped to 'Profile' on load (App.tsx). */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Profile' | 'Admin';
+/* `Store` and `Profile` belong to the Alpha Store (store/launch.ts). Once it
+   launches, Store takes Review's slot in the rail and Review's contents move
+   into the student's own page, Profile, opened from the account button at the
+   bottom of the rail. Until then the rail is as it was, with Review. A saved
+   `lastUsedTab` is mapped to whichever of the two is drawn (App.tsx). */
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Profile' | 'Admin';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {

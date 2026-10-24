@@ -47,6 +47,8 @@ const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import MyProfile from './profile/MyProfile';
+import ReviewTab from './review/ReviewTab';
+import { STORE_LAUNCHED } from './store/launch';
 import type { DecksIntent } from './decks/types';
 import type { StoreSection } from './store/types';
 import type { OnboardingResult, ProfilePick } from './onboarding/OnboardingFlow';
@@ -173,8 +175,12 @@ const App: React.FC = () => {
       merged.reading = normalizeReading(parsed.reading, BOOK.chapterIds[parsed.rewards?.bookChapter ?? -1] ?? null);
       /* The Questions tab became Mocks and took its slot in the rail. */
       if ((parsed.lastUsedTab as string) === 'Questions') merged.lastUsedTab = 'Mocks';
-      /* Review moved into the profile page when the Store took its slot. */
-      if ((parsed.lastUsedTab as string) === 'Review') merged.lastUsedTab = 'Profile';
+      /* Review and the Alpha Store's Profile page hold the same things; land on
+         whichever is drawn (store/launch.ts). Store itself is not drawn before
+         launch, so it falls back to Today. */
+      if (STORE_LAUNCHED && merged.lastUsedTab === 'Review') merged.lastUsedTab = 'Profile';
+      if (!STORE_LAUNCHED && merged.lastUsedTab === 'Profile') merged.lastUsedTab = 'Review';
+      if (!STORE_LAUNCHED && merged.lastUsedTab === 'Store') merged.lastUsedTab = 'Today';
       // The Observatory was removed; anyone who left the app there lands on Today.
       if ((parsed.lastUsedTab as string) === 'Observatory') merged.lastUsedTab = 'Today';
         return merged;
@@ -1907,7 +1913,7 @@ const App: React.FC = () => {
      settings under it. Above the early return, like every hook here. */
   const ownHandle = profileCtl.ownProfile?.handle ?? null;
   useEffect(() => {
-    if (!ownHandle || profileCtl.routeHandle !== ownHandle) return;
+    if (!STORE_LAUNCHED || !ownHandle || profileCtl.routeHandle !== ownHandle) return;
     handleTabChange('Profile');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownHandle, profileCtl.routeHandle]);
@@ -2030,6 +2036,7 @@ const App: React.FC = () => {
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
         isAdmin={isAdmin}
         ownProfile={profileCtl.ownProfile}
+        onOpenAccount={profileCtl.openEditProfile}
         groupsUnread={groupsState.totalUnread}
         currentClass={state.currentClass}
         onClassChange={setCurrentClass}
@@ -2045,8 +2052,8 @@ const App: React.FC = () => {
         userId={profileCtl.openProfileUserId}
         onClose={profileCtl.closeProfile}
         onViewFull={handle => {
-          // There is one page for yourself: your own row opens the Profile tab.
-          if (handle === profileCtl.ownProfile?.handle) { profileCtl.closeProfile(); handleTabChange('Profile'); }
+          // Once the store launches there is one page for yourself: your own row opens the Profile tab.
+          if (STORE_LAUNCHED && handle === profileCtl.ownProfile?.handle) { profileCtl.closeProfile(); handleTabChange('Profile'); }
           else profileCtl.viewFullProfile(handle);
         }}
         onEdit={profileCtl.openEditProfile}
@@ -2250,7 +2257,7 @@ const App: React.FC = () => {
             </React.Suspense>
           )}
           {/* Lazy, server state end to end: nothing in it touches AppState. */}
-          {activeTab === 'Store' && (
+          {STORE_LAUNCHED && activeTab === 'Store' && (
             <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
               <StoreTab
                 user={user}
@@ -2263,7 +2270,27 @@ const App: React.FC = () => {
               />
             </React.Suspense>
           )}
-          {activeTab === 'Profile' && (
+          {!STORE_LAUNCHED && activeTab === 'Review' && (
+            <ReviewTab
+              logs={state.logs}
+              score={lockInScore}
+              onClearData={clearLogs}
+              theme={theme}
+              user={user}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onSignOut={handleSignOut}
+              onDeleteAccount={handleDeleteAccount}
+              onLog={logStudy}
+              dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
+              examPreference={state.examPreference || 'JEE'}
+              onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
+              activeSubjects={activeSubjects}
+              reminders={reminderPrefs}
+              onChangeReminders={setReminderPrefs}
+              goalHours={state.dailyGoalHours}
+            />
+          )}
+          {STORE_LAUNCHED && activeTab === 'Profile' && (
             <MyProfile
               theme={theme}
               user={user}
@@ -2395,9 +2422,9 @@ const App: React.FC = () => {
           profile={profileCtl.ownProfile}
           syncStatus={syncStatus}
           onSignIn={() => { void signInWithGoogle().then(err => { if (err) setIsAuthModalOpen(true); }); }}
-          onOpenProfile={() => handleTabChange('Profile')}
+          onOpenProfile={STORE_LAUNCHED ? () => handleTabChange('Profile') : profileCtl.openEditProfile}
           install={install}
-          onOpenAll={() => handleTabChange('Profile')}
+          onOpenAll={() => handleTabChange(STORE_LAUNCHED ? 'Profile' : 'Review')}
           festive={festiveLive === 'none' ? null : {
             theme: festiveLive,
             label: FESTIVE_LABEL[festiveLive],

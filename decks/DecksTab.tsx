@@ -45,6 +45,11 @@ import SheetView from './SheetView';
 import KitView from './KitView';
 import { addSheet, exploreKits, exploreSheets, removeKit, removeSheet } from '../store/api';
 import type { StoreSection, Kit, KitItem, Sheet } from '../store/types';
+import { STORE_LAUNCHED } from '../store/launch';
+
+// Until the Alpha Store launches, the packs store lives here, as it did. Its
+// rack physics and opening animation load only when it opens.
+const PackStore = React.lazy(() => import('./store/PackStore'));
 import type { AdminDeckStat, DeckStatus, DeckSummary, DecksIntent, ExploreDeck, Note, Pack } from './types';
 
 interface Props {
@@ -65,7 +70,9 @@ type View =
   | { kind: 'deck'; id: string; fromPack?: string; fromKit?: string }
   | { kind: 'pack'; id: string; fromKit?: string }
   | { kind: 'sheet'; id: string; fromKit?: string }
-  | { kind: 'kit'; id: string };
+  | { kind: 'kit'; id: string }
+  /* The packs store inside Decks, used only while the Alpha Store is not launched. */
+  | { kind: 'store' };
 type Review = { deckId: string; tags: string[] | null } | { packId: string };
 interface EditorState { deckId: string; note: Note | null; done?: (n: Note | null) => void }
 
@@ -131,8 +138,9 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
     await Promise.all([
       exploreDecks().then(setExplore).catch(() => setExplore([])),
       explorePacks().then(setPacks).catch(() => setPacks([])),
-      exploreSheets().then(setSheets).catch(() => setSheets([])),
-      exploreKits().then(setKits).catch(() => setKits([])),
+      // Sheets and kits are the Alpha Store's; nothing asks for them before it launches.
+      STORE_LAUNCHED ? exploreSheets().then(setSheets).catch(() => setSheets([])) : setSheets([]),
+      STORE_LAUNCHED ? exploreKits().then(setKits).catch(() => setKits([])) : setKits([]),
     ]);
   }, [uid]);
 
@@ -313,7 +321,26 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
 
   return (
     <>
-      {view.kind === 'sheet' && sheetById(view.id) ? (
+      {view.kind === 'store' ? (
+        <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+          <PackStore
+            packs={packs}
+            dark={dark}
+            examPreference={examPreference}
+            isAdmin={isAdmin}
+            owned={(packs ?? []).filter(p => p.inLibrary).length}
+            onBack={() => setView({ kind: 'library' })}
+            onOpenOwned={id => setView({ kind: 'pack', id })}
+            acquire={acquirePack}
+            loadPreview={loadPreview}
+            onAcquired={async id => {
+              await refresh();
+              refreshExplore();
+              setView({ kind: 'pack', id });
+            }}
+          />
+        </React.Suspense>
+      ) : view.kind === 'sheet' && sheetById(view.id) ? (
         <SheetView
           sheet={sheetById(view.id)!}
           dark={dark}
@@ -412,7 +439,11 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
           onOpenAuth={onOpenAuth}
           onRetry={() => void refresh()}
           packs={packs}
-          onOpenStore={() => onOpenStore('packs')}
+          onOpenStore={() => {
+            if (STORE_LAUNCHED) { onOpenStore('packs'); return; }
+            refreshExplore();
+            setView({ kind: 'store' });
+          }}
           sheets={sheets}
           kits={kits}
           onOpenSheet={id => setView({ kind: 'sheet', id })}
