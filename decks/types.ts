@@ -6,8 +6,10 @@ import type { Subject } from '../types';
 
 export type DeckScope = 'personal' | 'global';
 export type DeckStatus = 'draft' | 'published' | 'archived';
-/** Which shelf an Alpha deck sits on for students. Personal decks have none. */
-export type DeckCollection = 'essentials' | 'more';
+/** Which shelf an Alpha deck sits on for students. Personal decks have none.
+ *  `sheet` is no shelf at all: the formulas behind a formula sheet, imported
+ *  "for formula sheets" and read only through the sheet (supabase/decks.sql §11). */
+export type DeckCollection = 'essentials' | 'more' | 'sheet';
 export type NoteKind = 'cloze' | 'basic';
 export type DeckSubject = Exclude<Subject, 'General'>;
 
@@ -209,4 +211,15 @@ export interface CardRow {
   suspended: boolean;
   state: CardState;
   due: string | null;
+}
+
+/**
+ * Something for the Decks tab to open once, sent from elsewhere in the app:
+ * a deck the console asked for, or a pack, sheet or kit just taken in the
+ * Store. `nonce` makes the same item asked for twice a second request.
+ */
+export interface DecksIntent {
+  kind: 'deck' | 'pack' | 'sheet' | 'kit';
+  id: string;
+  nonce: number;
 }

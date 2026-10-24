@@ -32,7 +32,7 @@ export const humanError = (error: unknown): string => {
   const e = error as { code?: string; message?: string } | null;
   const code = e?.code ?? '';
   const message = e?.message ?? '';
-  if (/payment required/i.test(message)) return 'This pack has to be unlocked first.';
+  if (/payment required/i.test(message)) return 'This has to be unlocked first.';
   if (code === '42501' || /row-level security|not authorized/i.test(message)) return "You don't have permission to do that.";
   /* PGRST205 is a missing table and PGRST202 a missing function: decks.sql
      has not been run on this project yet. */

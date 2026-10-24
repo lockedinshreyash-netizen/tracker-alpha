@@ -41,6 +41,16 @@ interface Props {
   loadPreview: (packId: string) => Promise<PreviewCard[]>;
   /** The opening finished: refresh and go to the pack in My Alpha. */
   onAcquired: (packId: string) => Promise<void> | void;
+  /** A section of the Alpha Store (store/StoreTab.tsx), under its page header:
+      no back button, and a section heading rather than a page title. */
+  embedded?: boolean;
+  /** Every pack on one rack, ordered by subject, instead of a rack per
+      subject: the Alpha Store, whose own filter does the sorting. */
+  oneRack?: boolean;
+  /** The one rack's name ("All packs", or the subject the store is filtered to). */
+  rackTitle?: string;
+  /** What a rack with nothing on it says, when the store's filter left nothing. */
+  emptyNote?: { title: string; note: string };
 }
 
 
@@ -60,7 +70,7 @@ const hooksFor = (list: Pack[]): RackItem[] => {
 /** The rack's own order: as placed, then oldest pack first. */
 const order = (a: Pack, b: Pack) => a.sortOrder - b.sortOrder || a.packNo - b.packNo;
 
-const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owned, onBack, onOpenOwned, acquire, loadPreview, onAcquired }) => {
+const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owned, onBack, onOpenOwned, acquire, loadPreview, onAcquired, embedded = false, oneRack = false, rackTitle = 'All packs', emptyNote }) => {
   const t = tokens(dark);
   const size = useRackSize();
   const reduced = useReducedMotion();
@@ -80,6 +90,12 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
   const categories = useMemo(() => {
     const subjects: DeckSubject[] = examPreference === 'NEET' ? ['Physics', 'Chemistry', 'Biology', 'Maths'] : ['Physics', 'Chemistry', 'Maths', 'Biology'];
     const out: { key: string; title: string; items: RackItem[] }[] = [];
+    if (oneRack) {
+      // One rack: the student's exam's subjects in order, then packs with none.
+      const rank = (p: Pack) => (p.subject ? subjects.indexOf(p.subject) : subjects.length);
+      const all = [...visible].sort((a, b) => rank(a) - rank(b) || order(a, b));
+      return all.length ? [{ key: `all:${rackTitle}:${all.length}`, title: rackTitle, items: hooksFor(all) }] : out;
+    }
     subjects.forEach(s => {
       const list = visible.filter(p => p.subject === s).sort(order);
       if (list.length) out.push({ key: s, title: rackName(s), items: hooksFor(list) });
@@ -87,7 +103,7 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
     const rest = visible.filter(p => !p.subject).sort(order);
     if (rest.length) out.push({ key: 'more', title: rackName(null), items: hooksFor(rest) });
     return out;
-  }, [visible, examPreference]);
+  }, [visible, examPreference, oneRack, rackTitle]);
 
   const selected = visible.find(p => p.id === state.packId) ?? null;
   const busy = isBusy(state);
@@ -143,14 +159,18 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
 
   return (
     <div className="font-ui">
-      <button onClick={onBack} disabled={busy} className={`mk-rise -ml-1 inline-flex items-center gap-1.5 h-8 px-2 rounded-full text-[13px] font-semibold transition-opacity hover:opacity-70 disabled:opacity-40 ${t.muted}`}>
-        {Icon.back} Decks
-      </button>
+      {!embedded && (
+        <button onClick={onBack} disabled={busy} className={`mk-rise -ml-1 inline-flex items-center gap-1.5 h-8 px-2 rounded-full text-[13px] font-semibold transition-opacity hover:opacity-70 disabled:opacity-40 ${t.muted}`}>
+          {Icon.back} Decks
+        </button>
+      )}
 
-      <header className="mk-rise flex flex-wrap items-end justify-between gap-6 mt-4 mb-10 md:mb-14">
+      <header className={`mk-rise flex flex-wrap items-end justify-between gap-6 ${embedded ? 'mb-8 md:mb-10' : 'mt-4 mb-10 md:mb-14'}`}>
         <div>
-          <h1 className={`font-display uppercase text-[46px] md:text-[72px] leading-[0.9] tracking-[-0.01em] ${t.heading}`}>Alpha Packs</h1>
-          <p className={`text-[16px] md:text-[18px] mt-4 ${t.muted}`}>Curated knowledge. <span className="font-accent">Ready to load.</span></p>
+          {embedded
+            ? <h2 className={`font-display uppercase text-[34px] md:text-[44px] leading-[0.92] tracking-[-0.01em] ${t.heading}`}>Alpha Packs</h2>
+            : <h1 className={`font-display uppercase text-[46px] md:text-[72px] leading-[0.9] tracking-[-0.01em] ${t.heading}`}>Alpha Packs</h1>}
+          <p className={`text-[16px] md:text-[18px] ${embedded ? 'mt-3' : 'mt-4'} ${t.muted}`}>Curated knowledge. <span className="font-accent">Ready to load.</span></p>
         </div>
         <button onClick={onBack} disabled={busy} className={`inline-flex items-center gap-2.5 h-11 pl-5 pr-4 rounded-full text-[13px] font-bold uppercase tracking-[0.08em] transition-all active:scale-[0.97] ${
           dark ? 'text-zinc-100 bg-white/[0.06] hover:bg-white/[0.1] ring-1 ring-inset ring-white/[0.08]' : 'text-zinc-900 bg-white hover:bg-zinc-50 ring-1 ring-inset ring-zinc-200 shadow-sm'}`}>
@@ -173,8 +193,8 @@ const PackStore: React.FC<Props> = ({ packs, dark, examPreference, isAdmin, owne
       ) : categories.length === 0 ? (
         /* Before launch: a real rack, bare hooks, and one line. */
         <PackCategory
-          title="Coming soon"
-          note="The first packs are on their way. The hooks are ready."
+          title={emptyNote?.title ?? 'Coming soon'}
+          note={emptyNote?.note ?? 'The first packs are on their way. The hooks are ready.'}
           items={[]}
           emptyHooks={6}
           size={size} dark={dark} reduced={reduced}

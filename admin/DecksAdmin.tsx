@@ -240,7 +240,8 @@ const DecksAdmin: React.FC<Props> = ({ theme, onOpenDeck, loadStats = fetchAdmin
         <PackSheet
           dark={dark}
           pack={sheet.pack}
-          decks={rows ?? []}
+          // A sheet's formulas are never a pack's deck (the server refuses them too).
+          decks={(rows ?? []).filter(r => r.collection !== 'sheet')}
           onClose={() => setSheet(null)}
           onSave={async (meta, deckIds) => {
             try {

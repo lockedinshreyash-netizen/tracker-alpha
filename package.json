@@ -17,6 +17,7 @@
     "extension:build": "node scripts/extension.mjs",
     "test:nudges": "node scripts/test-decks.mjs reminders",
     "test:notes": "node scripts/test-decks.mjs notes",
+    "test:store": "node scripts/test-decks.mjs store",
     "android:build": "node scripts/android.mjs build",
     "android:fingerprint": "node scripts/android.mjs fingerprint"
   },

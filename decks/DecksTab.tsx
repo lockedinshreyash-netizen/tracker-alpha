@@ -11,8 +11,10 @@
    Reached only through React.lazy from App.tsx: ts-fsrs, the CSV reader and
    (later, on demand) KaTeX never reach anyone who does not open this tab.
 
-   Views: the library, a deck, a pack (in My Alpha), and the Alpha Packs
-   store. A pack is studied as one session across its decks. */
+   Views: the library, a deck, a pack, a formula sheet and a kit (each in My
+   Alpha). A pack is studied as one session across its decks. The store
+   itself moved to its own tab (store/StoreTab.tsx); the sign here leads
+   there, and what is taken there is opened here through `intent`. */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -38,10 +40,12 @@ import PackView from './PackView';
 import { PackSheet } from './PackSheet';
 import { packTotals } from './Packs';
 import { checkout } from './store/checkout';
-import type { AdminDeckStat, DeckStatus, DeckSummary, ExploreDeck, Note, Pack } from './types';
-
-// The store's rack physics and opening animation load only when the store opens.
-const PackStore = React.lazy(() => import('./store/PackStore'));
+import { useReducedMotion } from './store/env';
+import SheetView from './SheetView';
+import KitView from './KitView';
+import { addSheet, exploreKits, exploreSheets, removeKit, removeSheet } from '../store/api';
+import type { StoreSection, Kit, KitItem, Sheet } from '../store/types';
+import type { AdminDeckStat, DeckStatus, DeckSummary, DecksIntent, ExploreDeck, Note, Pack } from './types';
 
 interface Props {
   user: User | null;
@@ -49,16 +53,19 @@ interface Props {
   theme: 'dark' | 'light';
   examPreference: ExamPreference;
   onOpenAuth: () => void;
-  /** Set by the admin console's "Open in Decks". */
-  openDeckId?: string | null;
-  onOpenedDeck?: () => void;
+  /** Something to open once: a deck from the console, or what was just taken in the Store. */
+  intent?: DecksIntent | null;
+  onIntentHandled?: () => void;
+  /** The store sign: the Alpha Store, on its Packs section. */
+  onOpenStore: (section: StoreSection) => void;
 }
 
 type View =
   | { kind: 'library' }
-  | { kind: 'deck'; id: string; fromPack?: string }
-  | { kind: 'pack'; id: string }
-  | { kind: 'store' };
+  | { kind: 'deck'; id: string; fromPack?: string; fromKit?: string }
+  | { kind: 'pack'; id: string; fromKit?: string }
+  | { kind: 'sheet'; id: string; fromKit?: string }
+  | { kind: 'kit'; id: string };
 type Review = { deckId: string; tags: string[] | null } | { packId: string };
 interface EditorState { deckId: string; note: Note | null; done?: (n: Note | null) => void }
 
@@ -81,10 +88,17 @@ const STATUS_CONFIRM: Record<DeckStatus, string> = {
   archived: 'Archive this deck? It leaves the library. Students who already have it keep studying it.',
 };
 
-const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpenAuth, openDeckId, onOpenedDeck }) => {
+const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpenAuth, intent, onIntentHandled, onOpenStore }) => {
   const dark = theme === 'dark';
   const uid = user?.id ?? null;
-  const [summaries, setSummaries] = useState<DeckSummary[] | null>(null);
+  const reduced = useReducedMotion();
+  const [allSummaries, setSummaries] = useState<DeckSummary[] | null>(null);
+  /* A sheet's formulas (collection 'sheet') are a deck only to an
+     administrator, who can open one from the console to fix a typo. They are
+     never drawn on the shelf or counted as cards to study. */
+  const summaries = useMemo(() => allSummaries?.filter(d => d.collection !== 'sheet') ?? null, [allSummaries]);
+  const [sheets, setSheets] = useState<Sheet[] | null>(null);
+  const [kits, setKits] = useState<Kit[] | null>(null);
   const [explore, setExplore] = useState<ExploreDeck[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [packs, setPacks] = useState<Pack[] | null>(null);
@@ -111,39 +125,53 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
     }
   }, [uid]);
 
-  const refreshExplore = useCallback(() => {
+  const refreshExplore = useCallback(async () => {
     if (!uid) return;
-    exploreDecks().then(setExplore).catch(() => setExplore([]));
-    explorePacks().then(setPacks).catch(() => setPacks([]));
+    // A database that predates sheets and kits simply shows none.
+    await Promise.all([
+      exploreDecks().then(setExplore).catch(() => setExplore([])),
+      explorePacks().then(setPacks).catch(() => setPacks([])),
+      exploreSheets().then(setSheets).catch(() => setSheets([])),
+      exploreKits().then(setKits).catch(() => setKits([])),
+    ]);
   }, [uid]);
 
   useEffect(() => {
-    if (!uid) { setSummaries(null); setExplore(null); setPacks(null); return; }
+    if (!uid) { setSummaries(null); setExplore(null); setPacks(null); setSheets(null); setKits(null); return; }
     // Answers left in the outbox by a tab closed mid-session land first, so
     // the counts drawn here already include them.
     flush(uid).finally(() => { void refresh(); });
     refreshExplore();
   }, [uid, refresh, refreshExplore]);
 
-  // The admin console asked for a deck: put it on the shelf (admins can read
-  // every Alpha deck) and open it.
+  // Something to open, once. The console asked for a deck: put it on the
+  // shelf (admins can read every Alpha deck) and open it. The Store just gave
+  // the student a pack, sheet or kit: load it and open its page.
   useEffect(() => {
-    if (!openDeckId || !uid) return;
-    addToLibrary(openDeckId).catch(() => undefined).finally(() => {
-      void refresh().then(() => setView({ kind: 'deck', id: openDeckId }));
-      onOpenedDeck?.();
-    });
-  }, [openDeckId, uid, refresh, onOpenedDeck]);
+    if (!intent || !uid) return;
+    onIntentHandled?.();
+    const go = async () => {
+      if (intent.kind === 'deck') {
+        await addToLibrary(intent.id).catch(() => undefined);
+        await refresh();
+      } else {
+        await Promise.all([refresh(), refreshExplore()]);
+      }
+      setView({ kind: intent.kind, id: intent.id });
+    };
+    void go();
+  }, [intent, uid, refresh, refreshExplore, onIntentHandled]);
 
-  const deckById = useCallback((id: string) => summaries?.find(d => d.id === id) ?? null, [summaries]);
+  const deckById = useCallback((id: string) => allSummaries?.find(d => d.id === id) ?? null, [allSummaries]);
   const canEdit = useCallback((d: DeckSummary | null) => !!d && ((d.scope === 'personal' && d.ownerId === uid) || (d.scope === 'global' && isAdmin)), [uid, isAdmin]);
   const editable = useMemo(() => (summaries ?? []).filter(canEdit), [summaries, canEdit]);
   const current = view.kind === 'deck' ? deckById(view.id) : null;
   const packById = useCallback((id: string) => packs?.find(p => p.id === id) ?? null, [packs]);
+  const sheetById = useCallback((id: string) => sheets?.find(x => x.id === id) ?? null, [sheets]);
+  const kitById = useCallback((id: string) => kits?.find(k => k.id === id) ?? null, [kits]);
   const decksOfPack = useCallback((id: string) => (summaries ?? []).filter(d => d.packId === id), [summaries]);
   const reviewing = review && 'deckId' in review ? deckById(review.deckId) : null;
   const reviewingPack = review && 'packId' in review ? packById(review.packId) : null;
-  const ownedPacks = (packs ?? []).filter(p => p.inLibrary).length;
 
   // Tag suggestions for the editor come from the deck being edited.
   useEffect(() => {
@@ -247,7 +275,28 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
   };
 
   const openPackSheet = async (pack: Pack | null) => {
-    try { setPackSheet({ pack, decks: await fetchAdminStats() }); } catch (e) { fail(e); }
+    try { setPackSheet({ pack, decks: (await fetchAdminStats()).filter(d => d.collection !== 'sheet') }); } catch (e) { fail(e); }
+  };
+
+  /* ── Kits ── */
+
+  /** Is this item of a kit on the caller's shelf? */
+  const onShelf = (item: KitItem): boolean =>
+    item.kind === 'pack' ? !!packById(item.id)?.inLibrary
+      : item.kind === 'sheet' ? !!sheetById(item.id)?.inLibrary
+        : !!deckById(item.id);
+
+  const openKitItem = (kitId: string, item: KitItem) => setView({ kind: item.kind, id: item.id, fromKit: kitId });
+
+  /** Something added to a kit after it was taken: already unlocked by the kit, so adding is free. */
+  const addKitItem = async (item: KitItem) => {
+    try {
+      if (item.kind === 'pack') await addPack(item.id);
+      else if (item.kind === 'sheet') await addSheet(item.id);
+      else await addToLibrary(item.id);
+      await refresh();
+      await refreshExplore();
+    } catch (e) { fail(e); }
   };
 
   /* ── Render ── */
@@ -264,32 +313,40 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
 
   return (
     <>
-      {view.kind === 'store' ? (
-        <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
-          <PackStore
-            packs={packs}
-            dark={dark}
-            examPreference={examPreference}
-            isAdmin={isAdmin}
-            owned={ownedPacks}
-            onBack={() => setView({ kind: 'library' })}
-            onOpenOwned={id => setView({ kind: 'pack', id })}
-            acquire={acquirePack}
-            loadPreview={loadPreview}
-            onAcquired={async id => {
-              await refresh();
-              refreshExplore();
-              setView({ kind: 'pack', id });
-            }}
-          />
-        </React.Suspense>
+      {view.kind === 'sheet' && sheetById(view.id) ? (
+        <SheetView
+          sheet={sheetById(view.id)!}
+          dark={dark}
+          backLabel={view.fromKit ? kitById(view.fromKit)?.title ?? 'Decks' : 'Decks'}
+          onBack={() => setView(view.fromKit ? { kind: 'kit', id: view.fromKit } : { kind: 'library' })}
+          onRemove={async () => {
+            const sh = sheetById(view.id)!;
+            if (!window.confirm(`Remove "${sh.title}" from My Alpha? It stays yours: add it back from the store any time.`)) return;
+            try { await removeSheet(sh.id); setView({ kind: 'library' }); await refreshExplore(); } catch (e) { fail(e); }
+          }}
+        />
+      ) : view.kind === 'kit' && kitById(view.id) ? (
+        <KitView
+          kit={kitById(view.id)!}
+          dark={dark}
+          reduced={reduced}
+          onShelf={onShelf}
+          onBack={() => setView({ kind: 'library' })}
+          onOpenItem={item => openKitItem(view.id, item)}
+          onAddItem={item => addKitItem(item)}
+          onRemove={async () => {
+            const k = kitById(view.id)!;
+            if (!window.confirm(`Remove "${k.title}" and everything it brought from My Alpha? It stays yours, and your progress is kept: add it back from the store any time.`)) return;
+            try { await removeKit(k.id); setView({ kind: 'library' }); await refresh(); await refreshExplore(); } catch (e) { fail(e); }
+          }}
+        />
       ) : view.kind === 'pack' && viewPack ? (
         <PackView
           pack={viewPack}
           decks={decksOfPack(viewPack.id)}
           dark={dark}
           isAdmin={isAdmin}
-          onBack={() => setView({ kind: 'library' })}
+          onBack={() => setView(view.fromKit ? { kind: 'kit', id: view.fromKit } : { kind: 'library' })}
           onStudy={() => studyPack(viewPack)}
           onAdd={async () => {
             try { await acquirePack(viewPack); await refresh(); refreshExplore(); } catch (e) { pushToast({ id: 'dk-error', title: e instanceof Error ? e.message : humanError(e), tone: 'alert' }); }
@@ -311,13 +368,13 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
         <DeckView
           deck={current}
           pack={current.packId ? packById(current.packId) : null}
-          backLabel={fromPack ? fromPack.title : 'Decks'}
+          backLabel={fromPack ? fromPack.title : view.kind === 'deck' && view.fromKit ? kitById(view.fromKit)?.title ?? 'Decks' : 'Decks'}
           dark={dark}
           canEdit={canEdit(current)}
           isAdmin={isAdmin}
           source={source}
           version={version}
-          onBack={() => setView(fromPack ? { kind: 'pack', id: fromPack.id } : { kind: 'library' })}
+          onBack={() => setView(fromPack ? { kind: 'pack', id: fromPack.id } : view.kind === 'deck' && view.fromKit ? { kind: 'kit', id: view.fromKit } : { kind: 'library' })}
           onReview={t => setReview({ deckId: current.id, tags: t ?? null })}
           onAddCard={() => { saved.current = false; setEditor({ deckId: current.id, note: null }); }}
           onEditNote={n => { saved.current = false; setEditor({ deckId: current.id, note: n }); }}
@@ -355,7 +412,11 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
           onOpenAuth={onOpenAuth}
           onRetry={() => void refresh()}
           packs={packs}
-          onOpenStore={() => { refreshExplore(); setView({ kind: 'store' }); }}
+          onOpenStore={() => onOpenStore('packs')}
+          sheets={sheets}
+          kits={kits}
+          onOpenSheet={id => setView({ kind: 'sheet', id })}
+          onOpenKit={id => setView({ kind: 'kit', id })}
           onOpenPack={id => setView({ kind: 'pack', id })}
           onReviewPack={id => { const pk = packById(id); if (pk) studyPack(pk); }}
         />

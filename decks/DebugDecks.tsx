@@ -97,7 +97,7 @@ const pk = (id: string, title: string, subject: DeckSubject | null, access: Pack
   ...o,
 });
 
-const FIXTURE_PACKS: Pack[] = [
+export const FIXTURE_PACKS: Pack[] = [
   pk('pk1', 'Physics Essentials', 'Physics', 'paid', [['Kinematics', 52], ['Laws of Motion', 48], ['Work & Energy', 41], ['Rotation', 46]], { description: 'The formulas and relationships you should know cold.', examLine: 'Full JEE Physics syllabus' }),
   pk('pk2', 'Mechanics Essentials', 'Physics', 'free', [['Units & Errors', 30], ['Projectiles', 34], ['Friction', 28]], { description: 'The ideas every mechanics question is built on.' }),
   pk('pk4', 'Electrodynamics Essentials', 'Physics', 'pro', [['Electrostatics', 64], ['Current Electricity', 51], ['Magnetism', 58]], { description: 'Fields, circuits and forces, one card at a time.' }),
@@ -112,7 +112,7 @@ const FIXTURE_PACKS: Pack[] = [
   pk('pk12', 'Trigonometry Essentials', 'Maths', 'pro', [['Identities', 44], ['Equations', 27]], { finish: 'paper' }),
 ];
 
-const PREVIEW: Record<string, PreviewCard[]> = {
+export const PREVIEW: Record<string, PreviewCard[]> = {
   Physics: [
     { deckId: '', kind: 'cloze', front: 'v = u + {{c1::at}}', back: '' },
     { deckId: '', kind: 'cloze', front: 'F = {{c1::ma}}', back: '' },

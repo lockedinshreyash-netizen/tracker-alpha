@@ -24,6 +24,8 @@ export const DEFAULT_AUDIENCE: Audience = { scope: 'personal', collection: 'more
 export const COLLECTION_COPY: Record<DeckCollection, { title: string; line: string }> = {
   essentials: { title: 'Alpha Essentials', line: 'The must-have decks. Shown first, big and up front.' },
   more: { title: 'More from Alpha', line: 'Extra decks students can browse and add.' },
+  // Never offered as a choice here; it is how the console names a sheet's formulas.
+  sheet: { title: 'a formula sheet', line: 'Read on a formula sheet, never studied as cards.' },
 };
 
 const Radio: React.FC<{ on: boolean; dark: boolean }> = ({ on, dark }) => (

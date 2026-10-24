@@ -22,6 +22,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('decks') === 'debug') {
   // Alpha Decks' review, editor and import preview on fixture cards, no database.
   import('./decks/DebugDecks').then(({ default: DebugDecks }) => ReactDOM.createRoot(rootElement).render(<DebugDecks />));
+} else if (import.meta.env.DEV && params.get('store') === 'debug') {
+  // The Alpha Store: kits, sheets, packs, the openings, the reader and the console, on fixtures.
+  import('./store/DebugStore').then(({ default: DebugStore }) => ReactDOM.createRoot(rootElement).render(<DebugStore />));
 } else if (import.meta.env.DEV && params.get('sfx') === 'debug') {
   // Every sound effect through the real player, for tuning levels.
   import('./sound/DebugSounds').then(({ default: DebugSounds }) => ReactDOM.createRoot(rootElement).render(<DebugSounds />));

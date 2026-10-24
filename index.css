@@ -1049,6 +1049,94 @@ button:active,
 @media (hover: hover) { .pk-rear-btn:not(:disabled):hover .pk-rear { filter: var(--pk-rear-hover); } }
 .pk-rear-btn:focus-visible .pk-focus { opacity: 1; }
 
+/* ── Formula sheets and kits (store/, decks/SheetView.tsx) ──
+   One formula reads like a label and its formula on a line; a sentence with
+   its answers marked reads like the deck browser's note. Colours come in as
+   custom properties from the surface (paper in the store, the app's card in
+   Decks), so one stylesheet serves both. */
+
+.sh-f { color: var(--sh-ink); font-size: 14.5px; line-height: 1.5; overflow-wrap: anywhere; text-align: left; }
+.sh-f b, .sh-f strong { font-weight: 700; }
+.sh-f i, .sh-f em { font-style: italic; }
+.sh-f sub, .sh-f sup { font-size: 0.62em; }
+.sh-f ul { list-style: disc; padding-left: 1.2em; }
+.sh-f ol { list-style: decimal; padding-left: 1.2em; }
+.sh-f img { display: block; max-width: 100%; max-height: 180px; margin: 0.35em 0; border-radius: 8px; }
+.sh-f [data-missing-image] { display: none; }
+.sh-f .katex { font-size: 1.04em; }
+.sh-f .katex-display { margin: 0.15em 0; text-align: left; }
+.sh-f .katex-display > .katex { text-align: left; }
+.sh-basic { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 1em; row-gap: 0.1em; }
+.sh-label { flex: 1 1 auto; min-width: 0; color: var(--sh-muted); font-weight: 500; }
+.sh-back { margin-left: auto; max-width: 100%; color: var(--sh-ink); font-weight: 650; text-align: right; }
+.sh-note { margin-top: 0.2em; font-size: 0.86em; color: var(--sh-muted); }
+.sh-f [data-cloze="mark"] {
+  font-weight: 650;
+  background-image: linear-gradient(var(--sh-accent), var(--sh-accent));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1.5px;
+}
+/* On the store's paper: small type, one line each, nothing taller than it needs. */
+.sh-tight { font-size: 0.86em; line-height: 1.35; }
+.sh-tight .sh-note { display: none; }
+.sh-tight .katex-display { display: inline; margin: 0; }
+
+/* The reader: columns that never split an entry. */
+.sh-screen { container-type: inline-size; }
+.sh-cols { columns: 1; column-gap: 40px; }
+@container (min-width: 640px) { .sh-cols { columns: 2; } }
+@container (min-width: 1040px) { .sh-cols { columns: 3; } }
+.sh-entry { break-inside: avoid; padding: 0.7em 0; border-bottom: 1px solid var(--sh-rule); }
+
+/* Cover answers: the formulas hide until hovered, focused or tapped. */
+.sh-covered .sh-entry { cursor: pointer; outline: none; }
+.sh-covered .sh-back, .sh-covered [data-cloze="mark"] {
+  color: transparent;
+  background-color: var(--sh-cover);
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+.sh-covered .sh-back * , .sh-covered [data-cloze="mark"] * { visibility: hidden; }
+.sh-covered .sh-entry[data-open="true"] .sh-back, .sh-covered .sh-entry[data-open="true"] [data-cloze="mark"],
+.sh-covered .sh-entry:focus-visible .sh-back, .sh-covered .sh-entry:focus-visible [data-cloze="mark"] {
+  color: var(--sh-ink); background-color: transparent;
+}
+.sh-covered .sh-entry[data-open="true"] .sh-back *, .sh-covered .sh-entry[data-open="true"] [data-cloze="mark"] *,
+.sh-covered .sh-entry:focus-visible .sh-back *, .sh-covered .sh-entry:focus-visible [data-cloze="mark"] * { visibility: visible; }
+@media (hover: hover) {
+  .sh-covered .sh-entry:hover .sh-back, .sh-covered .sh-entry:hover [data-cloze="mark"] { color: var(--sh-ink); background-color: transparent; }
+  .sh-covered .sh-entry:hover .sh-back *, .sh-covered .sh-entry:hover [data-cloze="mark"] * { visibility: visible; }
+}
+
+/* A page on the shelf leans back a little; pointed at, it straightens and lifts. */
+.sh-stand .sh-lean { display: block; transform: rotate(-1.6deg); transform-origin: 50% 100%; transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (hover: hover) { .sh-stand:hover .sh-lean { transform: translateY(-6px) rotate(0deg); } }
+.sh-stand:focus-visible .sh-lean { transform: translateY(-6px); outline: 2px solid #E10600; outline-offset: 4px; border-radius: 4px; }
+.kit-stand:focus-visible { outline: 2px solid #E10600; outline-offset: 4px; }
+/* The top box of a pile lifts a little when pointed at, as if about to be picked up. */
+.kit-stand .kit-top { transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (hover: hover) { .kit-stand:hover .kit-top { transform: translateY(-5px) !important; } }
+@media (prefers-reduced-motion: reduce) { .kit-stand .kit-top { transition: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-stand .sh-lean, .sh-covered .sh-back, .sh-covered [data-cloze="mark"] { transition: none; }
+}
+
+/* Sheets are on screen only. While one is open the page prints one line, and
+   the store's paper never prints at all. There is no print button anywhere. */
+@media print {
+  html.sh-reading body * { display: none !important; }
+  html.sh-reading body::before {
+    content: 'Formula sheets are on screen only.';
+    display: block;
+    padding: 48px;
+    font: 600 16px/1.4 system-ui, sans-serif;
+    color: #000;
+  }
+  .sh-paper { visibility: hidden !important; }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    The camera cutout (the Play app)
    ══════════════════════════════════════════════════════════════════════════

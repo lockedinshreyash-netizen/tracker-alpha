@@ -25,7 +25,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CUES, CUE_IDS, type Cue } from '../../sound/cues';
 import { Biquad, Bus, SR, encodeWav16, limit, reverb } from './audio/dsp';
-import { clap, clunk, impact, kick, riser as noiseRiser, shepard, shimmer, whoosh } from './audio/instruments';
+import { clap, clunk, impact, kick, pageTurn, riser as noiseRiser, shepard, shimmer, whoosh } from './audio/instruments';
 import { BEATS, ARENA_SECONDS } from '../../onboarding/arena';
 import { flick, glock, marimba, pop, sparkleInto, tear, thud } from './audio/sfx-instruments';
 
@@ -375,6 +375,38 @@ const RECIPES: Record<Cue, Recipe> = {
       m.add(glock(A5, 0.55, 1.2), 0.04, 1, -0.25);
       m.add(glock(Fs5, 0.5, 1.2), 0.08, 1, 0.25);
       m.sparkle(0.12, 118, 0.4, 0.15);
+    },
+  },
+
+  /* ── The Alpha Store: a sheet into its folder, a kit's lid ── */
+  'sheet-add': {
+    // A page slides down into a folder: paper, a soft landing, two notes up.
+    len: 1.2,
+    room: 0.55,
+    wet: 0.3,
+    build: m => {
+      m.add(pageTurn(0.55), 0, 0.9, -0.1, 0.15);
+      m.addStereo(whoosh(0.42, 0.3, 0.5), 0.02, 0.45, 0.2);
+      m.add(thud(0.5), 0.4, 0.75, 0, 0.1);
+      m.add(marimba(A4, 0.42, 0.5), 0.42, 1, -0.2);
+      m.add(marimba(D5, 0.52, 0.6), 0.5, 1, 0.2);
+      m.add(glock(Fs5, 0.32, 1.0), 0.54, 1, 0.1);
+    },
+  },
+  'kit-open': {
+    // The lid: a long breath of air as it slides up, a felt thump as it comes
+    // free, then the bright chord as what was inside rises.
+    len: 3.0,
+    room: 0.82,
+    wet: 0.5,
+    build: m => {
+      m.addStereo(whoosh(1.0, 0.7, 0.55), 0.15, 0.6, 0.3);
+      m.add(thud(0.62), 1.12, 0.85, 0, 0.1);
+      m.add(kick(0.45, 1.2), 1.12, 0.18, 0, 0);
+      [D4, A4].forEach((n, k) => m.add(marimba(n, 0.5), 1.2 + k * 0.02, 1, (k - 0.5) * 0.3, 0.2));
+      [D5, Fs5, A5, D6].forEach((n, k) => m.add(glock(n, 0.62 - k * 0.05, 2.2), 1.22 + k * 0.045, 1, (k - 1.5) * 0.3, 0.5));
+      m.add(glock(A6, 0.4, 1.6), 1.5, 1, 0.2);
+      m.sparkle(1.26, 141, 0.9, 0.2);
     },
   },
 

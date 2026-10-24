@@ -39,11 +39,16 @@ const ShareModal = React.lazy(() => import('./share/ShareModal'));
 /* Seen once per device: the flow, its stylesheet and its film stay out of the bundle everyone downloads. */
 const OnboardingFlow = React.lazy(() => import('./onboarding/OnboardingFlow'));
 const DecksTab = React.lazy(() => import('./decks/DecksTab'));
+/* The Alpha Store: kits, formula sheets and packs. Lazy like Decks; the rack
+   physics and the openings load with it, never with the app. */
+const StoreTab = React.lazy(() => import('./store/StoreTab'));
 /* Notes: the store and Yjs arrive with the tab, the editor with the first page. */
 const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
-import ReviewTab from './review/ReviewTab';
+import MyProfile from './profile/MyProfile';
+import type { DecksIntent } from './decks/types';
+import type { StoreSection } from './store/types';
 import type { OnboardingResult, ProfilePick } from './onboarding/OnboardingFlow';
 import RanksTab from './leaderboard/RanksTab';
 import { leaveBoard } from './leaderboard/api';
@@ -168,6 +173,8 @@ const App: React.FC = () => {
       merged.reading = normalizeReading(parsed.reading, BOOK.chapterIds[parsed.rewards?.bookChapter ?? -1] ?? null);
       /* The Questions tab became Mocks and took its slot in the rail. */
       if ((parsed.lastUsedTab as string) === 'Questions') merged.lastUsedTab = 'Mocks';
+      /* Review moved into the profile page when the Store took its slot. */
+      if ((parsed.lastUsedTab as string) === 'Review') merged.lastUsedTab = 'Profile';
       // The Observatory was removed; anyone who left the app there lands on Today.
       if ((parsed.lastUsedTab as string) === 'Observatory') merged.lastUsedTab = 'Today';
         return merged;
@@ -630,9 +637,20 @@ const App: React.FC = () => {
     document.body.style.color = theme === 'dark' ? '#FFFFFF' : '#17150F';
   }, [theme]);
 
-  /* A deck the admin console asked to open; DecksTab takes it and clears it. */
-  const [deckToOpen, setDeckToOpen] = useState<string | null>(null);
-  const clearDeckToOpen = useCallback(() => setDeckToOpen(null), []);
+  /* Something for the Decks tab to open once: a deck the console asked for,
+     or a pack, sheet or kit just taken in the Store. DecksTab clears it. */
+  const [decksIntent, setDecksIntent] = useState<DecksIntent | null>(null);
+  const clearDecksIntent = useCallback(() => setDecksIntent(null), []);
+  const openInDecks = useCallback((kind: DecksIntent['kind'] | null, id?: string) => {
+    if (kind && id) setDecksIntent({ kind, id, nonce: Date.now() });
+    handleTabChange('Decks');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Which section of the Store to open on: Decks' store sign asks for Packs. */
+  const [storeIntent, setStoreIntent] = useState<{ section: StoreSection; nonce: number } | null>(null);
+  const openStore = useCallback((section: StoreSection) => {
+    setStoreIntent({ section, nonce: Date.now() });
+    handleTabChange('Store');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Syllabus → a chapter's notes page: Notes opens it, or makes it. */
   const [notesRequest, setNotesRequest] = useState<NotesRequest | null>(null);
@@ -654,7 +672,10 @@ const App: React.FC = () => {
     });
   }, []);
 
+  /* Through goHome first: a tab change while /u/<handle> is showing would
+     otherwise switch tabs invisibly behind the profile page. */
   const handleTabChange = (tab: TabType) => {
+    profileCtl.goHome();
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
   };
@@ -1882,6 +1903,14 @@ const App: React.FC = () => {
     profileCtl.goHome();
     handleTabChange(tab);
   };
+  /* Your own /u/<handle> is the Profile tab: one page for yourself, with the
+     settings under it. Above the early return, like every hook here. */
+  const ownHandle = profileCtl.ownProfile?.handle ?? null;
+  useEffect(() => {
+    if (!ownHandle || profileCtl.routeHandle !== ownHandle) return;
+    handleTabChange('Profile');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownHandle, profileCtl.routeHandle]);
 
   /* One replay of the history (streak/firewood.ts), cached per log array. */
   const ledger = streakLedger(state.logs);
@@ -2001,7 +2030,6 @@ const App: React.FC = () => {
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
         isAdmin={isAdmin}
         ownProfile={profileCtl.ownProfile}
-        onOpenAccount={profileCtl.openEditProfile}
         groupsUnread={groupsState.totalUnread}
         currentClass={state.currentClass}
         onClassChange={setCurrentClass}
@@ -2016,7 +2044,11 @@ const App: React.FC = () => {
       <ProfileModal
         userId={profileCtl.openProfileUserId}
         onClose={profileCtl.closeProfile}
-        onViewFull={profileCtl.viewFullProfile}
+        onViewFull={handle => {
+          // There is one page for yourself: your own row opens the Profile tab.
+          if (handle === profileCtl.ownProfile?.handle) { profileCtl.closeProfile(); handleTabChange('Profile'); }
+          else profileCtl.viewFullProfile(handle);
+        }}
         onEdit={profileCtl.openEditProfile}
         currentUserId={user?.id ?? null}
         ownTotalHours={ownTotalHours}
@@ -2190,8 +2222,9 @@ const App: React.FC = () => {
                 theme={theme}
                 examPreference={state.examPreference || 'JEE'}
                 onOpenAuth={() => setIsAuthModalOpen(true)}
-                openDeckId={deckToOpen}
-                onOpenedDeck={clearDeckToOpen}
+                intent={decksIntent}
+                onIntentHandled={clearDecksIntent}
+                onOpenStore={openStore}
               />
             </React.Suspense>
           )}
@@ -2216,24 +2249,45 @@ const App: React.FC = () => {
               />
             </React.Suspense>
           )}
-          {activeTab === 'Review' && (
-            <ReviewTab
-              logs={state.logs}
-              score={lockInScore}
-              onClearData={clearLogs}
+          {/* Lazy, server state end to end: nothing in it touches AppState. */}
+          {activeTab === 'Store' && (
+            <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+              <StoreTab
+                user={user}
+                isAdmin={isAdmin}
+                theme={theme}
+                examPreference={state.examPreference || 'JEE'}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+                intent={storeIntent}
+                onOpenInDecks={openInDecks}
+              />
+            </React.Suspense>
+          )}
+          {activeTab === 'Profile' && (
+            <MyProfile
               theme={theme}
               user={user}
-              onOpenAuth={() => setIsAuthModalOpen(true)}
-              onSignOut={handleSignOut}
-              onDeleteAccount={handleDeleteAccount}
-              onLog={logStudy}
-              dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
-              examPreference={state.examPreference || 'JEE'}
-              onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
-              activeSubjects={activeSubjects}
-              reminders={reminderPrefs}
-              onChangeReminders={setReminderPrefs}
-              goalHours={state.dailyGoalHours}
+              profile={profileCtl.ownProfile}
+              totalHours={ownTotalHours}
+              onEditProfile={profileCtl.openEditProfile}
+              onSignIn={() => setIsAuthModalOpen(true)}
+              review={{
+                logs: state.logs,
+                score: lockInScore,
+                onClearData: clearLogs,
+                user,
+                onOpenAuth: () => setIsAuthModalOpen(true),
+                onSignOut: handleSignOut,
+                onDeleteAccount: handleDeleteAccount,
+                onLog: logStudy,
+                dailyQuestionsLog: state.questionTracking.dailyQuestionsLog,
+                examPreference: state.examPreference || 'JEE',
+                onChangeExamPreference: (p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p })),
+                activeSubjects,
+                reminders: reminderPrefs,
+                onChangeReminders: setReminderPrefs,
+                goalHours: state.dailyGoalHours,
+              }}
             />
           )}
           {/* Drawn only for an administrator, and `user` is guaranteed here
@@ -2241,7 +2295,7 @@ const App: React.FC = () => {
               Hiding it is not the control; every query inside it is refused by
               row-level security for anybody else. */}
           {activeTab === 'Admin' && isAdmin && user && (
-            <AdminTab adminId={user.id} theme={theme} onOpenDeck={id => { if (id) setDeckToOpen(id); handleTabChange('Decks'); }} />
+            <AdminTab adminId={user.id} theme={theme} onOpenDeck={id => openInDecks(id ? 'deck' : null, id ?? undefined)} />
           )}
           </>
           )}
@@ -2341,9 +2395,9 @@ const App: React.FC = () => {
           profile={profileCtl.ownProfile}
           syncStatus={syncStatus}
           onSignIn={() => { void signInWithGoogle().then(err => { if (err) setIsAuthModalOpen(true); }); }}
-          onOpenProfile={profileCtl.openEditProfile}
+          onOpenProfile={() => handleTabChange('Profile')}
           install={install}
-          onOpenAll={() => handleTabChangeAndExitProfile('Review')}
+          onOpenAll={() => handleTabChange('Profile')}
           festive={festiveLive === 'none' ? null : {
             theme: festiveLive,
             label: FESTIVE_LABEL[festiveLive],

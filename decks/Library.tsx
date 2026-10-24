@@ -13,8 +13,11 @@
      one of their own, and a short row is finished by an "add another" tile
      that spans the gap instead of leaving a hole.
    - My Alpha: what you got from Alpha. A pack is one item, drawn as a
-     digital deck (AlphaLibraryItem), never as the packaging it came in.
-   - The store: a sign with a short rack on it, leading to Alpha Packs.
+     digital deck (AlphaLibraryItem), never as the packaging it came in. A
+     kit is one item too (a small box), and the packs, sheets and decks it
+     brought are not listed again beside it. A sheet is a small page.
+   - The store: a sign with a short rack on it, leading to the Alpha Store's
+     packs.
    - Discovering: Alpha Essentials as featured cards, More from Alpha as a
      compact grid — the administrator's choice of shelf is what puts a deck in
      one or the other.
@@ -29,6 +32,9 @@ import { MASTERY_RAMP, STATE_COLOR, deckAccent, fmtUntil, room } from './theme';
 import { AlphaBadge, Icon, MasteryBar, StackArt, SubjectEyebrow, masteryOf, masteryPct, pill } from './ui';
 import { AlphaLibraryItem, packTotals } from './Packs';
 import { StoreEntry } from './store/StoreEntry';
+import { KitTile, SheetTile } from './StoreTiles';
+import { shelfItems } from '../store/model';
+import type { Kit, Sheet } from '../store/types';
 import type { DeckSubject, DeckSummary, ExploreDeck, Pack } from './types';
 
 interface Props {
@@ -52,6 +58,11 @@ interface Props {
   onOpenStore?: () => void;
   onOpenPack?: (id: string) => void;
   onReviewPack?: (id: string) => void;
+  /** Formula sheets and kits from the store. Null while loading. */
+  sheets?: Sheet[] | null;
+  kits?: Kit[] | null;
+  onOpenSheet?: (id: string) => void;
+  onOpenKit?: (id: string) => void;
 }
 
 const todayCount = (d: DeckSummary) => d.due + d.newAvailable;
@@ -60,6 +71,7 @@ const essentialsFirst = (a: DeckSummary, b: DeckSummary) => Number(b.collection 
 const Library: React.FC<Props> = props => {
   const { dark, isAdmin, signedIn, summaries, explore, error, onOpenDeck, onReview, onNewDeck, onImport, onOpenAuth, onRetry } = props;
   const { packs = null, onOpenStore, onOpenPack = () => undefined, onReviewPack = () => undefined } = props;
+  const { sheets = null, kits = null, onOpenSheet = () => undefined, onOpenKit = () => undefined } = props;
   const t = tokens(dark);
 
   const groups = useMemo(() => {
@@ -68,13 +80,19 @@ const Library: React.FC<Props> = props => {
     const owned = (packs ?? []).filter(p => p.inLibrary || all.some(d => d.packId === p.id));
     const ownedIds = new Set(owned.map(p => p.id));
     const inPack = (d: DeckSummary) => !!d.packId && ownedIds.has(d.packId);
+    // A kit you have is one item too: what it brought is not listed again.
+    const shelf = shelfItems(kits ?? [], owned.map(p => ({ id: p.id, inLibrary: true })), sheets ?? []);
+    const shownPacks = new Set(shelf.packs);
     return {
       mine: all.filter(d => d.scope === 'personal'),
-      packs: owned.map(p => ({ pack: p, decks: all.filter(d => d.packId === p.id) })),
-      alpha: all.filter(d => d.scope === 'global' && d.status !== 'draft' && !inPack(d)).sort(essentialsFirst),
+      kits: (kits ?? []).filter(k => shelf.kits.includes(k.id)),
+      packs: owned.filter(p => shownPacks.has(p.id)).map(p => ({ pack: p, decks: all.filter(d => d.packId === p.id) })),
+      sheets: (sheets ?? []).filter(x => shelf.sheets.includes(x.id)),
+      alpha: all.filter(d => d.scope === 'global' && d.status !== 'draft' && !inPack(d) && !shelf.hiddenDecks.has(d.id)).sort(essentialsFirst),
       drafts: all.filter(d => d.scope === 'global' && d.status === 'draft' && !inPack(d)).sort(essentialsFirst),
     };
-  }, [summaries, packs]);
+  }, [summaries, packs, sheets, kits]);
+  const alphaCount = groups.kits.length + groups.packs.length + groups.sheets.length + groups.alpha.length;
   const stocked = (packs ?? []).filter(p => p.status === 'published' || (isAdmin && p.status === 'draft'));
 
   const discover = useMemo(() => {
@@ -99,7 +117,8 @@ const Library: React.FC<Props> = props => {
     );
   }
   if (!summaries) return <LibrarySkeleton dark={dark} />;
-  if (!summaries.length) {
+  // A sheet or kit with no deck of its own still makes a shelf.
+  if (!summaries.length && !groups.sheets.length && !groups.kits.length) {
     return (
       <Welcome
         {...props}
@@ -148,15 +167,17 @@ const Library: React.FC<Props> = props => {
         </Shelf>
       )}
 
-      {groups.packs.length + groups.alpha.length > 0 && (
-        <Shelf title="My Alpha" line="Your packs and decks from Alpha." count={groups.packs.length + groups.alpha.length} dark={dark}>
+      {alphaCount > 0 && (
+        <Shelf title="My Alpha" line="Your kits, packs, sheets and decks from Alpha." count={alphaCount} dark={dark}>
+          {groups.kits.map((k, i) => <KitTile key={k.id} kit={k} dark={dark} delay={i * 40} onOpen={() => onOpenKit(k.id)} />)}
           {groups.packs.map(({ pack, decks }, i) => (
-            <AlphaLibraryItem key={pack.id} pack={pack} decks={decks} dark={dark} delay={i * 40} onOpen={() => onOpenPack(pack.id)} onContinue={() => onReviewPack(pack.id)} />
+            <AlphaLibraryItem key={pack.id} pack={pack} decks={decks} dark={dark} delay={(groups.kits.length + i) * 40} onOpen={() => onOpenPack(pack.id)} onContinue={() => onReviewPack(pack.id)} />
           ))}
-          {groups.alpha.map((d, i) => <DeckTile key={d.id} deck={d} dark={dark} delay={(groups.packs.length + i) * 40} onOpen={() => onOpenDeck(d.id)} onReview={() => onReview(d.id)} />)}
+          {groups.sheets.map((x, i) => <SheetTile key={x.id} sheet={x} dark={dark} delay={(groups.kits.length + groups.packs.length + i) * 40} onOpen={() => onOpenSheet(x.id)} />)}
+          {groups.alpha.map((d, i) => <DeckTile key={d.id} deck={d} dark={dark} delay={(groups.kits.length + groups.packs.length + groups.sheets.length + i) * 40} onOpen={() => onOpenDeck(d.id)} onReview={() => onReview(d.id)} />)}
           {/* A short row ends in the decks still waiting below, not in a hole. */}
-          {(groups.packs.length + groups.alpha.length) % 3 !== 0 && discover.essentials.length + discover.more.length > 0 && (
-            <FindMoreTile dark={dark} count={groups.packs.length + groups.alpha.length} waiting={discover.essentials.length + discover.more.length} delay={(groups.packs.length + groups.alpha.length) * 40} />
+          {alphaCount % 3 !== 0 && discover.essentials.length + discover.more.length > 0 && (
+            <FindMoreTile dark={dark} count={alphaCount} waiting={discover.essentials.length + discover.more.length} delay={alphaCount * 40} />
           )}
         </Shelf>
       )}

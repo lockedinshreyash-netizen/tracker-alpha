@@ -26,6 +26,8 @@ interface Props {
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
   /** The daily goal, for the nudge preview. */
   goalHours?: number;
+  /** Drawn under the profile header (profile/MyProfile.tsx), which says what the page is. */
+  bare?: boolean;
 }
 
 /* One shape for every setting: what it is, where it stands, and its control.
@@ -78,14 +80,14 @@ const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) =
 
 const ReviewTab: React.FC<Props> = ({
   logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onDeleteAccount, onLog,
-  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders, goalHours,
+  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders, goalHours, bare = false,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
   const [manualQuality, setManualQuality] = useState<number>(3);
   const [deleting, setDeleting] = useState(false);
 
-  /* /?open=review#account is where the "delete your account" web page sends
+  /* /?open=review#account (now the profile page) is where the "delete your account" web page sends
      people (site/legal.tsx), so arriving with that hash lands on the row. */
   useEffect(() => {
     if (window.location.hash !== '#account') return;
@@ -115,11 +117,13 @@ const ReviewTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        dark={dark}
-        title="Review"
-        subtitle={logs.length ? `${totalHours.toFixed(1)} hours across ${logs.length} sessions. Here’s what they add up to.` : 'Your numbers, your settings, and the log you fix by hand.'}
-      />
+      {!bare && (
+        <PageHeader
+          dark={dark}
+          title="Review"
+          subtitle={logs.length ? `${totalHours.toFixed(1)} hours across ${logs.length} sessions. Here’s what they add up to.` : 'Your numbers, your settings, and the log you fix by hand.'}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card dark={dark} delay={60} className="md:col-span-2 p-6 md:p-10 relative overflow-hidden">

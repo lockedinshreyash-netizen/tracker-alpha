@@ -7,6 +7,8 @@ import ThemeAdmin from './ThemeAdmin';
 
 /* Lazy so the Decks data layer stays out of the main bundle. */
 const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
+/* Lazy, and for the same reason: the store's data layer and editors. */
+const StoreAdmin = React.lazy(() => import('./StoreAdmin'));
 /* Lazy for the same reason: the charts are the console's alone. */
 const AnalyticsAdmin = React.lazy(() => import('../analytics/AnalyticsAdmin'));
 
@@ -17,7 +19,7 @@ interface Props {
   onOpenDeck: (id: string | null) => void;
 }
 
-type Section = 'analytics' | 'announce' | 'theme' | 'inbox' | 'moderation' | 'decks' | 'people';
+type Section = 'analytics' | 'announce' | 'theme' | 'inbox' | 'moderation' | 'decks' | 'store' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'analytics', label: 'Analytics' },
@@ -26,13 +28,14 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'inbox', label: 'Feedback' },
   { id: 'moderation', label: 'Moderation' },
   { id: 'decks', label: 'Decks' },
+  { id: 'store', label: 'Store' },
   { id: 'people', label: 'Administrators' },
 ];
 
 /**
  * The console.
  *
- * Seven sections behind one switch rather than seven tabs in the rail: the rail
+ * Eight sections behind one switch rather than eight tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -74,6 +77,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}
       {section === 'moderation' && <ModerationAdmin adminId={adminId} theme={theme} />}
       {section === 'decks' && <Suspense fallback={null}><DecksAdmin theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
+      {section === 'store' && <Suspense fallback={null}><StoreAdmin adminId={adminId} theme={theme} onOpenDeck={onOpenDeck} /></Suspense>}
       {section === 'people' && <AdminRoster adminId={adminId} theme={theme} />}
     </div>
   );

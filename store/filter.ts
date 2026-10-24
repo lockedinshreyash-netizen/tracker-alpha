@@ -1,0 +1,72 @@
+/* ── The store's filter ──
+   What to show: everything, or one type (kits, formula sheets, flashcard
+   packs), for every subject or one. Remembered per device, never in
+   AppState, the way Mocks remembers its filter. React-free and tested
+   (store/tests/store.test.ts). */
+
+import type { DeckSubject } from '../decks/types';
+import type { ExamPreference } from '../types';
+
+export type StoreType = 'all' | 'kits' | 'sheets' | 'packs';
+export type StoreSubject = 'all' | DeckSubject;
+
+export interface StoreFilter {
+  type: StoreType;
+  subject: StoreSubject;
+}
+
+export const ALL: StoreFilter = { type: 'all', subject: 'all' };
+
+/** In the order the page shows them. */
+export const TYPES: { value: StoreType; label: string }[] = [
+  { value: 'all', label: 'Everything' },
+  { value: 'kits', label: 'Kits' },
+  { value: 'sheets', label: 'Formula sheets' },
+  { value: 'packs', label: 'Flashcard packs' },
+];
+
+/** The subjects worth a chip: the student's exam's. Anything else is still under "All subjects". */
+export const subjectsFor = (exam: ExamPreference): DeckSubject[] =>
+  exam === 'NEET' ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Maths'];
+
+export const showsType = (f: StoreFilter, type: Exclude<StoreType, 'all'>): boolean => f.type === 'all' || f.type === type;
+
+export const matchesSubject = (item: { subject: DeckSubject | null }, f: StoreFilter): boolean =>
+  f.subject === 'all' || item.subject === f.subject;
+
+const NOUN: Record<Exclude<StoreType, 'all'>, string> = { kits: 'kits', sheets: 'formula sheets', packs: 'packs' };
+
+/** What a rack says when the filter leaves nothing on it. Null: nothing is filtered, so say the usual. */
+export const emptyFor = (type: Exclude<StoreType, 'all'>, f: StoreFilter): { title: string; line: string } | null =>
+  f.subject === 'all' ? null : { title: `No ${f.subject} ${NOUN[type]} yet.`, line: 'Try another subject, or all of them.' };
+
+const KEY = 'alpha_store_filter_v1';
+const SUBJECTS: DeckSubject[] = ['Physics', 'Chemistry', 'Maths', 'Biology'];
+
+/** A stored filter, checked: anything unreadable, or a subject outside this exam, falls back to all. */
+export const parseFilter = (raw: string | null, exam: ExamPreference): StoreFilter => {
+  try {
+    const v = raw ? JSON.parse(raw) : null;
+    const type: StoreType = TYPES.some(t => t.value === v?.type) ? v.type : 'all';
+    const subject: StoreSubject = SUBJECTS.includes(v?.subject) && subjectsFor(exam).includes(v.subject) ? v.subject : 'all';
+    return { type, subject };
+  } catch {
+    return ALL;
+  }
+};
+
+export const readFilter = (exam: ExamPreference): StoreFilter => {
+  try { return parseFilter(localStorage.getItem(KEY), exam); } catch { return ALL; }
+};
+
+export const writeFilter = (f: StoreFilter): void => {
+  try { localStorage.setItem(KEY, JSON.stringify(f)); } catch { /* private mode: the default next time */ }
+};
+
+/** The heading's line: what the page is showing. */
+export const filterLine = (f: StoreFilter): string => {
+  const kind = TYPES.find(t => t.value === f.type)?.label ?? 'Everything';
+  if (f.type === 'all' && f.subject === 'all') return 'Kits, formula sheets and flashcard packs, made by Alpha.';
+  if (f.type === 'all') return `Everything for ${f.subject}.`;
+  return f.subject === 'all' ? `${kind}, every subject.` : `${kind} for ${f.subject}.`;
+};

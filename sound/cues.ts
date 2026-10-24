@@ -18,7 +18,7 @@ export type CueGroup =
   | 'streak'
   /** Reward unlocks. Fetched when the modal mounts. */
   | 'rare'
-  /** The Alpha Packs opening. Fetched when the store opens. */
+  /** The Alpha Store: a pack's opening, a sheet into its folder, a kit's unboxing. Fetched when the store opens. */
   | 'store'
   | 'social'
   | 'onboarding';
@@ -80,6 +80,8 @@ export const CUES = {
   'pack-tear': cue('store', 0.5, 'Pack tear', 'The pack tears open', { stereo: true }),
   'pack-reveal': cue('store', 0.55, 'Pack reveal', 'The cards rise out of the pack', { stereo: true }),
   'pack-added': cue('store', 0.6, 'Added to Alpha', 'The pack lands in My Alpha', { stereo: true }),
+  'sheet-add': cue('store', 0.5, 'Sheet added', 'A formula sheet slides into its folder', { stereo: true }),
+  'kit-open': cue('store', 0.65, 'Kit opened', 'A kit lid lifts and its contents rise', { stereo: true }),
 
   /* ── Social ── */
   overtake: cue('social', 0.45, 'Overtake', 'Someone passes you in the race, or you pass them', { stereo: true }),
