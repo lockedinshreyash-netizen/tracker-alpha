@@ -1,0 +1,80 @@
+/* ── Chat bubbles (chat/ChatMessage.tsx, chat/MessageMenu.tsx) ──
+   Hand-written rather than Tailwind for two things CDN Tailwind cannot say:
+   "only where a mouse can hover" and keyframes. */
+
+/* The ↩ 😊 ⋯ strip beside a bubble is for a mouse. On a touch screen a tap
+   leaves :hover stuck on, which would park the strip beside whatever was
+   last touched; there, long press and swipe do its job. */
+.chat-strip {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+.chat-row:hover .chat-strip,
+.chat-row:focus-within .chat-strip,
+.chat-strip[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .chat-strip { display: none; }
+}
+
+/* A long press must open our menu, not the OS's: no callout, no selection
+   handles. Text stays copyable through the menu's Copy. */
+@media (hover: none) {
+  .chat-bubble {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* The bubble sinks a little under the finger before the menu opens. */
+.chat-bubble[data-pressing='true'] {
+  transform: scale(0.97);
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes chat-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.chat-in { animation: chat-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes chat-pop {
+  from { opacity: 0; transform: scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+.chat-pop { animation: chat-pop 200ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
+
+@keyframes chat-emoji {
+  from { opacity: 0; transform: translateY(8px) scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+.chat-emoji { animation: chat-emoji 240ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+
+@keyframes chat-lift {
+  from { transform: translateY(var(--chat-from, 0px)) scale(1); }
+  to { transform: scale(1.03); }
+}
+.chat-lift { animation: chat-lift 240ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
+
+/* Double tap: a heart blooms over the bubble and fades, as on Instagram. */
+@keyframes chat-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  55% { transform: translate(-50%, -50%) scale(0.95); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(0.9); }
+}
+.chat-burst { animation: chat-burst 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes chat-scrim { from { opacity: 0; } to { opacity: 1; } }
+.chat-scrim { animation: chat-scrim 160ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-in, .chat-pop, .chat-emoji, .chat-lift, .chat-scrim { animation: none; }
+  .chat-burst { animation-duration: 1ms; }
+  .chat-bubble[data-pressing='true'] { transform: none; }
+}

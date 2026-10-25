@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { ExamPreference, MockChapter, MockMistake, MockResult, MockSubjectScore, MockTest, MockVerdict, Subject } from '../types';
 import { SingleChapterPicker } from './ChapterPicker';
-import { EXAMS, MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, blankScores, chapterKey, examColor, paperShort, topicKey, totals } from './model';
+import { MISTAKES, MISTAKE_COLORS, MISTAKE_ORDER, blankScores, chapterKey, examColor, paperShort, perQuestionFor, schemeFor, topicKey, totals } from './model';
 import { TakenMock, formatDate } from './insights';
 import { ExamBadge, Eyebrow, Field, ScopeBadge, Sheet, btn, deltaTone, signedPct, subjectDot, tokens } from './ui';
 
@@ -99,7 +99,7 @@ const ResultSheet: React.FC<Props> = ({ test, previous, pref, subjects, today, d
     return Array.from(seen.values());
   });
 
-  const scheme = EXAMS[test.exam].scheme;
+  const scheme = schemeFor(test);
   const patch = (i: number, p: Partial<ScoreDraft>) => setScores(prev => prev.map((s, j) => (j === i ? { ...s, ...p } : s)));
 
   /* With a fixed scheme, counts determine marks. Filled in as the counts are
@@ -133,7 +133,7 @@ const ResultSheet: React.FC<Props> = ({ test, previous, pref, subjects, today, d
     setVerdicts(prev => { const next = { ...prev }; if (v) next[key] = v; else delete next[key]; return next; });
 
   const lostTotal = MISTAKE_ORDER.reduce((a, k) => a + (mistakes[k] ?? 0), 0);
-  const marksLost = lostTotal * EXAMS[test.exam].perQuestion;
+  const marksLost = lostTotal * perQuestionFor(test);
 
   const save = () => {
     const result: MockResult = { scores: parsed };

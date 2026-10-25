@@ -1,7 +1,10 @@
 import type { ReadingState } from './reader/model';
+import type { ExamTarget } from './content/exams';
 
 export type Subject = 'Physics' | 'Chemistry' | 'Maths' | 'Biology' | 'General';
 
+/** The stream, under its old name: 'JEE' is PCM, 'NEET' is PCB. Which exams
+    a student writes, and when, is `AppState.exams` (content/exams.ts). */
 export type ExamPreference = 'JEE' | 'NEET';
 
 export type SyllabusStatus = 'not_started' | 'in_progress' | 'practice_pending' | 'completed' | 'revision_pending';
@@ -744,6 +747,13 @@ export interface MocksState {
 export interface AppState {
   currentClass: 11 | 12;
   examPreference?: ExamPreference;
+  /** The exams the student is writing and the year, kept in step with the
+      stream above (content/exams.ts). Absent in a blob from an older build:
+      derived from the stream and class on load and on read. */
+  exams?: ExamTarget;
+  /** Show the main exam and year as a chip on the public profile (Ranks,
+      Groups). Absent means yes. Off writes nulls to the profile. */
+  showExamOnProfile?: boolean;
   logs: DailyLog[];
   progress: ChapterProgress[];
   lastUsedTab: TabType;

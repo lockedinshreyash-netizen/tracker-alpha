@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Avatar } from './Avatar';
 import { Profile, fetchProfileByHandle, fetchProfileByUserId, fetchTotalHours, humanError } from './profileApi';
 import { formatGap } from '../leaderboard/engine';
+import { ExamChip } from '../exams/ExamChip';
 
 /* ── Profile views ──
    One presentational card (ProfileCard), two shells around it: a compact
@@ -89,6 +90,13 @@ export const ProfileCard: React.FC<CardProps> = ({ profile, totalHours, isOwn, o
     <div className="flex flex-col items-center text-center">
       <Avatar profile={profile} size={compact ? 84 : 108} className="ring-2 ring-inset ring-white/10 rounded-full" />
       <h2 className={`mt-4 text-xl md:text-2xl font-black font-ui ${heading}`}>{profile.display_name}</h2>
+      {/* The exams they are writing, main one first, when their profile shows them. */}
+      {profile.exam && (
+        <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
+          <ExamChip exam={profile.exam} year={profile.exam_year} dark={dark} size="sm" />
+          {(profile.exams_also ?? []).map(id => <ExamChip key={id} exam={id} dark={dark} size="sm" />)}
+        </div>
+      )}
 
       {profile.bio && (
         <p className={`mt-2 text-[12px] font-ui italic leading-relaxed max-w-xs ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>

@@ -16,8 +16,10 @@ import type { User } from '@supabase/supabase-js';
 import { Card, Eyebrow, PageHeader, btn, tokens } from '../ui/kit';
 import { Avatar } from './Avatar';
 import type { Profile } from './profileApi';
+import type { ExamId } from '../content/exams';
 import { formatGap } from '../leaderboard/engine';
 import ReviewTab from '../review/ReviewTab';
+import { ExamChip } from '../exams/ExamChip';
 
 type ReviewProps = React.ComponentProps<typeof ReviewTab>;
 
@@ -53,6 +55,13 @@ const MyProfile = ({ theme, user, profile, totalHours, onEditProfile, onSignIn, 
               <div className="min-w-0">
                 <h2 className={`font-display text-[26px] md:text-[30px] leading-tight truncate ${t.heading}`}>{profile.display_name}</h2>
                 <p className={`text-[13px] font-ui mt-1 ${t.faint}`}>@{profile.handle}</p>
+                {/* What others see beside your name, while you show it (the Exam row below switches it). */}
+                {review.showExam && review.exams && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <ExamChip exam={review.exams.primary} year={review.exams.year} dark={dark} size="sm" />
+                    {review.exams.also.map((id: ExamId) => <ExamChip key={id} exam={id} dark={dark} size="sm" />)}
+                  </div>
+                )}
                 {profile.bio && <p className={`text-[14px] font-accent mt-2 line-clamp-2 ${t.body}`}>{profile.bio}</p>}
               </div>
             </div>

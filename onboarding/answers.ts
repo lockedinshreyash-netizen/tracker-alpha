@@ -1,33 +1,43 @@
 /* ── What onboarding asks, and what it works out ──
    Pure and React-free. The answers become things the app already
-   understands: an exam, a class, a daily goal, a timer mode, and the one
-   chapter to start with. Onboarding no longer builds a Plan: a timetable
+   understands: a stream, the exams and the year, a class, a daily goal, a
+   timer mode, and the one chapter to start with. Onboarding no longer builds a Plan: a timetable
    guessed from four questions alternated subjects the way no real student
    studies, so the opening shows the Plan tab instead and the student builds
    their own day there. */
 
 import type { ChapterProgress, ExamPreference, Subject, TimerMode } from '../types';
-import { getChaptersFor, getCoreSubjects, JEE_2027_DATE, NEET_2027_DATE } from '../constants';
+import { getChaptersFor, getCoreSubjects } from '../constants';
+import { defaultExam, defaultYear, examById, examDateFor, streamOf, targetExams, type ExamId, type ExamTarget } from '../content/exams';
 import { getWeight, TIER_LABELS, TIER_ORDER, type WeightTier } from '../content';
 import { getDaysRemaining } from '../utils';
 
 export interface Answers {
+  /** The stream, as the app stores it: 'JEE' is PCM, 'NEET' is PCB. */
   exam: ExamPreference;
+  /** The exams picked, main exam first (content/exams.ts). */
+  exams: ExamId[];
+  /** The year they write them. Follows the class until the student picks one. */
+  year: number;
+  yearPicked: boolean;
   cls: 11 | 12;
   hours: number;
   style: TimerMode;
 }
 
-export const DEFAULT_ANSWERS = (exam: ExamPreference, cls: 11 | 12, hours: number, style: TimerMode): Answers => ({
+export const DEFAULT_ANSWERS = (exam: ExamPreference, cls: 11 | 12, hours: number, style: TimerMode, target?: ExamTarget): Answers => ({
   exam,
+  exams: target ? targetExams(target) : [defaultExam(streamOf(exam))],
+  year: target?.year ?? defaultYear(cls),
+  yearPicked: false,
   cls,
   hours: Math.min(14, Math.max(1, Math.round(hours))),
   style,
 });
 
-export const examLabel = (exam: ExamPreference): string => (exam === 'NEET' ? 'NEET' : 'JEE Main');
-export const examDate = (exam: ExamPreference): Date => (exam === 'NEET' ? NEET_2027_DATE : JEE_2027_DATE);
-export const daysLeft = (exam: ExamPreference): number => Math.max(0, getDaysRemaining(examDate(exam)));
+export const examLabel = (id: ExamId): string => examById(id).name;
+export const examDate = (id: ExamId, year: number): Date => examDateFor(id, year).date;
+export const daysLeft = (id: ExamId, year: number): number => Math.max(0, getDaysRemaining(examDate(id, year)));
 
 /* ── The chapter to start with ── */
 

@@ -221,3 +221,38 @@ create policy "users delete their own avatar"
 -- No select policy for READING: the bucket's `public` flag serves GET requests
 -- through /storage/v1/object/public/avatars/... without RLS being consulted.
 -- Listing and removing your own files do need one; it is in account.sql.
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Exams on the profile
+--
+-- Which exam a student is writing, and when, shown as a coloured chip beside
+-- their name in Ranks, race chat and Groups (content/exams.ts, ExamChip).
+-- Written by the student's own device from their exam settings, through the
+-- same "users update their own profile" policy as everything else here, and
+-- only while their "Show my exam on my profile" switch is on: turning it off
+-- writes nulls. Readable, like the rest of a profile, by signed-in users.
+--
+-- The ids are content/exams.ts's; keep the two lists in step. Added after the
+-- table, so an existing project gains them by re-running this file. Until it
+-- is re-run the app reads profiles without them and simply shows no chips.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+alter table public.profiles add column if not exists exam text;
+alter table public.profiles add column if not exists exam_year smallint;
+alter table public.profiles add column if not exists exams_also text[] not null default '{}';
+
+alter table public.profiles drop constraint if exists exam_valid;
+alter table public.profiles add constraint exam_valid check (
+  exam is null or exam in ('jee-main', 'jee-advanced', 'bitsat', 'mht-cet', 'wbjee', 'kcet', 'comedk', 'viteee', 'neet-ug')
+);
+-- An exam and its year come together, or not at all.
+alter table public.profiles drop constraint if exists exam_year_valid;
+alter table public.profiles add constraint exam_year_valid check (
+  (exam is null) = (exam_year is null) and (exam_year is null or exam_year between 2025 and 2040)
+);
+alter table public.profiles drop constraint if exists exams_also_valid;
+alter table public.profiles add constraint exams_also_valid check (
+  cardinality(exams_also) <= 4
+  and exams_also <@ array['jee-main', 'jee-advanced', 'bitsat', 'mht-cet', 'wbjee', 'kcet', 'comedk', 'viteee', 'neet-ug']::text[]
+  and (exam is not null or cardinality(exams_also) = 0)
+);

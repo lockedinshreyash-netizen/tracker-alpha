@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppState, ExamPreference, LogSource, PomodoroSettings, ScheduleBlock, Subject, Task, TaskColumn, TimerMode, TimerState } from '../types';
 import { getISTDateString, getSubjectDistribution } from '../utils';
 import ExamCountdown from './ExamCountdown';
+import { normalizeTarget, streamOf } from '../content/exams';
 import { isIdle as pomodoroIsIdle, effectiveMode } from './pomodoro';
 import { CLEARED, isArmed, isPaused, pauseRun, resumeRun, sessionSpan } from './stopwatch';
 import * as sfx from '../audio';
@@ -254,7 +255,7 @@ const TodayTab: React.FC<Props> = ({
           }
           /* The exam countdown: it lived in the old web header above every
              tab, and belongs here at the top of the day it is counting. */
-          aside={<ExamCountdown exam={state.examPreference || 'JEE'} dark={dark} />}
+          aside={<ExamCountdown target={normalizeTarget(state.exams, streamOf(state.examPreference), state.currentClass)} dark={dark} />}
         />
       )}
       {/* Only while idle — mid-session the last thing anyone needs is a second

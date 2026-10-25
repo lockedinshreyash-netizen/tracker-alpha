@@ -15,17 +15,13 @@ import * as sfx from '../audio';
 import LiquidGlass from '../ui/LiquidGlass';
 import { Overlay } from '../ui/kit';
 import { getDaysRemaining } from '../utils';
-import { JEE_2027_DATE, NEET_2027_DATE } from '../constants';
-import type { ExamPreference } from '../types';
+import { examById, examDateFor, targetLabel, type ExamTarget } from '../content/exams';
 
 const RED = '#E10600';
 
-/* The same notes the landing page gives (landing/content.ts): no exam date
-   for 2027 is announced yet, so neither is claimed here. */
-const EXAM = {
-  JEE: { name: 'JEE Main', date: JEE_2027_DATE, note: 'Session 1 is expected in January.' },
-  NEET: { name: 'NEET', date: NEET_2027_DATE, note: 'Usually held on the first Sunday of May.' },
-} as const;
+/* Counts to the main exam in the chosen year (content/exams.ts). Until a
+   body announces a date it counts to the start of the exam's usual window
+   and says so; nothing here claims a date that has not been announced. */
 
 /** The calendar page itself, at any size: a hairline red outline, two ring
  *  ticks and a hairline header rule. No fill, no glow; the number carries it. */
@@ -62,9 +58,14 @@ const Page: React.FC<{ days: number; size: 'sm' | 'lg'; dark: boolean }> = ({ da
   );
 };
 
-const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam, dark }) => {
-  const info = EXAM[exam === 'NEET' ? 'NEET' : 'JEE'];
-  const days = getDaysRemaining(info.date);
+const ExamCountdown: React.FC<{ target: ExamTarget; dark: boolean }> = ({ target, dark }) => {
+  const main = examDateFor(target.primary, target.year);
+  const info = { name: targetLabel(target.primary, target.year), note: main.official ? `On ${main.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}.` : main.note };
+  const days = Math.max(0, getDaysRemaining(main.date));
+  // The others, soonest first.
+  const others = target.also
+    .map(id => ({ id, days: Math.max(0, getDaysRemaining(examDateFor(id, target.year).date)), official: examDateFor(id, target.year).official }))
+    .sort((x, y) => x.days - y.days);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ top: number; right: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -127,6 +128,16 @@ const ExamCountdown: React.FC<{ exam: ExamPreference; dark: boolean }> = ({ exam
                 {days} {days === 1 ? 'day' : 'days'} till {info.name}<span style={{ color: RED }}>.</span>
               </p>
               <p className="text-[13px] font-ui text-zinc-500 mt-2">{info.note}</p>
+              {others.length > 0 && (
+                <ul className={`w-full mt-5 pt-4 border-t space-y-2 text-left ${dark ? 'border-white/[0.08]' : 'border-black/[0.06]'}`}>
+                  {others.map(o => (
+                    <li key={o.id} className="flex items-baseline justify-between gap-3 text-[13px] font-ui">
+                      <span className={`font-semibold ${ink}`}>{examById(o.id).name}</span>
+                      <span className="text-zinc-500 tabular-nums">{o.days} {o.days === 1 ? 'day' : 'days'}{o.official ? '' : ', expected'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className={`text-[13px] font-ui font-semibold mt-4 ${ink}`}>Make every one of them count.</p>
             </div>
           </LiquidGlass>

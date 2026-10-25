@@ -46,10 +46,9 @@ export interface Reaction {
   updated_at: string;
 }
 
-/** Mirrors the reaction_emoji CHECK in supabase/groups.sql, byte for byte. */
-export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'] as const;
-/** What a double tap on a message means, as on Instagram. */
-export const QUICK_REACTION = '❤️';
+/* The emoji set mirrors the reaction_emoji CHECK in supabase/groups.sql and
+   race_chat.sql, byte for byte; it lives once, in chat/reactions.ts. */
+export { REACTIONS, QUICK_REACTION } from '../chat/reactions';
 
 /** A page of messages plus the reactions embedded alongside them. */
 export interface MessagePage {

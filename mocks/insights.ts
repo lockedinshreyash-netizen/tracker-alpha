@@ -15,7 +15,7 @@ import {
 import { addDays } from '../utils';
 import {
   EXAMS, MISTAKE_ORDER, accuracy, isCleared, paperKey, paperShort, attemptRate, chapterKey, isTaken,
-  parseKey, scorePct, subjectPct,
+  parseKey, perQuestionFor, scorePct, subjectPct,
 } from './model';
 
 /** 'all', or a `paperKey` — a fixed exam, or one of the student's own named papers. */
@@ -218,7 +218,7 @@ export const mistakeMix = (series: TakenMock[], lastN = 8): MistakeMix => {
         const v = t.test.result!.mistakes![k] ?? 0;
         counts[k] = v;
         totalsBy[k] += v;
-        marks[k] += v * EXAMS[t.test.exam].perQuestion;
+        marks[k] += v * perQuestionFor(t.test);
       });
       return { test: t.test, counts, sum: MISTAKE_ORDER.reduce((a, k) => a + counts[k], 0) };
     });

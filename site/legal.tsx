@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-23';
-const EFFECTIVE_LONG = '23 October 2026';
+const POLICY_EFFECTIVE = '2026-10-25';
+const EFFECTIVE_LONG = '25 October 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -123,7 +123,7 @@ const privacyPage = (): SitePage => {
               </p>
 
               <h3>Your profile</h3>
-              <p>A handle, a display name, an optional short bio and an avatar: one of ours, or a photo you upload.</p>
+              <p>A handle, a display name, an optional short bio and an avatar: one of ours, or a photo you upload. Unless you turn it off, it also shows the exams you are writing and the year (for example, JEE Main 2027). You can hide them any time in your exam settings.</p>
 
               <h3>Features you choose to use</h3>
               <ul className="plain">
@@ -166,7 +166,7 @@ const privacyPage = (): SitePage => {
 
             <Section id="visible" title="What other students see">
               <ul className="plain">
-                <li>Anyone signed in can see your <b>profile</b>: handle, display name, bio and avatar.</li>
+                <li>Anyone signed in can see your <b>profile</b>: handle, display name, bio and avatar, and your exams and year unless you hide them. They appear next to your name in Ranks and Groups.</li>
                 <li>If you join <b>Ranks</b>, anyone signed in can see your display name, your hours and your race chat messages.</li>
                 <li>In a <b>group</b>, members see your profile and messages, plus your hours and tasks only if you chose to share them there.</li>
                 <li>Everything else, including your study log, plan, mocks, notebook and decks, is <b>yours alone</b>.</li>

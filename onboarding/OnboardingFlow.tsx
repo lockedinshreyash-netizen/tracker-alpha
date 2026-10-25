@@ -34,7 +34,8 @@ import { DEFAULT_ALPHA_AVATAR_ID } from '../profile/alphaAvatars';
 import { saveProfileDraft } from '../profile/draft';
 import { isLite, Stage, TopBar } from './kit';
 import Opening from './Opening';
-import { QClass, QExam, QHours } from './Questions';
+import { QClass, QExam, QExams, QHours, QYear } from './Questions';
+import { normalizeTarget, streamOf, type ExamTarget } from '../content/exams';
 import { Pledge } from './Commit';
 import { ProfileBuilder, type ProfilePick, SaveProfile } from './Profile';
 import { FirstSession } from './Finish';
@@ -49,6 +50,8 @@ export type { ProfilePick } from './Profile';
 
 export interface OnboardingInitial {
   examPreference: ExamPreference;
+  /** The exams and year already chosen, if any (content/exams.ts). */
+  exams?: ExamTarget;
   currentClass: 11 | 12;
   dailyGoalHours: number;
   timerMode: TimerMode;
@@ -63,6 +66,7 @@ export interface OnboardingInitial {
 /** The one write. */
 export interface OnboardingResult {
   examPreference: ExamPreference;
+  exams: ExamTarget;
   currentClass: 11 | 12;
   dailyGoalHours: number;
   timerMode: TimerMode;
@@ -87,7 +91,7 @@ interface Props {
   onComplete: () => void;
 }
 
-type Scene = 'opening' | 'exam' | 'class' | 'hours' | 'pledge' | 'profile' | 'save' | 'remind' | 'install' | 'start';
+type Scene = 'opening' | 'exam' | 'exams' | 'class' | 'year' | 'hours' | 'pledge' | 'profile' | 'save' | 'remind' | 'install' | 'start';
 
 const LEAVE_MS = 260;
 
@@ -105,7 +109,7 @@ const takeResume = (): Scene | null => {
 
 const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, keepMethod, installAvailable, onInstall, onReminders, onGoogle, onStart, onComplete }) => {
   const [a, setA] = useState<Answers>(() =>
-    DEFAULT_ANSWERS(initial.examPreference, initial.currentClass, initial.dailyGoalHours, initial.timerMode));
+    DEFAULT_ANSWERS(initial.examPreference, initial.currentClass, initial.dailyGoalHours, initial.timerMode, initial.exams));
   const [resumed] = useState(takeResume);
   const [scene, setScene] = useState<Scene>(resumed ?? 'opening');
   const [leaving, setLeaving] = useState(false);
@@ -129,7 +133,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, keepMeth
 
   /* The order, without the scenes that do not apply to this student. */
   const order = useMemo<Scene[]>(() => [
-    'opening', 'exam', 'class', 'hours', 'pledge', 'profile',
+    'opening', 'exam', 'exams', 'class', 'year', 'hours', 'pledge', 'profile',
     ...(initial.signedIn ? [] : ['save' as const]), 'remind',
     ...(offerInstall ? ['install' as const] : []), 'start',
   ], [initial.signedIn, offerInstall]);
@@ -183,6 +187,7 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, keepMeth
     setApplied(true);
     onApply({
       examPreference: a.exam,
+      exams: normalizeTarget({ primary: a.exams[0], also: a.exams.slice(1), year: a.year }, streamOf(a.exam), a.cls),
       currentClass: a.cls,
       dailyGoalHours: a.hours,
       timerMode: a.style,
@@ -223,7 +228,9 @@ const OnboardingFlow: React.FC<Props> = ({ initial, onApply, onProfile, keepMeth
     switch (scene) {
       case 'opening': return <Opening onDone={next} onSignIn={() => { void onGoogle(); }} />;
       case 'exam': return <QExam {...q} />;
+      case 'exams': return <QExams {...q} />;
       case 'class': return <QClass {...q} />;
+      case 'year': return <QYear {...q} />;
       case 'hours': return <QHours {...q} />;
       case 'pledge': return <Pledge a={a} onCommit={commit} onDone={next} />;
       case 'profile': return <ProfileBuilder pick={pick} onChange={setPick} onNext={confirmProfile} />;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ExamChip } from '../exams/ExamChip';
 import { AlphaAvatarGlyph, TONES, getAlphaAvatar } from './alphaAvatars';
 import { ProfileSummary } from './profileApi';
 
@@ -94,6 +95,8 @@ interface UserChipProps {
    */
   nameClassName?: string;
   className?: string;
+  /** Leave the exam chip off (it is shown by default when the profile has one). */
+  hideExam?: boolean;
 }
 
 /**
@@ -102,7 +105,7 @@ interface UserChipProps {
  * a leaderboard row or chat bubble already does with clicks.
  */
 export const UserChip: React.FC<UserChipProps> = ({
-  userId, name, profile, onOpen, size = 28, theme, nameClassName, className = '',
+  userId, name, profile, onOpen, size = 28, theme, nameClassName, className = '', hideExam = false,
 }) => {
   const dark = theme === 'dark';
   const defaultNameClass = `truncate group-hover:text-[#E10600] transition-colors ${dark ? 'text-white' : 'text-zinc-900'}`;
@@ -116,6 +119,8 @@ export const UserChip: React.FC<UserChipProps> = ({
       <span className={nameClassName ?? defaultNameClass}>
         {name}
       </span>
+      {/* Which exam they are writing, when their profile shows it (content/exams.ts). */}
+      {!hideExam && profile?.exam && <ExamChip exam={profile.exam} year={profile.exam_year} dark={dark} />}
     </button>
   );
 };

@@ -28,7 +28,7 @@ import {
   ExamFilter, ScopeFilter, applyFilter, buildInsights, fixedLeaks, leaks as leaksOf, mistakeMix,
   readiness as readinessOf, subjectTrends, summarize, takenMocks, topLeaks,
 } from './insights';
-import { SCOPES, SCOPE_ORDER, chapterKey, examColor, isCleared, paperKey, paperLabel } from './model';
+import { SCOPES, SCOPE_ORDER, chapterKey, examColor, isCleared, paperKey, paperLabel, type PaperPreset } from './model';
 import { Card, Chip, Eyebrow, ScopeGlyph, Segmented, btn, tokens } from './ui';
 
 /* The CBT is a private feature (supabase/cbt.sql): both halves are loaded
@@ -53,6 +53,10 @@ interface Props {
   onRecordAttempts: (answers: Record<string, boolean>) => void;
   onAddTopic: (key: string, name: string) => void;
   onForgetTopic: (key: string, name: string) => void;
+  /** The student's exams that are named papers (BITSAT, MHT CET…), main exam first. */
+  paperPresets?: PaperPreset[];
+  /** Their main exam is one of those. */
+  mainIsPreset?: boolean;
   /** Present only for an account holding the `cbt` feature. */
   cbt?: {
     userId: string;
@@ -80,6 +84,7 @@ type ErrorCtx = { draft: ErrorDraft; mock?: MockTest };
 const MocksTab: React.FC<Props> = ({
   mocks, progress, examPreference: pref, subjects, today, theme,
   onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic, cbt,
+  paperPresets = [], mainIsPreset = false,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -447,6 +452,8 @@ const MocksTab: React.FC<Props> = ({
           onAddTopic={onAddTopic}
           onForgetTopic={onForgetTopic}
           past={plan.past}
+          presets={paperPresets}
+          mainIsPreset={mainIsPreset}
         />
       )}
       {resultFor && (

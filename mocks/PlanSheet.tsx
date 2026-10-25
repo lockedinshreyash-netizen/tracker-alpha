@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { ChapterProgress, ExamPreference, MockChapter, MockExam, MockScope, MockTest, Subject } from '../types';
 import { addDays } from '../utils';
 import { MultiChapterPicker } from './ChapterPicker';
-import { DEFAULT_OTHER_MAX, EXAMS, SCOPES, SCOPE_ORDER, examColor, examsFor, paperTotal, suggestName } from './model';
+import { DEFAULT_OTHER_MAX, EXAMS, SCOPES, SCOPE_ORDER, examColor, examsFor, paperTotal, suggestName, type PaperPreset } from './model';
 import { formatDate, nextSunday, relativeDay } from './insights';
 import { ExamBadge, Field, ScopeBadge, ScopeGlyph, Segmented, Sheet, btn, subjectDot, tokens } from './ui';
 
@@ -40,9 +40,13 @@ interface Props {
   onForgetTopic: (key: string, name: string) => void;
   /** Logging a mock already taken: dates look backwards, and saving goes on to the scores. */
   past?: boolean;
+  /** The student's exams that are named papers (BITSAT, MHT CET…), main exam first. */
+  presets?: PaperPreset[];
+  /** The main exam is one of those: a first mock starts on it. */
+  mainIsPreset?: boolean;
 }
 
-const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, library, today, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic, past }) => {
+const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, library, today, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic, past, presets = [], mainIsPreset = false }) => {
   const t = tokens(dark);
   const exams = examsFor(pref);
   // The student's habit is the best default: the exam and scope of their last mock.
@@ -57,12 +61,13 @@ const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, 
     : {
         name: '',
         date: past ? today : nextSunday(today),
-        exam: last && exams.includes(last.exam) ? last.exam : exams[0],
+        // The last mock's paper; with none yet, the main exam (a named paper when it is one).
+        exam: last && exams.includes(last.exam) ? last.exam : mainIsPreset && presets[0] ? 'other' : exams[0],
         scope: last?.scope ?? 'full',
         series: last?.series ?? '',
         chapters: [],
-        paperName: lastOther?.paperName ?? '',
-        maxMarks: lastOther?.maxMarks ? String(lastOther.maxMarks) : '',
+        paperName: lastOther?.paperName ?? (presets[0]?.name ?? ''),
+        maxMarks: lastOther?.maxMarks ? String(lastOther.maxMarks) : presets[0] ? String(presets[0].maxMarks) : '',
       });
   // Typing marks by hand stops a paper name from overwriting them.
   const [marksTouched, setMarksTouched] = useState(false);
@@ -190,6 +195,25 @@ const PlanSheet: React.FC<Props> = ({ initial, tests, pref, subjects, progress, 
                   className={t.input}
                 />
                 <datalist id="mk-own-papers">{ownPapers.map(x => <option key={x.id} value={x.paperName} />)}</datalist>
+                {/* Your exams first, each with its paper's total; then papers you named yourself. */}
+                {presets.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {presets.filter(p => !ownPapers.some(x => x.paperName!.toLowerCase() === p.name.toLowerCase())).map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { setMarksTouched(false); set({ paperName: p.name, maxMarks: String(p.maxMarks) }); }}
+                        className={`px-2.5 py-1 rounded-full border text-[11px] font-ui font-semibold transition-colors ${
+                          d.paperName.trim().toLowerCase() === p.name.toLowerCase()
+                            ? dark ? 'bg-white text-black border-white' : 'bg-zinc-900 text-white border-zinc-900'
+                            : dark ? 'border-white/[0.08] text-zinc-400 hover:text-zinc-200' : 'border-zinc-200 text-zinc-600 hover:text-zinc-900'
+                        }`}
+                      >
+                        {p.name} · {p.maxMarks}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {ownPapers.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {ownPapers.map(x => (

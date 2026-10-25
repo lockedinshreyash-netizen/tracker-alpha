@@ -17,6 +17,7 @@ import type { AppState } from '../types';
 import { addDays, getISTDateString, istInstant, streakLedger } from '../utils';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { examDate, examLabel } from '../onboarding/answers';
+import { normalizeTarget, streamOf } from '../content/exams';
 
 export const SUMMARY_KEY = 'alpha_ext_summary_v1';
 export const SUMMARY_EVENT = 'alpha:summary';
@@ -95,7 +96,10 @@ export const buildSummary = (state: AppState, name: string | null, now = Date.no
       const d = addDays(day, i - 6);
       return { day: d, hours: round1(byDay.get(d) ?? 0) };
     }),
-    exam: { label: examLabel(state.examPreference), at: examDate(state.examPreference).getTime() },
+    exam: (() => {
+      const t = normalizeTarget(state.exams, streamOf(state.examPreference), state.currentClass);
+      return { label: examLabel(t.primary), at: examDate(t.primary, t.year).getTime() };
+    })(),
     tasks,
     session: pomodoroArmed
       ? { kind: 'pomodoro', subject: String(p.subject), runningSince: null, bankedMs: 0, endsAt: p.isRunning ? p.phaseEndsAt : null, phase: p.phase }

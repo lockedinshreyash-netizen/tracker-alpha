@@ -23,6 +23,8 @@ interface Props {
   onLeave: () => void;
   onOpenAuth: () => void;
   onOpenProfile: (userId: string) => void;
+  /** App staff: may delete anyone's race chat message. */
+  isStaff?: boolean;
   theme: 'dark' | 'light';
 }
 
@@ -42,7 +44,7 @@ const Movement: React.FC<{ delta: number; dark: boolean }> = ({ delta, dark }) =
   );
 };
 
-const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, onOpenProfile, theme }) => {
+const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, onOpenAuth, onOpenProfile, isStaff = false, theme }) => {
   const dark = theme === 'dark';
   const [name, setName] = useState(prefs.displayName);
   const [joining, setJoining] = useState(false);
@@ -243,7 +245,7 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
         )}
       </section>
 
-      <RaceChat userId={user.id} displayName={prefs.displayName} raceDate={race.race.date} onOpenProfile={onOpenProfile} theme={theme} />
+      <RaceChat userId={user.id} displayName={prefs.displayName} raceDate={race.race.date} onOpenProfile={onOpenProfile} isStaff={isStaff} theme={theme} />
 
       {untimed > 0 && (
         <p className={`text-[12px] font-ui leading-relaxed px-1 ${muted}`}>

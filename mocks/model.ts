@@ -15,6 +15,8 @@ import {
   MockSubjectScore, MockTest, MockVerdict, MocksState, Subject,
 } from '../types';
 
+import { EXAMS as EXAM_LIST, examById, type ExamId } from '../content/exams';
+
 export const DEFAULT_MOCKS: MocksState = { tests: [], errors: [], topics: {} };
 
 /* ── Classification ── */
@@ -46,6 +48,33 @@ export const SCOPES: Record<MockScope, { label: string; short: string; noun: str
 
 export const SCOPE_ORDER: MockScope[] = ['full', 'part', 'chapter'];
 
+/* ── Papers from the exams list (content/exams.ts) ──
+   JEE Main, Advanced and NEET have papers of their own here. Every other exam
+   a student writes is offered as a named "Other" paper, preset with its name
+   and total, and a paper named like a known exam is marked by that exam's
+   scheme when it has one. */
+
+const OWN_PAPER: Partial<Record<ExamId, MockExam>> = { 'jee-main': 'mains', 'jee-advanced': 'advanced', 'neet-ug': 'neet' };
+
+export interface PaperPreset { id: ExamId; name: string; maxMarks: number }
+
+/** The student's exams that need a named paper, in their order. */
+export const paperPresets = (ids: ExamId[]): PaperPreset[] =>
+  ids.filter(id => !OWN_PAPER[id]).map(id => ({ id, name: examById(id).name, maxMarks: examById(id).maxMarks }));
+
+const knownExam = (t: { exam: MockExam; paperName?: string }) => {
+  if (t.exam !== 'other' || !t.paperName) return undefined;
+  const n = t.paperName.trim().toLowerCase();
+  return EXAM_LIST.find(e => e.name.toLowerCase() === n || e.short.toLowerCase() === n);
+};
+
+/** The paper's fixed marking scheme, if it has one. */
+export const schemeFor = (t: { exam: MockExam; paperName?: string }) => EXAMS[t.exam].scheme ?? knownExam(t)?.scheme;
+
+/** Marks one question is worth, for "≈ marks lost". */
+export const perQuestionFor = (t: { exam: MockExam; paperName?: string }): number =>
+  t.exam === 'other' ? knownExam(t)?.scheme?.right ?? EXAMS.other.perQuestion : EXAMS[t.exam].perQuestion;
+
 /** The papers a student of this exam can pick. */
 export const examsFor = (pref: ExamPreference): MockExam[] =>
   pref === 'NEET' ? ['neet', 'other'] : ['mains', 'advanced', 'other'];
@@ -61,7 +90,12 @@ export const MISTAKE_ORDER: MockMistake[] = ['silly', 'concept', 'time', 'unstud
 /* Exam colours, validated with the dataviz palette checker (adjacent and
    all-pairs, light on #ffffff and dark on #111114). Main and NEET share slot 1
    because no student plots both: NEET against a fourth hue failed the dark
-   CVD floor outright. The accent red is absent — it belongs to actions. */
+   CVD floor outright. The accent red is absent — it belongs to actions.
+   Main and Advanced are the same colours as their chips (content/exams.ts).
+   NEET's chip is aqua, but a trend keeps this palette: these three hues are
+   the only ones that pass all-pairs together, and re-checked in October 2026
+   no other hue for "Other" did (magenta, yellow and green all failed beside
+   Main and Advanced). */
 export const EXAM_COLORS: Record<MockExam, { light: string; dark: string }> = {
   mains: { light: '#2a78d6', dark: '#3987e5' },
   neet: { light: '#2a78d6', dark: '#3987e5' },

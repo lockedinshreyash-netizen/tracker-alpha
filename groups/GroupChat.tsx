@@ -2,8 +2,9 @@
    A view over useGroupChat, which owns every guarantee (no gaps, no
    duplicates, sends that survive a dropped connection). This file owns only
    what a person sees: where the scroll sits, which messages carry a name,
-   what "deleted" looks like, and the WhatsApp-shaped gestures — tap a message
-   for its reactions and Reply, double-tap to ❤️, swipe right to reply.
+   what "deleted" looks like. The gestures — swipe right to reply, long press
+   for reactions and Reply · Copy · Delete, double-tap to ❤️, and ↩ 😊 ⋯ beside
+   a bubble on hover — are chat/ChatMessage.tsx's, shared with race chat.
 
    Mounted keyed by group id, so switching groups is a fresh subscription and
    a fresh scroll position rather than one group's history flashing under
@@ -12,11 +13,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { UserChip } from '../profile/Avatar';
 import { useProfiles } from '../profile/profileCache';
-import { ProfileSummary } from '../profile/profileApi';
 import { MyGroup } from './api';
-import { GroupMessage, MAX_MESSAGE, QUICK_REACTION, REACTIONS, validateMessage } from './chatApi';
-import { Connection, OutboxEntry, QuoteMap, ReactionMap, useGroupChat } from './useGroupChat';
+import { GroupMessage, MAX_MESSAGE, validateMessage } from './chatApi';
+import { Connection, OutboxEntry, useGroupChat } from './useGroupChat';
 import { clock12, istDay, tokens } from './ui';
+import ChatMessage from '../chat/ChatMessage';
+import QuoteBlock, { Quote, resolveQuote } from '../chat/QuoteBlock';
+import { ReactionGroup, groupReactions } from '../chat/reactions';
 
 interface Props {
   group: MyGroup;
@@ -47,18 +50,6 @@ const dayLabel = (day: string): string => {
     .format(new Date(Date.UTC(y, m - 1, d)));
 };
 
-/** What a reply shows of the message it answers. */
-type Quote =
-  | { state: 'ok'; id: number; mine: boolean; name: string; body: string; onScreen: boolean }
-  | { state: 'deleted'; id: number; mine: boolean; name: string; onScreen: boolean }
-  | { state: 'missing' };
-
-/** One chip under a bubble: an emoji, how many, whether it is yours, and who. */
-interface ReactionGroup { emoji: string; count: number; mine: boolean; names: string[] }
-
-const nameList = (names: string[]): string =>
-  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-
 const CONNECTION_LABEL: Record<Connection, string | null> = {
   connecting: 'Connecting…',
   live: null,
@@ -72,7 +63,6 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
   const chat = useGroupChat({ groupId: group.id, userId, active: visible, onRead });
   const [draft, setDraft] = useState('');
-  const [selected, setSelected] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [flash, setFlash] = useState<number | null>(null);
   const [newCount, setNewCount] = useState(0);
@@ -103,11 +93,13 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   const byId = useMemo(() => new Map(chat.messages.map(m => [m.id, m])), [chat.messages]);
   const quoteFor = useCallback((id: number | null | undefined): Quote | null => {
     if (!id) return null;
-    return resolveQuote(id, byId, chat.quotes, userId, nameOf);
+    const onScreen = byId.get(id);
+    const q = onScreen ?? chat.quotes[id];
+    return resolveQuote(id, q && { senderId: q.sender_id, body: q.body, deleted: !!q.deleted_at, name: nameOf(q.sender_id) }, !!onScreen, userId);
   }, [byId, chat.quotes, userId, nameOf]);
 
   const reactionsFor = useCallback(
-    (messageId: number): ReactionGroup[] => groupReactions(chat.reactions, chat.pending, messageId, userId, nameOf),
+    (messageId: number): ReactionGroup[] => groupReactions(chat.reactions[messageId], chat.pending[messageId], userId, nameOf),
     [chat.reactions, chat.pending, userId, nameOf]
   );
 
@@ -156,6 +148,9 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   const lastIdRef = useRef<number | null>(null);
   const outLenRef = useRef(0);
   const initialRef = useRef(true);
+  /* The newest message when the thread first drew. Anything after it rose in
+     while the reader watched, and is the only thing that animates. */
+  const settledIdRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -167,6 +162,7 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
 
     if (initialRef.current) {
       initialRef.current = false;
+      settledIdRef.current = lastId ?? 0;
       toEnd(el);
     } else if (prependRef.current && firstId !== firstIdRef.current) {
       const { height, top } = prependRef.current;
@@ -261,19 +257,18 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
 
   const startReply = useCallback((id: number) => {
     setReplyTo(id);
-    setSelected(null);
-    textareaRef.current?.focus();
+    textareaRef.current?.focus({ preventScroll: true });
   }, []);
 
   /* Tapping a quote goes to the original, if it is loaded, and flashes it so
      the eye lands on the right bubble. Scrolling up there clears "stick to
      bottom" through the normal onScroll path. */
   const flashTimer = useRef<number | undefined>(undefined);
-  const jumpTo = useCallback((id: number) => {
+  const jumpTo = useCallback((id: string | number) => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-msg-id="${id}"]`);
     if (!el) return;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    setFlash(id);
+    setFlash(Number(id));
     window.clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlash(null), 1600);
   }, []);
@@ -374,35 +369,59 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
                 }
                 const { msg, first } = item;
                 const mine = msg.sender_id === userId;
+                const deleted = !!msg.deleted_at;
+                const profile = profiles[msg.sender_id];
+                const quote = quoteFor(msg.reply_to);
                 return (
-                  <MessageBubble
+                  <ChatMessage
                     key={item.key}
-                    msg={msg}
+                    id={msg.id}
                     mine={mine}
-                    first={first}
-                    profile={profiles[msg.sender_id]}
-                    selected={selected === msg.id}
+                    dark={dark}
+                    interactive={chat.extras && !deleted}
+                    canDelete={!deleted && (mine || canModerate)}
+                    className={first ? 'mt-3' : 'mt-1'}
+                    bubbleClass={`${mine
+                      ? 'bg-[#E10600]/10 border-[#E10600]/25'
+                      : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200'} ${deleted ? 'opacity-60' : ''}`}
                     flash={flash === msg.id}
-                    extras={chat.extras}
-                    quote={quoteFor(msg.reply_to)}
-                    reactions={chat.extras ? reactionsFor(msg.id) : []}
+                    animateIn={!mine && settledIdRef.current !== null && msg.id > settledIdRef.current}
+                    header={first && (mine ? (
+                      <span className={`text-[9px] font-ui mb-1 px-1 ${t.muted}`}>{clock12(msg.created_at)}</span>
+                    ) : (
+                      <div className="flex items-baseline gap-2 mb-1 px-1">
+                        <UserChip
+                          userId={msg.sender_id}
+                          name={profile?.display_name ?? 'Member'}
+                          profile={profile}
+                          onOpen={onOpenProfile}
+                          theme={theme}
+                          size={18}
+                          nameClassName={`truncate text-[11px] font-bold font-ui ${t.heading}`}
+                        />
+                        <span className={`text-[9px] font-ui ${t.muted}`}>{clock12(msg.created_at)}</span>
+                      </div>
+                    ))}
+                    reactions={chat.extras && !deleted ? reactionsFor(msg.id) : []}
                     reactionBusy={chat.pending[msg.id] !== undefined}
-                    canDelete={!msg.deleted_at && (mine || canModerate)}
-                    onSelect={() => setSelected(s => (s === msg.id ? null : msg.id))}
+                    timeLabel={clock12(msg.created_at)}
+                    copyText={msg.body}
+                    ariaLabel={deleted ? 'Deleted message' : undefined}
                     onReact={emoji => toggleReaction(msg.id, emoji)}
-                    onDoubleTap={() => { setSelected(null); toggleReaction(msg.id, QUICK_REACTION); }}
                     onReply={() => startReply(msg.id)}
-                    onJump={jumpTo}
-                    onDelete={() => {
-                      const who = mine ? 'your message' : 'this message for everyone';
-                      if (window.confirm(`Delete ${who}? This can’t be undone.`)) {
-                        setSelected(null);
-                        void chat.remove(msg.id);
-                      }
-                    }}
-                    onOpenProfile={onOpenProfile}
-                    theme={theme}
-                  />
+                    onDelete={() => void chat.remove(msg.id)}
+                  >
+                    {quote && !deleted && (
+                      <div className="mb-1.5 -mx-1">
+                        <QuoteBlock quote={quote} dark={dark} onJump={jumpTo} />
+                      </div>
+                    )}
+                    {deleted ? (
+                      <span className={`text-[12px] font-ui italic ${t.muted}`}>Message deleted</span>
+                    ) : (
+                      <span className={`block text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${t.body}`}>{msg.body}</span>
+                    )}
+                  </ChatMessage>
                 );
               })}
             </div>
@@ -472,332 +491,7 @@ const GroupChat: React.FC<Props> = ({ group, userId, onRead, onOpenProfile, them
   );
 };
 
-/* ── Pure helpers for the view ── */
-
-const resolveQuote = (
-  id: number,
-  byId: Map<number, GroupMessage>,
-  quotes: QuoteMap,
-  userId: string,
-  nameOf: (id: string) => string
-): Quote => {
-  const onScreen = byId.get(id);
-  const q = onScreen ?? quotes[id];
-  if (!q) return { state: 'missing' };
-  const mine = q.sender_id === userId;
-  const name = nameOf(q.sender_id);
-  if (q.deleted_at) return { state: 'deleted', id, mine, name, onScreen: !!onScreen };
-  return { state: 'ok', id, mine, name, body: q.body, onScreen: !!onScreen };
-};
-
-/* Chips in the order of the picker, so a message's reactions do not reshuffle
-   every time somebody adds one. An in-flight change of yours is drawn as if
-   it had landed. */
-const groupReactions = (
-  reactions: ReactionMap,
-  pending: Record<number, string | null>,
-  messageId: number,
-  userId: string,
-  nameOf: (id: string) => string
-): ReactionGroup[] => {
-  const byUser = reactions[messageId] ?? {};
-  const picks: Array<[string, string]> = [];
-  Object.entries(byUser).forEach(([uid, r]) => {
-    if (uid !== userId && r.emoji) picks.push([uid, r.emoji]);
-  });
-  const mineNow = pending[messageId] !== undefined ? pending[messageId] : byUser[userId]?.emoji ?? null;
-  if (mineNow) picks.push([userId, mineNow]);
-  if (!picks.length) return [];
-
-  const order = (REACTIONS as readonly string[]);
-  const groups = new Map<string, ReactionGroup>();
-  picks.forEach(([uid, emoji]) => {
-    const g = groups.get(emoji) ?? { emoji, count: 0, mine: false, names: [] };
-    g.count += 1;
-    if (uid === userId) g.mine = true;
-    else g.names.push(nameOf(uid));
-    groups.set(emoji, g);
-  });
-  groups.forEach(g => { if (g.mine) g.names.push('You'); });
-  return Array.from(groups.values()).sort((a, b) => order.indexOf(a.emoji) - order.indexOf(b.emoji));
-};
-
-const SWIPE_TRIGGER_PX = 56;
-const SWIPE_MAX_PX = 80;
-const DOUBLE_TAP_MS = 300;
-
 /* ── Pieces ── */
-
-const QuoteBlock: React.FC<{
-  quote: Quote;
-  dark: boolean;
-  label?: string;
-  onJump?: (id: number) => void;
-}> = ({ quote, dark, label, onJump }) => {
-  const t = tokens(dark);
-  const mine = quote.state !== 'missing' && quote.mine;
-  const rail = mine ? 'border-[#E10600]/60' : dark ? 'border-zinc-500' : 'border-zinc-400';
-  const fill = dark ? 'bg-white/[0.04]' : 'bg-black/[0.04]';
-  const jumpable = !!onJump && quote.state !== 'missing' && quote.onScreen;
-  const who = quote.state === 'missing' ? '' : label && quote.mine ? 'yourself' : quote.name;
-  const heading = [label, who].filter(Boolean).join(' ');
-  const inner = (
-    <>
-      {heading && (
-        <span className={`block text-[10px] font-bold font-ui truncate ${mine ? 'text-[#E10600]' : t.heading}`}>{heading}</span>
-      )}
-      {quote.state === 'ok' && (
-        <span className={`block text-[11px] font-ui truncate ${t.muted}`}>{quote.body.replace(/\s+/g, ' ')}</span>
-      )}
-      {quote.state === 'deleted' && <span className={`block text-[11px] font-ui italic ${t.muted}`}>Message deleted</span>}
-      {quote.state === 'missing' && <span className={`block text-[11px] font-ui italic ${t.muted}`}>Original message unavailable</span>}
-    </>
-  );
-  const cls = `block w-full text-left min-w-0 pl-2.5 pr-3 py-1.5 rounded-md border-l-2 ${rail} ${fill}`;
-  if (!jumpable) return <div className={cls}>{inner}</div>;
-  return (
-    <button
-      type="button"
-      onClick={e => { e.stopPropagation(); onJump!(quote.id); }}
-      className={`${cls} hover:opacity-80`}
-      aria-label={`Go to the message from ${quote.name}`}
-    >
-      {inner}
-    </button>
-  );
-};
-
-const ReactionChips: React.FC<{
-  groups: ReactionGroup[];
-  mine: boolean;
-  busy: boolean;
-  dark: boolean;
-  onReact: (emoji: string) => void;
-}> = ({ groups, mine, busy, dark, onReact }) => {
-  const t = tokens(dark);
-  if (!groups.length) return null;
-  return (
-    <div className={`flex flex-wrap gap-1 -mt-2 px-2 relative ${mine ? 'justify-end' : 'justify-start'}`}>
-      {groups.map(g => (
-        <button
-          key={g.emoji}
-          type="button"
-          disabled={busy}
-          onClick={() => onReact(g.emoji)}
-          title={nameList(g.names)}
-          aria-label={`${g.emoji} ${g.count}: ${nameList(g.names)}. ${g.mine ? 'Tap to remove yours.' : 'Tap to react with this.'}`}
-          aria-pressed={g.mine}
-          className={`h-6 px-1.5 rounded-full border flex items-center gap-1 text-[12px] leading-none shadow-sm transition-transform active:scale-[0.94] ${
-            g.mine
-              ? 'border-[#E10600]/50 bg-[#E10600]/15'
-              : dark ? 'border-white/[0.08] bg-[#17171B]' : 'border-zinc-200 bg-white'
-          } ${busy ? 'opacity-70' : ''}`}
-        >
-          <span aria-hidden="true">{g.emoji}</span>
-          {g.count > 1 && <span className={`text-[10px] font-bold font-ui ${g.mine ? 'text-[#E10600]' : t.muted}`}>{g.count}</span>}
-        </button>
-      ))}
-    </div>
-  );
-};
-
-const MessageBubble: React.FC<{
-  msg: GroupMessage;
-  mine: boolean;
-  first: boolean;
-  profile: ProfileSummary | undefined;
-  selected: boolean;
-  flash: boolean;
-  extras: boolean;
-  quote: Quote | null;
-  reactions: ReactionGroup[];
-  reactionBusy: boolean;
-  canDelete: boolean;
-  onSelect: () => void;
-  onReact: (emoji: string) => void;
-  onDoubleTap: () => void;
-  onReply: () => void;
-  onJump: (id: number) => void;
-  onDelete: () => void;
-  onOpenProfile: (userId: string) => void;
-  theme: 'dark' | 'light';
-}> = ({
-  msg, mine, first, profile, selected, flash, extras, quote, reactions, reactionBusy, canDelete,
-  onSelect, onReact, onDoubleTap, onReply, onJump, onDelete, onOpenProfile, theme,
-}) => {
-  const dark = theme === 'dark';
-  const t = tokens(dark);
-  const deleted = !!msg.deleted_at;
-  const interactive = extras && !deleted;
-  const bubble = mine
-    ? 'bg-[#E10600]/10 border-[#E10600]/25'
-    : dark ? 'bg-[#0D0D10] border-white/[0.06]' : 'bg-zinc-50 border-zinc-200';
-  const myEmoji = reactions.find(g => g.mine)?.emoji ?? null;
-
-  /* Double tap = ❤️, as on Instagram. The first tap still opens the actions
-     immediately — waiting 300ms to find out whether a second is coming would
-     make every single tap feel broken. */
-  const swipeRef = useRef<{ x: number; y: number; id: number; active: boolean } | null>(null);
-  const suppressClickRef = useRef(false);
-  const [dx, setDx] = useState(0);
-  const lastTapRef = useRef(0);
-  const handleTap = () => {
-    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
-    const now = Date.now();
-    if (interactive && now - lastTapRef.current < DOUBLE_TAP_MS) {
-      lastTapRef.current = 0;
-      onDoubleTap();
-      return;
-    }
-    lastTapRef.current = now;
-    onSelect();
-  };
-
-  /* Swipe right to reply, as in WhatsApp — touch only; a mouse has the Reply
-     button. `touch-action: pan-y` leaves vertical scrolling to the browser
-     (which cancels the pointer the moment it starts panning) and hands the
-     horizontal movement to us. Geometry is local state on this one bubble. */
-  const endSwipe = (commit: boolean) => {
-    const s = swipeRef.current;
-    swipeRef.current = null;
-    if (s?.active) {
-      suppressClickRef.current = true;
-      if (commit && dx >= SWIPE_TRIGGER_PX) onReply();
-    }
-    setDx(0);
-  };
-
-  return (
-    <div
-      data-msg-id={msg.id}
-      className={`flex ${mine ? 'justify-end' : 'justify-start'} ${first ? 'mt-3' : 'mt-1'} ${reactions.length ? 'mb-2' : ''}`}
-    >
-      <div className={`max-w-[85%] md:max-w-[70%] min-w-0 flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-        {first && !mine && (
-          <div className="flex items-baseline gap-2 mb-1 px-1">
-            <UserChip
-              userId={msg.sender_id}
-              name={profile?.display_name ?? 'Member'}
-              profile={profile}
-              onOpen={onOpenProfile}
-              theme={theme}
-              size={18}
-              nameClassName={`truncate text-[11px] font-bold font-ui ${t.heading}`}
-            />
-            <span className={`text-[9px] font-ui ${t.muted}`}>{clock12(msg.created_at)}</span>
-          </div>
-        )}
-        {first && mine && <span className={`text-[9px] font-ui mb-1 px-1 ${t.muted}`}>{clock12(msg.created_at)}</span>}
-
-        <div className="relative max-w-full">
-          {dx > 0 && (
-            <span
-              aria-hidden="true"
-              className={`absolute top-1/2 -translate-y-1/2 text-sm ${dx >= SWIPE_TRIGGER_PX ? 'text-[#E10600]' : t.muted}`}
-              style={{ left: -26, opacity: Math.min(1, dx / SWIPE_TRIGGER_PX) }}
-            >
-              ↩
-            </span>
-          )}
-          <div
-            role="button"
-            tabIndex={deleted ? -1 : 0}
-            aria-disabled={deleted || undefined}
-            aria-expanded={!deleted ? selected : undefined}
-            onClick={deleted ? undefined : handleTap}
-            // A double click would also select a word; drag-to-select still works.
-            onMouseDown={e => { if (interactive && e.detail > 1) e.preventDefault(); }}
-            onKeyDown={e => {
-              if (deleted || (e.key !== 'Enter' && e.key !== ' ')) return;
-              if (e.target !== e.currentTarget) return;
-              e.preventDefault();
-              onSelect();
-            }}
-            onPointerDown={e => {
-              if (!interactive || e.pointerType !== 'touch') return;
-              swipeRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, active: false };
-            }}
-            onPointerMove={e => {
-              const s = swipeRef.current;
-              if (!s || e.pointerId !== s.id) return;
-              const mx = e.clientX - s.x;
-              const my = e.clientY - s.y;
-              if (!s.active) {
-                if (Math.abs(my) > 10 || mx < -10) { swipeRef.current = null; return; }
-                if (mx < 12) return;
-                s.active = true;
-              }
-              setDx(Math.max(0, Math.min(mx - 12, SWIPE_MAX_PX)));
-            }}
-            onPointerUp={() => endSwipe(true)}
-            onPointerCancel={() => endSwipe(false)}
-            className={`text-left px-3.5 py-2 rounded-lg border outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]/40 ${bubble} ${deleted ? 'opacity-60' : 'cursor-pointer'} ${flash ? 'ring-2 ring-[#E10600]/50' : ''}`}
-            style={{
-              transform: dx ? `translateX(${dx}px)` : undefined,
-              transition: dx ? 'none' : 'transform 160ms ease-out, box-shadow 300ms',
-              touchAction: interactive ? 'pan-y' : undefined,
-            }}
-            aria-label={deleted ? 'Deleted message' : undefined}
-            title={clock12(msg.created_at)}
-          >
-            {quote && !deleted && (
-              <div className="mb-1.5 -mx-1">
-                <QuoteBlock quote={quote} dark={dark} onJump={onJump} />
-              </div>
-            )}
-            {deleted ? (
-              <span className={`text-[12px] font-ui italic ${t.muted}`}>Message deleted</span>
-            ) : (
-              <span className={`block text-[13px] font-ui leading-relaxed whitespace-pre-wrap break-words ${t.body}`}>{msg.body}</span>
-            )}
-          </div>
-        </div>
-
-        {!deleted && <ReactionChips groups={reactions} mine={mine} busy={reactionBusy} dark={dark} onReact={onReact} />}
-
-        {selected && !deleted && (
-          <div className={`flex flex-col gap-1.5 mt-1.5 ${mine ? 'items-end' : 'items-start'}`}>
-            {extras && (
-              <div
-                role="group"
-                aria-label="React"
-                className={`flex items-center gap-0.5 p-1 rounded-full border shadow-sm ${dark ? 'bg-[#17171B] border-white/[0.08]' : 'bg-white border-zinc-200'}`}
-              >
-                {REACTIONS.map(emoji => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    disabled={reactionBusy}
-                    onClick={() => onReact(emoji)}
-                    aria-label={myEmoji === emoji ? `Remove ${emoji}` : `React ${emoji}`}
-                    aria-pressed={myEmoji === emoji}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[17px] leading-none transition-transform active:scale-[0.85] hover:scale-110 ${myEmoji === emoji ? 'bg-[#E10600]/15' : ''}`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-            {reactions.length > 0 && (
-              <p className={`text-[10px] font-ui px-1 ${t.muted}`}>
-                {reactions.map(g => `${g.emoji} ${nameList(g.names)}`).join(' · ')}
-              </p>
-            )}
-            <div className={`flex items-center gap-3 px-1 text-[9px] font-ui ${t.muted}`}>
-              <span>{clock12(msg.created_at)}</span>
-              {extras && (
-                <button onClick={onReply} className={`font-black uppercase tracking-[0.1em] ${t.heading}`}>Reply</button>
-              )}
-              {canDelete && (
-                <button onClick={onDelete} className="font-black uppercase tracking-[0.1em] text-[#E10600]">Delete</button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const OutboxBubble: React.FC<{
   entry: OutboxEntry;
@@ -810,8 +504,8 @@ const OutboxBubble: React.FC<{
   const failed = entry.status === 'failed';
   return (
     <div className="flex justify-end mt-1">
-      <div className="max-w-[85%] md:max-w-[70%] min-w-0 flex flex-col items-end">
-        <div className={`px-3.5 py-2 rounded-lg border bg-[#E10600]/10 ${failed ? 'border-[#E10600]/60' : 'border-[#E10600]/25 opacity-60'}`}>
+      <div className="max-w-[85%] md:max-w-[70%] min-w-0 flex flex-col items-end chat-in">
+        <div className={`px-3.5 py-2 rounded-2xl rounded-br-md border bg-[#E10600]/10 ${failed ? 'border-[#E10600]/60' : 'border-[#E10600]/25 opacity-60'}`}>
           {quote && (
             <div className="mb-1.5 -mx-1">
               <QuoteBlock quote={quote} dark={dark} />

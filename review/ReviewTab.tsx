@@ -6,6 +6,8 @@ import type { User } from '@supabase/supabase-js';
 import { DailyLog, DailyQuestionsLog, Subject, ExamPreference, ReminderPrefs } from '../types';
 import ReminderSettings from '../reminders/ReminderSettings';
 import DeleteAccountSheet from '../account/DeleteAccountSheet';
+import { ExamRow } from '../exams/ExamSheet';
+import { streamOf, type ExamTarget, type Stream } from '../content/exams';
 
 interface Props {
   logs: DailyLog[];
@@ -20,7 +22,14 @@ interface Props {
   onLog: (subject: Subject, hours: number, quality: number, distractions: number) => void;
   dailyQuestionsLog: DailyQuestionsLog[];
   examPreference: ExamPreference;
-  onChangeExamPreference: (p: ExamPreference) => void;
+  /** The exams and year (content/exams.ts), and the class, for the Exam row. */
+  exams: ExamTarget;
+  currentClass: 11 | 12;
+  /** Stream and exams change together. */
+  onChangeExams: (stream: Stream, target: ExamTarget) => void;
+  /** Show the exam chip on the public profile. */
+  showExam: boolean;
+  onShowExam: (on: boolean) => void;
   activeSubjects: Subject[];
   reminders: ReminderPrefs;
   onChangeReminders: (patch: Partial<ReminderPrefs>) => void;
@@ -80,7 +89,7 @@ const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) =
 
 const ReviewTab: React.FC<Props> = ({
   logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onDeleteAccount, onLog,
-  examPreference, onChangeExamPreference, activeSubjects, reminders, onChangeReminders, goalHours, bare = false,
+  examPreference, exams, currentClass, onChangeExams, showExam, onShowExam, activeSubjects, reminders, onChangeReminders, goalHours, bare = false,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
@@ -212,15 +221,7 @@ const ReviewTab: React.FC<Props> = ({
 
           <SoundRow dark={dark} delay={290} />
 
-          <Row dark={dark} delay={300} title="Exam" detail="Switch any time. The other exam’s data stays safe and comes back if you switch back.">
-            <Segmented
-              value={examPreference}
-              onChange={(e: ExamPreference) => onChangeExamPreference(e)}
-              dark={dark}
-              label="Exam"
-              options={[{ value: 'JEE', label: 'JEE' }, { value: 'NEET', label: 'NEET' }]}
-            />
-          </Row>
+          <ExamRow dark={dark} delay={300} stream={streamOf(examPreference)} target={exams} cls={currentClass} onChange={onChangeExams} showExam={showExam} onShowExam={onShowExam} signedIn={!!user} />
 
           <Row dark={dark} delay={340} title="Talk to us" detail="Feedback, bug reports, or just say hi.">
             <a href="https://instagram.com/trackeralpha" target="_blank" rel="noopener noreferrer" className={`${btn} px-4 py-3 ${t.ghost} !normal-case !tracking-normal !text-[12px] !font-semibold`}>

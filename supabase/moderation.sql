@@ -595,6 +595,20 @@ create policy "hidden racers are not heard"
   to authenticated
   using (public.leaderboard_row_visible(user_id, race_date));
 
+-- Their reactions go with their messages. race_chat.sql creates the same
+-- policy when it runs after this file; guarded for a project that has not
+-- re-run race_chat.sql yet.
+do $$
+begin
+  if to_regclass('public.race_chat_reactions') is not null then
+    execute 'drop policy if exists "hidden racers'' reactions are not shown" on public.race_chat_reactions';
+    execute 'create policy "hidden racers'' reactions are not shown"
+               on public.race_chat_reactions as restrictive for select
+               to authenticated
+               using (public.leaderboard_row_visible(user_id, race_date))';
+  end if;
+end $$;
+
 -- Hide, or change a running hide's end. `p_from` is the board's study day,
 -- sent by the client. Re-hiding someone already hidden keeps the earlier
 -- start, so extending a hide never un-hides a day it already covered.

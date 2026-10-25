@@ -20,7 +20,8 @@ import { soundForTaskMove } from './sound/moments';
 const BookReader = React.lazy(() => import('./rewards/BookReader'));
 import { Recommendation } from './today/recommend';
 import MocksTab from './mocks/MocksTab';
-import { applyAttempts, mergeMocks, normalizeMocks } from './mocks/model';
+import { applyAttempts, mergeMocks, normalizeMocks, paperPresets } from './mocks/model';
+import { normalizeTarget, prefOf, streamOf, targetExams, type ExamTarget, type Stream } from './content/exams';
 import { mergeReading, normalizeReading, type ReadingState } from './reader/model';
 import { BOOK } from './content/book';
 import Sidebar from './Sidebar';
@@ -47,6 +48,7 @@ const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import MyProfile from './profile/MyProfile';
+import { useExamOnProfile } from './profile/useExamOnProfile';
 import ReviewTab from './review/ReviewTab';
 import { STORE_LAUNCHED } from './store/launch';
 import type { DecksIntent } from './decks/types';
@@ -170,6 +172,9 @@ const App: React.FC = () => {
       merged.analysis = normalizeAnalysis(parsed.analysis);
       merged.ai = normalizeAi(parsed.ai);
       merged.mocks = normalizeMocks(parsed.mocks);
+      /* Exams and a year, from the stream and class for anyone who chose only
+         JEE or NEET before there were more exams to choose. */
+      merged.exams = normalizeTarget(parsed.exams, streamOf(merged.examPreference), merged.currentClass);
       /* The reader used to remember only a chapter index (rewards.bookChapter);
          a student mid-book reopens in that chapter. */
       merged.reading = normalizeReading(parsed.reading, BOOK.chapterIds[parsed.rewards?.bookChapter ?? -1] ?? null);
@@ -293,6 +298,29 @@ const App: React.FC = () => {
      board, which sits inside a tab that re-renders ten times a second while a
      stopwatch is running. */
   const activeSubjects = useMemo(() => getActiveSubjects(state.examPreference), [state.examPreference]);
+  /* Normalized on read as well as on load: a blob from another device or an
+     older build may carry no exams, or exams from the other stream (an old
+     build that changed only `examPreference`). The stream wins. */
+  const examTarget = useMemo(
+    () => normalizeTarget(state.exams, streamOf(state.examPreference), state.currentClass),
+    [state.exams, state.examPreference, state.currentClass],
+  );
+  const showExam = state.showExamOnProfile !== false;
+  const setShowExam = useCallback((on: boolean) => {
+    setState(prev => {
+      const next = { ...prev, showExamOnProfile: on, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  }, []);
+  /** The one writer of the exam choice: the stream and the exams move together. */
+  const setExams = useCallback((stream: Stream, target: ExamTarget) => {
+    setState(prev => {
+      const next = { ...prev, examPreference: prefOf(stream), exams: normalizeTarget(target, stream, prev.currentClass), lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  }, []);
   const coreSubjects = getCoreSubjects(state.examPreference);
   const coreQSubjects = getCoreQSubjects(state.examPreference);
 
@@ -651,8 +679,11 @@ const App: React.FC = () => {
     if (kind && id) setDecksIntent({ kind, id, nonce: Date.now() });
     handleTabChange('Decks');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  /* Which section of the Store to open on: Decks' store sign asks for Packs. */
+  /* Which section of the Store to open on, once: Decks' store sign asks for
+     packs. Cleared as soon as the Store has used it; kept, it was applied
+     again on every later visit to the Store. */
   const [storeIntent, setStoreIntent] = useState<{ section: StoreSection; nonce: number } | null>(null);
+  const clearStoreIntent = useCallback(() => setStoreIntent(null), []);
   const openStore = useCallback((section: StoreSection) => {
     setStoreIntent({ section, nonce: Date.now() });
     handleTabChange('Store');
@@ -779,6 +810,7 @@ const App: React.FC = () => {
       const next: AppState = {
         ...prev,
         examPreference: r.examPreference,
+        exams: normalizeTarget(r.exams, streamOf(r.examPreference), r.currentClass),
         currentClass: r.currentClass,
         dailyGoalHours: r.dailyGoalHours,
         timerMode: r.timerMode,
@@ -1874,6 +1906,8 @@ const App: React.FC = () => {
      leaderboard row or a chat bubble on the Ranks tab, and reachable directly
      by /u/:handle regardless of which tab was last active. */
   const profileCtl = useProfileController(user);
+  /* Your exam chip, as others see it: kept in step with your settings. */
+  useExamOnProfile(user, profileCtl.ownProfile, examTarget, showExam);
 
   /* The profile built in onboarding. The name also becomes the Ranks name,
      so joining the race later starts from it (joining stays opt-in). Signed
@@ -2180,6 +2214,8 @@ const App: React.FC = () => {
               progress={state.progress}
               examPreference={state.examPreference || 'JEE'}
               subjects={getCoreSubjects(state.examPreference || 'JEE')}
+              paperPresets={paperPresets(targetExams(examTarget))}
+              mainIsPreset={paperPresets([examTarget.primary]).length > 0}
               today={getISTDateString()}
               theme={theme}
               onUpsertMock={upsertMock}
@@ -2203,6 +2239,7 @@ const App: React.FC = () => {
               onLeave={exitLeaderboard}
               onOpenAuth={() => setIsAuthModalOpen(true)}
               onOpenProfile={profileCtl.openProfile}
+              isStaff={isAdmin}
               theme={theme}
             />
           )}
@@ -2266,6 +2303,7 @@ const App: React.FC = () => {
                 examPreference={state.examPreference || 'JEE'}
                 onOpenAuth={() => setIsAuthModalOpen(true)}
                 intent={storeIntent}
+                onIntentHandled={clearStoreIntent}
                 onOpenInDecks={openInDecks}
               />
             </React.Suspense>
@@ -2283,7 +2321,11 @@ const App: React.FC = () => {
               onLog={logStudy}
               dailyQuestionsLog={state.questionTracking.dailyQuestionsLog}
               examPreference={state.examPreference || 'JEE'}
-              onChangeExamPreference={(p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p }))}
+              exams={examTarget}
+              currentClass={state.currentClass}
+              onChangeExams={setExams}
+              showExam={showExam}
+              onShowExam={setShowExam}
               activeSubjects={activeSubjects}
               reminders={reminderPrefs}
               onChangeReminders={setReminderPrefs}
@@ -2309,7 +2351,11 @@ const App: React.FC = () => {
                 onLog: logStudy,
                 dailyQuestionsLog: state.questionTracking.dailyQuestionsLog,
                 examPreference: state.examPreference || 'JEE',
-                onChangeExamPreference: (p: ExamPreference) => setState(prev => ({ ...prev, examPreference: p })),
+                exams: examTarget,
+                currentClass: state.currentClass,
+                onChangeExams: setExams,
+                showExam,
+                onShowExam: setShowExam,
                 activeSubjects,
                 reminders: reminderPrefs,
                 onChangeReminders: setReminderPrefs,
@@ -2492,6 +2538,8 @@ const App: React.FC = () => {
           <OnboardingFlow
             initial={{
               examPreference: landingExam.current ?? state.examPreference ?? 'JEE',
+              // A guide page's exam link (landingExam) picks the stream; the exams then start from it.
+              exams: landingExam.current && landingExam.current !== state.examPreference ? undefined : examTarget,
               currentClass: state.currentClass,
               dailyGoalHours: state.dailyGoalHours,
               timerMode: state.timerMode,

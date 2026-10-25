@@ -34,7 +34,7 @@ import { KitShelf, kitColumn, shelfStyle } from './kits/KitShelf';
 import { SheetRack, sheetColumn } from './sheets/SheetRack';
 import { StoreRow } from './StoreRow';
 import { StoreFilterButton } from './StoreFilterButton';
-import { emptyFor, filterLine, matchesSubject, readFilter, showsType, writeFilter, type StoreFilter } from './filter';
+import { ALL, emptyFor, filterLine, matchesSubject, showsType, type StoreFilter } from './filter';
 import { rackName } from '../decks/store/racks';
 import { KITS_LAUNCHED } from './launch';
 import { KitPage } from './kits/KitPage';
@@ -54,6 +54,8 @@ interface Props {
   onOpenAuth: () => void;
   /** Show this section, once (Decks' store sign asks for packs). */
   intent?: { section: StoreSection; nonce: number } | null;
+  /** The intent has been used: App drops it, so the next visit opens on everything. */
+  onIntentHandled?: () => void;
   /** Go to Decks, and open this item there. Null kind: just go. */
   onOpenInDecks: (kind: DecksIntent['kind'] | null, id?: string) => void;
   /** The design board's fixtures; the app always asks the database. */
@@ -67,14 +69,16 @@ const visible = <T extends { status: string; inLibrary: boolean }>(list: T[] | n
 
 const toEntries = (cards: PreviewCard[]) => cards.map(c => ({ deckId: c.deckId, kind: c.kind, front: c.front, back: c.back }));
 
-const StoreTab = ({ user, isAdmin, theme, examPreference, onOpenAuth, intent, onOpenInDecks, ops = REAL_STORE }: Props) => {
+const StoreTab = ({ user, isAdmin, theme, examPreference, onOpenAuth, intent, onIntentHandled, onOpenInDecks, ops = REAL_STORE }: Props) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   const reduced = useReducedMotion();
   const store = useStore(!!user, ops);
   const [view, setView] = useState<View>({ kind: 'home' });
-  const [filter, setFilterState] = useState<StoreFilter>(() => readFilter(examPreference));
-  const setFilter = useCallback((f: StoreFilter) => { setFilterState(f); writeFilter(f); }, []);
+  /* The Store always opens on everything. A filter lasts until you leave the
+     tab and is never saved: a saved one made the Store look half empty the
+     next time it was opened. */
+  const [filter, setFilter] = useState<StoreFilter>(ALL);
 
   /* A section asked for by another tab: back to the page, showing that kind. */
   const handled = useRef<number | null>(null);
@@ -82,7 +86,8 @@ const StoreTab = ({ user, isAdmin, theme, examPreference, onOpenAuth, intent, on
     if (!intent || handled.current === intent.nonce) return;
     handled.current = intent.nonce;
     setView({ kind: 'home' });
-    setFilter({ ...readFilter(examPreference), type: intent.section === 'kits' && !KITS_LAUNCHED ? 'all' : intent.section });
+    setFilter({ ...ALL, type: intent.section === 'kits' && !KITS_LAUNCHED ? 'all' : intent.section });
+    onIntentHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent]);
   // The openings' sounds land on their animations, so they are fetched on the way in.
@@ -367,7 +372,7 @@ const SignedOut = ({ dark, onOpenAuth }: { dark: boolean; onOpenAuth: () => void
             <p className={`text-[15px] mt-3 max-w-[420px] ${t.muted}`}>What you take here is saved to your account and waits for you in Decks, on every device.</p>
             <button onClick={onOpenAuth} className={`mt-7 ${pill.redLg}`}>Sign in {Icon.arrow}</button>
           </div>
-          <div aria-hidden className="relative flex items-end justify-center gap-2 h-[230px] w-[330px] max-w-full mx-auto">
+          <div aria-hidden className={`relative flex items-end justify-center gap-2 h-[230px] ${KITS_LAUNCHED ? 'w-[330px]' : 'w-[250px]'} max-w-full mx-auto`}>
             <div className="absolute left-0 bottom-3" style={{ transform: 'rotate(-6deg)' }}>
               <SheetPaper sheet={{ title: 'Kinematics', sheetNo: 1, subject: 'Physics', examLine: 'JEE Main' }} entries={null} width={112} lines={5} />
             </div>
