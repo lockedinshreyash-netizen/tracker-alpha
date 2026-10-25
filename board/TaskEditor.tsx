@@ -4,6 +4,7 @@ import { PRESET_COLORS, derive, subjectStyle } from '../schedule/colors';
 import { fromClockValue, toClockValue } from '../schedule/schedule';
 import { addDays } from '../utils';
 import { dueChoices, taskStyle } from './board';
+import { Overlay } from '../ui/kit';
 
 interface Props {
   task: Task;
@@ -54,9 +55,13 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`;
   const field = `w-full text-[12px] font-bold uppercase tracking-tight p-3 rounded-lg border focus:outline-none focus:ring-1 focus:ring-white/20 font-ui ${dark ? 'bg-black/30 border-white/[0.06] text-white' : 'bg-zinc-50 border-zinc-200 text-zinc-900'}`;
 
+  /* Through Overlay (a portal to <body>): drawn inside <main>, a stacking
+     context of its own at z-20, the sheet painted under the fixed chat
+     launcher and quick-settings gear, which covered Delete and Save on a phone. */
   return (
+    <Overlay>
     <div
-      className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -205,7 +210,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
 
         {/* Sticky, so the button that commits the card is never somewhere you
             have to scroll to find. */}
-        <div className={`sticky bottom-0 flex gap-2 p-4 border-t ${panel}`}>
+        <div className={`sticky bottom-0 flex gap-2 p-4 border-t ${panel}`} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
           <button
             onClick={() => window.confirm('Discard task?') && onDelete()}
             className={`text-[10px] font-bold uppercase tracking-[0.06em] px-4 py-3 rounded-md border font-ui ${dark ? 'border-white/[0.06] text-zinc-500 hover:text-[#E10600]' : 'border-zinc-200 text-zinc-500 hover:text-[#E10600]'}`}
@@ -228,6 +233,7 @@ const TaskEditor: React.FC<Props> = ({ task, theme, activeSubjects, today, onSav
         </div>
       </div>
     </div>
+    </Overlay>
   );
 };
 
