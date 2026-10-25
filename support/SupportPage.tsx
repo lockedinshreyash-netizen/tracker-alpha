@@ -29,12 +29,17 @@ import { Eyebrow, Switch, btn, tokens } from '../ui/kit';
 import { isAndroidApp } from '../install/useInstall';
 import { SUPPORT_COPY as C } from './content';
 import { SUPPORT_QR, SUPPORT_QR_SIZE, UPI_ID, supportReady, upiLink } from './config';
-import { NOTE_MAX, NoteError, sendFounderNote } from './api';
+import { NOTE_MAX, NoteError, ackReplies, isUnseen, listMyNotes, sendFounderNote, type MyNote } from './api';
 
 interface Props {
   theme: 'dark' | 'light';
   user: User | null;
   onSignIn: () => void;
+  /** Replies have been seen here; App clears the line on Today. */
+  onRepliesSeen?: () => void;
+  /** Arrived from "… replied to your note" on Today: scroll to Your notes. */
+  focusNotes?: boolean;
+  onNotesFocused?: () => void;
 }
 
 const RED = '#E10600';
@@ -270,7 +275,7 @@ const writeDraft = (v: string) => {
 
 const LINE = 30;
 
-const NoteCard = ({ dark, user, onSignIn, delay }: { dark: boolean; user: User | null; onSignIn: () => void; delay: number }) => {
+const NoteCard = ({ dark, user, onSignIn, delay, onSent }: { dark: boolean; user: User | null; onSignIn: () => void; delay: number; onSent?: () => void }) => {
   const t = tokens(dark);
   /* The draft survives the Google sign-in round trip (same tab, so
      sessionStorage), which is the one moment a guest's words would be lost. */
@@ -297,6 +302,7 @@ const NoteCard = ({ dark, user, onSignIn, delay }: { dark: boolean; user: User |
     try {
       await sendFounderNote(text, signed);
       setStatus('sent');
+      onSent?.();
       setText('');
       writeDraft('');
     } catch (err) {
@@ -416,13 +422,117 @@ const NoteCard = ({ dark, user, onSignIn, delay }: { dark: boolean; user: User |
   );
 };
 
+/* ── Your notes, and the replies to them ──
+   Only for a signed-in student who has sent at least one. A reply is "seen"
+   once this list has actually been on screen (IntersectionObserver), not when
+   the page opened: arriving at the top of a long page has not read anything.
+   A reply that was new keeps its "New" tag until the page is left, so the
+   tag does not vanish the instant it is looked at. */
+
+const dateLine = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const YourNotes = ({ dark, notes, fresh, delay, sectionRef }: {
+  dark: boolean;
+  notes: MyNote[];
+  fresh: ReadonlySet<string>;
+  delay: number;
+  sectionRef: React.RefObject<HTMLElement | null>;
+}) => {
+  const t = tokens(dark);
+  return (
+    <section
+      id="your-notes"
+      ref={sectionRef as React.RefObject<HTMLElement>}
+      aria-labelledby="your-notes-h"
+      className="mk-rise mt-16 md:mt-20 scroll-mt-24"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex items-center gap-3">
+        <span aria-hidden="true" className={`block h-px w-8 ${dark ? 'bg-white/[0.16]' : 'bg-zinc-300'}`} />
+        <Eyebrow dark={dark}><span id="your-notes-h">Your notes</span></Eyebrow>
+      </div>
+
+      <ol className="mt-6 grid gap-4 max-w-[46rem]">
+        {notes.map(n => {
+          const isNew = fresh.has(n.id) || isUnseen(n);
+          return (
+            <li key={n.id} className={`rounded-2xl border p-5 md:p-6 ${t.card}`}>
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={`text-[11px] font-ui ${t.faint}`}>
+                  You wrote · {dateLine(n.created_at)}{n.signed ? ' · signed' : ''}
+                </p>
+                {n.reply && isNew && (
+                  <span className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui" style={{ color: RED }}>New reply</span>
+                )}
+              </div>
+              <p className={`mt-2 text-[14px] font-ui leading-[1.65] whitespace-pre-wrap break-words ${t.muted}`}>{n.body}</p>
+
+              {n.reply ? (
+                <div className={`mt-5 pt-5 border-t ${t.rule}`}>
+                  <p className={`text-[15px] md:text-[16px] font-ui leading-[1.7] whitespace-pre-wrap break-words ${t.heading}`}>{n.reply}</p>
+                  <div className="mt-4 flex items-baseline justify-between gap-3 flex-wrap">
+                    <p className={`font-accent text-[22px] leading-none ${t.heading}`}>{C.signature}</p>
+                    {n.replied_at && <p className={`text-[11px] font-ui ${t.faint}`}>Replied {dateLine(n.replied_at)}</p>}
+                  </div>
+                </div>
+              ) : (
+                <p className={`mt-4 text-[12px] font-ui ${t.faint}`}>Sent. If there’s a reply, it will appear here.</p>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+};
+
 /* ── The page ── */
 
-const SupportPage = ({ theme, user, onSignIn }: Props) => {
+const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotesFocused }: Props) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   /* Decided once: the Play app flag is set before first paint and never changes. */
   const [inPlayApp] = useState(isAndroidApp);
+
+  const uid = user?.id ?? null;
+  const [notes, setNotes] = useState<MyNote[]>([]);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  const notesRef = useRef<HTMLElement | null>(null);
+
+  const loadNotes = React.useCallback(() => {
+    if (!uid) { setNotes([]); return; }
+    let alive = true;
+    void listMyNotes().then(rows => { if (alive) setNotes(rows); });
+    return () => { alive = false; };
+  }, [uid]);
+  useEffect(() => loadNotes(), [loadNotes]);
+
+  /* Seen = the list scrolled into view. Marked here at once and on the server;
+     if that write fails, the next check simply brings the line back. */
+  const unseenIds = notes.filter(isUnseen).map(n => n.id).join(',');
+  useEffect(() => {
+    const el = notesRef.current;
+    if (!unseenIds || !el) return;
+    const ids = unseenIds.split(',');
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      io.disconnect();
+      const now = new Date().toISOString();
+      setFresh(prev => new Set([...prev, ...ids]));
+      setNotes(prev => prev.map(n => (ids.includes(n.id) ? { ...n, reply_seen_at: now } : n)));
+      void ackReplies(ids).then(() => onRepliesSeen?.(), () => { /* shows again next time */ });
+    }, { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [unseenIds, onRepliesSeen]);
+
+  /* From the line on Today: once the list exists, bring it into view. */
+  useEffect(() => {
+    if (!focusNotes || notes.length === 0) return;
+    notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onNotesFocused?.();
+  }, [focusNotes, notes.length, onNotesFocused]);
 
   return (
     <div className="pb-10">
@@ -430,8 +540,10 @@ const SupportPage = ({ theme, user, onSignIn }: Props) => {
 
       <div className={`mt-16 md:mt-24 grid gap-5 md:gap-6 items-stretch ${inPlayApp ? 'max-w-[40rem]' : 'lg:grid-cols-2'}`}>
         {!inPlayApp && <SupportCard delay={340} />}
-        <NoteCard dark={dark} user={user} onSignIn={onSignIn} delay={inPlayApp ? 340 : 400} />
+        <NoteCard dark={dark} user={user} onSignIn={onSignIn} delay={inPlayApp ? 340 : 400} onSent={loadNotes} />
       </div>
+
+      {user && notes.length > 0 && <YourNotes dark={dark} notes={notes} fresh={fresh} delay={430} sectionRef={notesRef} />}
 
       <footer className="mk-rise mt-20 md:mt-28 flex flex-col items-center text-center" style={{ animationDelay: '460ms' }}>
         <span aria-hidden="true" className={`block w-px h-12 ${dark ? 'bg-white/[0.1]' : 'bg-zinc-200'}`} />

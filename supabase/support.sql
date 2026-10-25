@@ -1,25 +1,29 @@
 -- ── Notes to the founder ──
--- The "A note for the founder" box on the Support Alpha page. One table, one
--- function, and deliberately nothing else: no reply, no status, no category.
--- It is not Feedback (admin.sql §5) and must not become it — Feedback is a
--- support inbox; this is a letterbox.
+-- The "A note for the founder" box on the Support Alpha page, and the founder's
+-- one reply to each. It is not Feedback (admin.sql §5) and must not become it:
+-- Feedback is a support inbox with categories and statuses; this is a
+-- letterbox with at most one letter back. No thread, no status, no category.
 --
--- Who can write: signed-in students only, through send_founder_note(). A
--- guest has no row to limit or to delete, and an anonymous write endpoint is
+-- Who can write a note: signed-in students only, through send_founder_note().
+-- A guest has no row to limit or to delete, and an anonymous write endpoint is
 -- one anybody holding the anon key can flood.
 --
--- Who can read: nobody through the API, administrators included. The founder
--- reads them in the Supabase dashboard (Table editor → founder_notes), which
--- runs as the service role. There is no console screen, so there is no query
--- for a policy to get wrong.
+-- Who can read notes: administrators, through admin_founder_notes(), which
+-- returns the words and the signed name and NEVER the author's account or
+-- email. A note sent unsigned stays unsigned to the person replying. Nobody
+-- reads the table directly; every client privilege on it is revoked.
 --
--- The note is tied to its author's account for two reasons only: the rate
--- limit, and so deleting the account deletes the note (on delete cascade —
--- delete_my_account in account.sql needs nothing extra). Their name is copied
--- onto the note only if they tick "Sign it with my name".
+-- Who can reply: administrators, through admin_reply_founder_note(). The
+-- author reads the reply through my_founder_notes() and marks it seen with
+-- ack_founder_replies(), the same arrangement as feedback replies
+-- (reply_seen_at, admin.sql §6b), so reading on the phone clears the laptop.
 --
--- Re-runnable. Run any time; until it is run, the page says notes are not open
--- yet and never pretends a note was sent.
+-- The note is tied to its author's account for three reasons only: the rate
+-- limit, delivering the reply, and so deleting the account deletes the note
+-- (on delete cascade — delete_my_account in account.sql needs nothing extra).
+--
+-- Re-runnable, and run admin.sql first (is_admin()). Until it is run, the page
+-- says notes are not open yet and never pretends a note was sent.
 
 create table if not exists public.founder_notes (
   id          uuid        primary key default gen_random_uuid(),
@@ -35,7 +39,24 @@ create table if not exists public.founder_notes (
   constraint founder_notes_name_len check (signed_name is null or char_length(signed_name) <= 80)
 );
 
--- The rate limit's lookup, and newest-first reading in the dashboard.
+-- The reply. Added by ALTER so a table made by the first version of this file
+-- gains it in place.
+alter table public.founder_notes add column if not exists reply         text;
+alter table public.founder_notes add column if not exists replied_at    timestamptz;
+alter table public.founder_notes add column if not exists replied_by    uuid references auth.users (id) on delete set null;
+-- When the author last saw the reply. Unseen = a reply, and this null or older
+-- than replied_at, so an edited reply counts as new again.
+alter table public.founder_notes add column if not exists reply_seen_at timestamptz;
+
+alter table public.founder_notes drop constraint if exists founder_notes_reply_len;
+alter table public.founder_notes add constraint founder_notes_reply_len
+  check (reply is null or char_length(btrim(reply)) between 1 and 1000);
+-- A reply and its date arrive and leave together.
+alter table public.founder_notes drop constraint if exists founder_notes_reply_dated;
+alter table public.founder_notes add constraint founder_notes_reply_dated
+  check ((reply is null) = (replied_at is null));
+
+-- The rate limit's lookup and the author's own list, and newest-first reading.
 create index if not exists founder_notes_by_user
   on public.founder_notes (user_id, created_at desc);
 create index if not exists founder_notes_newest
@@ -97,3 +118,127 @@ $$;
 -- back to signed-in users only.
 revoke all on function public.send_founder_note(text, boolean) from public, anon;
 grant execute on function public.send_founder_note(text, boolean) to authenticated;
+
+-- ── The author's side ──
+-- Their own notes, newest first, with any reply. Never anyone else's.
+drop function if exists public.my_founder_notes();
+create function public.my_founder_notes()
+returns table (
+  id uuid, body text, signed boolean, created_at timestamptz,
+  reply text, replied_at timestamptz, reply_seen_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select n.id, n.body, n.signed_name is not null, n.created_at, n.reply, n.replied_at, n.reply_seen_at
+    from public.founder_notes n
+   where n.user_id = auth.uid()
+   order by n.created_at desc
+   limit 50;
+$$;
+
+-- Marks replies seen. Own rows only, this column only, and never earlier than
+-- the reply itself (replied_at comes from the replier's request; greatest()
+-- keeps a reply edited a moment later from looking already seen).
+create or replace function public.ack_founder_replies(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.founder_notes
+     set reply_seen_at = greatest(now(), replied_at)
+   where user_id = auth.uid()
+     and id = any(coalesce(p_ids, '{}'))
+     and reply is not null;
+$$;
+
+-- How many replies are waiting: the line on Today.
+create or replace function public.unseen_founder_replies()
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::int
+    from public.founder_notes
+   where user_id = auth.uid()
+     and reply is not null
+     and (reply_seen_at is null or reply_seen_at < replied_at);
+$$;
+
+-- ── The founder's side ──
+-- Every note, newest first, keyset-paged on created_at. Unreplied only when
+-- asked. The author is not in the result: only what they wrote and, if they
+-- chose to sign, their name.
+drop function if exists public.admin_founder_notes(boolean, timestamptz, int);
+create function public.admin_founder_notes(
+  p_unreplied boolean default false,
+  p_before    timestamptz default null,
+  p_limit     int default 50
+)
+returns table (
+  id uuid, body text, signed_name text, created_at timestamptz,
+  reply text, replied_at timestamptz, reply_seen boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  return query
+    select n.id, n.body, n.signed_name, n.created_at, n.reply, n.replied_at,
+           (n.reply is not null and n.reply_seen_at is not null and n.reply_seen_at >= n.replied_at)
+      from public.founder_notes n
+     where (not coalesce(p_unreplied, false) or n.reply is null)
+       and (p_before is null or n.created_at < p_before)
+     order by n.created_at desc
+     limit greatest(1, least(coalesce(p_limit, 50), 100));
+end;
+$$;
+
+-- Write, change or take back the one reply. An empty reply removes it.
+create or replace function public.admin_reply_founder_note(p_id uuid, p_reply text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_reply text := nullif(btrim(coalesce(p_reply, '')), '');
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if v_reply is not null and char_length(v_reply) > 1000 then
+    raise exception 'founder_reply_length' using errcode = '22023';
+  end if;
+  update public.founder_notes
+     set reply = v_reply,
+         replied_at = case when v_reply is null then null else now() end,
+         replied_by = case when v_reply is null then null else auth.uid() end,
+         reply_seen_at = case when v_reply is null then null else reply_seen_at end
+   where id = p_id;
+  if not found then
+    raise exception 'founder_note_missing' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function public.my_founder_notes() from public, anon;
+revoke all on function public.ack_founder_replies(uuid[]) from public, anon;
+revoke all on function public.unseen_founder_replies() from public, anon;
+revoke all on function public.admin_founder_notes(boolean, timestamptz, int) from public, anon;
+revoke all on function public.admin_reply_founder_note(uuid, text) from public, anon;
+grant execute on function public.my_founder_notes() to authenticated;
+grant execute on function public.ack_founder_replies(uuid[]) to authenticated;
+grant execute on function public.unseen_founder_replies() to authenticated;
+grant execute on function public.admin_founder_notes(boolean, timestamptz, int) to authenticated;
+grant execute on function public.admin_reply_founder_note(uuid, text) to authenticated;

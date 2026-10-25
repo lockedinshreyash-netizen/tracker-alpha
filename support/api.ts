@@ -41,3 +41,83 @@ export const sendFounderNote = async (body: string, signed: boolean): Promise<vo
   if (result.error) throw new NoteError(humanError(result.error));
   if (typeof result.data !== 'string' || !result.data) throw new NoteError('Couldn’t send it. Try again in a moment.');
 };
+
+/* ── Replies ──
+   One reply per note, written from Console → Notes and read on the Support
+   page. Reading the author's own list and counting unseen replies never
+   throw: before support.sql is re-run there is simply nothing to show. */
+
+export const REPLY_MAX = 1000;
+
+export interface MyNote {
+  id: string;
+  body: string;
+  signed: boolean;
+  created_at: string;
+  reply: string | null;
+  replied_at: string | null;
+  reply_seen_at: string | null;
+}
+
+export interface AdminNote {
+  id: string;
+  body: string;
+  /** Only when the author chose to sign. The author's account is never returned. */
+  signed_name: string | null;
+  created_at: string;
+  reply: string | null;
+  replied_at: string | null;
+  /** The author has opened the page with this reply on it. */
+  reply_seen: boolean;
+}
+
+export const isUnseen = (n: Pick<MyNote, 'reply' | 'replied_at' | 'reply_seen_at'>): boolean =>
+  !!n.reply && !!n.replied_at && (!n.reply_seen_at || Date.parse(n.reply_seen_at) < Date.parse(n.replied_at));
+
+export const listMyNotes = async (): Promise<MyNote[]> => {
+  try {
+    const { data, error } = await supabase.rpc('my_founder_notes');
+    return error || !Array.isArray(data) ? [] : (data as MyNote[]);
+  } catch {
+    return [];
+  }
+};
+
+export const countUnseenReplies = async (): Promise<number> => {
+  try {
+    const { data, error } = await supabase.rpc('unseen_founder_replies');
+    return error || typeof data !== 'number' ? 0 : data;
+  } catch {
+    return 0;
+  }
+};
+
+export const ackReplies = async (ids: string[]): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase.rpc('ack_founder_replies', { p_ids: ids });
+  if (error) throw new NoteError(humanError(error));
+};
+
+const adminError = (error: { code?: string; message?: string } | null): string => {
+  const code = error?.code ?? '';
+  const message = error?.message ?? '';
+  if (code === '42501' || /not authorized/.test(message)) return 'Only administrators can read notes.';
+  if (/founder_reply_length/.test(message)) return `Keep the reply under ${REPLY_MAX} characters.`;
+  if (/founder_note_missing/.test(message)) return 'That note no longer exists. Its author may have deleted their account.';
+  if (code === 'PGRST202' || /could not find the function/i.test(message)) return 'Replies aren’t set up yet. Re-run supabase/support.sql.';
+  if (/failed to fetch|network|timeout|load failed/i.test(message)) return 'No connection. Check your network and try again.';
+  return 'Something went wrong. Try again in a moment.';
+};
+
+export const adminListNotes = async (unreplied: boolean, before: string | null): Promise<AdminNote[]> => {
+  const { data, error } = await supabase.rpc('admin_founder_notes', { p_unreplied: unreplied, p_before: before, p_limit: 50 });
+  if (error) throw new NoteError(adminError(error));
+  return Array.isArray(data) ? (data as AdminNote[]) : [];
+};
+
+/** An empty reply takes the reply back. */
+export const adminReply = async (id: string, reply: string): Promise<void> => {
+  if (reply.trim().length > REPLY_MAX) throw new NoteError(`Keep the reply under ${REPLY_MAX} characters.`);
+  const { error } = await supabase.rpc('admin_reply_founder_note', { p_id: id, p_reply: reply });
+  if (error) throw new NoteError(adminError(error));
+};

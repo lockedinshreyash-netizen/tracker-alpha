@@ -48,6 +48,7 @@ const StoreTab = React.lazy(() => import('./store/StoreTab'));
 const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 /* Support Alpha: reached only from quick settings, Settings and the site footers. */
 const SupportPage = React.lazy(() => import('./support/SupportPage'));
+import { useFounderReplies } from './support/useFounderReplies';
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import MyProfile from './profile/MyProfile';
@@ -285,6 +286,10 @@ const App: React.FC = () => {
      feature: one message, one tab, one acknowledgement. Signed-out users have
      no per-user read state to keep, so they are never shown one. */
   const announcements = useAnnouncements(user, activeTab === 'Today');
+  /* Replies to the student's notes from the Support page: a line on Today. */
+  const founderReplies = useFounderReplies(user?.id ?? null);
+  const [supportFocusNotes, setSupportFocusNotes] = useState(false);
+  const clearSupportFocus = useCallback(() => setSupportFocusNotes(false), []);
 
   /* A saved `lastUsedTab` of 'Admin' can outlive the role that earned it — an
      administrator stood down, or somebody signed out on a shared laptop. Wait
@@ -2200,6 +2205,8 @@ const App: React.FC = () => {
               onShare={() => setSharePeriod('daily')}
               unreadAnnouncements={announcements.open ? 0 : announcements.queue.length}
               onOpenAnnouncement={announcements.reopen}
+              founderReplies={founderReplies.unseen}
+              onOpenFounderReply={() => { setSupportFocusNotes(true); openSupport(); }}
               festive={festive}
             />
           )}
@@ -2418,7 +2425,14 @@ const App: React.FC = () => {
               row-level security for anybody else. */}
           {activeTab === 'Support' && (
             <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
-              <SupportPage theme={theme} user={user} onSignIn={() => setIsAuthModalOpen(true)} />
+              <SupportPage
+                theme={theme}
+                user={user}
+                onSignIn={() => setIsAuthModalOpen(true)}
+                onRepliesSeen={founderReplies.markSeen}
+                focusNotes={supportFocusNotes}
+                onNotesFocused={clearSupportFocus}
+              />
             </React.Suspense>
           )}
           {activeTab === 'Admin' && isAdmin && user && (

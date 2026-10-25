@@ -40,6 +40,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('chat') === 'debug') {
   // The shared chat bubble's gestures and menu on a fixture thread, no database.
   import('./chat/DebugChat').then(({ default: DebugChat }) => ReactDOM.createRoot(rootElement).render(<DebugChat />));
+} else if (import.meta.env.DEV && params.get('support') === 'debug') {
+  // Founder notes end to end: the Support page beside Console → Notes, on in-memory RPCs.
+  import('./support/DebugSupport').then(({ default: DebugSupport }) => ReactDOM.createRoot(rootElement).render(<DebugSupport />));
 } else if (import.meta.env.DEV && params.get('festive') === 'debug') {
   // Every festive theme in real device-width frames, with working fireworks.
   import('./festive/DebugFestive').then(({ default: DebugFestive }) => ReactDOM.createRoot(rootElement).render(<DebugFestive />));

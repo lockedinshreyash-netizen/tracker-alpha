@@ -11,6 +11,7 @@ import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
 import { Recommendation } from './recommend';
 import NoticeLine from '../notify/NoticeLine';
+import { SUPPORT_COPY } from '../support/content';
 import NextUpStrip from '../schedule/NextUpStrip';
 import { EMPTY_SCHEDULE, materializeDay } from '../schedule/schedule';
 import ShareButton from '../share/ShareButton';
@@ -50,6 +51,9 @@ interface Props {
      ever lost to a stray tap on the scrim. */
   unreadAnnouncements: number;
   onOpenAnnouncement: () => void;
+  /** Replies from the founder to the student's notes that they have not seen yet. */
+  founderReplies?: number;
+  onOpenFounderReply?: () => void;
   /** The festive theme everyone is seeing; adds one greeting to the date line. */
   festive?: FestiveTheme;
 }
@@ -79,6 +83,8 @@ const TodayTab: React.FC<Props> = ({
   onShare,
   unreadAnnouncements,
   onOpenAnnouncement,
+  founderReplies = 0,
+  onOpenFounderReply,
   festive = 'none',
 }) => {
   const { timer, tasks, logs, dailyGoalHours, pomodoro, pomodoroSettings } = state;
@@ -280,6 +286,17 @@ const TodayTab: React.FC<Props> = ({
           label="A message from LOCK IN"
           detail={unreadAnnouncements > 1 ? `${unreadAnnouncements} unread` : 'Tap to read'}
           onOpen={onOpenAnnouncement}
+        />
+      )}
+      {/* A reply to a note the student wrote on the Support page. Same shape
+          and the same rule as the announcement line: no cross, it goes once
+          the reply has been read. */}
+      {!stopwatchBusy && !pomodoroBusy && founderReplies > 0 && onOpenFounderReply && (
+        <NoticeLine
+          theme={theme}
+          label={`${SUPPORT_COPY.signature} replied to your note`}
+          detail="Tap to read"
+          onOpen={onOpenFounderReply}
         />
       )}
       {!stopwatchBusy && !targetOpen && (
