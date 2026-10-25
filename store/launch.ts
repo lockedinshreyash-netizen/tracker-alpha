@@ -1,6 +1,7 @@
 /* ── Is the Alpha Store live? ──
-   The store (kits, formula sheets, packs on one page) is built but not
-   launched. With this false the app is exactly what it was before the store:
+   The store (formula sheets and flashcard packs on one page, kits when they
+   launch) is live. With STORE_LAUNCHED false the app is exactly what it was
+   before the store:
 
      - the rail shows Review, not Store, and there is no Profile page: the
        account button at the bottom of the rail opens Edit profile;
@@ -14,4 +15,10 @@
    set this to true, and deploy. A saved `lastUsedTab` is mapped either way
    (App.tsx), so nobody lands on a tab that is not drawn. */
 
-export const STORE_LAUNCHED = false;
+export const STORE_LAUNCHED = true;
+
+/* Subject kits are built but not launched. With this false nobody sees a kit
+   anywhere: no Kits rack or filter option in the store, no kits in My Alpha,
+   no Kits table or New kit in the console, and nothing calls the kit
+   functions. Sheets and packs are unaffected. Flip it to launch kits. */
+export const KITS_LAUNCHED = false;

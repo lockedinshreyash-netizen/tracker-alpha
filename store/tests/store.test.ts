@@ -133,23 +133,28 @@ test('labels: kit and sheet lines', () => {
 import { emptyFor, filterLine, matchesSubject, parseFilter, showsType } from '../filter';
 
 test('filter: types and subjects narrow the page', () => {
-  assert.equal(showsType({ type: 'all', subject: 'all' }, 'kits'), true);
-  assert.equal(showsType({ type: 'sheets', subject: 'all' }, 'kits'), false);
+  assert.equal(showsType({ type: 'all', subject: 'all' }, 'sheets'), true);
+  assert.equal(showsType({ type: 'packs', subject: 'all' }, 'sheets'), false);
+  // Kits are not launched (store/launch.ts): never shown, whatever the filter says.
+  assert.equal(showsType({ type: 'all', subject: 'all' }, 'kits'), false);
+  assert.equal(showsType({ type: 'kits', subject: 'all' }, 'kits'), false);
   assert.equal(matchesSubject({ subject: 'Physics' }, { type: 'all', subject: 'Physics' }), true);
   assert.equal(matchesSubject({ subject: null }, { type: 'all', subject: 'Physics' }), false, 'no subject shows only under all');
   assert.equal(matchesSubject({ subject: null }, { type: 'all', subject: 'all' }), true);
 });
 
 test('filter: a stored filter is checked, and a subject outside the exam falls back', () => {
-  assert.deepEqual(parseFilter('{"type":"kits","subject":"Maths"}', 'JEE'), { type: 'kits', subject: 'Maths' });
-  assert.deepEqual(parseFilter('{"type":"kits","subject":"Maths"}', 'NEET'), { type: 'kits', subject: 'all' });
+  assert.deepEqual(parseFilter('{"type":"sheets","subject":"Maths"}', 'JEE'), { type: 'sheets', subject: 'Maths' });
+  assert.deepEqual(parseFilter('{"type":"sheets","subject":"Maths"}', 'NEET'), { type: 'sheets', subject: 'all' });
+  assert.deepEqual(parseFilter('{"type":"kits","subject":"Maths"}', 'JEE'), { type: 'all', subject: 'Maths' }, 'kits are not an option yet');
   assert.deepEqual(parseFilter('not json', 'JEE'), { type: 'all', subject: 'all' });
   assert.deepEqual(parseFilter('{"type":"spaceships"}', 'JEE'), { type: 'all', subject: 'all' });
   assert.deepEqual(parseFilter(null, 'JEE'), { type: 'all', subject: 'all' });
 });
 
 test('filter: the heading and empty racks say what is shown', () => {
-  assert.equal(filterLine({ type: 'kits', subject: 'Physics' }), 'Kits for Physics.');
+  assert.equal(filterLine({ type: 'sheets', subject: 'Physics' }), 'Formula sheets for Physics.');
+  assert.equal(filterLine({ type: 'all', subject: 'all' }), 'Formula sheets and flashcard packs, made by Alpha.');
   assert.equal(filterLine({ type: 'all', subject: 'Chemistry' }), 'Everything for Chemistry.');
   assert.equal(emptyFor('packs', { type: 'all', subject: 'all' }), null);
   assert.equal(emptyFor('sheets', { type: 'all', subject: 'Maths' })?.title, 'No Maths formula sheets yet.');

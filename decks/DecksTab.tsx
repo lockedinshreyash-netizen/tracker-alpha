@@ -45,7 +45,7 @@ import SheetView from './SheetView';
 import KitView from './KitView';
 import { addSheet, exploreKits, exploreSheets, removeKit, removeSheet } from '../store/api';
 import type { StoreSection, Kit, KitItem, Sheet } from '../store/types';
-import { STORE_LAUNCHED } from '../store/launch';
+import { KITS_LAUNCHED, STORE_LAUNCHED } from '../store/launch';
 
 // Until the Alpha Store launches, the packs store lives here, as it did. Its
 // rack physics and opening animation load only when it opens.
@@ -140,7 +140,7 @@ const DecksTab: React.FC<Props> = ({ user, isAdmin, theme, examPreference, onOpe
       explorePacks().then(setPacks).catch(() => setPacks([])),
       // Sheets and kits are the Alpha Store's; nothing asks for them before it launches.
       STORE_LAUNCHED ? exploreSheets().then(setSheets).catch(() => setSheets([])) : setSheets([]),
-      STORE_LAUNCHED ? exploreKits().then(setKits).catch(() => setKits([])) : setKits([]),
+      STORE_LAUNCHED && KITS_LAUNCHED ? exploreKits().then(setKits).catch(() => setKits([])) : setKits([]),
     ]);
   }, [uid]);
 

@@ -33,6 +33,7 @@ import KitEditor from '../store/admin/KitEditor';
 import SheetEditor from '../store/admin/SheetEditor';
 import FormulaImport, { type ImportDone } from '../store/admin/FormulaImport';
 import { pushToast } from '../notify/toastBus';
+import { KITS_LAUNCHED } from '../store/launch';
 
 /** What the console does. The design board swaps in fakes. */
 export interface StoreAdminOps {
@@ -96,7 +97,8 @@ const StoreAdmin = ({ adminId, theme, onOpenDeck, ops = REAL }: Props) => {
   const load = useCallback(async () => {
     // A database before the store's tables simply shows the start screens.
     await Promise.all([
-      ops.kits().then(setKits, e => { setKits([]); setError(humanError(e)); }),
+      // Kits are not launched yet (store/launch.ts): nothing asks for them.
+      KITS_LAUNCHED ? ops.kits().then(setKits, e => { setKits([]); setError(humanError(e)); }) : setKits([]),
       ops.sheets().then(setSheets, () => setSheets([])),
       ops.decks().then(setDecks, () => setDecks([])),
       ops.packs().then(setPacks, () => setPacks([])),
@@ -128,17 +130,19 @@ const StoreAdmin = ({ adminId, theme, onOpenDeck, ops = REAL }: Props) => {
           <p className={`font-display text-[26px] leading-tight mt-2 ${heading}`}>
             {kits && sheets ? `${live} live · ${students.toLocaleString()} ${students === 1 ? 'student' : 'students'}` : '…'}
           </p>
-          <p className="text-[13px] mt-1.5 text-zinc-500">Kits and formula sheets. Packs are made in the Decks section.</p>
+          <p className="text-[13px] mt-1.5 text-zinc-500">{KITS_LAUNCHED ? 'Kits and formula sheets.' : 'Formula sheets.'} Packs are made in the Decks section.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setImporting({ sheetId: null })} className={pill.red}>{Icon.upload}Import formulas</button>
           <button onClick={() => setSheetSheet({ sheet: null })} className={pill.ghost(dark)}>{Icon.plus}New sheet</button>
-          <button onClick={() => setKitSheet({ kit: null })} className={pill.ghost(dark)}>{Icon.plus}New kit</button>
+          {KITS_LAUNCHED && <button onClick={() => setKitSheet({ kit: null })} className={pill.ghost(dark)}>{Icon.plus}New kit</button>}
         </div>
       </div>
 
       {error && <p className="text-[13px] text-rose-500">{error}</p>}
 
+      {KITS_LAUNCHED && (
+      <>
       {/* ── Kits ── */}
       <div>
         <div className="flex items-baseline justify-between gap-4 mb-3">
@@ -191,6 +195,8 @@ const StoreAdmin = ({ adminId, theme, onOpenDeck, ops = REAL }: Props) => {
           </Table>
         )}
       </div>
+      </>
+      )}
 
       {/* ── Sheets ── */}
       <div>

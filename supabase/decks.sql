@@ -10,7 +10,7 @@
 --   Ownership    who made the deck            decks.owner_id
 --   Scope        who may see it               decks.scope  (personal | global)
 --   Review state how THIS user is doing with  user_card_progress, one row per
---                THIS card                    (user, card)
+--                THIS card                    (user, card)a
 --
 -- A global deck exists once. Ten thousand students studying card 123 are ten
 -- thousand progress rows pointing at the same card row, never ten thousand

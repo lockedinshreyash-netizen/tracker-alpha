@@ -6,6 +6,7 @@
 
 import type { DeckSubject } from '../decks/types';
 import type { ExamPreference } from '../types';
+import { KITS_LAUNCHED } from './launch';
 
 export type StoreType = 'all' | 'kits' | 'sheets' | 'packs';
 export type StoreSubject = 'all' | DeckSubject;
@@ -20,7 +21,8 @@ export const ALL: StoreFilter = { type: 'all', subject: 'all' };
 /** In the order the page shows them. */
 export const TYPES: { value: StoreType; label: string }[] = [
   { value: 'all', label: 'Everything' },
-  { value: 'kits', label: 'Kits' },
+  // Kits are not launched yet (store/launch.ts): no option, and a stored "kits" reads as everything.
+  ...(KITS_LAUNCHED ? [{ value: 'kits' as StoreType, label: 'Kits' }] : []),
   { value: 'sheets', label: 'Formula sheets' },
   { value: 'packs', label: 'Flashcard packs' },
 ];
@@ -29,7 +31,8 @@ export const TYPES: { value: StoreType; label: string }[] = [
 export const subjectsFor = (exam: ExamPreference): DeckSubject[] =>
   exam === 'NEET' ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Maths'];
 
-export const showsType = (f: StoreFilter, type: Exclude<StoreType, 'all'>): boolean => f.type === 'all' || f.type === type;
+export const showsType = (f: StoreFilter, type: Exclude<StoreType, 'all'>): boolean =>
+  (type !== 'kits' || KITS_LAUNCHED) && (f.type === 'all' || f.type === type);
 
 export const matchesSubject = (item: { subject: DeckSubject | null }, f: StoreFilter): boolean =>
   f.subject === 'all' || item.subject === f.subject;
@@ -66,7 +69,7 @@ export const writeFilter = (f: StoreFilter): void => {
 /** The heading's line: what the page is showing. */
 export const filterLine = (f: StoreFilter): string => {
   const kind = TYPES.find(t => t.value === f.type)?.label ?? 'Everything';
-  if (f.type === 'all' && f.subject === 'all') return 'Kits, formula sheets and flashcard packs, made by Alpha.';
+  if (f.type === 'all' && f.subject === 'all') return KITS_LAUNCHED ? 'Kits, formula sheets and flashcard packs, made by Alpha.' : 'Formula sheets and flashcard packs, made by Alpha.';
   if (f.type === 'all') return `Everything for ${f.subject}.`;
   return f.subject === 'all' ? `${kind}, every subject.` : `${kind} for ${f.subject}.`;
 };

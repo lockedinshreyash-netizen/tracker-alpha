@@ -36,6 +36,7 @@ import { StoreRow } from './StoreRow';
 import { StoreFilterButton } from './StoreFilterButton';
 import { emptyFor, filterLine, matchesSubject, readFilter, showsType, writeFilter, type StoreFilter } from './filter';
 import { rackName } from '../decks/store/racks';
+import { KITS_LAUNCHED } from './launch';
 import { KitPage } from './kits/KitPage';
 import { KitOpening } from './kits/KitOpening';
 import { useShelfWidth } from './sheets/SheetCard';
@@ -81,7 +82,7 @@ const StoreTab = ({ user, isAdmin, theme, examPreference, onOpenAuth, intent, on
     if (!intent || handled.current === intent.nonce) return;
     handled.current = intent.nonce;
     setView({ kind: 'home' });
-    setFilter({ ...readFilter(examPreference), type: intent.section });
+    setFilter({ ...readFilter(examPreference), type: intent.section === 'kits' && !KITS_LAUNCHED ? 'all' : intent.section });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent]);
   // The openings' sounds land on their animations, so they are fetched on the way in.
@@ -358,7 +359,7 @@ const SignedOut = ({ dark, onOpenAuth }: { dark: boolean; onOpenAuth: () => void
   const t = tokens(dark);
   return (
     <div className="space-y-8 font-ui">
-      <PageHeader dark={dark} title="Alpha Store" subtitle="Kits, packs and formula sheets, made by Alpha." />
+      <PageHeader dark={dark} title="Alpha Store" subtitle={KITS_LAUNCHED ? 'Kits, packs and formula sheets, made by Alpha.' : 'Formula sheets and flashcard packs, made by Alpha.'} />
       <section className={`mk-rise rounded-2xl border overflow-hidden ${dark ? 'border-white/[0.06]' : 'border-zinc-200/80'}`} style={tableStyle(dark)}>
         <div className="grid md:grid-cols-[minmax(0,1fr)_auto] items-center gap-8 p-7 md:p-12">
           <div>
@@ -373,9 +374,11 @@ const SignedOut = ({ dark, onOpenAuth }: { dark: boolean; onOpenAuth: () => void
             <div className="absolute right-0 bottom-6" style={{ transform: 'rotate(5deg)' }}>
               <PackCard pack={SAMPLE_PACK} w={96} h={146} style={{ ['--pk-shadow-o' as string]: dark ? 0.6 : 0.2 }} />
             </div>
-            <div className="relative z-10 -mb-4">
-              <KitBox kit={{ title: 'Physics Kit', kitNo: 1, subject: 'Physics', examLine: 'JEE', finish: dark ? 'white' : 'black' }} size={170} />
-            </div>
+            {KITS_LAUNCHED && (
+              <div className="relative z-10 -mb-4">
+                <KitBox kit={{ title: 'Physics Kit', kitNo: 1, subject: 'Physics', examLine: 'JEE', finish: dark ? 'white' : 'black' }} size={170} />
+              </div>
+            )}
           </div>
         </div>
       </section>

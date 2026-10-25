@@ -16,6 +16,7 @@ import type { Pack, PreviewCard } from '../decks/types';
 import { addKit, addSheet, exploreKits, exploreSheets, sheetPreview } from './api';
 import { checkout } from './checkout';
 import type { Kit, Sheet, StoreKind } from './types';
+import { KITS_LAUNCHED } from './launch';
 
 export interface StoreOps {
   packs: () => Promise<Pack[]>;
@@ -64,7 +65,8 @@ export const useStore = (signedIn: boolean, ops: StoreOps = REAL_STORE): StoreDa
     await Promise.all([
       ops.packs().then(setPacks, () => setPacks([])),
       ops.sheets().then(setSheets, () => setSheets([])),
-      ops.kits().then(setKits, () => setKits([])),
+      // Kits are not launched yet (store/launch.ts): nothing asks for them.
+      KITS_LAUNCHED ? ops.kits().then(setKits, () => setKits([])) : setKits([]),
     ]);
   }, [signedIn, ops]);
 
