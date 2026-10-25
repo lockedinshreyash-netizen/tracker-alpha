@@ -665,6 +665,7 @@ export const Shell: React.FC<{ page: SitePage; pages: SitePage[] }> = ({ page, p
               <li><a href="/syllabus/">All syllabus guides</a></li>
               <li><a href="https://instagram.com/trackeralpha" rel="noopener noreferrer">Instagram</a></li>
               <li><a href="mailto:lockinhq@gmail.com">Email us</a></li>
+              <li><a href="/support/">Support Alpha</a></li>
               <li><a href="/privacy/">Privacy policy</a></li>
               <li><a href="/delete-account/">Delete your account</a></li>
             </ul>

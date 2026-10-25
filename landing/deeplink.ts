@@ -23,6 +23,8 @@ const TABS: Record<string, TabType> = {
   notes: 'Notes',
   groups: 'Groups',
   streak: 'Streak',
+  // The footers' "Support Alpha" (site/support.tsx's "Write a note" link).
+  support: 'Support',
   // The "delete your account" page (site/legal.tsx) links to /?open=review#account.
   // Once the Alpha Store launches, Review's contents live on the profile page.
   review: STORE_LAUNCHED ? 'Profile' : 'Review',

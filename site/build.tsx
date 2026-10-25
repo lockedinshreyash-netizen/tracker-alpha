@@ -10,6 +10,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CONTENT_UPDATED, SITE_URL, Shell, SitePage, allPages } from './pages';
 import { legalPages } from './legal';
+import { supportPage } from './support';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -115,12 +116,12 @@ export interface BuiltSite {
   guides: Array<{ path: string; label: string; description: string }>;
 }
 
-/* The legal pages (site/legal.tsx) are built in the same shell and go in the
+/* The legal pages (site/legal.tsx) and /support/ (site/support.tsx) are built in the same shell and go in the
    sitemap, but they are not guides: the footers' guide lists, the landing
    page's "Free guides" and llms.txt list only `pages`. */
 export const buildSite = (css: string): BuiltSite => {
   const pages = allPages();
-  const all = [...pages, ...legalPages()];
+  const all = [...pages, ...legalPages(), supportPage()];
   return {
     files: all.map(p => ({ path: p.path, html: document(p, pages, css) })),
     urls: all.map(p => ({ path: p.path, lastmod: p.updated ?? CONTENT_UPDATED })),

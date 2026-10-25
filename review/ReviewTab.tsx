@@ -37,6 +37,8 @@ interface Props {
   goalHours?: number;
   /** Drawn under the profile header (profile/MyProfile.tsx), which says what the page is. */
   bare?: boolean;
+  /** Opens the Support Alpha page. The last row of Settings, after "Talk to us". */
+  onOpenSupport?: () => void;
 }
 
 /* One shape for every setting: what it is, where it stands, and its control.
@@ -89,7 +91,7 @@ const SoundRow: React.FC<{ dark: boolean; delay: number }> = ({ dark, delay }) =
 
 const ReviewTab: React.FC<Props> = ({
   logs, score, onClearData, theme, user, onOpenAuth, onSignOut, onDeleteAccount, onLog,
-  examPreference, exams, currentClass, onChangeExams, showExam, onShowExam, activeSubjects, reminders, onChangeReminders, goalHours, bare = false,
+  examPreference, exams, currentClass, onChangeExams, showExam, onShowExam, activeSubjects, reminders, onChangeReminders, goalHours, bare = false, onOpenSupport,
 }) => {
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [manualHours, setManualHours] = useState<string>('');
@@ -243,6 +245,14 @@ const ReviewTab: React.FC<Props> = ({
               Privacy policy
             </a>
           </Row>
+
+          {onOpenSupport && (
+            <Row dark={dark} delay={370} title="Support Alpha" detail="A note from the founder. Entirely optional.">
+              <button onClick={onOpenSupport} className={`${btn} px-4 py-3 ${t.ghost} !normal-case !tracking-normal !text-[12px] !font-semibold`}>
+                Open
+              </button>
+            </Row>
+          )}
         </div>
       </div>
 

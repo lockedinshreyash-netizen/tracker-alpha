@@ -14,6 +14,9 @@ interface Props {
   /** Tracks the sidebar so the dock clears the rail. See index.css. */
   railPx: number;
   onOpenAuth: () => void;
+  /** Opens the Support Alpha page. A quiet row at the foot of the menu, nothing more:
+   *  this widget files tickets, and a note to the founder is not a ticket. */
+  onOpenSupport?: () => void;
 }
 
 type View = 'menu' | 'form' | 'sent' | 'mine';
@@ -41,7 +44,7 @@ type View = 'menu' | 'form' | 'sent' | 'mine';
  * to the foreground, at most every two minutes; a reply is not urgent enough to
  * poll for.
  */
-const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAuth }) => {
+const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAuth, onOpenSupport }) => {
   const dark = theme === 'dark';
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>('menu');
@@ -217,6 +220,23 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
     : 'bg-[#F7F6F3] border-zinc-200 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-300'}`;
   const eyebrow = `text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${muted}`;
 
+  /* The way to Support Alpha, under everything else on the first screen and
+     set apart by a hairline: seen by anyone who opens the bubble, asking
+     nothing of them. Guests see it too — the page needs no account. */
+  const supportRow = onOpenSupport ? (
+    <button
+      type="button"
+      onClick={() => { close(); onOpenSupport(); }}
+      className={`group mt-3 pt-3 border-t w-full flex items-center justify-between gap-3 px-1 text-left ${dark ? 'border-white/[0.06]' : 'border-zinc-100'}`}
+    >
+      <span className="min-w-0">
+        <span className={`block text-[12px] font-bold font-ui ${ink}`}>Support Alpha</span>
+        <span className={`block text-[11px] font-ui mt-0.5 leading-snug ${muted}`}>A note from the founder. Entirely optional.</span>
+      </span>
+      <span aria-hidden="true" className={`shrink-0 text-[13px] font-ui transition-transform group-hover:translate-x-0.5 ${muted}`}>→</span>
+    </button>
+  ) : null;
+
   return (
     /* One wrapper so `--rail` reaches both fixed children; it lays out nothing
        itself. */
@@ -304,6 +324,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                   >
                     Sign in
                   </button>
+                  {supportRow}
                 </div>
               ) : view === 'menu' ? (
                 <div className="flex flex-col gap-2">
@@ -327,6 +348,7 @@ const FeedbackWidget: React.FC<Props> = ({ user, theme, route, railPx, onOpenAut
                     {hasUnseen && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] shrink-0" aria-hidden="true" />}
                     {hasUnseen ? `Your messages · ${unseen.length === 1 ? 'new reply' : `${unseen.length} new replies`} →` : 'Your messages →'}
                   </button>
+                  {supportRow}
                 </div>
               ) : view === 'form' ? (
                 <div className="flex flex-col gap-3">

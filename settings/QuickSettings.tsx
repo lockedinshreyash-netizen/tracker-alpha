@@ -46,6 +46,8 @@ interface Props {
   install: InstallApi;
   /** The full settings, on Review. */
   onOpenAll: () => void;
+  /** The Support Alpha page: one quiet line under All settings, never a row with a switch. */
+  onOpenSupport?: () => void;
   /** The festive theme an administrator has switched on, or null when none is
    *  live — and then there is no row at all, because there is nothing to turn off. */
   festive?: { theme: 'dussehra' | 'diwali' | 'christmas'; label: string; on: boolean; onToggle: (on: boolean) => void } | null;
@@ -108,7 +110,7 @@ const SYNC_DOT: Record<SyncStatus, string> = {
 
 const QuickSettings: React.FC<Props> = ({
   theme, onToggleTheme, currentClass, onClassChange, showClass = true, reminders, onChangeReminders,
-  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, festive = null,
+  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, onOpenSupport, festive = null,
 }) => {
   const dark = theme === 'dark';
   const sound = useSound();
@@ -299,6 +301,18 @@ const QuickSettings: React.FC<Props> = ({
                 All settings
                 <span className={muted}><Icon d={CHEVRON} size={16} /></span>
               </button>
+
+              {/* Seen every time the pane opens, asking nothing: plain muted
+                  text, no icon, no colour. */}
+              {onOpenSupport && (
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); onOpenSupport(); }}
+                  className={`mt-2 mx-auto flex items-center justify-center px-3 h-10 text-[13px] font-semibold font-ui ${muted} ${dark ? 'hover:text-zinc-300' : 'hover:text-zinc-800'} transition-colors`}
+                >
+                  Support Alpha
+                </button>
+              )}
             </div>
           </LiquidGlass>
         </>

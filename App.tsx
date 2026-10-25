@@ -46,6 +46,8 @@ const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 const StoreTab = React.lazy(() => import('./store/StoreTab'));
 /* Notes: the store and Yjs arrive with the tab, the editor with the first page. */
 const NotesTab = React.lazy(() => import('./notes/NotesTab'));
+/* Support Alpha: reached only from quick settings, Settings and the site footers. */
+const SupportPage = React.lazy(() => import('./support/SupportPage'));
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import MyProfile from './profile/MyProfile';
@@ -728,6 +730,14 @@ const App: React.FC = () => {
     profileCtl.goHome();
     setActiveTab(tab);
     setState(prev => ({ ...prev, lastUsedTab: tab }));
+  };
+
+  /* Support Alpha is a page someone went looking for, not a tab they live on:
+     it is not in the rail and does not become the tab Alpha reopens on. */
+  const openSupport = () => {
+    profileCtl.goHome();
+    setActiveTab('Support');
+    window.scrollTo({ top: 0 });
   };
 
   /* ── Rewards ──────────────────────────────────────────────────────────── */
@@ -2367,6 +2377,7 @@ const App: React.FC = () => {
               reminders={reminderPrefs}
               onChangeReminders={setReminderPrefs}
               goalHours={state.dailyGoalHours}
+              onOpenSupport={openSupport}
             />
           )}
           {STORE_LAUNCHED && activeTab === 'Profile' && (
@@ -2397,6 +2408,7 @@ const App: React.FC = () => {
                 reminders: reminderPrefs,
                 onChangeReminders: setReminderPrefs,
                 goalHours: state.dailyGoalHours,
+                onOpenSupport: openSupport,
               }}
             />
           )}
@@ -2404,6 +2416,11 @@ const App: React.FC = () => {
               because `isAdmin` can only be true for a signed-in session.
               Hiding it is not the control; every query inside it is refused by
               row-level security for anybody else. */}
+          {activeTab === 'Support' && (
+            <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+              <SupportPage theme={theme} user={user} onSignIn={() => setIsAuthModalOpen(true)} />
+            </React.Suspense>
+          )}
           {activeTab === 'Admin' && isAdmin && user && (
             <AdminTab adminId={user.id} theme={theme} onOpenDeck={id => openInDecks(id ? 'deck' : null, id ?? undefined)} />
           )}
@@ -2479,6 +2496,7 @@ const App: React.FC = () => {
           route={activeTab}
           railPx={sidebarCollapsed ? 72 : 212}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenSupport={openSupport}
         />
       )}
 
@@ -2508,6 +2526,7 @@ const App: React.FC = () => {
           onOpenProfile={STORE_LAUNCHED ? () => handleTabChange('Profile') : profileCtl.openEditProfile}
           install={install}
           onOpenAll={() => handleTabChange(STORE_LAUNCHED ? 'Profile' : 'Review')}
+          onOpenSupport={openSupport}
           festive={festiveLive === 'none' ? null : {
             theme: festiveLive,
             label: FESTIVE_LABEL[festiveLive],

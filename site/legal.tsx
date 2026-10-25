@@ -135,6 +135,7 @@ const privacyPage = (): SitePage => {
                 <li><b>The new-tab extension.</b> If you install it: it copies a summary of your day (streak, today’s hours, goal, week, exam date, your open Focus Tasks, and any session running) from Alpha into your browser’s storage, so your new tab can show it. It stays on your device. The extension sends nothing anywhere.</li>
                 <li><b>Daily nudges.</b> If you turn them on: the time you usually study, and the next few days of nudges, each with today’s hours and goal in it (like “7.5h to go”). We hold only what is about to be sent, withdraw it when you log enough, and delete sent ones after a week. Turn them off and nothing more is sent.</li>
                 <li><b>Feedback and reports.</b> What you write to us, and your email so we can reply.</li>
+                <li><b>Notes to the founder.</b> If you send one from the Support Alpha page: what you wrote, and your profile name only if you choose to sign it. It is linked to your account so we can stop spam and delete it with your account. Only the founder reads it, and it is never published. Alpha never collects payment details; if you pay by UPI, that happens in your payment app.</li>
                 <li><b>Polls.</b> Your answer. Nobody, including us, can see who voted for what. We only see totals.</li>
                 <li><b>Voice commands.</b> In Chrome and Edge, your browser sends your voice to Google’s or Microsoft’s speech service to turn it into text. We never receive or keep the audio.</li>
               </ul>
@@ -282,7 +283,7 @@ const deleteAccountPage = (): SitePage => {
                 <li>Your synced study history, plan, syllabus progress, tasks, mock tests and error notebook.</li>
                 <li>Your decks, cards, images and review history.</li>
                 <li>Your group memberships and messages, your Ranks entries and race chat messages.</li>
-                <li>Your reminders, feedback, poll answers and usage stats.</li>
+                <li>Your reminders, feedback, notes to the founder, poll answers and usage stats.</li>
               </ul>
               <p>
                 It happens straight away, and it can’t be undone. Groups you own pass to another member. Backups held

@@ -238,3 +238,46 @@ ol.plain li::before { content: counter(step); left: 0; top: 1px; width: 22px; he
 .foot a { text-decoration: none; }
 .foot a:hover { color: var(--d1); }
 .foot-base { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--dline); font-family: var(--mono); font-size: 11.5px; color: var(--d3); }
+
+/* ── /support/ (site/support.tsx) ──
+   The public twin of the in-app Support Alpha page: a letter in the dark hero,
+   then the payment card (always dark, because the QR image is) beside a ruled
+   note card on the paper. The QR is never cropped, rounded or filtered. */
+.sp-hero { padding-bottom: 72px; }
+.sp-letter { margin-top: 34px; max-width: 36rem; }
+.sp-letter .lead { margin-top: 0; color: var(--d1); }
+.sp-letter p + p { margin-top: 16px; color: var(--d2); font-size: 17px; line-height: 1.7; }
+.sp-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px; margin-top: 30px; }
+.sp-letter .sp-sign p { margin-top: 0; }
+.sp-name { font-size: 30px; line-height: 1; color: var(--d1); }
+.sp-letter .sp-role { margin-top: 8px; font-size: 12px; color: var(--d3); }
+.sp-letter .sp-optional { font-size: 13px; color: var(--d3); }
+.sp-body { padding-top: 56px; padding-bottom: 96px; }
+.sp-grid { display: grid; gap: 18px; }
+@media (min-width: 900px) { .sp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; } }
+.sp-pay, .sp-note { border-radius: 22px; padding: clamp(24px, 4vw, 36px); display: flex; flex-direction: column; }
+.sp-pay { position: relative; isolation: isolate; overflow: hidden; color: var(--d1); background: linear-gradient(180deg, #131317, #0b0b0d); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07) inset, 0 30px 60px -36px rgba(0, 0, 0, 0.6); }
+.sp-pay::before { content: ''; position: absolute; z-index: -1; right: -35%; top: -45%; width: 90%; aspect-ratio: 1; background: radial-gradient(closest-side, rgba(225, 6, 0, 0.22), rgba(225, 6, 0, 0.05) 55%, transparent 72%); }
+.sp-note { background: var(--white); box-shadow: 0 0 0 1px rgba(10, 10, 11, 0.05), 0 24px 48px -36px rgba(10, 10, 11, 0.25); }
+.sp-kicker { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #71717a; }
+.sp-pay h2, .sp-note h2 { margin-top: 12px; font-weight: 900; font-size: clamp(28px, 3vw, 32px); line-height: 1; letter-spacing: -0.035em; }
+.sp-copy { margin-top: 12px; font-size: 15px; line-height: 1.6; color: var(--l2); }
+.sp-pay .sp-copy { color: #a1a1aa; }
+.sp-small { font-size: 13px; color: var(--l3); }
+.sp-setup { margin-top: 28px; padding: 40px 20px; border: 1px dashed rgba(255, 255, 255, 0.14); border-radius: 14px; text-align: center; font-size: 13px; color: #a1a1aa; }
+.sp-qr { margin: 30px auto 0; width: 100%; max-width: 300px; text-align: center; }
+/* The plate's colours are sampled from the image's own edges, so its border disappears and the QR reads as one tile. */
+.sp-plate { padding: 18px; border-radius: 26px; background: linear-gradient(180deg, #171715 0%, #1a1917 55%, #241d19 100%); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07) inset, 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 48px -28px rgba(0, 0, 0, 0.8); }
+.sp-qr img { width: 100%; height: auto; }
+.sp-qr figcaption { margin-top: 16px; font-size: 12px; color: #a1a1aa; }
+.sp-or { display: flex; align-items: center; gap: 12px; margin-top: 28px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #71717a; }
+.sp-or::before, .sp-or::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.08); }
+.sp-upi { margin-top: 16px; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset; }
+.sp-upi code { font-family: var(--mono); font-size: 15px; color: #fff; user-select: all; -webkit-user-select: all; }
+.sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sp-open { display: none; margin-top: 12px; height: 48px; border-radius: 12px; background: #fff; color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; align-items: center; justify-content: center; }
+@media (pointer: coarse) { .sp-open { display: flex; } }
+.sp-lines { flex: 1; min-height: 150px; margin: 24px 0 18px; border-radius: 14px; border: 1px solid #e4e4e7; background: #fcfcfb repeating-linear-gradient(to bottom, transparent 0, transparent 29px, rgba(24, 24, 27, 0.08) 29px, rgba(24, 24, 27, 0.08) 30px); background-position: 0 10px; }
+.sp-note .btn { margin-top: 18px; align-self: flex-start; }
+.sp-closing { margin-top: 88px; text-align: center; font-size: clamp(28px, 3.4vw, 36px); line-height: 1.2; }
+.sp-closing::before { content: ''; display: block; width: 1px; height: 48px; margin: 0 auto 32px; background: var(--lline); }

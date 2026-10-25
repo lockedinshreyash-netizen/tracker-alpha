@@ -200,7 +200,7 @@ export interface ChapterProgress {
    into the student's own page, Profile, opened from the account button at the
    bottom of the rail. Until then the rail is as it was, with Review. A saved
    `lastUsedTab` is mapped to whichever of the two is drawn (App.tsx). */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Profile' | 'Admin';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Profile' | 'Admin' | 'Support';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
