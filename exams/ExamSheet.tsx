@@ -25,17 +25,24 @@ const Check = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>
 );
 
-interface SheetProps {
-  dark: boolean;
+/* ── The choice being made ──
+   Shared by the Settings sheet and the one-time launch modal (ExamLaunch.tsx):
+   the same three questions, the same rules, one place. */
+
+export interface ExamDraft {
   stream: Stream;
-  target: ExamTarget;
-  cls: 11 | 12;
-  onClose: () => void;
-  onSave: (stream: Stream, target: ExamTarget) => void;
+  picked: ExamId[];
+  year: number;
+  full: boolean;
+  changeStream: (s: Stream) => void;
+  toggle: (id: ExamId) => void;
+  makeMain: (id: ExamId) => void;
+  setYear: (y: number) => void;
+  /** The draft as a target, made whole for its stream. */
+  result: (cls: 11 | 12) => ExamTarget;
 }
 
-export const ExamSheet = ({ dark, stream: stream0, target: target0, cls, onClose, onSave }: SheetProps) => {
-  const t = tokens(dark);
+export const useExamDraft = (stream0: Stream, target0: ExamTarget): ExamDraft => {
   const [stream, setStream] = useState<Stream>(stream0);
   const [picked, setPicked] = useState<ExamId[]>(targetExams(target0));
   const [year, setYear] = useState(target0.year);
@@ -61,8 +68,117 @@ export const ExamSheet = ({ dark, stream: stream0, target: target0, cls, onClose
 
   const makeMain = (id: ExamId) => setPicked(list => [id, ...list.filter(x => x !== id)]);
 
+  const result = (cls: 11 | 12) => normalizeTarget({ primary: picked[0], also: picked.slice(1), year }, stream, cls);
+
+  return { stream, picked, year, full, changeStream, toggle, makeMain, setYear, result };
+};
+
+/** "Jan 2027", the month an exam is held (or expected) in the chosen year. */
+const monthOf = (d: Date) => new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(d);
+
+/** Stream, exams and year, top to bottom. Each exam says when it is in the chosen year. */
+export const ExamFields = ({ dark, draft }: { dark: boolean; draft: ExamDraft }) => {
+  const t = tokens(dark);
+  const { stream, picked, year, full, changeStream, toggle, makeMain, setYear } = draft;
+  return (
+    <div className="space-y-7 font-ui">
+      <div>
+        <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-3 ${t.faint}`}>Stream</p>
+        <Segmented
+          full
+          value={stream}
+          onChange={changeStream}
+          dark={dark}
+          label="Stream"
+          options={(['PCM', 'PCB'] as Stream[]).map(s => ({ value: s, label: STREAM_LABEL[s].title, hint: STREAM_LABEL[s].sub }))}
+        />
+        <p className={`text-[12px] mt-2 ${t.muted}`}>{STREAM_LABEL[stream].sub}. Your other stream's progress stays saved.</p>
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between gap-3 mb-3">
+          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] ${t.faint}`}>Exams</p>
+          <p className={`text-[11px] ${t.faint}`}>Up to {MAX_ALSO + 1}</p>
+        </div>
+        <ul className="space-y-2">
+          {examsIn(stream).map(e => {
+            const on = picked.includes(e.id);
+            const main = picked[0] === e.id;
+            const blocked = !on && full;
+            const when = examDateFor(e.id, year);
+            return (
+              <li key={e.id}>
+                <div className={`flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors ${on
+                  ? dark ? 'bg-white/[0.06] ring-1 ring-inset ring-white/[0.14]' : 'bg-zinc-50 ring-1 ring-inset ring-zinc-300'
+                  : dark ? 'ring-1 ring-inset ring-white/[0.07]' : 'ring-1 ring-inset ring-zinc-200'} ${blocked ? 'opacity-45' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(e.id)}
+                    disabled={blocked}
+                    aria-pressed={on}
+                    aria-label={`${e.name}${main ? ', main exam' : ''}, ${when.official ? '' : 'expected '}${monthOf(when.date)}`}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  >
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${on ? (dark ? 'bg-white text-black' : 'bg-zinc-900 text-white') : dark ? 'ring-1 ring-inset ring-white/20' : 'ring-1 ring-inset ring-zinc-300'}`}>
+                      {on && <Check />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className={`block text-[14px] font-bold ${t.heading}`}>{e.name}</span>
+                      <span className={`block text-[12px] truncate ${t.muted}`}>
+                        {when.official ? '' : 'Expected '}{monthOf(when.date)} · {e.body}{e.requires ? ` · needs ${examById(e.requires).name}` : ''}{e.extra ? ` · also ${e.extra.join(', ')}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                  {main ? (
+                    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1 rounded-full ${dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'}`}>Main</span>
+                  ) : on ? (
+                    <button type="button" onClick={() => makeMain(e.id)} className={`shrink-0 text-[12px] font-semibold underline underline-offset-2 ${t.muted}`}>Make main</button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div role="radiogroup" aria-label="Year">
+        <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-3 ${t.faint}`}>Year you write them</p>
+        <div className="grid grid-cols-4 gap-2">
+          {yearChoices().map(y => (
+            <button
+              key={y}
+              type="button"
+              role="radio"
+              aria-checked={year === y}
+              onClick={() => setYear(y)}
+              className={`h-11 rounded-xl text-[14px] font-bold transition-colors ${year === y
+                ? dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'
+                : dark ? 'text-zinc-300 ring-1 ring-inset ring-white/[0.08] hover:bg-white/[0.04]' : 'text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50'}`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface SheetProps {
+  dark: boolean;
+  stream: Stream;
+  target: ExamTarget;
+  cls: 11 | 12;
+  onClose: () => void;
+  onSave: (stream: Stream, target: ExamTarget) => void;
+}
+
+export const ExamSheet = ({ dark, stream: stream0, target: target0, cls, onClose, onSave }: SheetProps) => {
+  const t = tokens(dark);
+  const draft = useExamDraft(stream0, target0);
+
   const save = () => {
-    onSave(stream, normalizeTarget({ primary: picked[0], also: picked.slice(1), year }, stream, cls));
+    onSave(draft.stream, draft.result(cls));
     onClose();
   };
 
@@ -85,84 +201,8 @@ export const ExamSheet = ({ dark, stream: stream0, target: target0, cls, onClose
         </div>
       }
     >
-      <div className="px-5 md:px-7 py-6 space-y-7 font-ui">
-        <div>
-          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-3 ${t.faint}`}>Stream</p>
-          <Segmented
-            full
-            value={stream}
-            onChange={changeStream}
-            dark={dark}
-            label="Stream"
-            options={(['PCM', 'PCB'] as Stream[]).map(s => ({ value: s, label: STREAM_LABEL[s].title, hint: STREAM_LABEL[s].sub }))}
-          />
-          <p className={`text-[12px] mt-2 ${t.muted}`}>{STREAM_LABEL[stream].sub}. Your other stream's progress stays saved.</p>
-        </div>
-
-        <div>
-          <div className="flex items-baseline justify-between gap-3 mb-3">
-            <p className={`text-[10px] font-bold uppercase tracking-[0.06em] ${t.faint}`}>Exams</p>
-            <p className={`text-[11px] ${t.faint}`}>Up to {MAX_ALSO + 1}</p>
-          </div>
-          <ul className="space-y-2">
-            {examsIn(stream).map(e => {
-              const on = picked.includes(e.id);
-              const main = picked[0] === e.id;
-              const blocked = !on && full;
-              return (
-                <li key={e.id}>
-                  <div className={`flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors ${on
-                    ? dark ? 'bg-white/[0.06] ring-1 ring-inset ring-white/[0.14]' : 'bg-zinc-50 ring-1 ring-inset ring-zinc-300'
-                    : dark ? 'ring-1 ring-inset ring-white/[0.07]' : 'ring-1 ring-inset ring-zinc-200'} ${blocked ? 'opacity-45' : ''}`}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(e.id)}
-                      disabled={blocked}
-                      aria-pressed={on}
-                      aria-label={main ? `${e.name}, main exam` : e.name}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                    >
-                      <span className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${on ? (dark ? 'bg-white text-black' : 'bg-zinc-900 text-white') : dark ? 'ring-1 ring-inset ring-white/20' : 'ring-1 ring-inset ring-zinc-300'}`}>
-                        {on && <Check />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className={`block text-[14px] font-bold ${t.heading}`}>{e.name}</span>
-                        <span className={`block text-[12px] truncate ${t.muted}`}>
-                          {e.body}{e.requires ? ` · needs ${examById(e.requires).name}` : ''}{e.extra ? ` · also ${e.extra.join(', ')}` : ''}
-                        </span>
-                      </span>
-                    </button>
-                    {main ? (
-                      <span className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1 rounded-full ${dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'}`}>Main</span>
-                    ) : on ? (
-                      <button type="button" onClick={() => makeMain(e.id)} className={`shrink-0 text-[12px] font-semibold underline underline-offset-2 ${t.muted}`}>Make main</button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        <div role="radiogroup" aria-label="Year">
-          <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-3 ${t.faint}`}>Year you write them</p>
-          <div className="grid grid-cols-4 gap-2">
-            {yearChoices().map(y => (
-              <button
-                key={y}
-                type="button"
-                role="radio"
-                aria-checked={year === y}
-                onClick={() => setYear(y)}
-                className={`h-11 rounded-xl text-[14px] font-bold transition-colors ${year === y
-                  ? dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'
-                  : dark ? 'text-zinc-300 ring-1 ring-inset ring-white/[0.08] hover:bg-white/[0.04]' : 'text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50'}`}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="px-5 md:px-7 py-6">
+        <ExamFields dark={dark} draft={draft} />
       </div>
     </Sheet>
   );

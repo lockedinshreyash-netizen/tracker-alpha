@@ -22,6 +22,7 @@ import { Recommendation } from './today/recommend';
 import MocksTab from './mocks/MocksTab';
 import { applyAttempts, mergeMocks, normalizeMocks, paperPresets } from './mocks/model';
 import { normalizeTarget, prefOf, streamOf, targetExams, type ExamTarget, type Stream } from './content/exams';
+import ExamLaunch from './exams/ExamLaunch';
 import { mergeReading, normalizeReading, type ReadingState } from './reader/model';
 import { BOOK } from './content/book';
 import Sidebar from './Sidebar';
@@ -102,6 +103,13 @@ import { deleteAccount } from './account/deleteAccount';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
+/** The later of two "happened at" stamps, for fields that only move forward. Garbage reads as absent. */
+const laterStamp = (a: unknown, b: unknown): number | undefined => {
+  const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
+  if (ok(a) && ok(b)) return Math.max(a, b);
+  return ok(a) ? a : ok(b) ? b : undefined;
+};
+
 // --- Main App Component ---
 
 const App: React.FC = () => {
@@ -175,6 +183,7 @@ const App: React.FC = () => {
       /* Exams and a year, from the stream and class for anyone who chose only
          JEE or NEET before there were more exams to choose. */
       merged.exams = normalizeTarget(parsed.exams, streamOf(merged.examPreference), merged.currentClass);
+      merged.examsAskedAt = laterStamp(parsed.examsAskedAt, undefined);
       /* The reader used to remember only a chapter index (rewards.bookChapter);
          a student mid-book reopens in that chapter. */
       merged.reading = normalizeReading(parsed.reading, BOOK.chapterIds[parsed.rewards?.bookChapter ?? -1] ?? null);
@@ -316,7 +325,8 @@ const App: React.FC = () => {
   /** The one writer of the exam choice: the stream and the exams move together. */
   const setExams = useCallback((stream: Stream, target: ExamTarget) => {
     setState(prev => {
-      const next = { ...prev, examPreference: prefOf(stream), exams: normalizeTarget(target, stream, prev.currentClass), lastUpdated: Date.now() };
+      const now = Date.now();
+      const next = { ...prev, examPreference: prefOf(stream), exams: normalizeTarget(target, stream, prev.currentClass), examsAskedAt: now, lastUpdated: now };
       stateRef.current = next;
       return next;
     });
@@ -387,6 +397,7 @@ const App: React.FC = () => {
               lastUsedTab: prev.lastUsedTab,
               theme: prev.theme,
               notes: mergeNotesPref(prev.notes, remoteState.notes),
+              examsAskedAt: laterStamp(prev.examsAskedAt, remoteState.examsAskedAt),
               // A push from another device must not reach in and restart or
               // rewind a timer running here…
               timer: prev.timer,
@@ -454,6 +465,7 @@ const App: React.FC = () => {
               lastUsedTab: localState.lastUsedTab,
               theme: localState.theme,
               notes: mergeNotesPref(localState.notes, remoteState.notes),
+              examsAskedAt: laterStamp(localState.examsAskedAt, remoteState.examsAskedAt),
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
               pomodoro: localState.pomodoro,
@@ -501,6 +513,7 @@ const App: React.FC = () => {
             lastUsedTab: localState.lastUsedTab,
             theme: localState.theme,
             notes: mergeNotesPref(localState.notes, remoteState.notes),
+            examsAskedAt: laterStamp(localState.examsAskedAt, remoteState.examsAskedAt),
             /* Running timers belong to the device running them, never to the
                account. Taking these from the server resurrected an already
                flushed Pomodoro block on every reload — it was logged locally,
@@ -811,6 +824,7 @@ const App: React.FC = () => {
         ...prev,
         examPreference: r.examPreference,
         exams: normalizeTarget(r.exams, streamOf(r.examPreference), r.currentClass),
+        examsAskedAt: Date.now(),
         currentClass: r.currentClass,
         dailyGoalHours: r.dailyGoalHours,
         timerMode: r.timerMode,
@@ -1152,6 +1166,15 @@ const App: React.FC = () => {
      answers by the time any of these can be reached, except Skip, which by
      design writes nothing. */
   const finishOnboarding = () => {
+    /* Onboarding asked about exams, answered or skipped; the launch modal is
+       for students who were never asked. */
+    setState(prev => {
+      if (prev.examsAskedAt) return prev;
+      const now = Date.now();
+      const next = { ...prev, examsAskedAt: now, lastUpdated: now };
+      stateRef.current = next;
+      return next;
+    });
     completeOnboarding();
     handleTabChangeAndExitProfile('Today');
   };
@@ -1985,6 +2008,20 @@ const App: React.FC = () => {
   const showOnboarding =
     showLanding === false && needsOnboarding && syncSettled && !isAuthModalOpen;
 
+  /* "Pick your exams", once, for students from before the exam list
+     (exams/ExamLaunch.tsx). Existing means past onboarding AND with something
+     here: an account, or a history on this device. A guest left with a fresh
+     default state after signing out is not asked. Waits for the cloud pull
+     (the answer may already be on the account), and for any full-screen
+     moment or running session to finish; announcements, notices and the keep
+     banner queue behind it. */
+  const showExamLaunch =
+    showLanding === false && !needsOnboarding && syncSettled && !isAuthModalOpen
+    && !state.examsAskedAt
+    && (!!user || state.logs.length > 0 || state.progress.length > 0 || state.tasks.length > 0)
+    && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+    && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro);
+
   /* An invite takes you to Groups once you can see it — after the landing
      page and onboarding — and once more after signing in, when the card
      changes from "sign in to join" to the group itself. Keyed so it never
@@ -2388,7 +2425,7 @@ const App: React.FC = () => {
           Only on Today. An announcement that could open over the Plan grid or
           mid-way through a mock would be a modal that follows you
           around the app, which is the thing this feature is deliberately not. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
         && activeTab === 'Today' && announcements.current && (
         <AnnouncementModal
           announcement={announcements.current}
@@ -2409,7 +2446,7 @@ const App: React.FC = () => {
           the screen, and the news keeps until the block is done), and
           queued behind the other full-screen moments, including an
           announcement already open on Today. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
@@ -2427,7 +2464,7 @@ const App: React.FC = () => {
           behind every full-screen moment and any running session: the first
           run already asked in onboarding, and a banner over a running clock is
           the app interrupting the thing it exists for. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
         <KeepBanner install={install} theme={theme} />
       )}
@@ -2435,7 +2472,7 @@ const App: React.FC = () => {
       {/* "Need help? Tell us." Bottom-left, clear of the settings gear in the
           opposite corner, and gone during any full-screen moment — a floating
           bubble over the reward modal or the book is a bubble in the way. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
         <FeedbackWidget
           user={user}
           theme={theme}
@@ -2448,14 +2485,14 @@ const App: React.FC = () => {
       {/* Class 11 or 12, top-right on a laptop (the phone has it in the capsule,
           Sidebar.tsx), on Syllabus only: every other tab has it in quick
           settings. Same suppression as the gear below. */}
-      {activeTab === 'Syllabus' && !profileCtl.routeHandle && !showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
+      {activeTab === 'Syllabus' && !profileCtl.routeHandle && !showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
         <ClassSwitch placement="corner" dark={theme === 'dark'} value={state.currentClass} onChange={setCurrentClass} />
       )}
 
       {/* The gear, bottom-right, and the glass pane of quick settings it opens.
           It replaced the web-style header that held the same switches above
           every tab. Same suppression as the feedback launcher. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
         <QuickSettings
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
@@ -2491,6 +2528,17 @@ const App: React.FC = () => {
           next={nextReward(rewards, streakCount, verifiedStreakCount)}
           theme={theme}
           onClose={closeStreakMoment}
+        />
+      )}
+
+      {/* Once, for students who joined before there were exams to pick. */}
+      {showExamLaunch && (
+        <ExamLaunch
+          dark={theme === 'dark'}
+          stream={streamOf(state.examPreference)}
+          target={examTarget}
+          cls={state.currentClass}
+          onSave={setExams}
         />
       )}
 

@@ -751,6 +751,12 @@ export interface AppState {
       stream above (content/exams.ts). Absent in a blob from an older build:
       derived from the stream and class on load and on read. */
   exams?: ExamTarget;
+  /** When this account was asked which exams it writes: onboarding (finished
+      or skipped), Settings → Exam, or the one-time launch modal
+      (exams/ExamLaunch.tsx). Absent = a student from before the exam list
+      who has never been asked, which is what opens that modal. Only moves
+      forward; every merge keeps the later one. */
+  examsAskedAt?: number;
   /** Show the main exam and year as a chip on the public profile (Ranks,
       Groups). Absent means yes. Off writes nulls to the profile. */
   showExamOnProfile?: boolean;
