@@ -35,11 +35,15 @@ interface Props {
   theme: 'dark' | 'light';
   user: User | null;
   onSignIn: () => void;
-  /** Replies have been seen here; App clears the line on Today. */
-  onRepliesSeen?: () => void;
+  /** Replies have been seen here; App drops their card and the line on Today. */
+  onRepliesSeen?: (ids: string[]) => void;
   /** Arrived from "… replied to your note" on Today: scroll to Your notes. */
   focusNotes?: boolean;
   onNotesFocused?: () => void;
+  /** Changes when App learns of a new or edited reply. The list re-reads on a
+   *  change, because the reply card stays off this page and a list loaded
+   *  before the reply arrived would never show it. */
+  repliesKey?: string;
 }
 
 const RED = '#E10600';
@@ -89,14 +93,58 @@ const Letter = ({ dark }: { dark: boolean }) => {
               <p className={`font-accent text-[30px] leading-none ${t.heading}`}>{C.signature}</p>
               <p className={`mt-2 text-[11px] font-ui ${t.muted}`}>{C.signatureRole}</p>
             </div>
-            <p className={`inline-flex items-center gap-2 text-[12px] font-ui ${t.muted}`}>
-              <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${dark ? 'bg-zinc-600' : 'bg-zinc-300'}`} />
+            <p className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[12.5px] font-ui font-semibold ${t.heading} ${dark ? 'border-white/[0.12] bg-white/[0.03]' : 'border-zinc-200 bg-white'}`}>
+              <Check dark={dark} size={14} />
               {C.optional}
             </p>
           </div>
         </div>
       </div>
     </header>
+  );
+};
+
+/* ── The promise ──
+   The loudest thing on the page, on purpose, and placed so that nobody reaches
+   the QR without passing it. Ink, not red: this is reassurance, not an action. */
+
+const Check = ({ dark, size = 18 }: { dark: boolean; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
+    <circle cx="12" cy="12" r="11" fill={dark ? 'rgba(255,255,255,0.08)' : 'rgba(24,24,27,0.06)'} />
+    <path d="M7.5 12.5l3 3 6-7" fill="none" stroke={dark ? '#fff' : '#18181b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const NoPressure = ({ dark, delay }: { dark: boolean; delay: number }) => {
+  const t = tokens(dark);
+  return (
+    <section
+      aria-labelledby="promise-h"
+      className={`mk-rise mt-16 md:mt-24 rounded-2xl border p-7 sm:p-9 md:p-12 ${t.card}`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <h2
+        id="promise-h"
+        className={`font-display text-[36px] sm:text-[44px] md:text-[56px] leading-[0.95] ${t.heading}`}
+        style={{ fontWeight: 900, letterSpacing: '-0.04em' }}
+      >
+        {C.promiseTitle}<Stop />
+        <span className="block font-accent mt-1.5" style={{ fontWeight: 400, letterSpacing: '-0.03em' }}>
+          {C.promiseAccent}<Stop />
+        </span>
+      </h2>
+      <ul className="mt-9 md:mt-11 grid sm:grid-cols-2 gap-x-10 gap-y-7">
+        {C.promise.map(p => (
+          <li key={p.head} className="flex gap-3.5">
+            <span className="mt-0.5"><Check dark={dark} size={22} /></span>
+            <div className="min-w-0">
+              <p className={`text-[16px] md:text-[17px] font-ui font-bold leading-snug ${t.heading}`}>{p.head}.</p>
+              <p className={`mt-1 text-[14px] md:text-[15px] font-ui leading-[1.6] ${t.muted}`}>{p.body}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 };
 
@@ -172,11 +220,12 @@ const SupportCard = ({ delay }: { delay: number }) => {
         style={{ right: '-35%', top: '-45%', width: '90%', aspectRatio: '1', background: 'radial-gradient(closest-side, rgba(225,6,0,0.22), rgba(225,6,0,0.05) 55%, transparent 72%)' }}
       />
 
-      <p className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui text-zinc-500">Chip in</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.06em] font-ui text-zinc-500">{C.onlyIfYouWant}</p>
       <h2 id="support-h" className="font-display text-[28px] md:text-[32px] leading-none mt-3" style={{ fontWeight: 900, letterSpacing: '-0.035em' }}>
         {C.supportTitle}<Stop />
       </h2>
       <p className="text-[14px] md:text-[15px] font-ui leading-[1.6] text-zinc-400 mt-3 max-w-[30rem]">{C.supportBody}</p>
+      <p className="mt-2 text-[14px] md:text-[15px] font-ui font-semibold leading-[1.6] text-zinc-200">{C.anyAmount}</p>
 
       {!ready ? (
         <div className="mt-8 rounded-xl border border-dashed border-white/[0.14] px-5 py-10 text-center">
@@ -323,11 +372,12 @@ const NoteCard = ({ dark, user, onSignIn, delay, onSent }: { dark: boolean; user
       className={`mk-rise rounded-2xl border p-6 sm:p-8 md:p-9 flex flex-col ${t.card}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <Eyebrow dark={dark}>Write in</Eyebrow>
+      <Eyebrow dark={dark}>Free, always</Eyebrow>
       <h2 id="note-h" className={`font-display text-[28px] md:text-[32px] leading-none mt-3 ${t.heading}`} style={{ fontWeight: 900, letterSpacing: '-0.035em' }}>
         {C.noteTitle}<Stop />
       </h2>
       <p className={`text-[14px] md:text-[15px] font-ui leading-[1.6] mt-3 ${t.muted}`}>{C.noteBody}</p>
+      <p className={`mt-2 text-[14px] md:text-[15px] font-ui font-semibold leading-[1.6] ${t.body}`}>{C.noteFree}</p>
 
       {status === 'sent' ? (
         <div
@@ -489,7 +539,7 @@ const YourNotes = ({ dark, notes, fresh, delay, sectionRef }: {
 
 /* ── The page ── */
 
-const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotesFocused }: Props) => {
+const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotesFocused, repliesKey = '' }: Props) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
   /* Decided once: the Play app flag is set before first paint and never changes. */
@@ -506,7 +556,7 @@ const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotes
     void listMyNotes().then(rows => { if (alive) setNotes(rows); });
     return () => { alive = false; };
   }, [uid]);
-  useEffect(() => loadNotes(), [loadNotes]);
+  useEffect(() => loadNotes(), [loadNotes, repliesKey]);
 
   /* Seen = the list scrolled into view. Marked here at once and on the server;
      if that write fails, the next check simply brings the line back. */
@@ -521,7 +571,7 @@ const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotes
       const now = new Date().toISOString();
       setFresh(prev => new Set([...prev, ...ids]));
       setNotes(prev => prev.map(n => (ids.includes(n.id) ? { ...n, reply_seen_at: now } : n)));
-      void ackReplies(ids).then(() => onRepliesSeen?.(), () => { /* shows again next time */ });
+      void ackReplies(ids).then(() => onRepliesSeen?.(ids), () => { /* shows again next time */ });
     }, { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
@@ -538,7 +588,9 @@ const SupportPage = ({ theme, user, onSignIn, onRepliesSeen, focusNotes, onNotes
     <div className="pb-10">
       <Letter dark={dark} />
 
-      <div className={`mt-16 md:mt-24 grid gap-5 md:gap-6 items-stretch ${inPlayApp ? 'max-w-[40rem]' : 'lg:grid-cols-2'}`}>
+      {!inPlayApp && <NoPressure dark={dark} delay={320} />}
+
+      <div className={`${inPlayApp ? 'mt-16 md:mt-24' : 'mt-5 md:mt-6'} grid gap-5 md:gap-6 items-stretch ${inPlayApp ? 'max-w-[40rem]' : 'lg:grid-cols-2'}`}>
         {!inPlayApp && <SupportCard delay={340} />}
         <NoteCard dark={dark} user={user} onSignIn={onSignIn} delay={inPlayApp ? 340 : 400} onSent={loadNotes} />
       </div>

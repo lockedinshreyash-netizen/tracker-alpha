@@ -57,11 +57,26 @@ export const supportPage = (): SitePage => {
         </header>
 
         <div className="wrap sp-body">
+          {/* The loudest thing on the page, before the QR: paying is optional
+              and changes nothing. Same words as the app (support/content.ts). */}
+          <section className="sp-promise" aria-labelledby="sp-promise-h">
+            <h2 id="sp-promise-h">{C.promiseTitle}<span className="stop">.</span><span className="serif">{C.promiseAccent}<span className="stop">.</span></span></h2>
+            <ul>
+              {C.promise.map(p => (
+                <li key={p.head}>
+                  <span className="sp-check" aria-hidden="true" />
+                  <div><p className="sp-promise-head">{p.head}.</p><p>{p.body}</p></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
           <div className="sp-grid">
             <section className="sp-pay" aria-labelledby="sp-pay-h">
-              <p className="sp-kicker">Chip in</p>
+              <p className="sp-kicker">{C.onlyIfYouWant}</p>
               <h2 id="sp-pay-h">{C.supportTitle}<span className="stop">.</span></h2>
               <p className="sp-copy">{C.supportBody}</p>
+              <p className="sp-copy sp-strong">{C.anyAmount}</p>
               {!supportReady() ? (
                 <p className="sp-setup">{C.setup}</p>
               ) : (
@@ -93,9 +108,10 @@ export const supportPage = (): SitePage => {
             </section>
 
             <section className="sp-note" aria-labelledby="sp-note-h">
-              <p className="sp-kicker">Write in</p>
+              <p className="sp-kicker">Free, always</p>
               <h2 id="sp-note-h">{C.noteTitle}<span className="stop">.</span></h2>
               <p className="sp-copy">{C.noteBody}</p>
+              <p className="sp-copy sp-strong">{C.noteFree}</p>
               <div className="sp-lines" aria-hidden="true" />
               <p className="sp-copy sp-small">Notes are sent from inside Alpha, so you’ll need to sign in. Optional, and you can say whatever you like.</p>
               <a className="btn btn-red" href="/?open=support">Write a note in the app →</a>

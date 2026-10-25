@@ -281,3 +281,16 @@ ol.plain li::before { content: counter(step); left: 0; top: 1px; width: 22px; he
 .sp-note .btn { margin-top: 18px; align-self: flex-start; }
 .sp-closing { margin-top: 88px; text-align: center; font-size: clamp(28px, 3.4vw, 36px); line-height: 1.2; }
 .sp-closing::before { content: ''; display: block; width: 1px; height: 48px; margin: 0 auto 32px; background: var(--lline); }
+.sp-letter .sp-optional { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--d1); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset; background: rgba(255, 255, 255, 0.04); }
+.sp-letter .sp-optional::before { content: ''; width: 14px; height: 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7.5 12.5l3 3 6-7' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
+.sp-promise { margin-bottom: 22px; padding: clamp(28px, 5vw, 48px); border-radius: 22px; background: var(--white); box-shadow: 0 0 0 1px rgba(10, 10, 11, 0.05), 0 24px 48px -36px rgba(10, 10, 11, 0.25); }
+.sp-promise h2 { font-weight: 900; font-size: clamp(36px, 5vw, 56px); line-height: 0.95; letter-spacing: -0.04em; }
+.sp-promise h2 .serif { display: block; margin-top: 6px; }
+.sp-promise ul { display: grid; gap: 26px 40px; margin-top: 36px; }
+@media (min-width: 700px) { .sp-promise ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sp-promise li { display: flex; gap: 14px; }
+.sp-promise li p { font-size: 15px; line-height: 1.6; color: var(--l2); }
+.sp-promise .sp-promise-head { font-size: 17px; font-weight: 800; line-height: 1.3; color: var(--l1); }
+.sp-check { flex: none; width: 22px; height: 22px; margin-top: 2px; border-radius: 999px; background: rgba(24, 24, 27, 0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7.5 12.5l3 3 6-7' fill='none' stroke='%2318181b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px no-repeat; }
+.sp-strong { margin-top: 6px; font-weight: 700; color: var(--l1); }
+.sp-pay .sp-strong { color: #e4e4e7; }

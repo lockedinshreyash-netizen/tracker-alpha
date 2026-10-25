@@ -1,17 +1,19 @@
 /* ── `?support=debug` (DEV only) ──
    The founder-notes loop end to end with no database: the student's Support
    page (signed in, as a fixture user) beside Console → Notes, both talking to
-   an in-memory copy of supabase/support.sql's functions. Send a note on the
-   left, reply on the right, press "Check replies" to see the line Today would
-   show, scroll to Your notes to mark it read. Nothing leaves the page: the
-   support RPCs are answered here before they reach the network. */
+   an in-memory copy of supabase/support.sql's functions. Reply on the right
+   and the lock-screen preview shows the push the database would queue; press
+   "Check replies" for the reply card and the line on Today; "Got it" marks it
+   read and withdraws the unsent push, as ack_founder_replies does. Nothing
+   leaves the page: the support RPCs are answered here before the network. */
 
 import React, { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import SupportPage from './SupportPage';
 import FounderNotesAdmin from '../admin/FounderNotesAdmin';
 import NoticeLine from '../notify/NoticeLine';
-import { countUnseenReplies } from './api';
+import ReplyCard from './ReplyCard';
+import { useFounderReplies } from './useFounderReplies';
 import { SUPPORT_COPY } from './content';
 
 interface Row {
@@ -26,6 +28,18 @@ const rows: Row[] = [
   { id: 'n2', body: 'Alpha got me through Class 11. Thank you for building it.', signed_name: 'Asha', created_at: ago(60 * 26), reply: 'This made my week, Asha. Keep going.', replied_at: ago(60 * 2), reply_seen_at: null },
   { id: 'n1', body: 'The streak thing actually works on me lol', signed_name: null, created_at: ago(60 * 24 * 6), reply: 'It works on me too.', replied_at: ago(60 * 24 * 5), reply_seen_at: ago(60 * 24 * 5) },
 ];
+
+/* The unsent pushes founder_reply_push would hold in due_reminders. */
+interface Push { id: string; note: string; title: string; body: string }
+let pushes: Push[] = [];
+const pushListeners = new Set<() => void>();
+const setPushes = (next: Push[]) => { pushes = next; pushListeners.forEach(f => f()); };
+const queuePush = (note: string, reply: string | null) => {
+  const rest = pushes.filter(p => p.note !== note);
+  if (!reply) { setPushes(rest); return; }
+  const body = reply.length > 160 ? `${reply.slice(0, 157)}…` : reply;
+  setPushes([...rest, { id: `founder:${note}@${Date.now()}`, note, title: 'Shreyash replied to your note', body }]);
+};
 
 const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200, headers: { 'content-type': 'application/json' } });
 const fail = (message: string, code = 'P0001') => new Response(JSON.stringify({ code, message }), { status: 400, headers: { 'content-type': 'application/json' } });
@@ -46,7 +60,7 @@ const answer = (name: string, a: Record<string, unknown>): Response => {
       return json(rows.filter(unseen).length);
     case 'ack_founder_replies': {
       const ids = (a.p_ids as string[]) ?? [];
-      rows.forEach(r => { if (ids.includes(r.id) && r.reply) r.reply_seen_at = new Date().toISOString(); });
+      rows.forEach(r => { if (ids.includes(r.id) && r.reply) { r.reply_seen_at = new Date().toISOString(); queuePush(r.id, null); } });
       return json(null);
     }
     case 'admin_founder_notes': {
@@ -60,6 +74,7 @@ const answer = (name: string, a: Record<string, unknown>): Response => {
       row.reply = reply;
       row.replied_at = reply ? new Date().toISOString() : null;
       if (!reply) row.reply_seen_at = null;
+      queuePush(row.id, reply);
       return json(null);
     }
     default:
@@ -81,13 +96,36 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const STUDENT = { id: 'debug-student', email: 'asha@example.com' } as unknown as User;
 
+const LockScreen = () => {
+  const [list, setList] = useState(pushes);
+  useEffect(() => { const f = () => setList(pushes); pushListeners.add(f); return () => { pushListeners.delete(f); }; }, []);
+  return (
+    <div className="rounded-[28px] p-4 bg-gradient-to-b from-[#1d2a44] to-[#0c1220] text-white min-h-[120px]">
+      <p className="text-center text-[11px] opacity-60">Lock screen · pushes queued, not yet sent</p>
+      {list.length === 0 && <p className="text-center text-[12px] opacity-40 mt-6">Nothing queued</p>}
+      {list.map(p => (
+        <div key={p.id} className="mt-3 rounded-2xl bg-white/15 backdrop-blur px-3.5 py-3">
+          <div className="flex items-center gap-2 text-[11px] opacity-70">
+            <img src="/icon-192.png" width={16} height={16} alt="" className="rounded" /> Tracker Alpha · now
+          </div>
+          <p className="mt-1 text-[13px] font-semibold">{p.title}</p>
+          <p className="text-[13px] opacity-85 leading-snug">{p.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const DebugSupport = () => {
   const [dark, setDark] = useState(true);
-  const [count, setCount] = useState(0);
   const [focus, setFocus] = useState(false);
+  const [aside, setAside] = useState('');
   const theme = dark ? 'dark' : 'light';
-  const check = () => { void countUnseenReplies().then(setCount); };
-  useEffect(check, []);
+  const replies = useFounderReplies(STUDENT.id);
+  const check = replies.refresh;
+  const count = replies.unseen;
+  const reply = replies.pending[0];
+  const replyKey = reply ? `${reply.id}@${reply.replied_at}` : '';
 
   return (
     <div className={`min-h-screen font-ui ${dark ? 'bg-[#0B0B0D] text-white' : 'bg-[#F2F0EC] text-zinc-900'}`}>
@@ -108,17 +146,32 @@ const DebugSupport = () => {
               theme={theme}
               user={STUDENT}
               onSignIn={() => {}}
-              onRepliesSeen={() => setCount(0)}
+              onRepliesSeen={replies.markSeen}
               focusNotes={focus}
               onNotesFocused={() => setFocus(false)}
+              repliesKey={replies.pending.map(n => `${n.id}@${n.replied_at}`).join(',')}
             />
           </div>
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-500 mb-3">Console → Notes (as an admin)</p>
           <FounderNotesAdmin theme={theme} />
+          <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-zinc-500 mt-8 mb-3">The student's phone, app closed</p>
+          <LockScreen />
         </div>
       </div>
+      {reply && replyKey !== aside && (
+        <ReplyCard
+          note={reply}
+          total={replies.pending.length}
+          theme={theme}
+          saving={replies.saving}
+          error={replies.error}
+          onAcknowledge={() => { void replies.acknowledge([reply.id]); }}
+          onWriteBack={() => { void replies.acknowledge([reply.id]); }}
+          onSetAside={() => setAside(replyKey)}
+        />
+      )}
     </div>
   );
 };

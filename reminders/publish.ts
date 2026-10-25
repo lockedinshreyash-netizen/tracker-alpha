@@ -107,6 +107,9 @@ export const signatureOf = (rows: ReminderRow[]): string =>
  *
  * Never deletes a row that has already been sent: that is the record of what
  * the user was actually told, and the function's own retention sweep owns it.
+ * Nor a `founder:` row: those are written by the database when the founder
+ * replies to a note (supabase/support.sql) and withdrawn by it when the reply
+ * is read, so they are not this device's to reconcile.
  */
 export const reconcile = async (desired: ReminderRow[], userId: string): Promise<void> => {
   try {
@@ -116,7 +119,8 @@ export const reconcile = async (desired: ReminderRow[], userId: string): Promise
     }
 
     const keep = desired.map(r => r.id);
-    let query = supabase.from('due_reminders').delete().eq('user_id', userId).is('sent_at', null);
+    let query = supabase.from('due_reminders').delete().eq('user_id', userId).is('sent_at', null)
+      .not('id', 'like', 'founder:%');
     if (keep.length) query = query.not('id', 'in', `(${keep.map(k => `"${k}"`).join(',')})`);
     await query;
   } catch {

@@ -153,14 +153,28 @@ Deno.serve(async req => {
     if (!subs?.length) continue;
 
     for (const row of rows) {
-      /* Two kinds of row share the table. A deadline is `taskId@instant`; a
+      /* Three kinds of row share the table. A deadline is `taskId@instant`; a
          daily nudge is `nudge:<kind>:<day>@instant` (reminders/nudges.ts). A
          nudge is tagged per study day, so the evening check replaces the start
          nudge on the lock screen, and it does not stay pinned there: it is a
-         prompt, not a deadline. */
+         prompt, not a deadline. A reply from the founder to a note is
+         `founder:<noteId>@instant`, written by the database itself
+         (supabase/support.sql); tagged per note so an edited reply replaces
+         the first, and it opens the Support page, where the reply card waits. */
       const nudge = row.id.startsWith('nudge:');
+      const founder = row.id.startsWith('founder:');
       const day = nudge ? (row.id.split(':')[2] ?? '').split('@')[0] : '';
-      const payload = JSON.stringify(nudge
+      const payload = JSON.stringify(founder
+        ? {
+          title: row.title,
+          body: row.body,
+          key: row.id,
+          tag: `tracker-alpha-founder:${row.id.slice('founder:'.length).split('@')[0]}`,
+          channel: 'founder',
+          url: '/?open=support',
+          requireInteraction: false,
+        }
+        : nudge
         ? {
           title: row.title,
           body: row.body,

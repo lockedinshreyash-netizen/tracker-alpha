@@ -144,15 +144,26 @@ $$;
 -- keeps a reply edited a moment later from looking already seen).
 create or replace function public.ack_founder_replies(p_ids uuid[])
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  update public.founder_notes
-     set reply_seen_at = greatest(now(), replied_at)
-   where user_id = auth.uid()
-     and id = any(coalesce(p_ids, '{}'))
-     and reply is not null;
+declare
+  v_id uuid;
+begin
+  for v_id in
+    update public.founder_notes
+       set reply_seen_at = greatest(now(), replied_at)
+     where user_id = auth.uid()
+       and id = any(coalesce(p_ids, '{}'))
+       and reply is not null
+    returning id
+  loop
+    -- Read in the app: a lock-screen push still waiting to go out would only
+    -- announce what they have just read.
+    perform public.founder_reply_push(v_id, auth.uid(), null);
+  end loop;
+end;
 $$;
 
 -- How many replies are waiting: the line on Today.
@@ -169,6 +180,50 @@ as $$
      and reply is not null
      and (reply_seen_at is null or reply_seen_at < replied_at);
 $$;
+
+-- ── The lock-screen push ──
+-- A reply is queued as a row in due_reminders (reminders.sql), the table the
+-- send-reminders Edge Function already drains every minute, so a student whose
+-- app is closed hears about it on their lock screen. Only students who turned
+-- on reminders with an account have a push address; for everyone else the row
+-- simply goes unsent and the reply card in the app does the job.
+--
+-- Key: `founder:<note id>@<epoch ms>`. The `founder:` prefix is what tells the
+-- sender how to word and route it (`/?open=support`), and what the client's
+-- reminder reconciler (reminders/publish.ts) leaves alone — it deletes every
+-- other unsent row it did not write. Unsent rows for a note are withdrawn when
+-- the reply changes, is taken back, or is read in the app. Sent rows are never
+-- touched: they are the record of what the student was told.
+--
+-- Internal: called only by the two functions above and below, never by a
+-- client. Guarded, so support.sql still installs without reminders.sql.
+create or replace function public.founder_reply_push(p_note uuid, p_user uuid, p_reply text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_body text;
+begin
+  if to_regclass('public.due_reminders') is null then
+    return;
+  end if;
+  execute 'delete from public.due_reminders where user_id = $1 and sent_at is null and id like $2'
+    using p_user, 'founder:' || p_note::text || '@%';
+  if p_reply is null then
+    return;
+  end if;
+  -- The reply itself, shortened to fit the lock screen (body <= 200).
+  v_body := case when char_length(p_reply) > 160 then left(p_reply, 157) || '…' else p_reply end;
+  -- The name matches SUPPORT_COPY.signature in support/content.ts.
+  execute 'insert into public.due_reminders (id, user_id, fire_at, title, body) values ($1, $2, now(), $3, $4)'
+    using 'founder:' || p_note::text || '@' || floor(extract(epoch from clock_timestamp()) * 1000)::bigint::text,
+          p_user, 'Shreyash replied to your note', v_body;
+end;
+$$;
+
+revoke all on function public.founder_reply_push(uuid, uuid, text) from public, anon, authenticated;
 
 -- ── The founder's side ──
 -- Every note, newest first, keyset-paged on created_at. Unreplied only when
@@ -213,6 +268,7 @@ set search_path = public
 as $$
 declare
   v_reply text := nullif(btrim(coalesce(p_reply, '')), '');
+  v_author uuid;
 begin
   if not public.is_admin() then
     raise exception 'not authorized' using errcode = '42501';
@@ -225,10 +281,14 @@ begin
          replied_at = case when v_reply is null then null else now() end,
          replied_by = case when v_reply is null then null else auth.uid() end,
          reply_seen_at = case when v_reply is null then null else reply_seen_at end
-   where id = p_id;
+   where id = p_id
+  returning user_id into v_author;
   if not found then
     raise exception 'founder_note_missing' using errcode = 'P0002';
   end if;
+  -- Queue (or withdraw) the lock-screen push. An edited reply replaces the
+  -- unsent one rather than adding a second.
+  perform public.founder_reply_push(p_id, v_author, v_reply);
 end;
 $$;
 

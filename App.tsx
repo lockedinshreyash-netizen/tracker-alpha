@@ -49,6 +49,7 @@ const NotesTab = React.lazy(() => import('./notes/NotesTab'));
 /* Support Alpha: reached only from quick settings, Settings and the site footers. */
 const SupportPage = React.lazy(() => import('./support/SupportPage'));
 import { useFounderReplies } from './support/useFounderReplies';
+import ReplyCard from './support/ReplyCard';
 import SyllabusTab from './syllabus/SyllabusTab';
 import StreakTab from './streak/StreakTab';
 import MyProfile from './profile/MyProfile';
@@ -286,8 +287,15 @@ const App: React.FC = () => {
      feature: one message, one tab, one acknowledgement. Signed-out users have
      no per-user read state to keep, so they are never shown one. */
   const announcements = useAnnouncements(user, activeTab === 'Today');
-  /* Replies to the student's notes from the Support page: a line on Today. */
+  /* Replies to the student's notes from the Support page: a card on the next
+     visit (support/ReplyCard.tsx) and a line on Today until it is read. */
   const founderReplies = useFounderReplies(user?.id ?? null);
+  /* For the notification-click listener, which is bound once. */
+  const founderRepliesRef = useRef(founderReplies.refresh);
+  founderRepliesRef.current = founderReplies.refresh;
+  /* The reply card set aside (scrim or Escape) for this visit, keyed by the
+     reply it was showing: a newer or edited reply brings it back. */
+  const [replySetAside, setReplySetAside] = useState('');
   const [supportFocusNotes, setSupportFocusNotes] = useState(false);
   const clearSupportFocus = useCallback(() => setSupportFocusNotes(false), []);
 
@@ -1378,6 +1386,9 @@ const App: React.FC = () => {
       const channel = event.data.data?.channel;
       if (channel === 'reminder' || channel === 'nudge') handleTabChange('Today');
       if (channel === 'plan') handleTabChange('Plan');
+      /* A reply from the founder: ask now rather than waiting out the
+         foreground throttle, so the reply card is up as the tab comes forward. */
+      if (channel === 'founder') founderRepliesRef.current?.();
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
@@ -2432,6 +2443,7 @@ const App: React.FC = () => {
                 onRepliesSeen={founderReplies.markSeen}
                 focusNotes={supportFocusNotes}
                 onNotesFocused={clearSupportFocus}
+                repliesKey={founderReplies.pending.map(n => `${n.id}@${n.replied_at}`).join(',')}
               />
             </React.Suspense>
           )}
@@ -2477,6 +2489,30 @@ const App: React.FC = () => {
           the screen, and the news keeps until the block is done), and
           queued behind the other full-screen moments, including an
           announcement already open on Today. */}
+      {/* A reply from the founder to a note the student wrote. Same queue as the
+          removal notice and behind it, never over a running session, and not
+          on the Support page itself, whose list shows the reply and marks it read. */}
+      {(() => {
+        const reply = founderReplies.pending[0];
+        if (!reply || showOnboarding || isBookOpen || celebration || streakMoment !== null || sharePeriod || showExamLaunch) return null;
+        if (stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro)) return null;
+        if ((activeTab === 'Today' && announcements.current) || moderation.current || activeTab === 'Support') return null;
+        const key = `${reply.id}@${reply.replied_at}`;
+        if (key === replySetAside) return null;
+        return (
+          <ReplyCard
+            note={reply}
+            total={founderReplies.pending.length}
+            theme={theme}
+            saving={founderReplies.saving}
+            error={founderReplies.error}
+            onAcknowledge={() => { void founderReplies.acknowledge([reply.id]); }}
+            onWriteBack={() => { void founderReplies.acknowledge([reply.id]).then(() => openSupport()); }}
+            onSetAside={() => setReplySetAside(key)}
+          />
+        );
+      })()}
+
       {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
