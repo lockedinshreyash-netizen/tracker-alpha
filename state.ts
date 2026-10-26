@@ -84,6 +84,11 @@ export const normalizePomodoro = (raw: unknown): PomodoroRuntime => {
     subject,
     pendingRating,
     pendingBlock: p.pendingBlock ?? null,
+    /* The "Still studying?" check. A chain running from before it existed
+       starts its sitting now rather than being asked about hours ago. */
+    presenceAt: Number.isFinite(p.presenceAt) ? p.presenceAt : running ? Date.now() : undefined,
+    unattended: Array.isArray(p.unattended) ? p.unattended.filter(id => typeof id === 'string').slice(-24) : [],
+    checkAt: !running && Number.isFinite(p.checkAt) ? p.checkAt : undefined,
   };
 };
 

@@ -101,8 +101,9 @@ const ReviewTab: React.FC<Props> = ({
   /* /?open=review#account (now the profile page) is where the "delete your account" web page sends
      people (site/legal.tsx), so arriving with that hash lands on the row. */
   useEffect(() => {
-    if (window.location.hash !== '#account') return;
-    const id = window.setTimeout(() => document.getElementById('account')?.scrollIntoView({ block: 'center' }), 300);
+    const target = window.location.hash.slice(1);
+    if (target !== 'account' && target !== 'manual') return;
+    const id = window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ block: 'center' }), 300);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -169,7 +170,7 @@ const ReviewTab: React.FC<Props> = ({
         </div>
       </div>
 
-      <form onSubmit={handleManualLog}>
+      <form id="manual" className="scroll-mt-24" onSubmit={handleManualLog}>
         <Card dark={dark} delay={220} className="p-6 md:p-7">
           <div className="flex items-baseline justify-between gap-3">
             <p className={`text-[15px] font-ui font-bold ${t.heading}`}>Add a session by hand</p>

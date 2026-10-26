@@ -22,6 +22,7 @@ import {
   phaseDurationMs,
   servedMs,
 } from './pomodoro';
+import { pausePomodoroForCheck, pomodoroCheckAt } from './presence';
 
 /**
  * The Pomodoro engine.
@@ -57,6 +58,8 @@ export interface PomodoroCommit {
   rate?: { logId: string; quality: number };
   /** The log came from the bell, which has already made its sound. */
   rang?: boolean;
+  /** Logs to remove: blocks an unanswered "Still studying?" took back. */
+  drop?: string[];
 }
 
 export interface EndResult {
@@ -184,6 +187,10 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
       {
         ...advancePhase(p, s, { counted: credit.counted, autoStart: opts.autoStart, now: opts.at }),
         pendingRating,
+        /* Blocks logged since the last tap: an unanswered "Still studying?"
+           removes these (today/presence.ts). A start clears the list. */
+        unattended: log ? [...(p.unattended ?? []), log.id].slice(-24) : p.unattended,
+        checkAt: undefined,
         // The legacy field is dead the moment this engine writes anything.
         pendingBlock: null,
       },
@@ -199,6 +206,17 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
   const bell = useCallback(() => {
     const { pomodoro: p, settings: s } = readRef.current();
     const now = Date.now();
+
+    /* "Still studying?" comes before the bell when it is due first: the chain
+       stops at the check instant, so no block is settled past it. */
+    const checkAt = pomodoroCheckAt(p);
+    if (p.isRunning && !p.checkAt && checkAt !== null && now >= checkAt
+      && (p.phaseEndsAt === null || checkAt <= p.phaseEndsAt)) {
+      if (!readyRef.current) return;
+      commitRef.current(pausePomodoroForCheck(p, checkAt));
+      return;
+    }
+
     if (!hasElapsed(p, now) || p.phaseEndsAt === null) return;
     if (settledEndsAt.current === p.phaseEndsAt) return;
     // Logs written before the cloud pull lands can be overwritten by it.
@@ -280,6 +298,8 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
 
     const fire = () => bellRef.current();
     const timeout = window.setTimeout(fire, Math.max(0, runtime.phaseEndsAt - Date.now()) + 50);
+    const checkAt = pomodoroCheckAt(runtime);
+    const check = checkAt === null ? 0 : window.setTimeout(fire, Math.max(0, checkAt - Date.now()) + 50);
     const interval = window.setInterval(fire, 5_000);
     const onWake = () => { if (!document.hidden) fire(); };
 
@@ -292,12 +312,13 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
 
     return () => {
       window.clearTimeout(timeout);
+      window.clearTimeout(check);
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);
       window.removeEventListener('pageshow', onWake);
     };
-  }, [runtime.isRunning, runtime.phaseEndsAt, ready]);
+  }, [runtime.isRunning, runtime.phaseEndsAt, runtime.presenceAt, ready]);
 
   /* ── The bell, on the audio clock ──
      Desktop Chrome slows timers in a tab hidden for five minutes to one a
@@ -421,7 +442,8 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
     setStaleDrop(null);
     if (p.phase === 'work') sfx.play('session-start'); else sfx.select();
     const subjectUpdate = subject && p.phase === 'work' ? { subject } : {};
-    commitRef.current({ ...beginPhase(p, s), ...subjectUpdate });
+    // A start is a tap: a new sitting for the "Still studying?" check.
+    commitRef.current({ ...beginPhase(p, s), ...subjectUpdate, presenceAt: Date.now(), unattended: [], checkAt: undefined });
     return true;
   }, []);
 
@@ -472,7 +494,11 @@ export const usePomodoro = ({ runtime, settings, read, commit, active, ready }: 
     const { pomodoro: p } = readRef.current();
     sfx.select();
     commitRef.current(
-      { pendingRating: p.pendingRating.filter(r => r.logId !== logId) },
+      {
+        pendingRating: p.pendingRating.filter(r => r.logId !== logId),
+        // Rating is a tap: somebody is here.
+        ...(p.isRunning ? { presenceAt: Date.now(), unattended: [] } : {}),
+      },
       { rate: { logId, quality } },
     );
   }, []);

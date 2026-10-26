@@ -116,3 +116,42 @@ export const disablePush = async (): Promise<void> => {
     /* Nothing useful to do; the sender drops endpoints that 410. */
   }
 };
+
+/**
+ * Make sure this device is subscribed and its row is fresh. Run on every app
+ * open while push is on.
+ *
+ * Why: `ReminderPrefs.push` syncs with the account, but a subscription belongs
+ * to one browser. Turning push on from the phone left the laptop's switch "on"
+ * with nothing behind it. A browser that rotated its endpoint, cleared site
+ * data, or had its row deleted by the sender after five failures went silent
+ * for good, because nothing ever subscribed again. Never asks for permission:
+ * that needs a tap, so a device that has not granted it is left alone.
+ */
+export const ensurePushSubscription = async (): Promise<boolean> => {
+  if (!pushSupported() || Notification.permission !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription() ?? await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+    });
+    return await publishSubscription(sub);
+  } catch {
+    return false;
+  }
+};
+
+/** The worker's `pushsubscriptionchange` hands the new endpoint to an open page. */
+export const listenForRenewals = (): (() => void) => {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker) return () => {};
+  const onMessage = (event: MessageEvent) => {
+    if (event.data?.type !== 'push-subscription-changed') return;
+    void navigator.serviceWorker.ready
+      .then(reg => reg.pushManager.getSubscription())
+      .then(sub => { if (sub) void publishSubscription(sub); })
+      .catch(() => {});
+  };
+  navigator.serviceWorker.addEventListener('message', onMessage);
+  return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+};

@@ -43,7 +43,8 @@ export const studyDays = (logs: DailyLog[]): Map<string, DayTotals> => {
     const hours = clampDay(d.hours);
     // Rounded separately, then held under the total, so tracked <= hours
     // always satisfies the constraint even when clamping bites.
-    out.set(date, { hours, tracked: Math.min(hours, clampDay(d.tracked)) });
+    // Tracked hours rank, so they take the same 16h cap as Ranks (fair_hours.sql).
+    out.set(date, { hours, tracked: Math.min(hours, 16, clampDay(d.tracked)) });
   });
   return out;
 };

@@ -229,6 +229,9 @@ export interface TimerState {
   /* Carried alongside blockId so the log can say what was actually studied,
      not just which subject. */
   chapter?: string;
+  /* Set when the "Still studying?" check paused this run (today/presence.ts):
+     the instant it fired. Cleared by Continue or End. */
+  checkAt?: number;
 }
 
 export type TimerMode = 'stopwatch' | 'pomodoro';
@@ -293,6 +296,13 @@ export interface PomodoroRuntime {
      logged. Never written any more — flushed to `logs` once on load, then
      dropped. Kept only so state saved by an older build loses nothing. */
   pendingBlock?: { subject: Subject; hours: number } | null;
+  /* The "Still studying?" check (today/presence.ts). `presenceAt` is the last
+     tap on the timer (auto-start is not one); `unattended` the ids of blocks
+     auto-logged since then, removed if the check goes unanswered; `checkAt`
+     marks a phase paused by the check. */
+  presenceAt?: number;
+  unattended?: string[];
+  checkAt?: number;
 }
 
 /**

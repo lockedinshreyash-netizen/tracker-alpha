@@ -29,12 +29,15 @@
    day it gets muted, and every one of the channels below stops working at once.
    There is no way to earn that permission back.
 
-   Six channels, six identities, each traceable to a real event:
+   Seven channels, seven identities, each traceable to a real event:
      race       — a place changing hands, on a board you asked to join.
      pomodoro   — a bell for a block you started. Asked for, by starting it.
      reminder   — a due date you wrote, on a task you wrote.
      plan       — a block you put on your own timeline, about to begin.
      nudge      — a time you chose to study, on a day not yet done. Opt-in.
+     check      — "Still studying?" after 3.5h of a timer you started with no
+                  tap (today/presence.ts). Like the bell, it is the session
+                  itself, so gate 1 does not apply to it.
      moderation — a person removed you from a group or the race, and said why.
                   Not the app's opinion: somebody else's decision about you,
                   which you are owed hearing about from the app rather than
@@ -58,7 +61,7 @@
    hidden one gets a system notification, a closed app gets a push. Exactly one
    of the three. Never two. */
 
-export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'nudge' | 'moderation';
+export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'nudge' | 'moderation' | 'check';
 
 export interface ChannelDef {
   /** Notifications sharing a tag replace one another instead of stacking. */
@@ -79,6 +82,8 @@ export const CHANNELS: Record<Channel, ChannelDef> = {
   /* One per study day: the evening check replaces the start nudge on the lock
      screen rather than joining it. Matches the sender's tag for `nudge:` rows. */
   nudge: { tag: key => `tracker-alpha-nudge:${key.split(':')[2]?.split('@')[0] ?? ''}`, requireInteraction: false },
+  /* Must be answered, so it stays on the lock screen. Matches the sender. */
+  check: { tag: () => 'tracker-alpha-check', requireInteraction: true },
   /* Per notice: two removals are two different things to be told. */
   moderation: { tag: key => `tracker-alpha-moderation:${key}`, requireInteraction: false },
 

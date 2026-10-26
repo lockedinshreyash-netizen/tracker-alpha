@@ -60,13 +60,17 @@ export const isRanked = (log: DailyLog): boolean => RANKED_SOURCES.has(log.sourc
  * user's own record of their day and includes everything. Logs written before
  * `source` existed have no origin to verify, so they don't count either.
  */
+/** The most timed hours one study day can put on Ranks or a group board. */
+export const MAX_RANKED_HOURS = 16;
+
 export const hoursToday = (logs: DailyLog[]): number => {
   const today = getISTDateString();
   const total = logs
     .filter(l => l.date === today && isRanked(l))
     .reduce((sum, l) => sum + l.hours, 0);
-  // Clamped to match the DB constraint; a corrupted local state can't post 900h.
-  return Math.min(24, Math.max(0, Math.round(total * 100) / 100));
+  /* Capped at MAX_RANKED_HOURS, which supabase/fair_hours.sql also enforces:
+     past that a day is a timer left running, not studying. */
+  return Math.min(MAX_RANKED_HOURS, Math.max(0, Math.round(total * 100) / 100));
 };
 
 /** PostgREST/Postgres for "you asked for a column that isn't there". */

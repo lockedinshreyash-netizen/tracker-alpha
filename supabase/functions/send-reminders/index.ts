@@ -161,10 +161,25 @@ Deno.serve(async req => {
          `founder:<noteId>@instant`, written by the database itself
          (supabase/support.sql); tagged per note so an edited reply replaces
          the first, and it opens the Support page, where the reply card waits. */
+      /* "Still studying?" is `check:<device>@instant` (reminders/publish.ts
+         publishCheck), sent at the check itself. Keyed without the device so
+         it matches the open app's own key, and pinned: it must be answered. */
+      const check = row.id.startsWith('check:');
       const nudge = row.id.startsWith('nudge:');
       const founder = row.id.startsWith('founder:');
       const day = nudge ? (row.id.split(':')[2] ?? '').split('@')[0] : '';
-      const payload = JSON.stringify(founder
+      const payload = JSON.stringify(check
+        ? {
+          title: row.title,
+          body: row.body,
+          key: `check@${row.id.split('@')[1] ?? ''}`,
+          /* Matches CHANNELS.check.tag in notify/channels.ts. */
+          tag: 'tracker-alpha-check',
+          channel: 'check',
+          url: '/?open=today',
+          requireInteraction: true,
+        }
+        : founder
         ? {
           title: row.title,
           body: row.body,

@@ -36,6 +36,7 @@ export const CLEARED: Partial<TimerState> = {
   pausedAt: undefined,
   chapter: undefined,
   blockId: undefined,
+  checkAt: undefined,
 };
 
 /** What a session logs: the time served and the interval it is placed on. */
@@ -83,5 +84,5 @@ export const resumeRun = (
       update: { ...CLEARED, isRunning: true, startTime: now, chapter: t.chapter },
     };
   }
-  return { bank: null, update: { isRunning: true, startTime: now, pausedAt: undefined } };
+  return { bank: null, update: { isRunning: true, startTime: now, pausedAt: undefined, checkAt: undefined } };
 };

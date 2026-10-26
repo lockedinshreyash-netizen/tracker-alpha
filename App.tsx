@@ -87,6 +87,8 @@ import { useAnnouncements } from './announce/useAnnouncements';
 import AnnouncementModal from './announce/AnnouncementModal';
 import { useModerationNotices } from './moderation/useModerationNotices';
 import RemovalNoticeModal from './moderation/RemovalNoticeModal';
+import { useStillThere } from './today/useStillThere';
+import { RemovedNotice, StillStudyingPrompt } from './today/StillStudying';
 import { humanError as moderationError, rejoinLeaderboard } from './moderation/api';
 import FeedbackWidget from './feedback/FeedbackWidget';
 import { useInstall } from './install/useInstall';
@@ -1144,11 +1146,12 @@ const App: React.FC = () => {
       const runtime = { ...prev.pomodoro, ...update };
       let logs = prev.logs;
       if (extra?.log) logs = [...logs, extra.log];
+      if (extra?.drop?.length) logs = logs.filter(l => !extra.drop!.includes(l.id));
       if (extra?.rate) {
         const { logId, quality } = extra.rate;
         logs = logs.map(l => (l.id === logId ? { ...l, quality } : l));
       }
-      const touched = Boolean(extra?.log || extra?.rate);
+      const touched = Boolean(extra?.log || extra?.rate || extra?.drop?.length);
       const nextState: AppState = {
         ...prev,
         pomodoro: runtime,
@@ -1183,6 +1186,23 @@ const App: React.FC = () => {
     active: effectiveMode(state) === 'pomodoro',
     ready: syncSettled,
   });
+
+  /* "Still studying?" after 3.5h of a timer with no tap (today/presence.ts).
+     Its prompt goes over everything; the removed-session notice goes before
+     every other one-time modal, the streak moment included. */
+  const stillThere = useStillThere({
+    timer: state.timer,
+    pomodoro: state.pomodoro,
+    logs: state.logs,
+    read: () => ({ timer: stateRef.current.timer, pomodoro: stateRef.current.pomodoro, logs: stateRef.current.logs }),
+    ready: syncSettled,
+    userId: user?.id ?? null,
+    updateTimer,
+    logStudy,
+    pomodoroApi: pomodoro,
+    commitPomodoro,
+  });
+  const checkBusy = !!stillThere.ask || !!stillThere.removed;
 
   /* ── Leaving onboarding ──
      Three ways out, all landing on Today. The pledge has already written the
@@ -1360,6 +1380,30 @@ const App: React.FC = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, reminderPrefs.nudge, reminderPrefs.push, syncSettled]);
+
+  /* Push on means THIS device is subscribed, every open. The switch syncs but a
+     subscription is per browser, and endpoints get rotated or dropped by the
+     sender; without this a device went silent for good (notify/push.ts). */
+  useEffect(() => {
+    if (!user || !reminderPrefs.push || !syncSettled) return;
+    let stop = () => {};
+    void import('./notify/push').then(({ ensurePushSubscription, listenForRenewals }) => {
+      void ensurePushSubscription();
+      stop = listenForRenewals();
+    });
+    return () => stop();
+  }, [user?.id, reminderPrefs.push, syncSettled]);
+
+  /* The same check for a closed app or a locked phone: one push row due at
+     the check instant, held by this device and withdrawn by any tap. */
+  useEffect(() => {
+    if (!user || !reminderPrefs.push) return;
+    const at = stillThere.pendingCheckAt;
+    const id = window.setTimeout(() => {
+      void import('./reminders/publish').then(({ publishCheck }) => publishCheck(user.id, at));
+    }, 2_000);
+    return () => window.clearTimeout(id);
+  }, [user?.id, reminderPrefs.push, stillThere.pendingCheckAt]);
 
   /* ── Install to the home screen ──
      Moved wholesale into `install/useInstall`, which also serves the mobile
@@ -2045,7 +2089,7 @@ const App: React.FC = () => {
     showLanding === false && !needsOnboarding && syncSettled && !isAuthModalOpen
     && !state.examsAskedAt
     && (!!user || state.logs.length > 0 || state.progress.length > 0 || state.tasks.length > 0)
-    && !isBookOpen && !celebration && streakMoment === null && !sharePeriod
+    && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !stillThere.removed
     && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro);
 
   /* An invite takes you to Groups once you can see it — after the landing
@@ -2468,7 +2512,7 @@ const App: React.FC = () => {
           Only on Today. An announcement that could open over the Plan grid or
           mid-way through a mock would be a modal that follows you
           around the app, which is the thing this feature is deliberately not. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy
         && activeTab === 'Today' && announcements.current && (
         <AnnouncementModal
           announcement={announcements.current}
@@ -2513,7 +2557,7 @@ const App: React.FC = () => {
         );
       })()}
 
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
@@ -2531,7 +2575,7 @@ const App: React.FC = () => {
           behind every full-screen moment and any running session: the first
           run already asked in onboarding, and a banner over a running clock is
           the app interrupting the thing it exists for. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy
         && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
         <KeepBanner install={install} theme={theme} />
       )}
@@ -2539,7 +2583,7 @@ const App: React.FC = () => {
       {/* "Need help? Tell us." Bottom-left, clear of the settings gear in the
           opposite corner, and gone during any full-screen moment — a floating
           bubble over the reward modal or the book is a bubble in the way. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy && (
         <FeedbackWidget
           user={user}
           theme={theme}
@@ -2553,14 +2597,14 @@ const App: React.FC = () => {
       {/* Class 11 or 12, top-right on a laptop (the phone has it in the capsule,
           Sidebar.tsx), on Syllabus only: every other tab has it in quick
           settings. Same suppression as the gear below. */}
-      {activeTab === 'Syllabus' && !profileCtl.routeHandle && !showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
+      {activeTab === 'Syllabus' && !profileCtl.routeHandle && !showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy && (
         <ClassSwitch placement="corner" dark={theme === 'dark'} value={state.currentClass} onChange={setCurrentClass} />
       )}
 
       {/* The gear, bottom-right, and the glass pane of quick settings it opens.
           It replaced the web-style header that held the same switches above
           every tab. Same suppression as the feedback launcher. */}
-      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && (
+      {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy && (
         <QuickSettings
           theme={theme}
           onToggleTheme={() => setState(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
@@ -2589,7 +2633,22 @@ const App: React.FC = () => {
       {/* The daily streak moment: once a day, after the first session logged on
           this device. It goes before a reward unlock — on day 30 the streak
           lands first and the wallpaper pack follows when it is closed. */}
-      {!showOnboarding && !isBookOpen && !sharePeriod && streakMoment !== null && (
+      {stillThere.ask && (
+        <StillStudyingPrompt ask={stillThere.ask} dark={theme === 'dark'} onContinue={stillThere.cont} onDone={stillThere.done} />
+      )}
+      {!stillThere.ask && stillThere.removed && !showOnboarding && (
+        <RemovedNotice
+          removed={stillThere.removed}
+          dark={theme === 'dark'}
+          onClose={stillThere.ackRemoved}
+          onAddByHand={() => {
+            stillThere.ackRemoved();
+            try { window.history.replaceState(null, '', '#manual'); } catch { /* scroll is a nicety */ }
+            handleTabChange(STORE_LAUNCHED ? 'Profile' : 'Review');
+          }}
+        />
+      )}
+      {!showOnboarding && !isBookOpen && !sharePeriod && !checkBusy && streakMoment !== null && (
         <StreakMoment
           streak={streakMoment}
           ledger={ledger}

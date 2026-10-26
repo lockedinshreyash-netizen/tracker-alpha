@@ -107,6 +107,8 @@ export const signatureOf = (rows: ReminderRow[]): string =>
  *
  * Never deletes a row that has already been sent: that is the record of what
  * the user was actually told, and the function's own retention sweep owns it.
+ * Nor a `check:` row: each device holds its own (publishCheck), and the
+ * timer it is about runs on that device only.
  * Nor a `founder:` row: those are written by the database when the founder
  * replies to a note (supabase/support.sql) and withdrawn by it when the reply
  * is read, so they are not this device's to reconcile.
@@ -120,12 +122,53 @@ export const reconcile = async (desired: ReminderRow[], userId: string): Promise
 
     const keep = desired.map(r => r.id);
     let query = supabase.from('due_reminders').delete().eq('user_id', userId).is('sent_at', null)
-      .not('id', 'like', 'founder:%');
+      .not('id', 'like', 'founder:%')
+      .not('id', 'like', 'check:%');
     if (keep.length) query = query.not('id', 'in', `(${keep.map(k => `"${k}"`).join(',')})`);
     await query;
   } catch {
     /* Offline, or signed out mid-flight. Not an error path: the reconciler runs
        again on the next task change and on the next app open, and the local
        engine is unaffected either way. */
+  }
+};
+
+/* ── "Still studying?" for a closed app (today/presence.ts) ──
+   One row per device, `check:<device>@<instant>`, due at the check itself (no
+   PUSH_LAG_MS: the open app deletes it the moment it pauses for the check, and
+   the seen ledger covers the overlap). Every tap moves the check, which
+   replaces the row; `at` null withdraws it. */
+const deviceId = (): string => {
+  try {
+    let id = localStorage.getItem('alpha_device_v1');
+    if (!id) { id = Math.random().toString(36).slice(2, 10); localStorage.setItem('alpha_device_v1', id); }
+    return id;
+  } catch {
+    return 'device';
+  }
+};
+
+let publishedCheck: string | null | undefined;
+
+export const publishCheck = async (userId: string, at: number | null): Promise<void> => {
+  const prefix = `check:${deviceId()}@`;
+  const key = at === null || at <= Date.now() ? null : `${prefix}${at}`;
+  if (key === publishedCheck) return;
+  try {
+    let del = supabase.from('due_reminders').delete().eq('user_id', userId).is('sent_at', null).like('id', `${prefix}%`);
+    if (key) del = del.neq('id', key);
+    await del;
+    if (key) {
+      await supabase.from('due_reminders').upsert({
+        id: key,
+        user_id: userId,
+        fire_at: new Date(at as number).toISOString(),
+        title: 'Still studying?',
+        body: 'Your timer is paused. Open Alpha where it is running within 10 minutes, or this session is removed.',
+      }, { onConflict: 'id' });
+    }
+    publishedCheck = key;
+  } catch {
+    /* Offline. The next tap or open publishes again. */
   }
 };

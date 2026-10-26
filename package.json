@@ -12,6 +12,7 @@
     "qbank:chapters": "esbuild scripts/qbank/export-chapters.ts --bundle --platform=node --log-level=warning | node > scripts/qbank/chapters.json",
     "test:decks": "node scripts/test-decks.mjs",
     "test:streak": "node scripts/test-decks.mjs streak",
+    "test:timer": "node scripts/test-decks.mjs today",
     "test:reader": "node scripts/test-decks.mjs reader",
     "test:install": "node scripts/test-decks.mjs install",
     "extension:build": "node scripts/extension.mjs",
