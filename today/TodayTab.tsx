@@ -4,7 +4,8 @@ import { getISTDateString, getSubjectDistribution } from '../utils';
 import ExamCountdown from './ExamCountdown';
 import { normalizeTarget, streamOf } from '../content/exams';
 import { isIdle as pomodoroIsIdle, effectiveMode } from './pomodoro';
-import { CLEARED, isArmed, isPaused, pauseRun, resumeRun, sessionSpan } from './stopwatch';
+import { CLEARED, elapsedMs, isArmed, isPaused, pauseRun, resumeRun, sessionSpan } from './stopwatch';
+import { useSecondTick } from '../ui/useSecondTick';
 import * as sfx from '../audio';
 import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
@@ -22,6 +23,22 @@ import { Card, Chip, Eyebrow, PageHeader, Segmented, btn, tokens } from '../ui/k
 import { FESTIVE_GREETING, type FestiveTheme } from '../festive/useFestiveTheme';
 
 const TARGET_OPEN_KEY = 'today_target_open';
+
+const formatTime = (ms: number) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+/* The running clock, on its own. It redraws once a second, just after the
+   digit flips; the tab around it (the board, the history) does not redraw
+   at all. It used to be state on the whole tab, ten times a second. */
+function StopwatchClock({ timer, className }: { timer: TimerState; className: string }) {
+  const now = useSecondTick(timer.isRunning, timer.startTime ?? 0);
+  return <p className={className}>{formatTime(elapsedMs(timer, now))}</p>;
+}
 
 interface Props {
   state: AppState;
@@ -109,20 +126,6 @@ const TodayTab: React.FC<Props> = ({
   const timerRef = useRef(timer);
   useEffect(() => { timerRef.current = timer; }, [timer]);
 
-  const [currentDisplayMs, setCurrentDisplayMs] = useState(0);
-
-  useEffect(() => {
-    let interval: number;
-    if (timer.isRunning && timer.startTime) {
-      interval = window.setInterval(() => {
-        setCurrentDisplayMs(Date.now() - timer.startTime! + timer.accumulatedMs);
-      }, 100);
-    } else {
-      setCurrentDisplayMs(timer.accumulatedMs);
-    }
-    return () => clearInterval(interval);
-  }, [timer.isRunning, timer.startTime, timer.accumulatedMs]);
-
   /* Starting a session swaps in a much taller timer panel and removes the
      goal card above it, so whatever the user was scrolled to is no longer
      where they left it. Snap back to the top so the running timer is what
@@ -182,14 +185,6 @@ const TodayTab: React.FC<Props> = ({
     onTimerUpdate(update);
   };
 
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   const [historyOpen, setHistoryOpen] = useState(false);
 
   /* Today's target folds down to one line: the hours done today, and Share.
@@ -223,7 +218,7 @@ const TodayTab: React.FC<Props> = ({
 
   const totalToday = todayLogs.reduce((a, b) => a + b.hours, 0);
   const progressPercent = Math.min((totalToday / dailyGoalHours) * 100, 100);
-  const subjectDist = getSubjectDistribution(logs, activeSubjects);
+  const subjectDist = useMemo(() => getSubjectDistribution(logs, activeSubjects), [logs, activeSubjects]);
 
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -455,7 +450,7 @@ const TodayTab: React.FC<Props> = ({
             <Eyebrow dark={dark}>
               {timer.isRunning ? `Focused on ${timer.subject}` : stopwatchPaused ? `Paused · ${timer.subject}` : 'Pick a subject, then start'}
             </Eyebrow>
-            <p className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer mt-8 transition-opacity ${t.heading} ${stopwatchPaused ? 'opacity-40' : ''}`}>{formatTime(currentDisplayMs)}</p>
+            <StopwatchClock timer={timer} className={`text-[15vw] md:text-[104px] tabular-nums leading-none num-timer mt-8 transition-opacity ${t.heading} ${stopwatchPaused ? 'opacity-40' : ''}`} />
 
             {!stopwatchBusy ? (
               <>

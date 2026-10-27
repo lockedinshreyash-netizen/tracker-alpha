@@ -28,6 +28,16 @@ interface Props {
   theme: 'dark' | 'light';
 }
 
+/* The board shows the top of the race and where you stand, not everyone:
+   on a busy day a hundred rows (and a hundred avatars) is a lot to draw on a
+   phone for a question most people ask about four of them. The rest is one
+   tap away. */
+const TOP = 4;
+
+/** The rows drawn: the top four and you, or everyone once asked for. */
+const visibleRacers = (entrants: Racer[], all: boolean): Racer[] =>
+  all ? entrants : entrants.filter((r, i) => i < TOP || r.isMe);
+
 /** ▲2 / ▼1 against where this entrant stood when the day was first seen. */
 const Movement: React.FC<{ delta: number; dark: boolean }> = ({ delta, dark }) => {
   if (!delta) {
@@ -49,6 +59,8 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
   const [name, setName] = useState(prefs.displayName);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  /* Per visit, not AppState: which way the list is folded is not data. */
+  const [showAll, setShowAll] = useState(false);
 
   /* Hooks must run unconditionally on every render of this component — the
      two early returns below (signed out / not on the board) must never sit
@@ -59,7 +71,9 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
      down the whole app to a blank screen. race.race.entrants is always a
      valid array regardless of which branch below actually renders, so this
      is safe to call up here unconditionally. */
-  const profiles = useProfiles(race.race.entrants.map(r => r.userId));
+  const shown = visibleRacers(race.race.entrants, showAll);
+  // Profiles (names, avatars) only for the rows on screen.
+  const profiles = useProfiles(shown.map(r => r.userId));
 
   const card = dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm';
   const kit = tokens(dark);
@@ -187,13 +201,26 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
         ) : (
           <div className={`border-t divide-y ${dark ? 'border-white/[0.05] divide-white/[0.05]' : 'border-zinc-100 divide-zinc-100'}`}>
           {
-          entrants.map(racer => {
+          shown.map((racer, i) => {
             const opening = race.day.openingPositionById[racer.userId];
             const delta = opening === undefined ? 0 : opening - racer.position;
             const gap = gapToMe(racer);
+            /* Folded, your row can sit well below the top four: say how many
+               are between, so the jump from 4 to 27 reads as a gap. */
+            const skipped = !showAll && i > 0 ? entrants.indexOf(racer) - entrants.indexOf(shown[i - 1]) - 1 : 0;
             return (
+              <React.Fragment key={racer.userId}>
+              {skipped > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(true)}
+                  className={`w-full flex items-center gap-3 px-5 md:px-6 py-2 text-left text-[11px] font-ui ${muted} ${kit.hover}`}
+                >
+                  <span className="w-6 text-right tracking-[0.2em]" aria-hidden="true">···</span>
+                  <span>{skipped} more between</span>
+                </button>
+              )}
               <div
-                key={racer.userId}
                 className={`relative flex items-center gap-3 md:gap-4 px-5 md:px-6 py-3.5 transition-colors ${racer.isMe ? 'bg-[#E10600]/[0.05]' : ''}`}
               >
                 {racer.isMe && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#E10600]" aria-hidden="true" />}
@@ -232,9 +259,21 @@ const RanksBody: React.FC<Props> = ({ user, logs, prefs, race, onJoin, onLeave, 
                   {racer.hours.toFixed(1)}<span className={`font-ui text-[11px] ml-0.5 ${muted}`}>h</span>
                 </span>
               </div>
+              </React.Fragment>
             );
           })}
           </div>
+        )}
+
+        {(showAll || entrants.length > shown.length) && (
+          <button
+            type="button"
+            onClick={() => setShowAll(v => !v)}
+            aria-expanded={showAll}
+            className={`w-full px-5 md:px-6 py-3.5 border-t text-[12px] font-ui font-semibold ${dark ? 'border-white/[0.05]' : 'border-zinc-100'} ${muted} ${kit.hover} hover:text-[#E10600] transition-colors`}
+          >
+            {showAll ? `Show top ${TOP}` : `See the full board · ${entrants.length} racing`}
+          </button>
         )}
 
         {race.degraded && (

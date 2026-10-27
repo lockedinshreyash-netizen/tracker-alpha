@@ -4,10 +4,11 @@ import { SUBJECT_COLORS } from '../schedule/colors';
 import { Card, Chip, Eyebrow, btn, tokens } from '../ui/kit';
 import { formatCountdown, formatDuration } from './pomodoro';
 import {
-  EXTEND_MINUTES, MAX_ITEMS, PRESET_MINUTES, extendRoomMs, finalMs, isFinished, leftFraction, leftMs,
+  EXTEND_MINUTES, MAX_ITEMS, PRESET_MINUTES, deadlineAt, extendRoomMs, finalMs, isFinished, leftFraction, leftMs,
   openTasks, parseMinutes, sprintStats, statusOf, workedMs,
 } from './sprint';
 import { SprintApi } from './useSprint';
+import { useSecondTick } from '../ui/useSecondTick';
 
 /* ── Alpha Sprints on the Today card ──
    A view over the engine in App (today/useSprint.ts), in three states: set up
@@ -276,19 +277,11 @@ function SprintSetup({ tasks, api, activeSubjects, defaultSubject, dark }: {
 
 function ActiveSprint({ runtime, tasks, api, dark }: { runtime: SprintRuntime; tasks: Task[]; api: SprintApi; dark: boolean }) {
   const t = tokens(dark);
-  const [now, setNow] = useState(Date.now());
   const [confirmQuit, setConfirmQuit] = useState(false);
   const running = runtime.runStartedAt !== null;
-
-  /* Only the clock on screen; the sprint itself is run by the engine in App. */
-  useEffect(() => {
-    setNow(Date.now());
-    if (!running) return;
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    const onVisible = () => { if (!document.hidden) setNow(Date.now()); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
-  }, [running, runtime.runStartedAt]);
+  /* Only the clock on screen, once a second on the deadline's beat; the
+     sprint itself is run by the engine in App. */
+  const now = useSecondTick(running, deadlineAt(runtime) ?? 0);
 
   /* Space pauses and resumes, as on the Pomodoro. Not while typing or on a button. */
   const apiRef = useRef(api);
@@ -388,7 +381,7 @@ function ActiveSprint({ runtime, tasks, api, dark }: { runtime: SprintRuntime; t
 
       <div className="max-w-md mx-auto mt-6">
         <div className={`h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/[0.06]' : 'bg-zinc-100'}`} role="progressbar" aria-label="Time left" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(fraction * 100)}>
-          <div className="h-full rounded-full bg-[#E10600] transition-[width] duration-300 ease-linear" style={{ width: `${fraction * 100}%` }} />
+          <div className="h-full rounded-full bg-[#E10600] transition-[width] duration-1000 ease-linear" style={{ width: `${fraction * 100}%` }} />
         </div>
         <p className={`text-[11px] font-ui mt-2 tabular-nums ${t.faint}`}>
           {over

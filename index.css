@@ -1223,6 +1223,32 @@ html.android-app body { overscroll-behavior-y: none; }
   .nav-rail { transition: none; }
 }
 
+/* While the page scrolls (ui/scrollCalm.ts): glass trades its refraction for
+   the plain frosted blur, and endless decoration pauses. A backdrop filter
+   re-runs on every frame its backdrop moves, which during a scroll is every
+   frame, for every glass element on screen. */
+html.scrolling .lg-lens { backdrop-filter: var(--lg-frost) !important; }
+html.scrolling .fx-root,
+html.scrolling .fx-root *,
+html.scrolling .aurora-curtain,
+html.scrolling .aurora-spill { animation-play-state: paused !important; }
+
+/* The phone's menu, closed, sits off screen: hidden once it has slid away, so
+   its glass is not composited behind every frame (and it leaves the tab order). */
+@media (max-width: 767px) {
+  .nav-rail {
+    visibility: hidden;
+    transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), width 0.3s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.38s;
+  }
+  .nav-rail[data-open='true'] {
+    visibility: visible;
+    transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), width 0.3s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s;
+  }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .nav-rail, .nav-rail[data-open='true'] { transition: none; }
+}
+
 /* Glass that can be seen through is a choice some people turn off. */
 @media (prefers-reduced-transparency: reduce) {
   .lg-lens { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }

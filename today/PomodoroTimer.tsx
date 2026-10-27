@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useSecondTick } from '../ui/useSecondTick';
 import { Chip, btn } from '../ui/kit';
 import { SUBJECT_COLORS } from '../schedule/colors';
 import { PomodoroRuntime, PomodoroSettings, Subject } from '../types';
@@ -36,7 +37,6 @@ const PomodoroTimer: React.FC<Props> = ({
   onUpdateSettings,
 }) => {
   const dark = theme === 'dark';
-  const [now, setNow] = useState(Date.now());
   const [showSettings, setShowSettings] = useState(false);
   const [notifyNote, setNotifyNote] = useState<string | null>(null);
 
@@ -46,24 +46,10 @@ const PomodoroTimer: React.FC<Props> = ({
   const rating = runtime.pendingRating[0] ?? null;
 
   /* ── Display tick ──
-     Only the clock on screen. The phase itself is run by the engine in App, so
-     this stopping — another tab, a slept device — can't cost a block. */
-  useEffect(() => {
-    if (!runtime.isRunning) return;
-    setNow(Date.now());
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, [runtime.isRunning]);
-
-  useEffect(() => {
-    const onVisible = () => { if (!document.hidden) setNow(Date.now()); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, []);
+     Only the clock on screen, once a second on the phase's own beat. The
+     phase itself is run by the engine in App, so this stopping — another
+     tab, a slept device — can't cost a block. */
+  const now = useSecondTick(runtime.isRunning, runtime.phaseEndsAt ?? 0);
 
   /* Space starts and pauses. Ignored while typing, so the task box keeps its
      spaces, and while a button has focus, where it is already that button. */

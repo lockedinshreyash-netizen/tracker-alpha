@@ -343,7 +343,12 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
       // --lg-solid: the opaque fill for "reduce transparency" (index.css).
       style: { ...style, borderRadius: radius, isolation: 'isolate', boxShadow: shadow, ['--lg-solid' as string]: dark ? '#141418' : '#ffffff' } as React.CSSProperties,
     },
-    <span aria-hidden="true" style={{ ...layer, backdropFilter: lens, WebkitBackdropFilter: frosted }} className="lg-lens" />,
+    <span
+      aria-hidden="true"
+      // --lg-frost: what the lens falls back to while the page scrolls (ui/scrollCalm.ts).
+      style={{ ...layer, backdropFilter: lens, WebkitBackdropFilter: frosted, ['--lg-frost' as string]: frosted } as React.CSSProperties}
+      className="lg-lens"
+    />,
     <span
       aria-hidden="true"
       style={{
