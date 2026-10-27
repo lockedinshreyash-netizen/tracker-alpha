@@ -61,7 +61,7 @@
    hidden one gets a system notification, a closed app gets a push. Exactly one
    of the three. Never two. */
 
-export type Channel = 'race' | 'pomodoro' | 'reminder' | 'plan' | 'nudge' | 'moderation' | 'check';
+export type Channel = 'race' | 'pomodoro' | 'sprint' | 'reminder' | 'plan' | 'nudge' | 'moderation' | 'check';
 
 export interface ChannelDef {
   /** Notifications sharing a tag replace one another instead of stacking. */
@@ -78,6 +78,8 @@ export const CHANNELS: Record<Channel, ChannelDef> = {
      rather than joined by a second copy of itself. */
   race: { tag: () => 'tracker-alpha-race', requireInteraction: false },
   pomodoro: { tag: () => 'tracker-alpha-pomodoro', requireInteraction: false },
+  /* A deadline the student set themselves. One at a time, so one tag. */
+  sprint: { tag: () => 'tracker-alpha-sprint', requireInteraction: false },
   plan: { tag: () => 'tracker-alpha-plan', requireInteraction: false },
   /* One per study day: the evening check replaces the start nudge on the lock
      screen rather than joining it. Matches the sender's tag for `nudge:` rows. */

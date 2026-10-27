@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { AppState, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, ExamPreference, ErrorEntry, MockTest, MocksState, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs } from './types';
+import { AppState, SprintRuntime, TabType, DailyLog, Subject, TimerState, SyncStatus, QSubject, ExamPreference, ErrorEntry, MockTest, MocksState, TimerMode, PomodoroRuntime, PomodoroSettings, SyllabusStatus, Task, LogSource, TopicMastery, ScheduleState, ScheduleBlock, TemplateRule, BlockKind, TaskColumn, ReminderPrefs } from './types';
 import { getActiveSubjects, getCoreSubjects, getCoreQSubjects, STATUS_CYCLE } from './constants';
 import { getISTDateString, calculateStreak, calculateVerifiedStreak, streakLedger, calculateLockInScore, generateId, addDays } from './utils';
 import { supabase } from './supabaseClient';
@@ -77,6 +77,8 @@ import { materializeDay } from './schedule/schedule';
 import { isIdle as pomodoroIsIdle, heldMode, effectiveMode } from './today/pomodoro';
 import { usePomodoro, PomodoroCommit } from './today/usePomodoro';
 import { isArmed as stopwatchArmed } from './today/stopwatch';
+import { mergeSprints, normalizeSprint, normalizeSprints } from './today/sprint';
+import { SprintCommit, useSprint } from './today/useSprint';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
 import AdminTab from './admin/AdminTab';
@@ -160,10 +162,12 @@ const App: React.FC = () => {
         const merged: AppState = { ...DEFAULT_STATE, ...parsed };
         merged.pomodoroSettings = { ...DEFAULT_POMODORO_SETTINGS, ...(parsed.pomodoroSettings || {}) };
         merged.pomodoro = normalizePomodoro(parsed.pomodoro);
+        merged.sprint = normalizeSprint(parsed.sprint);
+        merged.sprints = normalizeSprints(parsed.sprints);
         /* Held to the session armed here, which also repairs a state saved
            while a synced mode was hiding it (see `heldMode`). */
-        merged.timerMode = heldMode(merged.timer, merged.pomodoro)
-          ?? (parsed.timerMode === 'pomodoro' ? 'pomodoro' : 'stopwatch');
+        merged.timerMode = heldMode(merged.timer, merged.pomodoro, merged.sprint)
+          ?? (parsed.timerMode === 'pomodoro' || parsed.timerMode === 'sprint' ? parsed.timerMode : 'stopwatch');
         merged.leaderboard = { ...DEFAULT_LEADERBOARD, ...(parsed.leaderboard || {}) };
         /* Rewards arrived late too, and an account with a long history should
            find its earned tiers already in the vault on first load — `evaluate`
@@ -419,8 +423,11 @@ const App: React.FC = () => {
               // rewind a timer running here…
               timer: prev.timer,
               pomodoro: prev.pomodoro,
+              sprint: prev.sprint,
               // …nor switch the Today tab away from it (see `heldMode`).
-              timerMode: heldMode(prev.timer, prev.pomodoro) ?? remoteState.timerMode ?? prev.timerMode,
+              timerMode: heldMode(prev.timer, prev.pomodoro, prev.sprint) ?? remoteState.timerMode ?? prev.timerMode,
+              // An ended sprint is a receipt, like a reward: never dropped by a push.
+              sprints: mergeSprints(prev.sprints, remoteState.sprints),
               // …nor take back a reward already earned here.
               rewards: mergeRewards(normalizeRewards(prev.rewards), normalizeRewards(remoteState.rewards)),
               /* `schedule` deliberately rides the wholesale spread, exactly like
@@ -486,7 +493,9 @@ const App: React.FC = () => {
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
               pomodoro: localState.pomodoro,
-              timerMode: heldMode(localState.timer, localState.pomodoro) ?? remoteState.timerMode ?? localState.timerMode,
+              sprint: localState.sprint,
+              timerMode: heldMode(localState.timer, localState.pomodoro, localState.sprint) ?? remoteState.timerMode ?? localState.timerMode,
+              sprints: mergeSprints(localState.sprints, remoteState.sprints),
               /* Never last-write-wins: an unlock is a receipt, and a stale
                  push from another device must not be able to revoke one. */
               rewards: mergeRewards(
@@ -543,7 +552,11 @@ const App: React.FC = () => {
                laptop mid-block hid the block and locked the switch back. */
             timer: localState.timer,
             pomodoro: localState.pomodoro,
-            timerMode: heldMode(localState.timer, localState.pomodoro) ?? remoteState.timerMode ?? localState.timerMode,
+            sprint: localState.sprint,
+            timerMode: heldMode(localState.timer, localState.pomodoro, localState.sprint) ?? remoteState.timerMode ?? localState.timerMode,
+            /* Union by id in every path: a record is written once and never
+               edited or deleted, so there is nothing to resurrect. */
+            sprints: mergeSprints(localState.sprints, remoteState.sprints),
             rewards: mergeRewards(
               normalizeRewards(localState.rewards),
               normalizeRewards(remoteState.rewards),
@@ -1014,6 +1027,8 @@ const App: React.FC = () => {
    * and remember the topic was served so tomorrow offers a different one.
    */
   const engageRecommendation = (rec: Recommendation) => {
+    // Never over a sprint: it has no other way to be seen once the mode moves.
+    if (stateRef.current.sprint) return;
     sfx.play('session-start');
     setState(prev => {
       const today = getISTDateString();
@@ -1163,6 +1178,52 @@ const App: React.FC = () => {
     });
   };
 
+  /**
+   * One atomic write for everything a sprint transition touches: the armed
+   * sprint, the record of one that ended, the study time it earned and the
+   * board card it ticks. Applied only if the sprint it was computed from is
+   * still the one armed (`expect`), so a double tap or two watchers reaching
+   * for the same expiry cannot end, log or tick anything twice.
+   *
+   * Like the timer, the armed sprint is device-local; `lastUpdated` moves only
+   * when something synced changed (a log, a record, a card).
+   */
+  const commitSprint = (expect: string | null, next: SprintRuntime | null, extra: SprintCommit = {}) => {
+    const current = stateRef.current;
+    if ((current.sprint?.id ?? null) !== expect) return;
+    const subject = current.sprint?.subject ?? next?.subject ?? 'General';
+    const logs: DailyLog[] = (extra.spans ?? []).filter(sp => sp.hours > 0).map(sp => ({
+      id: generateId(),
+      date: getISTDateString(new Date(sp.endedAt)),
+      subject,
+      hours: parseFloat(sp.hours.toFixed(2)),
+      quality: 4,
+      distractions: 0,
+      /* Measured by the app, paused time excluded and capped at three and a
+         half hours a sitting (today/sprint.ts), so it counts like a timer. */
+      source: 'timer',
+      startedAt: Math.floor(sp.startedAt),
+      endedAt: Math.floor(sp.endedAt),
+    }));
+    for (const l of logs) celebrateLog(l.date, l.hours, { rang: extra.rang });
+    if (extra.move) soundForTaskMove(current.tasks, extra.move.id, extra.move.to);
+    setState(prev => {
+      if ((prev.sprint?.id ?? null) !== expect) return prev;
+      const tasks = extra.move ? moveCard(prev.tasks, extra.move.id, extra.move.to, 0) : prev.tasks;
+      const touched = logs.length > 0 || !!extra.record || tasks !== prev.tasks;
+      const nextState: AppState = {
+        ...prev,
+        sprint: next,
+        logs: logs.length ? [...prev.logs, ...logs] : prev.logs,
+        tasks,
+        sprints: extra.record ? mergeSprints(prev.sprints, [extra.record]) : prev.sprints,
+        ...(touched ? { lastUpdated: Date.now() } : {}),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+  };
+
   const updatePomodoroSettings = (update: Partial<PomodoroSettings>) => {
     setState(prev => {
       const nextState = {
@@ -1186,6 +1247,19 @@ const App: React.FC = () => {
     active: effectiveMode(state) === 'pomodoro',
     ready: syncSettled,
   });
+
+  const readSprint = useCallback(() => ({ sprint: stateRef.current.sprint ?? null, tasks: stateRef.current.tasks }), []);
+  const sprintApi = useSprint({
+    sprint: state.sprint ?? null,
+    read: readSprint,
+    commit: commitSprint,
+    ready: syncSettled,
+    onScreen: activeTab === 'Today' && effectiveMode(state) === 'sprint',
+  });
+  /* Any session in flight on this device: stopwatch (paused included), a
+     Pomodoro phase, or a sprint. Everything that waits for a session to end
+     waits on this. */
+  const sessionArmed = stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro) || !!state.sprint;
 
   /* "Still studying?" after 3.5h of a timer with no tap (today/presence.ts).
      Its prompt goes over everything; the removed-session notice goes before
@@ -1227,7 +1301,7 @@ const App: React.FC = () => {
      is left alone: they land on it instead. */
   const startFirstSession = (subject: Subject) => {
     const current = stateRef.current;
-    if (!stopwatchArmed(current.timer) && pomodoroIsIdle(current.pomodoro)) {
+    if (!stopwatchArmed(current.timer) && pomodoroIsIdle(current.pomodoro) && !current.sprint) {
       if (current.timerMode === 'pomodoro') {
         pomodoro.start(subject);
       } else {
@@ -1303,7 +1377,7 @@ const App: React.FC = () => {
     read: readReminders,
     commit: commitReminded,
     ready: remindersReady,
-    busy: stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro),
+    busy: sessionArmed,
   });
 
   /* ── Daily nudges ── (reminders/nudges.ts) Said here while the app is open;
@@ -1331,7 +1405,7 @@ const App: React.FC = () => {
     read: readNudges,
     commit: commitNudged,
     ready: remindersReady,
-    busy: stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro),
+    busy: sessionArmed,
   });
 
   /* Publish what the server should be holding, so a deadline can still arrive
@@ -1731,7 +1805,7 @@ const App: React.FC = () => {
    */
   const startBlock = (block: ScheduleBlock) => {
     const current = stateRef.current;
-    if (stopwatchArmed(current.timer) || !pomodoroIsIdle(current.pomodoro)) {
+    if (stopwatchArmed(current.timer) || !pomodoroIsIdle(current.pomodoro) || current.sprint) {
       window.alert('A SESSION IS ALREADY RUNNING. FINISH IT.');
       return;
     }
@@ -2090,7 +2164,7 @@ const App: React.FC = () => {
     && !state.examsAskedAt
     && (!!user || state.logs.length > 0 || state.progress.length > 0 || state.tasks.length > 0)
     && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !stillThere.removed
-    && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro);
+    && !sessionArmed;
 
   /* An invite takes you to Groups once you can see it — after the landing
      page and onboarding — and once more after signing in, when the card
@@ -2248,6 +2322,7 @@ const App: React.FC = () => {
               onUpdateDailyGoal={updateDailyGoal}
               onSetTimerMode={setTimerMode}
               pomodoro={pomodoro}
+              sprint={sprintApi}
               onUpdatePomodoroSettings={updatePomodoroSettings}
               theme={theme}
               activeSubjects={activeSubjects}
@@ -2539,7 +2614,7 @@ const App: React.FC = () => {
       {(() => {
         const reply = founderReplies.pending[0];
         if (!reply || showOnboarding || isBookOpen || celebration || streakMoment !== null || sharePeriod || showExamLaunch) return null;
-        if (stopwatchArmed(state.timer) || !pomodoroIsIdle(state.pomodoro)) return null;
+        if (sessionArmed) return null;
         if ((activeTab === 'Today' && announcements.current) || moderation.current || activeTab === 'Support') return null;
         const key = `${reply.id}@${reply.replied_at}`;
         if (key === replySetAside) return null;
@@ -2558,7 +2633,7 @@ const App: React.FC = () => {
       })()}
 
       {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy
-        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro)
+        && !sessionArmed
         && !(activeTab === 'Today' && announcements.current)
         && moderation.current && (
         <RemovalNoticeModal
@@ -2576,7 +2651,7 @@ const App: React.FC = () => {
           run already asked in onboarding, and a banner over a running clock is
           the app interrupting the thing it exists for. */}
       {!showOnboarding && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !showExamLaunch && !checkBusy
-        && !stopwatchArmed(state.timer) && pomodoroIsIdle(state.pomodoro) && (
+        && !sessionArmed && (
         <KeepBanner install={install} theme={theme} />
       )}
 
@@ -2718,7 +2793,8 @@ const App: React.FC = () => {
               exams: landingExam.current && landingExam.current !== state.examPreference ? undefined : examTarget,
               currentClass: state.currentClass,
               dailyGoalHours: state.dailyGoalHours,
-              timerMode: state.timerMode,
+              // Onboarding offers the two classic modes only.
+              timerMode: state.timerMode === 'sprint' ? 'stopwatch' : state.timerMode,
               progress: state.progress,
               signedIn: !!user,
               profile: profileCtl.ownProfile

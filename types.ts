@@ -234,7 +234,76 @@ export interface TimerState {
   checkAt?: number;
 }
 
-export type TimerMode = 'stopwatch' | 'pomodoro';
+export type TimerMode = 'stopwatch' | 'pomodoro' | 'sprint';
+
+/* ── Alpha Sprints (today/sprint.ts) ──
+   Finish one or two named things inside a time limit you set yourself. */
+
+/** One thing a sprint is for: a board card, or something typed for this sprint only. */
+export interface SprintItem {
+  id: string;
+  /** As it read when the sprint began. A card renamed later keeps its old name here. */
+  text: string;
+  /** The board card it was started from. The card may since have been deleted. */
+  taskId?: string;
+  subject?: Subject;
+  /** When the student ticked it. Absent = not done. */
+  doneAt?: number;
+  /** The column the sprint moved its card out of, so an untick or Undo puts it back. */
+  movedFrom?: TaskColumn;
+}
+
+/** How a sprint ended. Only `on_time` and `late` mean the work was finished. */
+export type SprintOutcome = 'on_time' | 'late' | 'expired' | 'abandoned';
+
+/**
+ * The sprint armed on this device. Device-local in every merge path, like
+ * `timer` and `pomodoro`. Every figure is derived from timestamps: nothing
+ * counts down.
+ */
+export interface SprintRuntime {
+  id: string;
+  items: SprintItem[];
+  note?: string;
+  /** What its time is logged as. */
+  subject: Subject;
+  /** The time the student gave themselves at the start. Never changes. */
+  allowedMs: number;
+  /** Added by extensions. The deadline is `allowedMs + extendedMs` of working time. */
+  extendedMs: number;
+  extensions: number;
+  /** When the first run began. */
+  startedAt: number;
+  /** Start of the run on the clock now. Null = paused. */
+  runStartedAt: number | null;
+  /** Working time banked at the last pause. Stale while running by design. */
+  workedMs: number;
+  /** Where the clock stopped, while paused. */
+  pausedAt?: number;
+  /** Total time spent paused, for the history. */
+  pausedMs: number;
+  /** Working time already written to `logs` (a pause that crossed 04:00 IST). */
+  bankedMs: number;
+  /** The deadline (as total ms of work) the bell last rang for, so a reload cannot ring it twice. */
+  rangFor?: number;
+}
+
+/** A sprint that has ended. Immutable once written. */
+export interface SprintRecord {
+  id: string;
+  items: SprintItem[];
+  note?: string;
+  subject: Subject;
+  allowedMs: number;
+  /** The deadline it ended against: the allowance plus every extension. */
+  finalMs: number;
+  extensions: number;
+  workedMs: number;
+  pausedMs: number;
+  startedAt: number;
+  endedAt: number;
+  outcome: SprintOutcome;
+}
 
 export type PomodoroPhase = 'work' | 'short_break' | 'long_break';
 
@@ -782,6 +851,11 @@ export interface AppState {
   timerMode: TimerMode;
   pomodoroSettings: PomodoroSettings;
   pomodoro: PomodoroRuntime;
+  /* Alpha Sprints (today/sprint.ts). The armed sprint is device-local like
+     `timer`; the history unions by id in every merge path, because a record
+     never changes once written. Both absent in older blobs. */
+  sprint?: SprintRuntime | null;
+  sprints?: SprintRecord[];
   leaderboard: LeaderboardPrefs;
   coach?: CoachState;
   rewards?: RewardsState;

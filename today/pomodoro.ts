@@ -1,4 +1,4 @@
-import { PomodoroPhase, PomodoroRuntime, PomodoroSettings, TimerMode, TimerState } from '../types';
+import { PomodoroPhase, PomodoroRuntime, PomodoroSettings, SprintRuntime, TimerMode, TimerState } from '../types';
 import { isArmed as stopwatchArmed } from './stopwatch';
 
 /* Pure rules for the Pomodoro cycle. Kept out of React so the whole state
@@ -105,12 +105,12 @@ export const isPaused = (p: PomodoroRuntime): boolean => !p.isRunning && p.phase
  * stopwatch session, running or paused, wins over a Pomodoro because it has
  * no other way to be stopped.
  */
-export const heldMode = (timer: TimerState | undefined, p: PomodoroRuntime): TimerMode | null =>
-  stopwatchArmed(timer) ? 'stopwatch' : isIdle(p) ? null : 'pomodoro';
+export const heldMode = (timer: TimerState | undefined, p: PomodoroRuntime, sprint?: SprintRuntime | null): TimerMode | null =>
+  stopwatchArmed(timer) ? 'stopwatch' : sprint ? 'sprint' : isIdle(p) ? null : 'pomodoro';
 
-/** The mode the Today tab, the engine and voice act on. */
-export const effectiveMode = (s: { timerMode: TimerMode; timer?: TimerState; pomodoro: PomodoroRuntime }): TimerMode =>
-  heldMode(s.timer, s.pomodoro) ?? s.timerMode;
+/** The mode the Today tab and the engines act on. */
+export const effectiveMode = (s: { timerMode: TimerMode; timer?: TimerState; pomodoro: PomodoroRuntime; sprint?: SprintRuntime | null }): TimerMode =>
+  heldMode(s.timer, s.pomodoro, s.sprint) ?? s.timerMode;
 
 /** Time served in the armed phase. Off the clock while running, banked while paused. */
 export const servedMs = (p: PomodoroRuntime, now: number = Date.now()): number => {

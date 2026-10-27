@@ -9,6 +9,8 @@ import * as sfx from '../audio';
 import { PomodoroApi } from './usePomodoro';
 import TaskBoard from '../board/TaskBoard';
 import PomodoroTimer from './PomodoroTimer';
+import SprintTimer from './SprintTimer';
+import { SprintApi } from './useSprint';
 import { Recommendation } from './recommend';
 import NoticeLine from '../notify/NoticeLine';
 import { SUPPORT_COPY } from '../support/content';
@@ -34,6 +36,7 @@ interface Props {
   onUpdateDailyGoal: (val: number) => void;
   onSetTimerMode: (mode: TimerMode) => void;
   pomodoro: PomodoroApi;
+  sprint: SprintApi;
   onUpdatePomodoroSettings: (next: Partial<PomodoroSettings>) => void;
   theme: 'dark' | 'light';
   activeSubjects: Subject[];
@@ -71,6 +74,7 @@ const TodayTab: React.FC<Props> = ({
   onUpdateDailyGoal,
   onSetTimerMode,
   pomodoro: pomodoroApi,
+  sprint: sprintApi,
   onUpdatePomodoroSettings,
   theme,
   activeSubjects,
@@ -93,6 +97,12 @@ const TodayTab: React.FC<Props> = ({
      everything that hides mid-session stays hidden through a pause. */
   const stopwatchBusy = isArmed(timer);
   const stopwatchPaused = isPaused(timer);
+  /* A sprint, running or paused, owns the card the way a stopwatch session
+     does: the switch and everything above the clock step aside. */
+  const sprintBusy = !!state.sprint;
+  /* Keeps the card from jumping when the last task is ticked: the result
+     replaces the running sprint in the same place. */
+  const sprintFocus = sprintBusy || !!sprintApi.result;
   const [manualSubject, setManualSubject] = useState<Subject>('Physics');
   const [quality, setQuality] = useState(4);
 
@@ -221,10 +231,16 @@ const TodayTab: React.FC<Props> = ({
      mode another device last synced (see `heldMode`). */
   const shownMode = effectiveMode(state);
   const isPomodoro = shownMode === 'pomodoro';
+  const isSprint = shownMode === 'sprint';
+  const boardRef = useRef<HTMLDivElement>(null);
+  const backToTasks = () => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    boardRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  };
   const dot = (s: Subject) => (SUBJECT_COLORS[s] ?? SUBJECT_COLORS.General).dot;
   const todayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
   const remaining = Math.max(0, dailyGoalHours - totalToday);
-  const busy = stopwatchBusy || pomodoroBusy;
+  const busy = stopwatchBusy || pomodoroBusy || sprintFocus;
 
   const greeting = festive !== 'none' ? FESTIVE_GREETING[festive] : null;
   const dateLine = greeting ? (
@@ -266,7 +282,7 @@ const TodayTab: React.FC<Props> = ({
       )}
       {/* Only while idle — mid-session the last thing anyone needs is a second
           opinion about what they should be doing. */}
-      {!stopwatchBusy && !pomodoroBusy && state.schedule && (
+      {!stopwatchBusy && !pomodoroBusy && !sprintFocus && state.schedule && (
         <NextUpStrip
           schedule={state.schedule}
           timer={timer}
@@ -280,7 +296,7 @@ const TodayTab: React.FC<Props> = ({
           would be a notice that never arrived.
 
           Hidden mid-session with everything else here. */}
-      {!stopwatchBusy && !pomodoroBusy && unreadAnnouncements > 0 && (
+      {!stopwatchBusy && !pomodoroBusy && !sprintFocus && unreadAnnouncements > 0 && (
         <NoticeLine
           theme={theme}
           label="A message from LOCK IN"
@@ -291,7 +307,7 @@ const TodayTab: React.FC<Props> = ({
       {/* A reply to a note the student wrote on the Support page. Same shape
           and the same rule as the announcement line: no cross, it goes once
           the reply has been read. */}
-      {!stopwatchBusy && !pomodoroBusy && founderReplies > 0 && onOpenFounderReply && (
+      {!stopwatchBusy && !pomodoroBusy && !sprintFocus && founderReplies > 0 && onOpenFounderReply && (
         <NoticeLine
           theme={theme}
           label={`${SUPPORT_COPY.signature} replied to your note`}
@@ -299,7 +315,7 @@ const TodayTab: React.FC<Props> = ({
           onOpen={onOpenFounderReply}
         />
       )}
-      {!stopwatchBusy && !targetOpen && (
+      {!stopwatchBusy && !sprintFocus && !targetOpen && (
         /* Folded: the hours done today, Share, and the way back open. */
         <Card dark={dark} delay={60} className="px-5 py-4 md:px-6">
           <div className="flex items-center gap-3 w-full" data-onboarding-target="daily-target">
@@ -324,7 +340,7 @@ const TodayTab: React.FC<Props> = ({
           </div>
         </Card>
       )}
-      {!stopwatchBusy && targetOpen && (
+      {!stopwatchBusy && !sprintFocus && targetOpen && (
         <Card dark={dark} delay={60} className="relative p-6 md:p-8">
           <button type="button" onClick={toggleTarget} aria-expanded aria-label="Collapse today's target" className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg ${t.muted} ${t.hover}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6" /></svg>
@@ -381,14 +397,18 @@ const TodayTab: React.FC<Props> = ({
       {/* Mode switch — hidden mid-stopwatch, paused included, so a session can't
           be orphaned. A part-served Pomodoro block isn't orphaned by it:
           switching away banks the time first (see setTimerMode). */}
-      {!stopwatchBusy && (
+      {!stopwatchBusy && !sprintBusy && (
         <div className={`flex justify-center ${pomodoro.isRunning ? 'opacity-40 pointer-events-none' : ''}`}>
           <Segmented
             value={shownMode}
             onChange={mode => onSetTimerMode(mode)}
             dark={dark}
             label="Timer mode"
-            options={[{ value: 'stopwatch', label: 'Stopwatch' }, { value: 'pomodoro', label: 'Pomodoro' }]}
+            options={[
+              { value: 'stopwatch', label: 'Stopwatch' },
+              { value: 'pomodoro', label: 'Pomodoro' },
+              { value: 'sprint', label: 'Sprint' },
+            ]}
           />
         </div>
       )}
@@ -401,6 +421,17 @@ const TodayTab: React.FC<Props> = ({
           activeSubjects={activeSubjects}
           theme={theme}
           onUpdateSettings={onUpdatePomodoroSettings}
+        />
+      ) : isSprint ? (
+        <SprintTimer
+          runtime={state.sprint ?? null}
+          records={state.sprints ?? []}
+          tasks={tasks}
+          api={sprintApi}
+          activeSubjects={activeSubjects}
+          defaultSubject={timer.subject}
+          theme={theme}
+          onBackToTasks={backToTasks}
         />
       ) : (
         <section
@@ -484,6 +515,7 @@ const TodayTab: React.FC<Props> = ({
         </section>
       )}
 
+      <div ref={boardRef} className="scroll-mt-6">
       <TaskBoard
         tasks={tasks}
         todayBlocks={todayBlocks}
@@ -494,6 +526,7 @@ const TodayTab: React.FC<Props> = ({
         onDeleteTask={onDeleteTask}
         onMoveTask={onMoveTask}
       />
+      </div>
 
       {/* Collapsed by default. The header keeps the information the list was
           carrying — how many sessions and how many hours — so folding it away
