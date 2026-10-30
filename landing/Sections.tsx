@@ -157,8 +157,8 @@ export const Card: React.FC = () => (
         </div>
       </div>
       <div className="lp-cardsec-words rv">
-        <h2 id="lp-card-h">One card.<br /><em>One invite.</em></h2>
-        <p>Every member gets one invite. Give it to someone who studies.</p>
+        <h2 id="lp-card-h">One card.<br /><em>One pass to gift.</em></h2>
+        <p>Every member can gift one friend an Access Pass, worth ₹2,500. Give it to someone who studies.</p>
       </div>
     </div>
   </section>
@@ -166,22 +166,21 @@ export const Card: React.FC = () => (
 
 export const Ways: React.FC<{ onCta: () => void; onInvite: () => void }> = ({ onCta, onInvite }) => (
   <section id="ways-in" className="lp-sec lp-ways" aria-labelledby="lp-ways-h">
-    <h2 id="lp-ways-h" className="lp-h2 rv">Three ways in.</h2>
+    <h2 id="lp-ways-h" className="lp-h2 rv">Two ways in.</h2>
     <ol className="lp-ways-list">
       {WAYS.map((w, i) => (
         <li key={w.id} className="lp-way rv">
-          <span className="lp-way-n" aria-hidden="true">{['I', 'II', 'III'][i]}</span>
+          <span className="lp-way-n" aria-hidden="true">{['I', 'II'][i]}</span>
           <div className="lp-way-words">
             <h3>{w.title}</h3>
             <p>{w.small}</p>
           </div>
           {w.id === 'invite' && <button type="button" className="lp-pill" onClick={onInvite}>I have one</button>}
-          {w.id === 'pass' && <span className="lp-pill lp-pill-off">Soon</span>}
-          {w.id === 'waitlist' && <button type="button" className="lp-pill lp-pill-on" onClick={onCta}>Join</button>}
+          {w.id === 'pass' && <button type="button" className="lp-pill lp-pill-on" onClick={onCta}>Reserve</button>}
         </li>
       ))}
     </ol>
-    <p className="lp-note rv">Here before 1 November? You’re already in. <button type="button" onClick={onInvite}>Sign in</button></p>
+    <p className="lp-note rv">Already a member? <button type="button" onClick={onInvite}>Sign in</button></p>
   </section>
 );
 
@@ -240,7 +239,7 @@ export const Final: React.FC<{ onCta: () => void; onInvite: () => void }> = ({ o
         Request access <Arrow />
       </button>
       <button id="landing-invite-final" type="button" className="lp-link" onClick={onInvite}>
-        I have an invite
+        I have a pass
       </button>
     </div>
   </section>

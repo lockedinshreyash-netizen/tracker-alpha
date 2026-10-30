@@ -8,7 +8,7 @@
 
 import type { ChapterProgress, ExamPreference, Subject, TimerMode } from '../types';
 import { getChaptersFor, getCoreSubjects } from '../constants';
-import { defaultExam, defaultYear, examById, examDateFor, streamOf, targetExams, type ExamId, type ExamTarget } from '../content/exams';
+import { defaultExam, examById, examDateFor, seasonYear, streamOf, targetExams, type ExamId, type ExamTarget } from '../content/exams';
 import { getWeight, TIER_LABELS, TIER_ORDER, type WeightTier } from '../content';
 import { getDaysRemaining } from '../utils';
 
@@ -17,7 +17,7 @@ export interface Answers {
   exam: ExamPreference;
   /** The exams picked, main exam first (content/exams.ts). */
   exams: ExamId[];
-  /** The year they write them. Follows the class until the student picks one. */
+  /** The year they write them. This season (2027) until the student picks one. */
   year: number;
   yearPicked: boolean;
   cls: 11 | 12;
@@ -28,7 +28,7 @@ export interface Answers {
 export const DEFAULT_ANSWERS = (exam: ExamPreference, cls: 11 | 12, hours: number, style: TimerMode, target?: ExamTarget): Answers => ({
   exam,
   exams: target ? targetExams(target) : [defaultExam(streamOf(exam))],
-  year: target?.year ?? defaultYear(cls),
+  year: target?.year ?? seasonYear(),
   yearPicked: false,
   cls,
   hours: Math.min(14, Math.max(1, Math.round(hours))),

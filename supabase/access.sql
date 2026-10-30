@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Access: Alpha is invite-only from 1 Nov 2026
+-- Access: Alpha is invite-only
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- The backend is not ready for a sudden spike, so from the cutover a new
@@ -9,13 +9,14 @@
 --   founding  every account created before the cutover. has_access() answers
 --             yes for them from auth.users.created_at alone, so nobody already
 --             inside depends on a backfill having run; the row only gives them
---             a member number. A device that was used before the cutover can
---             also claim it for a new account (claim_founding_device), flagged
---             so staff can see it.
+--             a member number. A device used before the cutover can NOT claim
+--             it for a new account any more (its proof was localStorage): it
+--             applies with `device_since` and staff let it in.
 --   invite    every member owns exactly ONE invite code (access_invites.owner_id
 --             is unique). It is single use.
---   waitlist  sign in, apply, wait. Staff admit from the console.
---   pass      the ₹2,500 Priority Pass. Written by the payment webhook (service
+--   waitlist  sign in, reserve an Access Pass (or say you used Alpha before),
+--             wait. Staff admit from the console.
+--   pass      the ₹2,500 Access Pass. Written by the payment webhook (service
 --             role) through access_grant_pass(); no client can call it.
 --   admin     granted by hand from the console (the Play reviewer, a friend).
 --
@@ -31,12 +32,25 @@
 -- which numbers the founding members by sign-up date.
 
 -- ── 1. The cutover ──
--- One place. access/cutover.ts holds the same instant for the client.
+-- The doors close the first time this file is run, and on 1 Nov 2026 at the
+-- latest. Stored, so re-running the file never moves it. The client
+-- (access/cutover.ts) closes at deploy, which must come AFTER running this:
+-- with the client closed and this function missing, nobody gets in.
+create table if not exists public.access_settings (
+  id      boolean     primary key default true check (id),
+  cutover timestamptz not null default least(now(), timestamptz '2026-11-01 00:00:00+05:30')
+);
+insert into public.access_settings (id) values (true) on conflict (id) do nothing;
+alter table public.access_settings enable row level security;
+revoke all on public.access_settings from anon, authenticated;
+
 create or replace function public.access_cutover()
 returns timestamptz
 language sql
-immutable
-as $$ select timestamptz '2026-11-01 00:00:00+05:30' $$;
+stable
+security definer
+set search_path = public
+as $$ select coalesce((select cutover from public.access_settings where id), timestamptz '2026-11-01 00:00:00+05:30') $$;
 
 
 -- ── 2. Tables ──
@@ -77,6 +91,10 @@ create table if not exists public.access_waitlist (
   goal_hours  numeric(4, 1),
   why         text,
   wants_pass  boolean     not null default false,
+  -- The earliest day this person's device shows Alpha in use, when it
+  -- predates their account: a guest from before the doors closed. A hint for
+  -- staff, never access by itself.
+  device_since date,
   joined_at   timestamptz not null default now(),
   admitted_at timestamptz,
   constraint waitlist_exam check (exam is null or exam in ('JEE', 'NEET')),
@@ -84,6 +102,7 @@ create table if not exists public.access_waitlist (
   constraint waitlist_hours check (goal_hours is null or goal_hours between 0 and 16),
   constraint waitlist_why check (why is null or char_length(why) <= 140)
 );
+alter table public.access_waitlist add column if not exists device_since date;
 create index if not exists access_waitlist_waiting on public.access_waitlist (place) where admitted_at is null;
 
 create table if not exists public.access_invite_attempts (
@@ -427,6 +446,7 @@ declare
   v_hours numeric;
   v_why  text := nullif(left(trim(coalesce(p->>'why', '')), 140), '');
   v_pass boolean := coalesce((p->>'wants_pass')::boolean, false);
+  v_since date;
 begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -440,52 +460,29 @@ begin
   if v_class not in (11, 12, 13) then v_class := null; end if;
   begin v_hours := round((p->>'goal_hours')::numeric, 1); exception when others then v_hours := null; end;
   if v_hours < 0 or v_hours > 16 then v_hours := null; end if;
+  -- ISO only: Postgres reads 'yesterday' and 'today' as dates.
+  if coalesce(p->>'device_since', '') ~ '^\d{4}-\d{2}-\d{2}$' then
+    begin v_since := (p->>'device_since')::date; exception when others then v_since := null; end;
+  end if;
+  if v_since < date '2024-01-01' or v_since > (public.access_cutover() at time zone 'Asia/Kolkata')::date then
+    v_since := null;
+  end if;
 
-  insert into public.access_waitlist (user_id, exam, class, goal_hours, why, wants_pass)
-  values (uid, v_exam, v_class, v_hours, v_why, v_pass)
+  insert into public.access_waitlist (user_id, exam, class, goal_hours, why, wants_pass, device_since)
+  values (uid, v_exam, v_class, v_hours, v_why, v_pass, v_since)
   on conflict (user_id) do update
     set exam = excluded.exam, class = excluded.class, goal_hours = excluded.goal_hours,
-        why = excluded.why, wants_pass = excluded.wants_pass;
+        why = excluded.why, wants_pass = excluded.wants_pass,
+        device_since = coalesce(excluded.device_since, access_waitlist.device_since);
 
   return public.my_access();
 end;
 $$;
 
--- A device that was in use before the cutover, signing into a new account.
--- p.first_day is the earliest log date the device holds (YYYY-MM-DD, IST).
--- The client cannot prove it, so the grant is marked and staff can see it.
-create or replace function public.claim_founding_device(p jsonb)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = public
-as $$
-declare
-  uid   uuid := auth.uid();
-  v_first date;
-begin
-  if uid is null then
-    raise exception 'not authenticated' using errcode = '42501';
-  end if;
-  if public.has_access() then
-    return public.my_access();
-  end if;
-  -- ISO only: Postgres reads 'yesterday' and 'today' as dates.
-  if coalesce(p->>'first_day', '') ~ '^\d{4}-\d{2}-\d{2}$' then
-    begin v_first := (p->>'first_day')::date; exception when others then v_first := null; end;
-  end if;
-  if v_first is null or v_first >= (public.access_cutover() at time zone 'Asia/Kolkata')::date then
-    return jsonb_build_object('status', 'refused');
-  end if;
-
-  insert into public.access_grants (user_id, source, device_claim)
-  values (uid, 'founding', true)
-  on conflict (user_id) do nothing;
-  update public.access_waitlist set admitted_at = coalesce(admitted_at, now()) where user_id = uid;
-  return public.my_access();
-end;
-$$;
+-- Gone: a device used before the cutover used to claim founding access for a
+-- new account here, on proof the client could forge (localStorage). It now
+-- applies through join_waitlist with device_since, and staff decide.
+drop function if exists public.claim_founding_device(jsonb);
 
 
 -- ── 5b. Payment hook (service role only) ──
@@ -533,17 +530,20 @@ begin
     'invites_open', (select count(*) from public.access_invites where redeemed_at is null),
     'waiting', (select count(*) from public.access_waitlist where admitted_at is null),
     'waiting_wants_pass', (select count(*) from public.access_waitlist where admitted_at is null and wants_pass),
+    'waiting_used_before', (select count(*) from public.access_waitlist where admitted_at is null and device_since is not null),
     'admitted_from_waitlist', (select count(*) from public.access_waitlist where admitted_at is not null)
   );
 end;
 $$;
 
 -- The queue, oldest first, keyset-paged on place. Names come from profiles,
--- never an email (admin_recent_users' rule).
-create or replace function public.admin_waitlist(p_limit int default 50, p_after bigint default null)
+-- never an email (admin_recent_users' rule). Dropped first: its RETURNS TABLE
+-- gained device_since, and a changed return type cannot be replaced.
+drop function if exists public.admin_waitlist(int, bigint);
+create function public.admin_waitlist(p_limit int default 50, p_after bigint default null)
 returns table (
   user_id uuid, place bigint, name text, exam text, class smallint,
-  goal_hours numeric, why text, wants_pass boolean, joined_at timestamptz
+  goal_hours numeric, why text, wants_pass boolean, device_since date, joined_at timestamptz
 )
 language plpgsql
 stable
@@ -556,7 +556,7 @@ begin
   end if;
   return query
     select w.user_id, w.place, (public.access_public_face(w.user_id)->>'name'),
-           w.exam, w.class, w.goal_hours, w.why, w.wants_pass, w.joined_at
+           w.exam, w.class, w.goal_hours, w.why, w.wants_pass, w.device_since, w.joined_at
       from public.access_waitlist w
      where w.admitted_at is null and (p_after is null or w.place > p_after)
      order by w.place
@@ -708,7 +708,6 @@ revoke all on function public.my_access()                    from public, anon;
 revoke all on function public.preview_access_invite(text)    from public, anon;
 revoke all on function public.redeem_access_invite(text)     from public, anon;
 revoke all on function public.join_waitlist(jsonb)           from public, anon;
-revoke all on function public.claim_founding_device(jsonb)   from public, anon;
 revoke all on function public.admin_access_overview()        from public, anon;
 revoke all on function public.admin_waitlist(int, bigint)    from public, anon;
 revoke all on function public.admin_admit(uuid[])            from public, anon;
@@ -721,7 +720,6 @@ grant execute on function public.my_access()                  to authenticated;
 grant execute on function public.preview_access_invite(text)  to anon, authenticated;
 grant execute on function public.redeem_access_invite(text)   to authenticated;
 grant execute on function public.join_waitlist(jsonb)         to authenticated;
-grant execute on function public.claim_founding_device(jsonb) to authenticated;
 grant execute on function public.admin_access_overview()      to authenticated;
 grant execute on function public.admin_waitlist(int, bigint)  to authenticated;
 grant execute on function public.admin_admit(uuid[])          to authenticated;

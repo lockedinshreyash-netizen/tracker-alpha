@@ -3,14 +3,16 @@
    page renders, so the structured data can never claim what the page does not
    say (Google drops markup that disagrees with the visible text).
 
-   - jsonLd(): one @graph — Organization, WebSite, WebApplication, WebPage and
-     FAQPage — linked by @id so engines read them as one entity. Each exam's
+   - jsonLd(): one @graph — Organization, WebSite, WebApplication, WebPage,
+     FAQPage and the film's VideoObject — linked by @id so engines read them
+     as one entity. Each exam's
      page (VARIANTS) gets its own WebPage and FAQPage, pointing at the same
      Organization, WebSite and WebApplication on the root.
    - llmsTxt(): /llms.txt, the plain-Markdown summary that AI assistants and
      their crawlers look for. Facts first, in sentences worth quoting. */
 
 import { DEFINITION, FEATURES, ROOT, SITE, VARIANTS, WAYS, faqFor, pageDescription, pageTitle, type Variant } from './content';
+import { FILM } from './Showcase';
 
 const ORIGIN = SITE.url.replace(/\/$/, '');
 export const pageUrl = (v: Variant): string => `${ORIGIN}${v.path}`;
@@ -85,7 +87,25 @@ export const jsonLd = (builtAt: number, v: Variant = ROOT): object => {
         about: { '@id': id('app') },
         mainEntity: { '@id': id('app') },
         primaryImageOfPage: { '@type': 'ImageObject', url: SITE.image, width: 1200, height: 630 },
+        video: { '@id': id('film') },
         dateModified: modified,
+      },
+      {
+        // The "Look inside." film every landing page shows (landing/Showcase.tsx).
+        '@type': 'VideoObject',
+        '@id': id('film'),
+        name: FILM.name,
+        description: FILM.description,
+        thumbnailUrl: `${ORIGIN}${FILM.poster}`,
+        contentUrl: `${ORIGIN}${FILM.src}`,
+        uploadDate: FILM.made,
+        duration: `PT${FILM.seconds}S`,
+        width: 1920,
+        height: 1080,
+        inLanguage: 'en-IN',
+        isFamilyFriendly: true,
+        about: { '@id': id('app') },
+        publisher: { '@id': id('organization') },
       },
       {
         '@type': 'FAQPage',
@@ -116,10 +136,10 @@ export const llmsTxt = (builtAt: number, guides: Array<{ path: string; label: st
     '## Key facts',
     '',
     `- Website: ${SITE.url}`,
-    '- Access: invite-only from 1 November 2026, so the app stays fast while it grows.',
-    '- Three ways in: an invite from a member (every member has exactly one), the Priority Pass (₹2,500 paid once for lifetime access; not on sale yet), or the waitlist (sign in with Google, apply, get a place number; people are let in by waves).',
-    '- Members do not pay. The Priority Pass is only for skipping the line.',
-    '- Everyone who used the app before 1 November 2026 is a founding member.',
+    '- Access: invite-only, so the app stays fast while it grows.',
+    '- The way in is an Access Pass (lifetime access, worth ₹2,500). A member can gift one (every member can gift exactly one, single use, at no cost to the friend), or it can be bought for ₹2,500 once (not on sale yet, can be reserved).',
+    '- Founding members (accounts from before it went invite-only) never pay for what they use today. Alpha Pro, if it comes, will be optional.',
+    '- Everyone with an account before it went invite-only is a founding member.',
     '- Made for: Class 11, Class 12 and droppers preparing for JEE Main, JEE Advanced, NEET UG, BITSAT, MHT CET, WBJEE, KCET, COMEDK UGET or VITEEE, in 2027 or 2028.',
     '- Subjects: Physics, Chemistry and Maths for engineering exams; Physics, Chemistry and Biology for NEET.',
     '- Every day, students race on a live leaderboard of study hours, which resets at 4 AM IST, and study in groups with friends.',
@@ -127,6 +147,7 @@ export const llmsTxt = (builtAt: number, guides: Array<{ path: string; label: st
     '- Sign-in is with Google. It syncs phone and laptop, and unlocks study groups and the leaderboard.',
     '- The study day resets at 4 AM IST, so late-night study counts for the day it belongs to.',
     '- The study timer is a stopwatch or a Pomodoro timer, and each session gets a 1 to 5 focus rating.',
+    `- Look inside: a ${FILM.seconds}-second film of the app (timer, day plan, syllabus, mocks, flashcards, notes, streak), with a demo account's numbers: ${ORIGIN}${FILM.src}`,
     '- A 365-day study streak of timed sessions earns a physical hamper, shipped to the student.',
     '',
     '## Features',

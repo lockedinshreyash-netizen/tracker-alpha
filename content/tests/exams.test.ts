@@ -35,7 +35,8 @@ test('year: from the class and the season', () => {
 
 test('migration: an old JEE or NEET choice becomes a full target', () => {
   assert.deepEqual(normalizeTarget(undefined, 'PCM', 12, OCT_2026), { primary: 'jee-main', also: [], year: 2027 });
-  assert.deepEqual(normalizeTarget(undefined, 'PCB', 11, OCT_2026), { primary: 'neet-ug', also: [], year: 2028 });
+  // Not asked yet: this season, whatever the class.
+  assert.deepEqual(normalizeTarget(undefined, 'PCB', 11, OCT_2026), { primary: 'neet-ug', also: [], year: 2027 });
 });
 
 test('normalize: exams stay in their stream, unique, capped, with Main before Advanced', () => {
@@ -52,8 +53,8 @@ test('normalize: exams stay in their stream, unique, capped, with Main before Ad
   assert.ok(normalizeTarget({ primary: 'bitsat', also: ['jee-advanced'], year: 2027 }, 'PCM', 12, OCT_2026).also.includes('jee-main'));
   // At most four others.
   assert.equal(normalizeTarget({ primary: 'jee-main', also: ['bitsat', 'mht-cet', 'wbjee', 'kcet', 'comedk', 'viteee'], year: 2027 }, 'PCM', 12, OCT_2026).also.length, 4);
-  // A year far from now, or no year, falls back to the class.
-  assert.equal(normalizeTarget({ primary: 'jee-main', also: [], year: 1999 }, 'PCM', 11, OCT_2026).year, 2028);
+  // A year far from now, or no year, falls back to this season, whatever the class.
+  assert.equal(normalizeTarget({ primary: 'jee-main', also: [], year: 1999 }, 'PCM', 11, OCT_2026).year, 2027);
   assert.equal(normalizeTarget({ primary: 'jee-main', also: [], year: 2029 }, 'PCM', 12, OCT_2026).year, 2029);
   // Garbage is a default target, not a crash.
   assert.equal(normalizeTarget('nonsense', 'PCB', 12, OCT_2026).primary, 'neet-ug');

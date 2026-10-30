@@ -36,6 +36,8 @@
     "sfx": "tsx scripts/render-sfx.ts",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "showcase": "tsx scripts/showcase.ts",
+    "showcase:audio": "tsx scripts/render-showcase-audio.ts"
   }
 }

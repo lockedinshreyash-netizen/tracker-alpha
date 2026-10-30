@@ -123,7 +123,7 @@ export const Pledge: React.FC<{ a: Answers; onCommit: () => void; onDone: () => 
       <Eyebrow>Your word</Eyebrow>
       <h1 className="ob-h1"><Rise text="Make it *official.*" delay={80} /></h1>
       <p className="ob-pledge ob-fade" style={{ animationDelay: '360ms' }}>
-        I&apos;ll put in <em>{a.hours} {a.hours === 1 ? 'hour' : 'hours'}</em> a day, every day, until {examLabel(a.exams[0])}.
+        I&apos;ll put in <em>{a.hours} {a.hours === 1 ? 'hour' : 'hours'}</em> a day, every day, until {examLabel(a.exams[0])} {a.year}.
       </p>
       <HoldToCommit done={done} onCommit={() => { onCommit(); setDone(true); }} />
     </div>

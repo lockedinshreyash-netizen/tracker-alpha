@@ -157,15 +157,14 @@ export const FEATURES: Feature[] = [
 /* The three ways in. The Pass price matches access/cutover.ts (PASS_PRICE_LABEL);
    it is not on sale until payments are wired, and the page says so. */
 export interface Way {
-  id: 'invite' | 'pass' | 'waitlist';
+  id: 'invite' | 'pass';
   title: string;
   small: string;
 }
 
 export const WAYS: Way[] = [
-  { id: 'invite', title: 'Get invited', small: 'A member gives you theirs.' },
-  { id: 'pass', title: 'Skip the line', small: '₹2,500, once. Opens soon.' },
-  { id: 'waitlist', title: 'Join the waitlist', small: 'Sign in. Wait your turn.' },
+  { id: 'invite', title: 'Get gifted a pass', small: 'A member gifts you an Access Pass, worth ₹2,500.' },
+  { id: 'pass', title: 'Buy a pass', small: '₹2,500, once. Opens soon.' },
 ];
 
 /* The FAQ, told for a page. The first and the exam question change per exam;
@@ -179,11 +178,11 @@ export const faqFor = (v: Variant): Array<{ q: string; a: string }> => {
     { q: 'What is Tracker Alpha?', a: DEFINITION },
     examQ,
     { q: `Does it work for ${y2}?`, a: `Yes. Pick ${y1} or ${y2} and your countdown follows it.` },
-    { q: 'How do I get in?', a: 'Get an invite from a member, buy the Priority Pass when it opens, or join the waitlist.' },
-    { q: 'What is the Priority Pass?', a: 'Pay ₹2,500 once and get in for life, with no waiting. It is not on sale yet.' },
-    { q: 'Why invite-only?', a: 'So Alpha stays fast. We let people in a few at a time.' },
-    { q: 'Do members pay?', a: 'No. The Pass is only for skipping the line.' },
-    { q: 'I already use Alpha. Am I in?', a: 'Yes. If you used Alpha before 1 November 2026, you are a founding member. Just sign in.' },
+    { q: 'How do I get in?', a: 'With an Access Pass. A member can gift you one, or you can buy one when they open.' },
+    { q: 'What is the Access Pass?', a: 'Lifetime access to Alpha, plus one pass to gift a friend. It costs ₹2,500 once. It is not on sale yet.' },
+    { q: 'What is a gifted pass?', a: 'Every member can gift one friend an Access Pass, worth ₹2,500. It costs the friend nothing. It works once.' },
+    { q: 'Why invite-only?', a: 'So Alpha stays fast. People come in a few at a time.' },
+    { q: 'I already use Alpha. Am I in?', a: 'Yes. If you had an account before it went invite-only, you are a founding member. You never pay for what you use today. Just sign in.' },
     { q: 'Does it work on my phone?', a: 'Yes. It runs in any browser, and you can add it to your home screen.' },
   ];
 };

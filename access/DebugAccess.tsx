@@ -1,10 +1,13 @@
 /* ── `?access=debug` (DEV only) ──
-   Every state of the Gate, the member card, the founding moment and Console →
-   Access, on in-memory RPCs answered before the network (the support board's
-   fetch stub). A picker in the corner switches state; nothing is written. */
+   Every state of the Gate, the gifted pass (sealed, opening, open, claimed), the
+   member sheet, the founding moment and Console → Access, on in-memory RPCs
+   answered before the network (the support board's fetch stub). A picker in
+   the corner switches state, a switch dresses it for Diwali or not; nothing
+   is written. `&s=…&diwali=0|1` picks both from the URL. */
 
 import { useState } from 'react';
 import Gate from './Gate';
+import { GiftEnvelope, GiftPass, GiftReveal } from './GiftPass';
 import MemberSheet from './MemberSheet';
 import AccessAdmin from '../admin/AccessAdmin';
 import type { AccessView } from './useAccess';
@@ -36,11 +39,12 @@ const answer = (fn: string, args: Record<string, unknown>): Response => {
     case 'join_waitlist':
       return ok({ status: 'waitlist', position: 41, wants_pass: !!(args.p as { wants_pass?: boolean })?.wants_pass });
     case 'admin_access_overview':
-      return ok({ cutover: '2026-10-31T18:30:00Z', by_source: { founding: 3120, invite: 418, waitlist: 200, admin: 3 }, device_claims: 12, founding_unnumbered: 0, invites_redeemed: 418, invites_open: 3323, waiting: 2, waiting_wants_pass: 1, admitted_from_waitlist: 200 });
+      return ok({ cutover: '2026-10-31T18:30:00Z', by_source: { founding: 3120, invite: 418, waitlist: 200, admin: 3 }, device_claims: 12, founding_unnumbered: 0, invites_redeemed: 418, invites_open: 3323, waiting: 3, waiting_wants_pass: 1, waiting_used_before: 1, admitted_from_waitlist: 200 });
     case 'admin_waitlist':
       return ok([
         { user_id: 'a', place: 1, name: 'Ishaan', exam: 'JEE', class: 12, goal_hours: 10, why: 'I study 10 hours. I want the people around me to as well.', wants_pass: true, joined_at: '2026-11-01T06:10:00Z' },
         { user_id: 'b', place: 2, name: null, exam: 'NEET', class: 13, goal_hours: 8, why: null, wants_pass: false, joined_at: '2026-11-01T09:42:00Z' },
+        { user_id: 'c', place: 3, name: 'Meera', exam: 'JEE', class: 11, goal_hours: null, why: null, wants_pass: false, device_since: '2026-09-12', joined_at: '2026-11-01T11:05:00Z' },
       ]);
     default:
       return new Response(JSON.stringify({ code: 'PGRST202', message: 'unknown' }), { status: 404 });
@@ -59,47 +63,58 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 };
 
 type S =
-  | 'door-out' | 'door-in' | 'door-play' | 'invited-out' | 'invited-used' | 'invited-in'
-  | 'waitlist' | 'waitlist-play' | 'card-founding' | 'card-invited' | 'intro' | 'console-dark' | 'console-light';
+  | 'door-out' | 'door-in' | 'door-play' | 'door-before' | 'unknown' | 'invited-out' | 'invited-used' | 'invited-in'
+  | 'waitlist' | 'waitlist-back' | 'waitlist-play' | 'gifts' | 'reveal'
+  | 'card-founding' | 'card-invited' | 'intro' | 'console-dark' | 'console-light';
 
 const STATES: Array<[S, string]> = [
   ['door-out', 'Door · signed out'],
-  ['door-in', 'Door · signed in (apply)'],
+  ['door-in', 'Door · signed in (reserve a Pass)'],
   ['door-play', 'Door · Play app'],
-  ['invited-out', 'Invite link · signed out'],
-  ['invited-used', 'Invite link · already used'],
-  ['invited-in', 'Invite link · signed in → welcome'],
-  ['waitlist', 'On the waitlist'],
-  ['waitlist-play', 'On the waitlist · Play app'],
-  ['card-founding', 'Member card · founding, invite open'],
-  ['card-invited', 'Member card · invited, invite used'],
-  ['intro', 'Founding moment (once)'],
+  ['door-before', 'Door · device used Alpha before'],
+  ['unknown', "Couldn't check access"],
+  ['invited-out', 'Gift link · signed out'],
+  ['invited-used', 'Gift link · already claimed'],
+  ['invited-in', 'Gift link · signed in → opens'],
+  ['waitlist', 'Pass reserved'],
+  ['waitlist-back', 'Asked back in'],
+  ['waitlist-play', 'Waiting · Play app'],
+  ['gifts', 'Gifted pass · every form'],
+  ['reveal', 'Gift opening (loops)'],
+  ['card-founding', 'Member sheet · founding, pass to gift'],
+  ['card-invited', 'Member sheet · invited, pass claimed'],
+  ['intro', 'Founding moment (once) · the promise'],
   ['console-dark', 'Console → Access · dark'],
   ['console-light', 'Console → Access · light'],
 ];
 
-const DEFAULTS = { exam: 'JEE' as const, currentClass: 12 as const, hours: 9 };
+const DEFAULTS = { exam: 'JEE' as const, currentClass: 12 as const };
 const noop = () => { /* debug */ };
 
 const DebugAccess = () => {
   const [s, setS] = useState<S>(() => (new URLSearchParams(location.search).get('s') as S) || 'door-out');
+  const [diwali, setDiwali] = useState(() => new URLSearchParams(location.search).get('diwali') !== '0');
+  const [loop, setLoop] = useState(0);
   previewStatus = s === 'invited-used' ? 'used' : 'ok';
   try { sessionStorage.removeItem('alpha_gate_intent_v1'); } catch { /* fine */ }
 
   const view = (k: AccessView['kind']): AccessView =>
-    k === 'waitlist' ? { kind: 'waitlist', position: 41, wantsPass: true } : ({ kind: k } as AccessView);
+    k === 'waitlist' ? { kind: 'waitlist', position: 41, wantsPass: s !== 'waitlist-back' } : ({ kind: k } as AccessView);
 
-  const gate = (v: AccessView, signedIn: boolean, code: string | null, play = false) => (
+  const gate = (v: AccessView, signedIn: boolean, code: string | null, play = false, since: string | null = null) => (
     <Gate
-      key={s}
+      key={`${s}-${diwali}`}
       view={v}
       signedIn={signedIn}
       pendingCode={code}
       defaults={DEFAULTS}
       playApp={play}
+      diwali={diwali}
+      deviceSince={since}
       onSignIn={async () => 'Debug: Google is not reached from the board.'}
       onSignOut={noop}
       onSettle={a => alert(`settle → ${JSON.stringify(a).slice(0, 160)}`)}
+      onRetry={() => alert('retry')}
     />
   );
 
@@ -107,13 +122,38 @@ const DebugAccess = () => {
   if (s === 'door-out') body = gate(view('locked'), false, null);
   else if (s === 'door-in') body = gate(view('none'), true, null);
   else if (s === 'door-play') body = gate(view('locked'), false, null, true);
+  else if (s === 'door-before') body = gate(view('none'), true, null, false, '2026-09-12');
+  else if (s === 'unknown') body = gate(view('unknown'), true, null);
   else if (s === 'invited-out' || s === 'invited-used') body = gate(view('locked'), false, 'H4R8ZT1QK6NB');
   else if (s === 'invited-in') body = gate(view('none'), true, 'H4R8ZT1QK6NB');
-  else if (s === 'waitlist') body = gate(view('waitlist'), true, null);
+  else if (s === 'waitlist' || s === 'waitlist-back') body = gate(view('waitlist'), true, null);
   else if (s === 'waitlist-play') body = gate(view('waitlist'), true, null, true);
-  else if (s === 'card-founding') body = <MemberSheet key={s} member={FOUNDING} name="Shreyash" onClose={noop} />;
-  else if (s === 'card-invited') body = <MemberSheet key={s} member={INVITED} name={PRIYA.name} onClose={noop} />;
-  else if (s === 'intro') body = <MemberSheet key={s} member={FOUNDING} name="Shreyash" intro onClose={noop} />;
+  else if (s === 'gifts') {
+    body = (
+      <div className="ax" style={{ position: 'relative', minHeight: '100vh' }}>
+        <div className="ax-wrap" style={{ gap: 40, alignItems: 'center', paddingTop: 48 }}>
+          <GiftPass id="d1" from="Rahul Verma" fromNo={412} code="7K3QM9XD2PWC" diwali={diwali} />
+          <GiftPass id="d2" from="Rahul Verma" fromNo={412} claimedBy="Aman K" diwali={diwali} />
+          <GiftPass id="d3" from={null} diwali={diwali} />
+          <GiftEnvelope id="d4" from="Rahul Verma" diwali={diwali} />
+          <div style={{ width: 320 }}><GiftPass id="d5" from="Rahul Verma" fromNo={412} code="7K3QM9XD2PWC" diwali={diwali} /></div>
+        </div>
+      </div>
+    );
+  } else if (s === 'reveal') {
+    body = (
+      <div className="ax" style={{ position: 'relative', minHeight: '100vh' }}>
+        <div className="ax-wrap" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <div className="ax-giftstage" style={{ width: '100%' }}>
+            <GiftReveal key={loop} from="Rahul Verma" fromNo={412} diwali={diwali} onDone={() => window.setTimeout(() => setLoop(n => n + 1), 1800)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  else if (s === 'card-founding') body = <MemberSheet key={s} member={FOUNDING} name="Shreyash" diwali={diwali} onClose={noop} />;
+  else if (s === 'card-invited') body = <MemberSheet key={s} member={INVITED} name={PRIYA.name} diwali={diwali} onClose={noop} />;
+  else if (s === 'intro') body = <MemberSheet key={s} member={FOUNDING} name="Shreyash" intro diwali={diwali} onClose={noop} />;
   else {
     const dark = s === 'console-dark';
     body = (
@@ -134,6 +174,9 @@ const DebugAccess = () => {
       >
         {STATES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
+      <label style={{ position: 'fixed', right: 12, bottom: 56, zIndex: 1000, padding: '6px 10px', borderRadius: 10, font: '600 13px system-ui', background: '#fff', color: '#000', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input type="checkbox" checked={diwali} onChange={e => setDiwali(e.target.checked)} /> Diwali
+      </label>
     </>
   );
 };

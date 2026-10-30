@@ -111,7 +111,7 @@ import { deleteAccount } from './account/deleteAccount';
 import { useAccess } from './access/useAccess';
 import { accessLive } from './access/cutover';
 import { clearAccessInvite, takeAccessInvite } from './access/invite';
-import { stampDevice } from './access/device';
+import { deviceSince, stampDevice } from './access/device';
 import { isAndroidApp } from './install/useInstall';
 const AccessGate = React.lazy(() => import('./access/Gate'));
 const MemberSheet = React.lazy(() => import('./access/MemberSheet'));
@@ -338,7 +338,7 @@ const App: React.FC = () => {
      of the app for anyone without access once the doors close. The server
      refuses a non-member's writes to the synced blob on its own
      (supabase/access.sql §6); canSyncRef only stops this client knocking. */
-  const access = useAccess(user?.id ?? null, state.logs);
+  const access = useAccess(user?.id ?? null);
   const canSyncRef = useRef(true);
 
   /* Memoised because `getActiveSubjects` returns a fresh array literal every
@@ -614,6 +614,13 @@ const App: React.FC = () => {
             reading: mergeReading(normalizeReading(localState.reading), normalizeReading(remoteState.reading)),
           };
         });
+      } else {
+        /* No profile: a brand-new account. Onboarding is remembered per
+           device, so a new account on a device that already onboarded someone
+           else would skip every question and keep the default exam and year.
+           A fresh account with nothing here gets asked. */
+        const local = stateRef.current;
+        if (!local.examsAskedAt && local.logs.length === 0) setNeedsOnboarding(true);
       }
       isInitialSyncDone.current = true;
       setSyncStatus('synced');
@@ -670,10 +677,11 @@ const App: React.FC = () => {
     }
   }, [state, user?.id]);
 
-  /* Nothing is pushed for someone who is not in, and the moment they are
-     (an invite, an admission, a device claim) their state goes up once. */
+  /* Nothing is pushed for someone who is not in (or not known to be in), and
+     the moment they are (an invite, an admission) their state goes up once. */
   useEffect(() => {
-    const blocked = access.view.kind === 'none' || access.view.kind === 'waitlist';
+    const k = access.view.kind;
+    const blocked = k === 'none' || k === 'waitlist' || k === 'checking' || k === 'unknown' || k === 'locked';
     const was = canSyncRef.current;
     canSyncRef.current = !blocked;
     if (!was && !blocked && user && isInitialSyncDone.current) triggerSync();
@@ -2261,8 +2269,8 @@ const App: React.FC = () => {
     nudge: !!reminderPrefs.nudge,
   });
 
-  /* This device is in use, past onboarding: the record that lets a guest keep
-     guest mode after the doors close (access/device.ts). Written once. */
+  /* This device is in use, past onboarding: the hint that it was here before
+     ("you used Alpha before" on the Gate, access/device.ts). Written once. */
   useEffect(() => {
     if (showLanding === false && !needsOnboarding && !access.gated) stampDevice();
   }, [showLanding, needsOnboarding, access.gated]);
@@ -2305,8 +2313,11 @@ const App: React.FC = () => {
           view={access.view}
           signedIn={!!user}
           pendingCode={accessCode}
-          defaults={{ exam: landingExam.current ?? state.examPreference ?? 'JEE', currentClass: state.currentClass, hours: state.dailyGoalHours }}
+          defaults={{ exam: landingExam.current ?? state.examPreference ?? 'JEE', currentClass: state.currentClass }}
           playApp={isAndroidApp()}
+          diwali={festiveLive === 'diwali'}
+          deviceSince={deviceSince(state.logs)}
+          onRetry={access.refresh}
           onSignIn={signInWithGoogle}
           onSignOut={leaveGate}
           onSettle={a => {
@@ -2788,7 +2799,7 @@ const App: React.FC = () => {
           install={install}
           onOpenAll={() => handleTabChange(STORE_LAUNCHED ? 'Profile' : 'Review')}
           onOpenSupport={openSupport}
-          membership={member ? { no: member.memberNo, inviteOpen: !!member.invite && !member.invite.redeemedAt } : null}
+          membership={member ? { no: member.memberNo, inviteOpen: !!member.invite && !member.invite.redeemedAt, founding: member.source === 'founding' } : null}
           onOpenMembership={() => setMemberSheet('card')}
           festive={festiveLive === 'none' ? null : {
             theme: festiveLive,
@@ -2834,6 +2845,8 @@ const App: React.FC = () => {
             member={member}
             name={profileCtl.ownProfile?.display_name ?? null}
             intro={memberSheet !== 'card'}
+            diwali={festiveLive === 'diwali'}
+            exam={state.examPreference === 'NEET' ? 'NEET' : 'JEE'}
             onClose={closeMemberSheet}
           />
         </React.Suspense>

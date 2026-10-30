@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  /gift/<code>: the link a member sends (access/cutover.ts inviteLink). Two
+  jobs only. For WhatsApp, iMessage and Telegram, which fetch the page and
+  never run its script: the preview below, so the link reads as a gift from a
+  real product and not a random URL. For the friend who taps it: straight on
+  to /?invite=<code>, where the Gate says who sent it.
+
+  vercel.json rewrites /gift/:code here; vite.config.ts does the same for the
+  dev and preview servers. The image is rendered by film/scripts/gift-thumb.ts.
+  Out of the Diwali season, point both image tags at og.jpg.
+-->
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>An Alpha Access Pass for you, worth ₹2,500</title>
+  <meta name="description" content="A member gifted you lifetime access to Tracker Alpha, the invite-only study tracker for JEE and NEET. Nothing to pay. Open it to claim it." />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <meta name="theme-color" content="#0b0907" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Tracker Alpha" />
+  <meta property="og:title" content="An Alpha Access Pass for you, worth ₹2,500" />
+  <meta property="og:description" content="A member gifted you lifetime access to the invite-only study tracker for JEE and NEET. Nothing to pay. Tap to claim it." />
+  <meta property="og:url" content="https://trackeralpha.in/gift/" />
+  <meta property="og:image" content="https://trackeralpha.in/gift/og-diwali.jpg" />
+  <meta property="og:image:secure_url" content="https://trackeralpha.in/gift/og-diwali.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="A Tracker Alpha Access Pass: lifetime access, admits one, worth ₹2,500." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="An Alpha Access Pass for you, worth ₹2,500" />
+  <meta name="twitter:description" content="A member gifted you lifetime access to Tracker Alpha. Tap to claim it." />
+  <meta name="twitter:image" content="https://trackeralpha.in/gift/og-diwali.jpg" />
+
+  <script>
+    (function () {
+      var m = location.pathname.match(/^\/gift\/([^/?#]+)/);
+      var code = m ? decodeURIComponent(m[1]) : new URLSearchParams(location.search).get('invite');
+      location.replace(code ? '/?invite=' + encodeURIComponent(code) : '/');
+    })();
+  </script>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0907; color: #f4ecde; font: 16px/1.5 Georgia, serif; text-align: center; }
+    a { color: #f4ecde; }
+  </style>
+</head>
+<body>
+  <p><a href="/">Open your pass</a></p>
+  <script>
+    (function () {
+      var m = location.pathname.match(/^\/gift\/([^/?#]+)/);
+      if (m) document.querySelector('a').href = '/?invite=' + encodeURIComponent(decodeURIComponent(m[1]));
+    })();
+  </script>
+</body>
+</html>

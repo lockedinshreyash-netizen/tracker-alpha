@@ -14,7 +14,7 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-11-01';
+const POLICY_EFFECTIVE = '2026-10-30';
 const EFFECTIVE_LONG = '1 November 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
@@ -117,20 +117,21 @@ const privacyPage = (): SitePage => {
 
               <h3>Getting in</h3>
               <p>
-                From 1 November 2026, new accounts need a way in. Each member gets a member number and one invite.
-                If you use someone’s invite, we record that, and they can see your profile as the person who used it.
+                Alpha is invite-only: new accounts need an Access Pass. Each member gets a member number and one
+                pass to gift. If you use a pass someone gifted you, we record that, and they can see your profile as
+                the person who used it.
               </p>
               <p>
-                If you join the <b>waitlist</b>, we store your exam, your class, the hours a day you aim to study, an
-                optional one line on why you want in (140 characters at most) and whether you would buy the Priority
-                Pass. Our staff can read this, to let people in by waves.
+                If you <b>reserve an Access Pass</b> or ask to be let back in, we store your exam, your class and which
+                of the two you asked for. Our staff can read this, to let people in.
               </p>
               <p>
-                If you sign in on a device that used Alpha before 1 November 2026, the app sends the date of the
-                earliest study log on that device, so that device can still make you a founding member.
+                If you ask to be let back in from a device that used Alpha before, the app sends the earliest date
+                that device shows Alpha in use, so our staff can see you were here before. It does not let you in by
+                itself.
               </p>
               <p>
-                When the <b>Priority Pass</b> goes on sale, buying it will record an order reference from the payment
+                When the <b>Access Pass</b> goes on sale, buying it will record an order reference from the payment
                 provider against your account. Alpha never sees your card or UPI details.
               </p>
 

@@ -10,7 +10,7 @@ import { SUBJECT_COLORS } from '../schedule/colors';
 import type { ExamPreference } from '../types';
 import { Eyebrow, haptic, Rise, Tile } from './kit';
 import { type Answers, daysLeft, examLabel } from './answers';
-import { MAX_ALSO, STREAM_LABEL, defaultExam, defaultYear, examById, examsIn, prefOf, streamOf, yearChoices, type ExamId, type Stream } from '../content/exams';
+import { MAX_ALSO, STREAM_LABEL, defaultExam, defaultYear, examById, examsIn, prefOf, seasonYear, streamOf, yearChoices, type ExamId, type Stream } from '../content/exams';
 
 export const ADVANCE_MS = 420;
 
@@ -109,8 +109,8 @@ export const QExams: React.FC<Q> = ({ a, set, next }) => {
 
 export const QClass: React.FC<Q> = ({ a, set, next }) => {
   const advance = useAutoAdvance(next);
-  // Until the year is chosen it follows the class.
-  const pick = (cls: 11 | 12) => { choose(); set(a.yearPicked ? { cls } : { cls, year: defaultYear(cls) }); advance(); };
+  // The year is its own question: the class never changes it.
+  const pick = (cls: 11 | 12) => { choose(); set({ cls }); advance(); };
   return (
     <div className="ob-col">
       <Head n={3} label="Your class" title="Which class are you in?" />
@@ -128,13 +128,21 @@ export const QYear: React.FC<Q> = ({ a, set, next }) => {
   const advance = useAutoAdvance(next);
   const pick = (year: number) => { choose(); set({ year, yearPicked: true }); advance(); };
   const usual = defaultYear(a.cls);
+  const season = seasonYear();
+  const sub = (y: number) =>
+    y === season ? 'Most students pick this' : y === usual ? `Usual for Class ${a.cls}` : undefined;
   return (
     <div className="ob-col">
       <Head n={4} label="Your year" title="When do you *write it?*" />
       <div className="ob-choices">
         {yearChoices().map((y, i) => (
-          <Tile key={y} selected={a.year === y} onClick={() => pick(y)} title={String(y)} sub={y === usual ? `Usual for Class ${a.cls}` : undefined} delay={160 + i * 50} />
+          <Tile key={y} selected={a.year === y} onClick={() => pick(y)} title={String(y)} sub={sub(y)} delay={160 + i * 50} />
         ))}
+      </div>
+      <div className="ob-actions">
+        <button className="ob-primary" onClick={() => { sfx.select(); haptic.select(); set({ yearPicked: true }); next(); }}>
+          Continue with {a.year}
+        </button>
       </div>
     </div>
   );

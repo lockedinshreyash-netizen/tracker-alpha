@@ -8,3 +8,6 @@ out
 
 # Sound-effect masters: regenerate with `npm run sfx`. The app ships the .m4a files.
 public/sfx
+
+# The showcase score: regenerate with `npm run showcase:audio` (or `npm run showcase`).
+public/showcase

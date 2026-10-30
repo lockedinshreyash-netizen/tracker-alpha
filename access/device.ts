@@ -1,21 +1,17 @@
 /* ── A device that was here before the doors closed ──
-   Founding members are accounts created before the cutover, and the server
-   knows those by itself. A guest never had an account, so the only record of
-   them is this device: a stamp written the first time the app proper is used
-   here (past onboarding), plus any log dated before the cutover, for a device
-   that was not opened between this build and the cutover.
+   A guest never had an account, so the only record of them is this device: a
+   stamp written the first time the app proper is used here, and the logs it
+   holds. When such a device signs into a new account, the Gate says "You used
+   Alpha before" and the application carries the earliest of those days
+   (`device_since`), so staff can let them in first.
 
-   Such a device keeps guest mode for good — local only, nothing reaches the
-   backend — and if its owner signs into a new account it claims founding
-   access for it (`claim_founding_device`, flagged for staff). localStorage can
-   be forged; that is accepted, because the cost is one account and staff see
-   every claim.
+   It is a hint and never access. Both can be forged in localStorage, which is
+   why the old automatic founding claim was removed.
 
    The stamp is never cleared on sign-out (App's forgetAccountOnDevice removes
-   only sb-* and the state blob), or signing out would demote the device. */
+   only sb-* and the state blob). */
 
 import { getISTDateString } from '../utils';
-import { ACCESS_FROM, ACCESS_FROM_DAY } from './cutover';
 
 const STAMP = 'alpha_device_since_v1';
 
@@ -37,16 +33,13 @@ export const stampDevice = (): void => {
   }
 };
 
-/**
- * The earliest study day this device can show from before the cutover, or
- * null if it has none. What `claim_founding_device` is sent.
- */
-export const foundingDay = (logs: ReadonlyArray<{ date: string }>): string | null => {
+/** The earliest study day this device shows Alpha in use, or null. */
+export const deviceSince = (logs: ReadonlyArray<{ date: string }>): string | null => {
   let best: string | null = null;
   const stamp = readStamp();
-  if (stamp !== null && stamp < ACCESS_FROM) best = getISTDateString(new Date(stamp));
+  if (stamp !== null) best = getISTDateString(new Date(stamp));
   for (const l of logs) {
-    if (typeof l.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && l.date < ACCESS_FROM_DAY && (best === null || l.date < best)) {
+    if (typeof l.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && (best === null || l.date < best)) {
       best = l.date;
     }
   }

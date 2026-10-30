@@ -78,7 +78,7 @@ export const Hero: React.FC<{ variant: Variant; onCta: () => void; onInvite: () 
           Request access <Arrow />
         </button>
         <button id="landing-invite-hero" type="button" className="lp-link" onClick={onInvite}>
-          I have an invite
+          I have a pass
         </button>
       </div>
       <nav className="lp-exams in-5" aria-label="Pick your exam">
@@ -87,7 +87,7 @@ export const Hero: React.FC<{ variant: Variant; onCta: () => void; onInvite: () 
         ))}
       </nav>
     </div>
-    <a className="lp-scroll in-5" href="#inside" aria-label="See what's inside">
+    <a className="lp-scroll in-5" href="#look" aria-label="See what's inside">
       <span />
     </a>
   </header>

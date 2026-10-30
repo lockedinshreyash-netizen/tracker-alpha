@@ -1,17 +1,23 @@
 /* ── The Gate ──
-   What a person without access sees instead of the app, from the cutover on
-   (access/cutover.ts). Always black, whatever the theme: it is the door to a
-   members-only room.
+   What a person without access sees instead of the app, once the doors are
+   closed (access/cutover.ts). Always black, whatever the theme: it is the
+   door to a members-only room.
 
-   Three ways in, in this order: an invite (a member gave you a code), the
-   Priority Pass (₹2,500 once; payments not live yet, so it says so and
-   points at the line), and the waitlist (apply, get a place). All three need
-   Google, because access belongs to an account. A choice made before signing
-   in is remembered across the round trip (sessionStorage), so the person
-   comes back to the panel they picked rather than the start.
+   Two ways in, both an Access Pass: one gifted by a member (their one invite,
+   sent as a link or read out as a code), or one bought (₹2,500 once; payments
+   are not live yet, so it opens as a reservation and says so). A device that used
+   Alpha before the doors closed gets a third: "I used Alpha before", which
+   staff answer from the console. All of them need Google, because access
+   belongs to an account. A choice made before signing in is remembered across
+   the round trip (sessionStorage), so the person comes back to the panel they
+   picked rather than the start.
 
-   An invite link (`/?invite=CODE`, access/invite.ts) opens on "Rahul invited
-   you", read before sign-in, and is redeemed the moment they are signed in.
+   A gift link (`/gift/CODE` → `/?invite=CODE`, access/invite.ts) opens on
+   "Rahul sent you an Access Pass", read before sign-in, with what Alpha is
+   and what the pass gets them underneath (GiftAbout), and is redeemed the
+   moment they are signed in. The envelope opens only after the server said
+   yes. A signed-out founding member who lands on the door is told, before
+   any price, that they never pay for what they use today.
 
    Copy: short and plain (most readers are 16), blunt like the rest of Alpha,
    and true. No seat counts, no waitlist sizes, no promise of when.
@@ -20,7 +26,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import './access.css';
-import CardArt, { memberNo, tierOf } from './CardArt';
+import CardArt, { memberNo } from './CardArt';
+import { GiftEnvelope, GiftReveal } from './GiftPass';
+import GiftAbout from './GiftAbout';
 import {
   fetchAccess, joinWaitlist, previewAccessInvite, redeemAccessInvite,
   type AccessAnswer, type MemberFace, type PreviewStatus, type RedeemStatus,
@@ -30,13 +38,13 @@ import { clearAccessInvite, holdAccessInvite } from './invite';
 import type { AccessView } from './useAccess';
 import * as sfx from '../audio';
 
-type Way = 'invite' | 'pass' | 'waitlist';
+type Way = 'invite' | 'pass' | 'back';
 const INTENT_KEY = 'alpha_gate_intent_v1';
 
 const readIntent = (): Way | null => {
   try {
     const v = sessionStorage.getItem(INTENT_KEY);
-    return v === 'invite' || v === 'pass' || v === 'waitlist' ? v : null;
+    return v === 'invite' || v === 'pass' || v === 'back' ? v : v === 'waitlist' ? 'pass' : null;
   } catch { return null; }
 };
 const writeIntent = (w: Way | null) => {
@@ -45,17 +53,16 @@ const writeIntent = (w: Way | null) => {
 
 const CODE_MESSAGE: Partial<Record<PreviewStatus | RedeemStatus, string>> = {
   invalid: "That code doesn't work. Check it and try again.",
-  used: 'That invite was already used. Each member gets one.',
-  self: "That's your own invite. Send it to someone.",
+  used: 'That pass was already claimed. Each member gifts one.',
+  self: "That's your own pass to gift. Send it to a friend.",
   throttled: 'Too many wrong codes. Wait 15 minutes.',
   error: "Couldn't check that. Try again.",
-  missing: "Invites aren't open yet.",
+  missing: "Passes aren't open yet.",
 };
 
 export interface GateDefaults {
   exam: 'JEE' | 'NEET';
   currentClass: 11 | 12;
-  hours: number;
 }
 
 interface Props {
@@ -64,9 +71,14 @@ interface Props {
   pendingCode: string | null;
   defaults: GateDefaults;
   playApp: boolean;
+  /** The Diwali theme is live: the gift wears the season. */
+  diwali: boolean;
+  /** The earliest day this device shows Alpha in use (device.ts), or null. */
+  deviceSince: string | null;
   onSignIn: () => Promise<string | null>;
   onSignOut: () => void;
   onSettle: (a: AccessAnswer) => void;
+  onRetry: () => void;
 }
 
 const GoogleG = () => (
@@ -78,14 +90,14 @@ const GoogleG = () => (
   </svg>
 );
 
-const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSignOut, onSettle }: Props) => {
+const Gate = ({ view, signedIn, pendingCode, defaults, playApp, diwali, deviceSince, onSignIn, onSignOut, onSettle, onRetry }: Props) => {
   const [open, setOpen] = useState<Way | null>(() => readIntent() ?? (pendingCode ? 'invite' : null));
   const [code, setCode] = useState(pendingCode ? formatAccessCode(pendingCode) : '');
   const [codeNote, setCodeNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [signInNote, setSignInNote] = useState<string | null>(null);
 
-  // An invite link: who sent it, read before sign-in.
+  // A gift link: who sent it, read before sign-in.
   const [inviter, setInviter] = useState<MemberFace | null>(null);
   const [previewed, setPreviewed] = useState(false);
   useEffect(() => {
@@ -103,12 +115,13 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
     return () => { live = false; };
   }, [pendingCode]);
 
-  // You're in: the card, then the app.
+  // You're in: the envelope opens, then the app.
   const [welcome, setWelcome] = useState<{ answer: AccessAnswer; inviter: MemberFace | null } | null>(null);
+  const [revealed, setRevealed] = useState(false);
 
   const redeem = async (raw: string) => {
     const c = normalizeAccessCode(raw);
-    if (c.length !== 12) { setCodeNote('An invite code has 12 letters and numbers.'); return; }
+    if (c.length !== 12) { setCodeNote('A pass code has 12 letters and numbers.'); return; }
     setBusy(true);
     setCodeNote(null);
     const r = await redeemAccessInvite(c);
@@ -116,7 +129,6 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
       clearAccessInvite();
       writeIntent(null);
       const answer = await fetchAccess();
-      sfx.play('target-hit');
       setWelcome({ answer, inviter: r.inviter ?? inviter });
     } else {
       setCodeNote(CODE_MESSAGE[r.status] ?? CODE_MESSAGE.error!);
@@ -125,7 +137,7 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
     setBusy(false);
   };
 
-  // Signed in with an invite waiting: redeem it at once.
+  // Signed in with a pass waiting: open it at once.
   const autoRedeemed = useRef(false);
   useEffect(() => {
     if (!signedIn || !pendingCode || autoRedeemed.current || view.kind !== 'none') return;
@@ -143,24 +155,25 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
     if (err) { setSignInNote(err); setBusy(false); }
   };
 
-  // ── Waitlist application ──
+  // ── Reserving a Pass, or asking back in ──
   const [exam, setExam] = useState<'JEE' | 'NEET'>(defaults.exam);
   const [klass, setKlass] = useState<11 | 12 | 13>(defaults.currentClass);
-  const [hours, setHours] = useState(Math.min(16, Math.max(2, Math.round(defaults.hours || 8))));
-  const [why, setWhy] = useState('');
-  const [wantsPass, setWantsPass] = useState(false);
   const [applyNote, setApplyNote] = useState<string | null>(null);
 
-  const apply = async () => {
+  const apply = async (kind: 'pass' | 'back') => {
     setBusy(true);
     setApplyNote(null);
-    const r = await joinWaitlist({ exam, class: klass, goal_hours: hours, why: why.trim(), wants_pass: wantsPass });
+    const r = await joinWaitlist({
+      exam, class: klass,
+      wants_pass: kind === 'pass',
+      device_since: kind === 'back' ? deviceSince : null,
+    });
     setBusy(false);
     if (r.status === 'waitlist' || r.status === 'member') {
       writeIntent(null);
       onSettle(r);
     } else {
-      setApplyNote(r.status === 'missing' ? "The waitlist isn't open yet." : "Couldn't save that. Try again.");
+      setApplyNote(r.status === 'missing' ? "That isn't open yet." : "Couldn't save that. Try again.");
     }
   };
 
@@ -170,29 +183,33 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
     return <div className="ax" aria-busy="true" />;
   }
 
-  // ── You're in ──
+  // ── You're in: the gift opens ──
   if (welcome) {
     const m = welcome.answer.status === 'member' ? welcome.answer.member : null;
+    const from = welcome.inviter?.name?.trim() || null;
     return (
       <div className="ax">
         <div className="ax-wrap">
           <div className="ax-top"><span>Tracker Alpha</span></div>
           <div className="ax-hero">
-            <div className="ax-rise">
-              <p className="ax-kicker">Welcome in</p>
+            <div className="ax-giftstage">
+              <GiftReveal
+                from={from}
+                fromNo={welcome.inviter?.member_no ?? null}
+                diwali={diwali}
+                onDone={() => { setRevealed(true); sfx.play('target-hit'); }}
+              />
+            </div>
+            <div className="ax-rise" style={{ visibility: revealed ? 'visible' : 'hidden' }}>
+              <p className="ax-kicker">{diwali ? 'Happy Diwali' : 'Welcome in'}</p>
               <h1 className="ax-h1">You're in<i>.</i></h1>
-              <p className="ax-serif">
-                {welcome.inviter?.name ? `${welcome.inviter.name} vouched for you.` : 'Now show up every day.'}
-              </p>
+              <p className="ax-serif">{from ? `${from}'s gift: an Access Pass, for life.` : 'Your Access Pass, for life.'}</p>
               <p className="ax-lead">
-                You're member No. {memberNo(m?.memberNo)}. You get one invite too. Use it on someone who actually studies.
+                You're member No. {memberNo(m?.memberNo)}. Nothing to pay, ever, for what's in Alpha today. You get one pass to gift too. Give it to someone who actually studies.
               </p>
               <div style={{ marginTop: 32 }}>
                 <button className="ax-btn ax-btn-red" onClick={() => onSettle(welcome.answer)}>Enter Alpha</button>
               </div>
-            </div>
-            <div className="ax-cardstage ax-rise" style={{ animationDelay: '120ms' }}>
-              <CardArt no={m?.memberNo} name={null} tier={tierOf(m?.source)} />
             </div>
           </div>
         </div>
@@ -200,38 +217,64 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
     );
   }
 
-  // ── On the waitlist ──
+  const top = (
+    <div className="ax-top">
+      <span>Tracker Alpha</span>
+      {signedIn
+        ? <button onClick={onSignOut}>Use another account</button>
+        : <button onClick={() => signIn(null)} disabled={busy}>Member? Sign in</button>}
+    </div>
+  );
+
+  // ── Couldn't ask ──
+  if (view.kind === 'unknown') {
+    return (
+      <div className="ax">
+        <div className="ax-wrap">
+          {top}
+          <div className="ax-hero">
+            <div className="ax-rise">
+              <p className="ax-kicker">Members only</p>
+              <h1 className="ax-h1" style={{ fontSize: 'clamp(38px, 7vw, 64px)' }}>Couldn't check your access<i>.</i></h1>
+              <p className="ax-lead">Check your connection and try again.</p>
+              <div style={{ marginTop: 28 }}>
+                <button className="ax-btn ax-btn-white" onClick={onRetry}>Try again</button>
+              </div>
+            </div>
+            <div className="ax-cardstage ax-rise" style={{ animationDelay: '120ms' }}>
+              <CardArt no={null} name={null} tier="Members only" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Waiting: a Pass reserved, or asked back in ──
   if (view.kind === 'waitlist') {
     return (
       <div className="ax">
         <div className="ax-wrap">
-          <div className="ax-top">
-            <span>Tracker Alpha</span>
-            <button onClick={onSignOut}>Use another account</button>
-          </div>
+          {top}
           <div className="ax-hero">
             <div className="ax-rise">
-              <p className="ax-kicker">You're on the list</p>
+              <p className="ax-kicker">{view.wantsPass ? 'Pass reserved' : "You're on the list"}</p>
               <p className="ax-place"><small>No.</small>{view.position.toLocaleString('en-IN')}</p>
               <p className="ax-serif">in line.</p>
               <p className="ax-lead">
-                We let people in in waves. Come back and check. When you're in, this page opens the app.
+                {view.wantsPass
+                  ? 'Passes open soon. You hear first. When you\'re in, this page opens the app.'
+                  : 'We let people back in by hand. Come back and check. When you\'re in, this page opens the app.'}
               </p>
               <div className="ax-ways">
-                <Way n="01" t="Got an invite?" s="A member's code gets you in right now." on={open === 'invite'} onClick={() => toggle('invite')} />
+                <WayRow n="01" t="Got a pass code?" s="A pass from a member gets you in right now." on={open === 'invite'} onClick={() => toggle('invite')} />
                 {open === 'invite' && (
                   <InvitePanel code={code} setCode={setCode} note={codeNote} busy={busy} signedIn onSubmit={() => redeem(code)} />
-                )}
-                {!playApp && (
-                  <>
-                    <Way n="02" t="Priority Pass" s={`${PASS_PRICE_LABEL} once. Skip the line. Yours for life.`} tag="Opens soon" on={open === 'pass'} onClick={() => toggle('pass')} />
-                    {open === 'pass' && <PassPanel wantsPass={view.wantsPass} />}
-                  </>
                 )}
               </div>
             </div>
             <div className="ax-cardstage ax-rise" style={{ animationDelay: '120ms' }}>
-              <CardArt no={null} name={null} tier="Waiting" />
+              <CardArt no={null} name={null} tier={view.wantsPass ? 'Pass reserved' : 'Waiting'} />
             </div>
           </div>
         </div>
@@ -241,141 +284,181 @@ const Gate = ({ view, signedIn, pendingCode, defaults, playApp, onSignIn, onSign
 
   // ── The door ──
   const invited = !!inviter && !codeNote;
+  const from = inviter?.name?.trim() || 'A member';
+  const fields = (
+    <>
+      <div className="ax-field">
+        <span className="ax-label">Exam</span>
+        <div className="ax-seg">
+          {(['JEE', 'NEET'] as const).map(e => (
+            <button key={e} aria-pressed={exam === e} onClick={() => setExam(e)}>{e}</button>
+          ))}
+        </div>
+      </div>
+      <div className="ax-field">
+        <span className="ax-label">Class</span>
+        <div className="ax-seg">
+          {([[11, 'Class 11'], [12, 'Class 12'], [13, 'Dropper']] as const).map(([v, l]) => (
+            <button key={v} aria-pressed={klass === v} onClick={() => setKlass(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+  const google = (intent: Way, label = 'Continue with Google') => (
+    <div style={{ marginTop: 16 }}>
+      <button className="ax-btn ax-btn-white ax-btn-wide" disabled={busy} onClick={() => signIn(intent)}>
+        <GoogleG /> {label}
+      </button>
+      {signInNote && <p className="ax-note bad">{signInNote}</p>}
+    </div>
+  );
+
   return (
     <div className="ax">
       <div className="ax-wrap">
-        <div className="ax-top">
-          <span>Tracker Alpha</span>
-          {signedIn
-            ? <button onClick={onSignOut}>Use another account</button>
-            : <button onClick={() => signIn(null)} disabled={busy}>Member? Sign in</button>}
-        </div>
-        <div className="ax-hero">
+        {top}
+        <div className={`ax-hero${invited ? ' ax-hero-gift' : ''}`}>
           <div className="ax-rise">
             {invited ? (
               <>
-                <p className="ax-kicker">An invite for you</p>
-                <h1 className="ax-h1" style={{ fontSize: 'clamp(40px, 7vw, 68px)' }}>{inviter!.name || 'A member'} invited you<i>.</i></h1>
-                <p className="ax-serif">
-                  {inviter!.founding ? 'A founding member' : 'Member'} No. {memberNo(inviter!.member_no)}. One invite each. They picked you.
+                <p className="ax-kicker">{diwali ? 'A Diwali gift for you' : 'A gift for you'}</p>
+                <h1 className="ax-h1" style={{ fontSize: 'clamp(40px, 7vw, 68px)' }}>{from} sent you an Access Pass<i>.</i></h1>
+                <p className="ax-serif">Lifetime access to Alpha, worth {PASS_PRICE_LABEL}. On them.</p>
+                <p className="ax-lead">
+                  {from === 'A member' ? 'They are' : `${from} is`} {inviter!.founding ? 'a founding member' : 'a member'} (No. {memberNo(inviter!.member_no)}). Every member can gift just one pass. They picked you.
                 </p>
                 <div style={{ marginTop: 32, maxWidth: 380 }}>
                   {signedIn ? (
                     <button className="ax-btn ax-btn-red ax-btn-wide" disabled={busy} onClick={() => redeem(pendingCode!)}>
-                      {busy ? 'Letting you in…' : 'Accept invite'}
+                      {busy ? 'Opening…' : 'Open your pass'}
                     </button>
                   ) : (
                     <button className="ax-btn ax-btn-white ax-btn-wide" disabled={busy} onClick={() => signIn('invite', pendingCode!)}>
-                      <GoogleG /> Accept with Google
+                      <GoogleG /> Open with Google
                     </button>
                   )}
                   {codeNote && <p className="ax-note bad">{codeNote}</p>}
                   {signInNote && <p className="ax-note bad">{signInNote}</p>}
+                  <p className="ax-note">Free for you. No card. It takes a minute.</p>
                 </div>
               </>
             ) : (
               <>
                 <p className="ax-kicker">By invitation</p>
                 <h1 className="ax-h1">Invite only<i>.</i></h1>
-                <p className="ax-serif">For the ones who actually lock in.</p>
-                <p className="ax-lead">
-                  Alpha lets people in slowly. Get an invite from a member, take a Priority Pass, or join the line.
+                <p className="ax-serif">
+                  {diwali
+                    ? `This Diwali, every member can gift one friend an Access Pass, worth ${PASS_PRICE_LABEL}.`
+                    : `Every member can gift one friend an Access Pass, worth ${PASS_PRICE_LABEL}.`}
                 </p>
+                <p className="ax-lead">
+                  {playApp ? 'To get in, a member gifts you a pass.' : 'To get in, a member gifts you a pass, or you buy one.'}
+                </p>
+                {!signedIn && (
+                  <div className="ax-callout">
+                    <b>Already use Alpha?</b>
+                    <span>You're a founding member. Sign in with the same Google account. You never pay for what you use today.</span>
+                    <button className="ax-btn ax-btn-white" disabled={busy} onClick={() => signIn(null)}><GoogleG /> Sign in</button>
+                  </div>
+                )}
                 <div className="ax-ways">
-                  <Way n="01" t="I have an invite" s="A member gave you a code." on={open === 'invite'} onClick={() => toggle('invite')} />
+                  <WayRow n="01" t="I was gifted a pass" s="Enter the code from your friend's link." on={open === 'invite'} onClick={() => toggle('invite')} />
                   {open === 'invite' && (
                     <InvitePanel
                       code={code} setCode={setCode} note={codeNote ?? signInNote} busy={busy} signedIn={signedIn}
                       onSubmit={() => (signedIn ? redeem(code) : (normalizeAccessCode(code).length === 12
                         ? signIn('invite', normalizeAccessCode(code))
-                        : setCodeNote('An invite code has 12 letters and numbers.')))}
+                        : setCodeNote('A pass code has 12 letters and numbers.')))}
                     />
                   )}
                   {!playApp && (
                     <>
-                      <Way n="02" t="Priority Pass" s={`${PASS_PRICE_LABEL} once. Skip the line. Yours for life.`} tag="Opens soon" on={open === 'pass'} onClick={() => toggle('pass')} />
-                      {open === 'pass' && <PassPanel onJoin={() => { setWantsPass(true); setOpen('waitlist'); }} />}
+                      <WayRow n="02" t="Buy an Access Pass" s={`${PASS_PRICE_LABEL} once. Yours for life, plus one to gift.`} tag="Opens soon" on={open === 'pass'} onClick={() => toggle('pass')} />
+                      {open === 'pass' && (
+                        <div className="ax-panelbox">
+                          <p className="ax-note" style={{ marginTop: 0, color: '#d4d4d8' }}>
+                            Passes open soon. Reserve yours and you'll hear first.
+                          </p>
+                          {signedIn ? (
+                            <>
+                              <div style={{ marginTop: 22 }}>{fields}</div>
+                              <div className="ax-field">
+                                <button className="ax-btn ax-btn-red ax-btn-wide" disabled={busy} onClick={() => apply('pass')}>
+                                  {busy ? 'Saving…' : 'Reserve my Pass'}
+                                </button>
+                                {applyNote && <p className="ax-note bad">{applyNote}</p>}
+                              </div>
+                            </>
+                          ) : google('pass')}
+                        </div>
+                      )}
                     </>
                   )}
-                  <Way n={playApp ? '02' : '03'} t="Join the waitlist" s="Tell us how you study. Get your place in line." on={open === 'waitlist'} onClick={() => toggle('waitlist')} />
-                  {open === 'waitlist' && (
-                    <div className="ax-panelbox">
-                      {signedIn ? (
-                        <>
-                          <div className="ax-field">
-                            <span className="ax-label">Exam</span>
-                            <div className="ax-seg">
-                              {(['JEE', 'NEET'] as const).map(e => (
-                                <button key={e} aria-pressed={exam === e} onClick={() => setExam(e)}>{e}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="ax-field">
-                            <span className="ax-label">Class</span>
-                            <div className="ax-seg">
-                              {([[11, 'Class 11'], [12, 'Class 12'], [13, 'Dropper']] as const).map(([v, l]) => (
-                                <button key={v} aria-pressed={klass === v} onClick={() => setKlass(v)}>{l}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="ax-field">
-                            <label className="ax-label" htmlFor="ax-hours">Hours you study a day</label>
-                            <div className="ax-hours">{hours}<small>{hours === 1 ? 'hour' : 'hours'}</small></div>
-                            <input id="ax-hours" className="ax-range" type="range" min={2} max={16} step={1} value={hours} onChange={e => setHours(Number(e.target.value))} />
-                          </div>
-                          <div className="ax-field">
-                            <label className="ax-label" htmlFor="ax-why">Why should we let you in? <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span></label>
-                            <textarea id="ax-why" className="ax-input" maxLength={140} value={why} onChange={e => setWhy(e.target.value)} placeholder="One line. Make it count." />
-                            <div className="ax-count">{why.length}/140</div>
-                          </div>
-                          {!playApp && (
-                            <div className="ax-field">
-                              <label className="ax-check">
-                                <input type="checkbox" checked={wantsPass} onChange={e => setWantsPass(e.target.checked)} />
-                                <span>I'd buy the Priority Pass when it opens.</span>
-                              </label>
-                            </div>
+                  {deviceSince && (
+                    <>
+                      <WayRow n={playApp ? '02' : '03'} t="I used Alpha before" s="Before it went invite-only. Tell us and we'll let you back in." on={open === 'back'} onClick={() => toggle('back')} />
+                      {open === 'back' && (
+                        <div className="ax-panelbox">
+                          {signedIn ? (
+                            <>
+                              {fields}
+                              <div className="ax-field">
+                                <button className="ax-btn ax-btn-red ax-btn-wide" disabled={busy} onClick={() => apply('back')}>
+                                  {busy ? 'Saving…' : 'Let me back in'}
+                                </button>
+                                {applyNote && <p className="ax-note bad">{applyNote}</p>}
+                              </div>
+                              <p className="ax-note">Your history is safe on this device. It syncs the moment you're in.</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="ax-note" style={{ marginTop: 0 }}>Had an account? Sign in with it and you're straight in. If not, sign in and ask.</p>
+                              {google('back')}
+                            </>
                           )}
-                          <div className="ax-field">
-                            <button className="ax-btn ax-btn-red ax-btn-wide" disabled={busy} onClick={apply}>
-                              {busy ? 'Saving…' : 'Join the line'}
-                            </button>
-                            {applyNote && <p className="ax-note bad">{applyNote}</p>}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="ax-note" style={{ marginTop: 0 }}>Sign in first. Your place is tied to your account.</p>
-                          <div style={{ marginTop: 16 }}>
-                            <button className="ax-btn ax-btn-white ax-btn-wide" disabled={busy} onClick={() => signIn('waitlist')}>
-                              <GoogleG /> Continue with Google
-                            </button>
-                            {signInNote && <p className="ax-note bad">{signInNote}</p>}
-                          </div>
-                        </>
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
-                <p className="ax-fine">
-                  Already used Alpha before 1 November? You're a founding member. {signedIn
-                    ? <>Sign in with that same Google account.</>
-                    : <button onClick={() => signIn(null)} disabled={busy}>Sign in with Google</button>}
-                </p>
+                {signedIn && (
+                  <p className="ax-fine">
+                    Already a member on another account? Use another account and sign in with that one. Founding members never pay for what they use today.
+                  </p>
+                )}
               </>
             )}
           </div>
           <div className="ax-cardstage ax-rise" style={{ animationDelay: '120ms' }}>
-            <CardArt no={null} name={null} tier={invited ? 'Invited' : 'Members only'} />
+            {invited
+              ? <GiftEnvelope from={inviter?.name?.trim() || null} diwali={diwali} id="ax-gate-env" />
+              : <CardArt no={null} name={null} tier="Members only" />}
           </div>
         </div>
+        {invited && (
+          <>
+            <GiftAbout exam={defaults.exam} />
+            <div className="ax-about-cta">
+              {signedIn ? (
+                <button className="ax-btn ax-btn-red ax-btn-wide" disabled={busy} onClick={() => redeem(pendingCode!)}>
+                  {busy ? 'Opening…' : 'Open your pass'}
+                </button>
+              ) : (
+                <button className="ax-btn ax-btn-white ax-btn-wide" disabled={busy} onClick={() => signIn('invite', pendingCode!)}>
+                  <GoogleG /> Open with Google
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
 interface WayProps { n: string; t: string; s: string; tag?: string; on: boolean; onClick: () => void }
-const Way = ({ n, t, s, tag, on, onClick }: WayProps) => (
+const WayRow = ({ n, t, s, tag, on, onClick }: WayProps) => (
   <button className="ax-way" aria-expanded={on} onClick={onClick}>
     <span className="ax-way-n">{n}</span>
     <span>
@@ -405,32 +488,14 @@ const InvitePanel = ({ code, setCode, note, busy, signedIn, onSubmit }: InvitePa
         autoCapitalize="characters"
         autoComplete="off"
         spellCheck={false}
-        aria-label="Invite code"
+        aria-label="Pass code"
       />
       <button className={`ax-btn ${signedIn ? 'ax-btn-red' : 'ax-btn-white'}`} disabled={busy} type="submit">
-        {signedIn ? (busy ? '…' : 'Enter') : <><GoogleG /> Go</>}
+        {signedIn ? (busy ? '…' : 'Open') : <><GoogleG /> Go</>}
       </button>
     </form>
-    {!signedIn && <p className="ax-note">You'll sign in with Google, then you're in.</p>}
+    {!signedIn && <p className="ax-note">You'll sign in with Google, then your pass opens.</p>}
     {note && <p className="ax-note bad">{note}</p>}
-  </div>
-);
-
-const PassPanel = ({ onJoin, wantsPass }: { onJoin?: () => void; wantsPass?: boolean }) => (
-  <div className="ax-panelbox">
-    <p className="ax-note" style={{ marginTop: 0, color: '#d4d4d8' }}>
-      Pay {PASS_PRICE_LABEL} once. Skip the line. Full Alpha for life, plus your own invite.
-    </p>
-    <p className="ax-note">
-      Payments open soon. {onJoin
-        ? 'Join the line and tick the Pass box. You hear first.'
-        : wantsPass ? "You ticked the Pass box. You'll hear first." : 'Stay in line. It opens here.'}
-    </p>
-    {onJoin && (
-      <div style={{ marginTop: 16 }}>
-        <button className="ax-btn ax-btn-ghost ax-btn-wide" onClick={onJoin}>Join the line</button>
-      </div>
-    )}
   </div>
 );
 

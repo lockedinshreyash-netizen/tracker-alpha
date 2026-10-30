@@ -38,4 +38,4 @@ export default CardArt;
 
 /** What the card says under the name. */
 export const tierOf = (source: string | null | undefined): string =>
-  source === 'founding' ? 'Founding member' : source === 'pass' ? 'Priority Pass' : 'Member';
+  source === 'founding' ? 'Founding member' : source === 'pass' ? 'Access Pass' : 'Member';

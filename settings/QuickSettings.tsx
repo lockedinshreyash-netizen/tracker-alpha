@@ -48,8 +48,8 @@ interface Props {
   onOpenAll: () => void;
   /** The Support Alpha page: one quiet line under All settings, never a row with a switch. */
   onOpenSupport?: () => void;
-  /** Invite-only: this account's member number and whether its one invite is unused. */
-  membership?: { no: number | null; inviteOpen: boolean } | null;
+  /** Invite-only: this account's member number and whether its one gift is still to give. */
+  membership?: { no: number | null; inviteOpen: boolean; founding: boolean } | null;
   onOpenMembership?: () => void;
   /** The festive theme an administrator has switched on, or null when none is
    *  live — and then there is no row at all, because there is nothing to turn off. */
@@ -240,7 +240,7 @@ const QuickSettings: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* ── Membership: the card and the one invite ── */}
+              {/* ── Membership: the card, the one pass to gift, and for founding members the promise ── */}
               {membership && onOpenMembership && (
                 <button
                   type="button"
@@ -250,10 +250,10 @@ const QuickSettings: React.FC<Props> = ({
                   <span className="w-10 h-10 rounded-xl bg-[#050506] text-white flex items-center justify-center shrink-0 border border-white/10" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 22 }} aria-hidden="true">α</span>
                   <span className="flex-1 min-w-0">
                     <span className={`block text-[15px] font-bold font-ui truncate ${ink}`}>
-                      Member No. {membership.no ? String(membership.no).padStart(4, '0') : '····'}
+                      {membership.founding ? 'Founding member' : 'Member'} No. {membership.no ? String(membership.no).padStart(4, '0') : '····'}
                     </span>
                     <span className={`block text-[12px] font-ui ${muted}`}>
-                      {membership.inviteOpen ? 'You have 1 invite' : 'Your invite is used'}
+                      {[membership.founding ? 'Free for life' : null, membership.inviteOpen ? '1 pass to gift' : 'Pass gifted'].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                   {membership.inviteOpen && <i className="w-2 h-2 rounded-full bg-[#E10600] shrink-0" aria-hidden="true" />}

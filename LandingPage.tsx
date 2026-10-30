@@ -5,9 +5,10 @@
    code: the first render must be pure (no window, no storage, no clock except
    landingNow()), and anything that moves on arrival is CSS.
 
-   A members' club, told in very few words: the door (hero), what is inside,
-   the crowd, the card, the three ways in, the countdown, a short FAQ, the
-   door again. Copy lives in landing/content.ts.
+   A members' club, told in very few words: the door (hero), the film (a
+   poster until it is tapped; landing/Showcase.tsx), what is inside, the
+   crowd, the card, the three ways in, the countdown, a short FAQ, the door
+   again. Copy lives in landing/content.ts (the film's own in Showcase.tsx).
 
    One page per exam. The build renders this once for "/" and once per
    VARIANTS entry (/bitsat-study-tracker/ …), each into its own copy of
@@ -29,6 +30,7 @@ import type { Exam, Variant } from './landing/content';
 import { ROOT, VARIANTS } from './landing/content';
 import { examById, prefOf, type ExamId } from './content/exams';
 import { Hero } from './landing/Hero';
+import { Showcase } from './landing/Showcase';
 import { Card, Clock, Crowd, Faq, Final, Footer, Inside, Nav, Tools, Ways } from './landing/Sections';
 
 /** The page this document was built as. The build passes it; the browser reads it off #root. */
@@ -64,6 +66,7 @@ const LandingPage = ({ onCtaClick, variant: given }: Props) => {
       <Nav onCta={start} onInvite={invite} />
       <main>
         <Hero variant={variant} onCta={start} onInvite={invite} />
+        <Showcase />
         <Inside />
         <Tools />
         <Crowd />

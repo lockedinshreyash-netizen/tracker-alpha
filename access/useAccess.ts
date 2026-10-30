@@ -4,26 +4,26 @@
    admin/useAdmin.ts: this decides what is DRAWN. The busy tables refuse a
    non-member's writes on their own (supabase/access.sql §6).
 
-   - Signed out: before the cutover, or on a founding device, the app is open
-     as it always was (`guest`); otherwise the Gate asks them to sign in.
+   - Signed out: the Gate asks them to sign in. There is no guest mode once
+     the doors are closed, on any device.
    - Signed in: `my_access()`. The last answer is cached per account so a
      member never sees the Gate flash on a cold start, and a member who is
      offline stays in.
-   - It fails OPEN: no SQL on the project, or an error with nothing cached, and
-     the app behaves exactly as before invite-only. A wrongly open door costs
-     one session; a wrongly shut one locks out a founding member.
-   - A post-cutover account on a founding device claims founding access once
-     (device.ts). */
+   - It fails CLOSED: no SQL on the project, or an error with nothing cached,
+     and the Gate says it couldn't check, with a retry (`unknown`). A member
+     with a cached answer is never shut out by a bad connection.
+   - A device used before the doors closed claims nothing: the Gate offers it
+     the "you used Alpha before" application (device.ts), and staff decide. */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { claimFoundingDevice, fetchAccess, type AccessAnswer, type MemberInfo } from './api';
+import { fetchAccess, type AccessAnswer, type MemberInfo } from './api';
 import { accessLive } from './cutover';
-import { foundingDay } from './device';
 
 export type AccessView =
   | { kind: 'open' }
   | { kind: 'checking' }
-  | { kind: 'guest' }
+  /** Couldn't ask the server (offline, an error, or no SQL), and nothing cached. */
+  | { kind: 'unknown' }
   | { kind: 'locked' }
   | { kind: 'member'; member: MemberInfo }
   | { kind: 'waitlist'; position: number; wantsPass: boolean }
@@ -54,8 +54,7 @@ const toView = (a: Settled): AccessView =>
     : a.status === 'waitlist' ? { kind: 'waitlist', position: a.position, wantsPass: a.wantsPass }
       : { kind: 'none' };
 
-const signedOutView = (logs: ReadonlyArray<{ date: string }>): AccessView =>
-  !accessLive() ? { kind: 'open' } : foundingDay(logs) ? { kind: 'guest' } : { kind: 'locked' };
+const signedOutView = (): AccessView => (!accessLive() ? { kind: 'open' } : { kind: 'locked' });
 
 export interface Access {
   view: AccessView;
@@ -67,17 +66,13 @@ export interface Access {
   settle: (a: AccessAnswer) => void;
 }
 
-export const useAccess = (userId: string | null, logs: ReadonlyArray<{ date: string }>): Access => {
-  const logsRef = useRef(logs);
-  logsRef.current = logs;
-
+export const useAccess = (userId: string | null): Access => {
   const [view, setView] = useState<AccessView>(() => {
-    if (!userId) return signedOutView(logs);
+    if (!userId) return signedOutView();
     const c = readCache(userId);
     return c ? toView(c) : { kind: 'checking' };
   });
   const lastAsk = useRef(0);
-  const claimed = useRef<string | null>(null);
 
   const settle = useCallback((a: AccessAnswer) => {
     if (!userId) return;
@@ -85,28 +80,19 @@ export const useAccess = (userId: string | null, logs: ReadonlyArray<{ date: str
       writeCache(userId, a);
       setView(toView(a));
     } else {
-      // Missing SQL or an error: keep what we knew, else fail open.
-      setView(v => (v.kind === 'checking' ? { kind: 'open' } : v));
+      // Missing SQL or an error: keep what we knew, else stay shut.
+      setView(v => (v.kind === 'checking' || v.kind === 'unknown' ? { kind: 'unknown' } : v));
     }
   }, [userId]);
 
   const ask = useCallback(async () => {
     if (!userId) return;
     lastAsk.current = Date.now();
-    let a = await fetchAccess();
-    if (a.status === 'none' && claimed.current !== userId) {
-      const day = foundingDay(logsRef.current);
-      if (day) {
-        claimed.current = userId;
-        const c = await claimFoundingDevice(day);
-        if (c.status === 'member') a = c;
-      }
-    }
-    settle(a);
+    settle(await fetchAccess());
   }, [userId, settle]);
 
   useEffect(() => {
-    if (!userId) { setView(signedOutView(logsRef.current)); return; }
+    if (!userId) { setView(signedOutView()); return; }
     const c = readCache(userId);
     setView(c ? toView(c) : { kind: 'checking' });
     void ask();
@@ -128,13 +114,13 @@ export const useAccess = (userId: string | null, logs: ReadonlyArray<{ date: str
   useEffect(() => {
     if (userId || accessLive()) return;
     const t = window.setInterval(() => {
-      if (accessLive()) { setView(signedOutView(logsRef.current)); window.clearInterval(t); }
+      if (accessLive()) { setView(signedOutView()); window.clearInterval(t); }
     }, 60_000);
     return () => window.clearInterval(t);
   }, [userId]);
 
   const live = accessLive();
-  const gated = live && (view.kind === 'locked' || view.kind === 'none' || view.kind === 'waitlist' || view.kind === 'checking');
+  const gated = live && (view.kind === 'locked' || view.kind === 'none' || view.kind === 'waitlist' || view.kind === 'checking' || view.kind === 'unknown');
 
   return { view, gated, refresh: () => { void ask(); }, settle };
 };

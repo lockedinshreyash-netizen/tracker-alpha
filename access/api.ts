@@ -2,8 +2,8 @@
    Thin wrappers over supabase/access.sql. Every answer is the server's: the
    client never decides who is a member, it only decides what to draw.
 
-   `missing` means the SQL has not been run on this project. The app then
-   behaves as it did before invite-only (useAccess fails open). */
+   `missing` means the SQL has not been run on this project. The Gate stays
+   shut (useAccess fails closed), so run access.sql before deploying. */
 
 import { supabase } from '../supabaseClient';
 
@@ -79,16 +79,15 @@ export const fetchAccess = (): Promise<AccessAnswer> => call('my_access');
 export interface WaitlistApplication {
   exam: 'JEE' | 'NEET';
   class: 11 | 12 | 13;
-  goal_hours: number;
-  why: string;
+  goal_hours?: number | null;
+  why?: string | null;
   wants_pass: boolean;
+  /** The earliest day this device shows Alpha in use, for a guest from before (device.ts). */
+  device_since?: string | null;
 }
 
 export const joinWaitlist = (app: WaitlistApplication): Promise<AccessAnswer> =>
   call('join_waitlist', { p: app });
-
-export const claimFoundingDevice = (firstDay: string): Promise<AccessAnswer> =>
-  call('claim_founding_device', { p: { first_day: firstDay } });
 
 export const previewAccessInvite = async (code: string): Promise<{ status: PreviewStatus; inviter?: MemberFace }> => {
   try {
@@ -121,6 +120,7 @@ export interface AccessOverview {
   invites_open: number;
   waiting: number;
   waiting_wants_pass: number;
+  waiting_used_before?: number;
   admitted_from_waitlist: number;
 }
 
@@ -133,6 +133,7 @@ export interface WaitlistRow {
   goal_hours: number | null;
   why: string | null;
   wants_pass: boolean;
+  device_since?: string | null;
   joined_at: string;
 }
 

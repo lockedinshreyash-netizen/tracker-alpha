@@ -130,6 +130,14 @@ export const defaultYear = (cls: 11 | 12, now: Date = new Date()): number => {
   return cls === 12 ? season : season + 1;
 };
 
+/**
+ * The exams most students write next: this season (Class 12's year). It is the
+ * default for anyone not yet asked, whatever their class, because most of the
+ * people choosing are writing this year; a Class 11 student picks the next one
+ * themselves.
+ */
+export const seasonYear = (now: Date = new Date()): number => defaultYear(12, now);
+
 /** The years worth offering: this season and the three after. */
 export const yearChoices = (now: Date = new Date()): number[] => {
   const first = defaultYear(12, now);
@@ -156,7 +164,7 @@ export const normalizeTarget = (raw: unknown, stream: Stream, cls: 11 | 12, now:
   also = also.slice(0, MAX_ALSO);
   const years = yearChoices(now);
   const yr = typeof r.year === 'number' && Number.isInteger(r.year) ? r.year : NaN;
-  const year = yr >= years[0] - 1 && yr <= years[years.length - 1] ? yr : defaultYear(cls, now);
+  const year = yr >= years[0] - 1 && yr <= years[years.length - 1] ? yr : seasonYear(now);
   return { primary, also, year };
 };
 

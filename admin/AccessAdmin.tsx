@@ -100,8 +100,8 @@ const AccessAdmin = ({ theme }: Props) => {
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile dark={dark} label="Members" value={members.toLocaleString('en-IN')} sub={`${((by.founding ?? 0) + (overview?.founding_unnumbered ?? 0)).toLocaleString('en-IN')} founding`} />
-        <StatTile dark={dark} label="Waiting" value={(overview?.waiting ?? 0).toLocaleString('en-IN')} sub={`${overview?.waiting_wants_pass ?? 0} would buy the Pass`} />
-        <StatTile dark={dark} label="Invites used" value={(overview?.invites_redeemed ?? 0).toLocaleString('en-IN')} sub={`${(overview?.invites_open ?? 0).toLocaleString('en-IN')} still open`} />
+        <StatTile dark={dark} label="Waiting" value={(overview?.waiting ?? 0).toLocaleString('en-IN')} sub={`${overview?.waiting_wants_pass ?? 0} reserved a Pass · ${overview?.waiting_used_before ?? 0} used Alpha before`} />
+        <StatTile dark={dark} label="Passes gifted" value={(overview?.invites_redeemed ?? 0).toLocaleString('en-IN')} sub={`${(overview?.invites_open ?? 0).toLocaleString('en-IN')} still open`} />
         <StatTile dark={dark} label="Let in" value={((by.waitlist ?? 0) + (by.admin ?? 0) + (by.pass ?? 0)).toLocaleString('en-IN')} sub={`${by.pass ?? 0} Pass · ${overview?.device_claims ?? 0} device claims`} />
       </div>
 
@@ -109,7 +109,7 @@ const AccessAdmin = ({ theme }: Props) => {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Eyebrow dark={dark}>Let people in</Eyebrow>
-            <p className={`mt-2 text-sm font-ui ${t.muted}`}>Oldest in line first. They get in on their next visit, with their own invite.</p>
+            <p className={`mt-2 text-sm font-ui ${t.muted}`}>Oldest in line first. They get in on their next visit, with their own pass to gift.</p>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -136,9 +136,15 @@ const AccessAdmin = ({ theme }: Props) => {
             <div key={r.user_id} className={`grid grid-cols-[48px_1fr_auto] gap-3 items-start py-4 border-b ${t.rule}`}>
               <span className={`num-stat text-sm tabular-nums ${t.faint}`}>{r.place}</span>
               <div className="min-w-0">
-                <p className={`text-sm font-bold font-ui truncate ${t.heading}`}>{r.name ?? 'No name yet'}</p>
+                <p className={`text-sm font-bold font-ui truncate ${t.heading}`}>{r.name ?? 'No name yet'}
+                  {r.device_since && (
+                    <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-[#F59F00]/15 text-[#B76E00]">
+                      Used Alpha since {new Date(`${r.device_since}T00:00:00+05:30`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </p>
                 <p className={`text-[12px] font-ui ${t.muted}`}>
-                  {[r.exam, r.class ? CLASS_LABEL[r.class] : null, r.goal_hours != null ? `${r.goal_hours}h a day` : null, r.wants_pass ? 'Would buy the Pass' : null]
+                  {[r.exam, r.class ? CLASS_LABEL[r.class] : null, r.goal_hours != null ? `${r.goal_hours}h a day` : null, r.wants_pass ? 'Reserved a Pass' : null]
                     .filter(Boolean).join(' · ') || 'No answers'}
                   <span className={t.faint}> · {when(r.joined_at)}</span>
                 </p>
