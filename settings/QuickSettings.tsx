@@ -48,6 +48,9 @@ interface Props {
   onOpenAll: () => void;
   /** The Support Alpha page: one quiet line under All settings, never a row with a switch. */
   onOpenSupport?: () => void;
+  /** Invite-only: this account's member number and whether its one invite is unused. */
+  membership?: { no: number | null; inviteOpen: boolean } | null;
+  onOpenMembership?: () => void;
   /** The festive theme an administrator has switched on, or null when none is
    *  live — and then there is no row at all, because there is nothing to turn off. */
   festive?: { theme: 'dussehra' | 'diwali' | 'christmas'; label: string; on: boolean; onToggle: (on: boolean) => void } | null;
@@ -110,7 +113,7 @@ const SYNC_DOT: Record<SyncStatus, string> = {
 
 const QuickSettings: React.FC<Props> = ({
   theme, onToggleTheme, currentClass, onClassChange, showClass = true, reminders, onChangeReminders,
-  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, onOpenSupport, festive = null,
+  user, profile, syncStatus, onSignIn, onOpenProfile, install, onOpenAll, onOpenSupport, membership = null, onOpenMembership, festive = null,
 }) => {
   const dark = theme === 'dark';
   const sound = useSound();
@@ -235,6 +238,27 @@ const QuickSettings: React.FC<Props> = ({
                     <GoogleMark /> Continue with Google
                   </button>
                 </div>
+              )}
+
+              {/* ── Membership: the card and the one invite ── */}
+              {membership && onOpenMembership && (
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); onOpenMembership(); }}
+                  className={`${group} mt-3 w-full flex items-center gap-3 px-3.5 py-3 text-left active:scale-[0.99] transition-transform`}
+                >
+                  <span className="w-10 h-10 rounded-xl bg-[#050506] text-white flex items-center justify-center shrink-0 border border-white/10" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 22 }} aria-hidden="true">α</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-[15px] font-bold font-ui truncate ${ink}`}>
+                      Member No. {membership.no ? String(membership.no).padStart(4, '0') : '····'}
+                    </span>
+                    <span className={`block text-[12px] font-ui ${muted}`}>
+                      {membership.inviteOpen ? 'You have 1 invite' : 'Your invite is used'}
+                    </span>
+                  </span>
+                  {membership.inviteOpen && <i className="w-2 h-2 rounded-full bg-[#E10600] shrink-0" aria-hidden="true" />}
+                  <span className={muted}><Icon d={CHEVRON} size={16} /></span>
+                </button>
               )}
 
               {/* ── Switches ── */}

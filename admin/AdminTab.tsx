@@ -13,6 +13,8 @@ const DecksAdmin = React.lazy(() => import('./DecksAdmin'));
 const StoreAdmin = React.lazy(() => import('./StoreAdmin'));
 /* Lazy for the same reason: the charts are the console's alone. */
 const AnalyticsAdmin = React.lazy(() => import('../analytics/AnalyticsAdmin'));
+/* Invite-only: the waitlist and the door (supabase/access.sql). */
+const AccessAdmin = React.lazy(() => import('./AccessAdmin'));
 
 interface Props {
   adminId: string;
@@ -21,10 +23,12 @@ interface Props {
   onOpenDeck: (id: string | null) => void;
 }
 
-type Section = 'analytics' | 'announce' | 'theme' | 'inbox' | 'notes' | 'moderation' | 'decks' | 'store' | 'people';
+type Section = 'analytics' | 'access' | 'announce' | 'theme' | 'inbox' | 'notes' | 'moderation' | 'decks' | 'store' | 'people';
 
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'analytics', label: 'Analytics' },
+  // Who is in and who is waiting: the console's daily decision while Alpha is invite-only.
+  { id: 'access', label: 'Access' },
   { id: 'announce', label: 'Announcements' },
   { id: 'theme', label: 'Theme' },
   { id: 'inbox', label: 'Feedback' },
@@ -40,7 +44,7 @@ const SECTIONS: Array<{ id: Section; label: string }> = [
 /**
  * The console.
  *
- * Eight sections (nine once the store launches) behind one switch rather than tabs in the rail: the rail
+ * Nine sections (ten once the store launches) behind one switch rather than tabs in the rail: the rail
  * is the student's app and this is not part of it. Anyone who is not an
  * administrator never sees this tab at all — and if they reach it anyway, every
  * query underneath returns a permission error, because none of the enforcement
@@ -77,6 +81,7 @@ const AdminTab: React.FC<Props> = ({ adminId, theme, onOpenDeck }) => {
       </div>
 
       {section === 'analytics' && <Suspense fallback={null}><AnalyticsAdmin theme={theme} /></Suspense>}
+      {section === 'access' && <Suspense fallback={null}><AccessAdmin theme={theme} /></Suspense>}
       {section === 'announce' && <AnnouncementsAdmin theme={theme} />}
       {section === 'theme' && <ThemeAdmin theme={theme} />}
       {section === 'inbox' && <FeedbackInbox adminId={adminId} theme={theme} />}

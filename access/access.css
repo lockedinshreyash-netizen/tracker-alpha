@@ -1,0 +1,290 @@
+/* ── The Gate and the member card ──
+   Hand-written and scoped under .ax, like the reader and Notes. Always black:
+   the door to a members-only room is the one screen that does not follow the
+   app theme. #E10600 is spent on the primary button and the card's hairline
+   only. */
+
+.ax {
+  --ax-bg: #050506;
+  --ax-ink: #f4f4f5;
+  --ax-mute: #8a8a93;
+  --ax-faint: #4a4a52;
+  --ax-rule: rgba(255, 255, 255, 0.07);
+  --ax-panel: rgba(255, 255, 255, 0.025);
+  --ax-red: #e10600;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
+    var(--ax-bg);
+  color: var(--ax-ink);
+  font-family: 'Satoshi', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.ax *, .ax *::before, .ax *::after { box-sizing: border-box; }
+
+.ax-wrap {
+  min-height: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: calc(var(--safe-top, 0px) + 28px) 20px 48px;
+  display: flex;
+  flex-direction: column;
+}
+.ax-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ax-mute);
+  font-weight: 700;
+}
+.ax-top button {
+  background: none;
+  border: 0;
+  color: var(--ax-mute);
+  font: inherit;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.ax-top button:hover { color: var(--ax-ink); }
+
+.ax-hero {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+  padding: 48px 0 24px;
+}
+@media (min-width: 900px) {
+  .ax-hero { grid-template-columns: 1.05fr 0.95fr; gap: 72px; padding-top: 72px; }
+}
+
+.ax-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ax-mute);
+  margin: 0 0 18px;
+}
+.ax-h1 {
+  font-weight: 900;
+  font-size: clamp(44px, 9vw, 84px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  margin: 0;
+}
+.ax-h1 i { font-style: normal; color: var(--ax-red); }
+.ax-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(20px, 3.4vw, 28px);
+  line-height: 1.25;
+  color: #d4d4d8;
+  margin: 18px 0 0;
+}
+.ax-lead {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ax-mute);
+  max-width: 440px;
+  margin: 22px 0 0;
+}
+
+.ax-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 26px;
+  border-radius: 999px;
+  border: 0;
+  font: 700 13px/1 'Satoshi', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+}
+.ax-btn:active { transform: scale(0.97); }
+.ax-btn:disabled { opacity: 0.4; pointer-events: none; }
+.ax-btn-red { background: var(--ax-red); color: #fff; box-shadow: 0 10px 36px -12px rgba(225, 6, 0, 0.7); }
+.ax-btn-red:hover { background: #c90500; }
+.ax-btn-white { background: #f4f4f5; color: #050506; }
+.ax-btn-white:hover { background: #fff; }
+.ax-btn-ghost { background: transparent; color: var(--ax-ink); border: 1px solid rgba(255, 255, 255, 0.16); }
+.ax-btn-ghost:hover { background: rgba(255, 255, 255, 0.04); }
+.ax-btn-wide { width: 100%; }
+.ax-g { width: 18px; height: 18px; }
+
+.ax-ways { display: grid; gap: 10px; margin-top: 34px; }
+.ax-way {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 18px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--ax-rule);
+  background: var(--ax-panel);
+  color: var(--ax-ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.ax-way:hover { border-color: rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.04); }
+.ax-way[aria-expanded='true'] { border-color: rgba(255, 255, 255, 0.22); }
+.ax-way-n { font-size: 11px; font-weight: 700; color: var(--ax-faint); font-variant-numeric: tabular-nums; letter-spacing: 0.1em; }
+.ax-way-t { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.ax-way-s { font-size: 13px; color: var(--ax-mute); margin-top: 3px; line-height: 1.45; }
+.ax-way-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ax-mute);
+  border: 1px solid var(--ax-rule);
+  border-radius: 999px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.ax-panelbox {
+  border: 1px solid var(--ax-rule);
+  border-top: 0;
+  margin-top: -14px;
+  padding: 26px 18px 18px;
+  border-radius: 0 0 16px 16px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.ax-input {
+  width: 100%;
+  height: 52px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b0b0d;
+  color: var(--ax-ink);
+  font: 600 16px/1 'Satoshi', system-ui, sans-serif;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.ax-input:focus { border-color: var(--ax-red); }
+.ax-input::placeholder { color: var(--ax-faint); }
+.ax-code { font-family: ui-monospace, 'IBM Plex Mono', monospace; letter-spacing: 0.18em; text-transform: uppercase; }
+textarea.ax-input { height: 84px; padding: 14px 16px; resize: none; line-height: 1.45; font-size: 15px; font-weight: 500; }
+.ax-row { display: flex; gap: 10px; }
+.ax-row > .ax-input { flex: 1; min-width: 0; }
+.ax-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ax-mute); margin: 0 0 10px; }
+.ax-field + .ax-field { margin-top: 22px; }
+.ax-seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.ax-seg button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--ax-mute);
+  font: 700 13px/1 'Satoshi', system-ui, sans-serif;
+  cursor: pointer;
+}
+.ax-seg button[aria-pressed='true'] { background: var(--ax-ink); color: #050506; border-color: var(--ax-ink); }
+.ax-range { width: 100%; accent-color: #f4f4f5; }
+.ax-hours { font-weight: 900; font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.ax-hours small { font-size: 13px; font-weight: 600; color: var(--ax-mute); margin-left: 6px; letter-spacing: 0; }
+.ax-check { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: #d4d4d8; line-height: 1.45; cursor: pointer; }
+.ax-check input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--ax-red); flex: none; }
+.ax-count { font-size: 11px; color: var(--ax-faint); text-align: right; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ax-note { font-size: 13px; line-height: 1.5; color: var(--ax-mute); margin: 14px 0 0; }
+.ax-note.bad { color: #ff8a80; }
+.ax-fine { font-size: 12px; color: var(--ax-faint); margin-top: 22px; line-height: 1.5; }
+.ax-fine button { background: none; border: 0; padding: 0; color: var(--ax-mute); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; }
+
+.ax-place {
+  font-weight: 900;
+  font-size: clamp(72px, 18vw, 140px);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0 0;
+}
+.ax-place small { font-size: 0.3em; letter-spacing: -0.01em; color: var(--ax-mute); margin-right: 6px; font-weight: 700; }
+
+/* ── The card ── */
+.ax-cardstage { display: flex; justify-content: center; perspective: 1400px; }
+.ax-card {
+  position: relative;
+  width: min(100%, 420px);
+  aspect-ratio: 1.586;
+  border-radius: 22px;
+  padding: 26px 26px 22px;
+  overflow: hidden;
+  color: #f4f4f5;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(140% 120% at 100% 100%, #1d1d22 0%, #0a0a0c 55%, #050506 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 40px 80px -30px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transform: rotateX(8deg) rotateY(-14deg) rotateZ(2deg);
+  animation: ax-float 7s ease-in-out infinite;
+}
+.ax-card.flat { transform: none; animation: none; }
+.ax-card::before {
+  /* the brushed grain */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+.ax-card::after {
+  /* a slow sheen, the only thing that moves */
+  content: '';
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.08) 50%, transparent 58%);
+  animation: ax-sheen 6s ease-in-out infinite;
+  pointer-events: none;
+}
+.ax-card-top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; }
+.ax-card-mark { font-weight: 900; font-size: 15px; letter-spacing: 0.32em; }
+.ax-card-alpha { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 40px; line-height: 0.8; color: rgba(255, 255, 255, 0.9); }
+.ax-card-mid { position: relative; }
+.ax-card-no { font-family: ui-monospace, 'IBM Plex Mono', monospace; font-size: clamp(18px, 5vw, 24px); letter-spacing: 0.2em; color: #e4e4e7; }
+.ax-card-bot { position: relative; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.ax-card-name { font-weight: 700; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-card-tier { font-size: 9px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: #a1a1aa; margin-top: 6px; }
+.ax-card-line { position: absolute; left: 26px; right: 26px; bottom: 0; height: 2px; background: var(--ax-red); opacity: 0.85; }
+
+@keyframes ax-float {
+  0%, 100% { transform: rotateX(8deg) rotateY(-14deg) rotateZ(2deg) translateY(0); }
+  50% { transform: rotateX(6deg) rotateY(-10deg) rotateZ(1deg) translateY(-8px); }
+}
+@keyframes ax-sheen {
+  0%, 100% { transform: translateX(-30%); }
+  50% { transform: translateX(30%); }
+}
+.ax-rise { animation: ax-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes ax-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-card, .ax-card::after, .ax-rise { animation: none; }
+}

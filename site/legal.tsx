@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-25';
-const EFFECTIVE_LONG = '25 October 2026';
+const POLICY_EFFECTIVE = '2026-11-01';
+const EFFECTIVE_LONG = '1 November 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -113,6 +113,25 @@ const privacyPage = (): SitePage => {
                 you never give us a password. Accounts made earlier with an email and a password keep that email
                 address, and the password stays stored hashed by our sign-in provider, never as text. We can’t
                 read it. We email you only about your account.
+              </p>
+
+              <h3>Getting in</h3>
+              <p>
+                From 1 November 2026, new accounts need a way in. Each member gets a member number and one invite.
+                If you use someone’s invite, we record that, and they can see your profile as the person who used it.
+              </p>
+              <p>
+                If you join the <b>waitlist</b>, we store your exam, your class, the hours a day you aim to study, an
+                optional one line on why you want in (140 characters at most) and whether you would buy the Priority
+                Pass. Our staff can read this, to let people in by waves.
+              </p>
+              <p>
+                If you sign in on a device that used Alpha before 1 November 2026, the app sends the date of the
+                earliest study log on that device, so that device can still make you a founding member.
+              </p>
+              <p>
+                When the <b>Priority Pass</b> goes on sale, buying it will record an order reference from the payment
+                provider against your account. Alpha never sees your card or UPI details.
               </p>
 
               <h3>Your study data</h3>

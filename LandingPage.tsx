@@ -5,40 +5,75 @@
    code: the first render must be pure (no window, no storage, no clock except
    landingNow()), and anything that moves on arrival is CSS.
 
-   Order is the argument: the promise (hero), the problem (you are guessing),
-   the tools, how to start, the price, the comparison, the questions, the
-   close. Copy lives in landing/content.ts. */
+   A members' club, told in very few words: the door (hero), what is inside,
+   the crowd, the card, the three ways in, the countdown, a short FAQ, the
+   door again. Copy lives in landing/content.ts.
+
+   One page per exam. The build renders this once for "/" and once per
+   VARIANTS entry (/bitsat-study-tracker/ …), each into its own copy of
+   index.html with `data-lp-variant` on #root. The browser hydrates whichever
+   it was served by reading that attribute back: the same value the build
+   rendered with, so the first render matches.
+
+   The CTA hands App the exam's stream and, when the page is an exam's own page
+   or the visitor switched the countdown's year, that exam and year, so
+   onboarding opens on BITSAT 2028 rather than asking again.
+
+   Two entries, two handlers: "Request access" (`start`) and "I have an
+   invite" / "Sign in" (`invite`). Both lead to the same place today; the
+   Gate (access/) decides what happens after. */
 
 import React, { useState } from 'react';
 import './landing/landing.css';
-import type { Exam } from './landing/content';
+import type { Exam, Variant } from './landing/content';
+import { ROOT, VARIANTS } from './landing/content';
+import { examById, prefOf, type ExamId } from './content/exams';
 import { Hero } from './landing/Hero';
-import { Compare, Faq, Features, Final, Footer, Manifesto, Nav, Price, Ribbon, Steps } from './landing/Sections';
+import { Card, Clock, Crowd, Faq, Final, Footer, Inside, Nav, Tools, Ways } from './landing/Sections';
 
-const LandingPage = ({ onCtaClick }: { onCtaClick: (exam: Exam) => void }) => {
-  const [exam, setExam] = useState<Exam>('JEE');
+/** The page this document was built as. The build passes it; the browser reads it off #root. */
+const servedVariant = (): Variant => {
+  if (typeof document === 'undefined') return ROOT;
+  const id = document.getElementById('root')?.dataset.lpVariant;
+  return VARIANTS.find(v => v.id === id) ?? ROOT;
+};
+
+/** What the landing page knew about the visitor's exam: the exam, and the year only if they picked one. */
+export interface LandingTarget { primary: ExamId; year?: number }
+
+interface Props {
+  onCtaClick: (exam: Exam, target?: LandingTarget) => void;
+  variant?: Variant;
+}
+
+const LandingPage = ({ onCtaClick, variant: given }: Props) => {
+  const [variant] = useState<Variant>(() => given ?? servedVariant());
+  const [exam, setExam] = useState<ExamId>(variant.exams[0]);
+  // Null until the visitor switches it: the default year is onboarding's to work out from their class.
+  const [year, setYear] = useState<number | null>(null);
 
   const start = () => {
     try { localStorage.setItem('hasVisited', 'true'); } catch { /* private mode: they will see this page again */ }
-    // The exam on the hero's toggle goes with them into onboarding.
-    onCtaClick(exam);
+    const target = variant !== ROOT || year !== null ? { primary: exam, ...(year !== null ? { year } : {}) } : undefined;
+    onCtaClick(prefOf(examById(exam).streams[0]), target);
   };
+  const invite = start;
 
   return (
     <div className="lp" id="top">
-      <Nav onCta={start} />
+      <Nav onCta={start} onInvite={invite} />
       <main>
-        <Hero exam={exam} onExam={setExam} onCta={start} />
-        <Ribbon />
-        <Manifesto />
-        <Features exam={exam} />
-        <Steps onCta={start} />
-        <Price onCta={start} />
-        <Compare />
-        <Faq />
-        <Final exam={exam} onCta={start} />
+        <Hero variant={variant} onCta={start} onInvite={invite} />
+        <Inside />
+        <Tools />
+        <Crowd />
+        <Card />
+        <Ways onCta={start} onInvite={invite} />
+        <Clock variant={variant} exam={exam} onExam={setExam} year={year} onYear={setYear} />
+        <Faq variant={variant} />
+        <Final onCta={start} onInvite={invite} />
       </main>
-      <Footer />
+      <Footer variant={variant} />
     </div>
   );
 };

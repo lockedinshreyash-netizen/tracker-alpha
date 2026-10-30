@@ -13,7 +13,14 @@
    Writes: the landing page into #root (with its build time, which the
    browser's first render reuses so hydration matches), the JSON-LD graph into
    <head>, the static guide pages from site/ (dist/<path>/index.html), the
-   sitemap covering all of them, and dist/llms.txt. */
+   sitemap covering all of them, and dist/llms.txt.
+
+   The landing page is written more than once: into dist/index.html for "/",
+   and into dist/<exam>-study-tracker/index.html for each exam's version
+   (landing/content.ts VARIANTS). Each copy is the whole app shell, so the
+   page hydrates and its buttons work exactly as on "/"; #root carries
+   `data-lp-variant` so the browser renders the version it was served, and
+   the canonical and share tags point at that copy's own address. */
 
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -24,6 +31,7 @@ import type { Plugin, ResolvedConfig } from 'vite';
 const EMPTY_ROOT = '<div id="root"></div>';
 
 interface SiteGuide { path: string; label: string; description: string }
+interface LandingDoc { id: string; path: string; url: string; html: string; head: string; title: string; description: string }
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -60,7 +68,7 @@ export const prerenderLanding = (): Plugin => {
       const builtAt = Date.now();
       // The query string defeats Node's module cache across watch rebuilds.
       const mod = await import(`${pathToFileURL(entry).href}?t=${builtAt}`) as {
-        prerender: (t: number, guides: SiteGuide[]) => { html: string; head: string; llms: string; title: string; description: string };
+        prerender: (t: number, guides: SiteGuide[]) => LandingDoc & { llms: string; variants: LandingDoc[] };
         buildSite: (css: string) => { files: Array<{ path: string; html: string }>; urls: Array<{ path: string; lastmod: string }>; guides: SiteGuide[] };
         sitemapXml: (homeLastmod: string, urls: Array<{ path: string; lastmod: string }>) => string;
       };
@@ -73,31 +81,56 @@ export const prerenderLanding = (): Plugin => {
         await mkdir(dir, { recursive: true });
         await writeFile(path.join(dir, 'index.html'), f.html);
       }
+      const landing = mod.prerender(builtAt, site.guides);
       const today = new Date(builtAt + 330 * 60_000).toISOString().slice(0, 10);
-      await writeFile(path.join(outDir, 'sitemap.xml'), mod.sitemapXml(today, site.urls));
-
-      const { html, head, llms, title, description } = mod.prerender(builtAt, site.guides);
+      const examUrls = landing.variants.map(v => ({ path: v.path, lastmod: today }));
+      await writeFile(path.join(outDir, 'sitemap.xml'), mod.sitemapXml(today, [...examUrls, ...site.urls]));
 
       const indexPath = path.join(outDir, 'index.html');
-      let doc = await readFile(indexPath, 'utf8');
-      if (!doc.includes(EMPTY_ROOT)) throw new Error(`prerender-landing: ${EMPTY_ROOT} not found in ${indexPath}`);
-      if (html.length < 2000) throw new Error('prerender-landing: rendered page is suspiciously short');
-      doc = doc.replace(EMPTY_ROOT, `<div id="root" data-lp-built="${builtAt}">${html}</div>`);
-      // Title and description from landing/seo.ts, so production has one source.
-      const TITLE_RE = /<title>[\s\S]*?<\/title>/;
-      const DESC_RE = /(<meta name="description"\s+content=")[^"]*(")/;
-      if (!TITLE_RE.test(doc) || !DESC_RE.test(doc)) throw new Error('prerender-landing: <title> or meta description not found');
-      doc = doc
-        .replace(TITLE_RE, `<title>${escapeHtml(title)}</title>`)
-        .replace(DESC_RE, (_m, a: string, b: string) => `${a}${escapeHtml(description)}${b}`);
-      // The LAST </head>: the first could be inside a comment.
-      const headEnd = doc.lastIndexOf('</head>');
-      if (headEnd < 0) throw new Error('prerender-landing: </head> not found');
-      doc = `${doc.slice(0, headEnd)}  ${head}\n${doc.slice(headEnd)}`;
-      await writeFile(indexPath, doc);
-      await writeFile(path.join(outDir, 'llms.txt'), llms);
+      const template = await readFile(indexPath, 'utf8');
+      if (!template.includes(EMPTY_ROOT)) throw new Error(`prerender-landing: ${EMPTY_ROOT} not found in ${indexPath}`);
 
-      config.logger.info(`prerender-landing: ${Math.round(html.length / 1024)} kB of landing HTML, ${site.files.length} static pages (guides + legal), sitemap, JSON-LD and llms.txt written`);
+      const fill = (page: LandingDoc, variant: boolean): string => {
+        if (page.html.length < 2000) throw new Error(`prerender-landing: ${page.path} is suspiciously short`);
+        const attrs = `data-lp-built="${builtAt}"${variant ? ` data-lp-variant="${escapeHtml(page.id)}"` : ''}`;
+        let doc = template.replace(EMPTY_ROOT, `<div id="root" ${attrs}>${page.html}</div>`);
+        // Title and description from landing/seo.ts, so production has one source.
+        const TITLE_RE = /<title>[\s\S]*?<\/title>/;
+        const DESC_RE = /(<meta name="description"\s+content=")[^"]*(")/;
+        if (!TITLE_RE.test(doc) || !DESC_RE.test(doc)) throw new Error('prerender-landing: <title> or meta description not found');
+        doc = doc
+          .replace(TITLE_RE, `<title>${escapeHtml(page.title)}</title>`)
+          .replace(DESC_RE, (_m, a: string, b: string) => `${a}${escapeHtml(page.description)}${b}`);
+        if (variant) {
+          // Its own address, or Google folds the page into "/" as a duplicate.
+          const swaps: Array<[RegExp, string]> = [
+            [/(<link rel="canonical" href=")[^"]*(")/, page.url],
+            [/(<meta property="og:url" content=")[^"]*(")/, page.url],
+            [/(<meta property="og:title" content=")[^"]*(")/, page.title],
+            [/(<meta name="twitter:title" content=")[^"]*(")/, page.title],
+            [/(<meta property="og:description"\s+content=")[^"]*(")/, page.description],
+            [/(<meta name="twitter:description"\s+content=")[^"]*(")/, page.description],
+          ];
+          for (const [re, value] of swaps) {
+            if (!re.test(doc)) throw new Error(`prerender-landing: ${re} not found for ${page.path}`);
+            doc = doc.replace(re, (_m, a: string, b: string) => `${a}${escapeHtml(value)}${b}`);
+          }
+        }
+        // The LAST </head>: the first could be inside a comment.
+        const headEnd = doc.lastIndexOf('</head>');
+        if (headEnd < 0) throw new Error('prerender-landing: </head> not found');
+        return `${doc.slice(0, headEnd)}  ${page.head}\n${doc.slice(headEnd)}`;
+      };
+
+      await writeFile(indexPath, fill(landing, false));
+      for (const v of landing.variants) {
+        const dir = path.join(outDir, ...v.path.split('/').filter(Boolean));
+        await mkdir(dir, { recursive: true });
+        await writeFile(path.join(dir, 'index.html'), fill(v, true));
+      }
+      await writeFile(path.join(outDir, 'llms.txt'), landing.llms);
+
+      config.logger.info(`prerender-landing: ${Math.round(landing.html.length / 1024)} kB of landing HTML, ${landing.variants.length} exam pages, ${site.files.length} static pages (guides + legal), sitemap, JSON-LD and llms.txt written`);
     },
   };
 };

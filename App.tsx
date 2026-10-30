@@ -26,7 +26,7 @@ import ExamLaunch from './exams/ExamLaunch';
 import { mergeReading, normalizeReading, type ReadingState } from './reader/model';
 import { BOOK } from './content/book';
 import Sidebar from './Sidebar';
-import LandingPage from './LandingPage';
+import LandingPage, { type LandingTarget } from './LandingPage';
 import { landingWillShow } from './landing/gate';
 import { readDeepLink, settleDeepLink } from './landing/deeplink';
 import AuthModal from './AuthModal';
@@ -108,6 +108,14 @@ import type { NotesRequest } from './notes/NotesTab';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
 import { deleteAccount } from './account/deleteAccount';
+import { useAccess } from './access/useAccess';
+import { accessLive } from './access/cutover';
+import { clearAccessInvite, takeAccessInvite } from './access/invite';
+import { stampDevice } from './access/device';
+import { isAndroidApp } from './install/useInstall';
+const AccessGate = React.lazy(() => import('./access/Gate'));
+const MemberSheet = React.lazy(() => import('./access/MemberSheet'));
+import { memberIntroDue, markMemberIntro } from './access/memberIntro';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -240,6 +248,9 @@ const App: React.FC = () => {
      render and held (in localStorage too) until it is used or dismissed — the
      person opening it has often not signed up yet. See groups/invite.ts. */
   const [pendingInvite, setPendingInvite] = useState<string | null>(takePendingInvite);
+  /* An Alpha invite from `/?invite=CODE` (access/invite.ts): the way in for
+     somebody new once the doors close. Held across sign-in, like a group one. */
+  const [accessCode, setAccessCode] = useState<string | null>(takeAccessInvite);
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -322,6 +333,14 @@ const App: React.FC = () => {
   const stateRef = useRef(state);
   const preventSyncOnUpdate = useRef(false);
 
+  /* ── Invite-only (access/) ──
+     Whether this person is in. Decides what is drawn: the Gate stands in front
+     of the app for anyone without access once the doors close. The server
+     refuses a non-member's writes to the synced blob on its own
+     (supabase/access.sql §6); canSyncRef only stops this client knocking. */
+  const access = useAccess(user?.id ?? null, state.logs);
+  const canSyncRef = useRef(true);
+
   /* Memoised because `getActiveSubjects` returns a fresh array literal every
      call, and this is read on every render. An unstable array here silently
      defeats React.memo on every child that receives it — including the task
@@ -374,7 +393,7 @@ const App: React.FC = () => {
         /* An invite link skips the landing page: the person was sent to a
            specific group by a friend, and a pitch for the whole product
            standing between them and it is the fastest way to lose them. */
-        setShowLanding(!hasVisited && !pendingInvite);
+        setShowLanding(!hasVisited && !pendingInvite && !accessCode);
         // Local-only session: there is no cloud pull to wait for.
         setSyncSettled(true);
       }
@@ -609,7 +628,7 @@ const App: React.FC = () => {
   };
 
   const triggerSync = async () => {
-    if (!user || !isInitialSyncDone.current || preventSyncOnUpdate.current) return;
+    if (!user || !isInitialSyncDone.current || preventSyncOnUpdate.current || !canSyncRef.current) return;
 
     if (isSyncingRef.current) {
       pendingSyncRef.current = true;
@@ -650,6 +669,16 @@ const App: React.FC = () => {
       triggerSync();
     }
   }, [state, user?.id]);
+
+  /* Nothing is pushed for someone who is not in, and the moment they are
+     (an invite, an admission, a device claim) their state goes up once. */
+  useEffect(() => {
+    const blocked = access.view.kind === 'none' || access.view.kind === 'waitlist';
+    const was = canSyncRef.current;
+    canSyncRef.current = !blocked;
+    if (!was && !blocked && user && isInitialSyncDone.current) triggerSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [access.view.kind]);
 
   /* What signing out and deleting the account both leave on this device:
      nothing of the account. One list, so the two can never drift apart. */
@@ -885,6 +914,9 @@ const App: React.FC = () => {
   /* The exam picked on the landing page's toggle, carried into onboarding so
      a NEET student who said NEET is not asked as if they hadn't. */
   const landingExam = useRef<ExamPreference | null>(null);
+  /* On an exam's own landing page (/bitsat-study-tracker/), that exam, and the
+     year if the visitor switched the countdown to one: onboarding opens on it. */
+  const landingTarget = useRef<LandingTarget | null>(null);
 
   /* ── What a new log sounds like ──
      Read from `stateRef` before the write lands, so "first log today" and
@@ -2166,6 +2198,28 @@ const App: React.FC = () => {
     && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !stillThere.removed
     && !sessionArmed;
 
+  /* ── Your membership ──
+     The card (quick settings → Member No.), and once after the doors close,
+     on its own, as the founding-member moment. Someone who just came in by an
+     invite has seen the welcome on the Gate and is not shown it again. Queued
+     behind every other full-screen moment and never over a running session. */
+  const [memberSheet, setMemberSheet] = useState<'card' | 'intro' | null>(null);
+  const [introSeen, setIntroSeen] = useState(false);
+  const member = access.view.kind === 'member' ? access.view.member : null;
+  const showMemberIntro =
+    !!member && !!user && !introSeen && accessLive() && member.source !== 'invite'
+    && memberIntroDue(user.id)
+    && showLanding === false && !needsOnboarding && syncSettled && !isAuthModalOpen && !showExamLaunch
+    && !isBookOpen && !celebration && streakMoment === null && !sharePeriod && !stillThere.removed && !checkBusy
+    && !sessionArmed;
+  const closeMemberSheet = useCallback(() => {
+    if (memberSheet === 'intro' || showMemberIntro) {
+      if (user) markMemberIntro(user.id);
+      setIntroSeen(true);
+    }
+    setMemberSheet(null);
+  }, [memberSheet, showMemberIntro, user]);
+
   /* An invite takes you to Groups once you can see it — after the landing
      page and onboarding — and once more after signing in, when the card
      changes from "sign in to join" to the group itself. Keyed so it never
@@ -2207,6 +2261,21 @@ const App: React.FC = () => {
     nudge: !!reminderPrefs.nudge,
   });
 
+  /* This device is in use, past onboarding: the record that lets a guest keep
+     guest mode after the doors close (access/device.ts). Written once. */
+  useEffect(() => {
+    if (showLanding === false && !needsOnboarding && !access.gated) stampDevice();
+  }, [showLanding, needsOnboarding, access.gated]);
+
+  /* Leaving the Gate for another Google account. Nothing here is worth a
+     confirm: someone who is not in has no synced data. */
+  const leaveGate = async () => {
+    preventSyncOnUpdate.current = true;
+    await supabase.auth.signOut().catch(() => { /* leaving anyway */ });
+    forgetAccountOnDevice();
+    window.location.href = window.location.origin;
+  };
+
   // While checking session, show nothing (prevents flash)
   if (showLanding === null) {
     return <div style={{ background: theme === 'dark' ? '#0B0B0D' : '#F2F0EC', width: '100vw', height: '100vh' }} />;
@@ -2216,13 +2285,36 @@ const App: React.FC = () => {
   if (showLanding) {
     return (
       <LandingPage
-        onCtaClick={(exam: ExamPreference) => {
+        onCtaClick={(exam: ExamPreference, target?: LandingTarget) => {
           /* Into onboarding, not a sign-up form: an account is offered at
              the end, once there is a plan worth keeping. */
           landingExam.current = exam;
+          landingTarget.current = target ?? null;
           setShowLanding(false);
         }}
       />
+    );
+  }
+
+  /* Invite-only: the Gate instead of the app, after the landing page and
+     before onboarding (access/Gate.tsx). */
+  if (access.gated) {
+    return (
+      <React.Suspense fallback={<div style={{ position: 'fixed', inset: 0, background: '#050506' }} />}>
+        <AccessGate
+          view={access.view}
+          signedIn={!!user}
+          pendingCode={accessCode}
+          defaults={{ exam: landingExam.current ?? state.examPreference ?? 'JEE', currentClass: state.currentClass, hours: state.dailyGoalHours }}
+          playApp={isAndroidApp()}
+          onSignIn={signInWithGoogle}
+          onSignOut={leaveGate}
+          onSettle={a => {
+            if (a.status === 'member') { clearAccessInvite(); setAccessCode(null); }
+            access.settle(a);
+          }}
+        />
+      </React.Suspense>
     );
   }
 
@@ -2696,6 +2788,8 @@ const App: React.FC = () => {
           install={install}
           onOpenAll={() => handleTabChange(STORE_LAUNCHED ? 'Profile' : 'Review')}
           onOpenSupport={openSupport}
+          membership={member ? { no: member.memberNo, inviteOpen: !!member.invite && !member.invite.redeemedAt } : null}
+          onOpenMembership={() => setMemberSheet('card')}
           festive={festiveLive === 'none' ? null : {
             theme: festiveLive,
             label: FESTIVE_LABEL[festiveLive],
@@ -2732,6 +2826,17 @@ const App: React.FC = () => {
           theme={theme}
           onClose={closeStreakMoment}
         />
+      )}
+
+      {(memberSheet || showMemberIntro) && member && (
+        <React.Suspense fallback={null}>
+          <MemberSheet
+            member={member}
+            name={profileCtl.ownProfile?.display_name ?? null}
+            intro={memberSheet !== 'card'}
+            onClose={closeMemberSheet}
+          />
+        </React.Suspense>
       )}
 
       {/* Once, for students who joined before there were exams to pick. */}
@@ -2790,7 +2895,9 @@ const App: React.FC = () => {
             initial={{
               examPreference: landingExam.current ?? state.examPreference ?? 'JEE',
               // A guide page's exam link (landingExam) picks the stream; the exams then start from it.
-              exams: landingExam.current && landingExam.current !== state.examPreference ? undefined : examTarget,
+              exams: landingTarget.current
+                ? normalizeTarget({ primary: landingTarget.current.primary, also: [], year: landingTarget.current.year }, streamOf(landingExam.current ?? 'JEE'), state.currentClass)
+                : landingExam.current && landingExam.current !== state.examPreference ? undefined : examTarget,
               currentClass: state.currentClass,
               dailyGoalHours: state.dailyGoalHours,
               // Onboarding offers the two classic modes only.

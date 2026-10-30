@@ -81,7 +81,7 @@ const Hero: React.FC<{
       <p className="lead">{lead}</p>
       {stats && <ul className="stats">{stats.map((s, i) => <li key={i}>{s}</li>)}</ul>}
       <div className="hero-ctas">
-        <a className="btn btn-red" href={exam ? appLink(exam) : '/'}>{exam ? 'Track this syllabus free' : 'Open Tracker Alpha'} →</a>
+        <a className="btn btn-red" href={exam ? appLink(exam) : '/'}>{exam ? 'Request access to track it' : 'Request access'} →</a>
       </div>
       <p className="updated">Updated <time dateTime={CONTENT_UPDATED}>{UPDATED_LONG}</time></p>
     </div>
@@ -134,9 +134,9 @@ const Method: React.FC<{ exam: SiteExam }> = ({ exam }) => {
 
 const Cta: React.FC<{ exam?: SiteExam; text?: string }> = ({ exam, text }) => (
   <aside className="cta" aria-label="Track your syllabus">
-    <h2>Track every chapter. <span className="serif">Free<span className="stop">.</span></span></h2>
+    <h2>Track every chapter. <span className="serif">By invitation<span className="stop">.</span></span></h2>
     <p>{text ?? 'Tracker Alpha has this full syllabus built in. Mark each chapter as started, done or due for revision, time your study, and see what is left before the exam.'}</p>
-    <a className="btn btn-red" href={exam ? appLink(exam) : '/'}>Start tracking free →</a>
+    <a className="btn btn-red" href={exam ? appLink(exam) : '/'}>Request access →</a>
   </aside>
 );
 
@@ -254,7 +254,7 @@ const subjectPage = (exam: SiteExam, subject: SiteSubject): SitePage => {
           title={`${name} ${YEAR} ${subject} syllabus`}
           accent="ranked by weightage"
           exam={exam}
-          lead={<>All <strong>{rows.length} chapters</strong> of {name} {subject}, Class 11 and 12, ranked by how often they come up in past papers. See what matters most, what to study first, and track every chapter free.</>}
+          lead={<>All <strong>{rows.length} chapters</strong> of {name} {subject}, Class 11 and 12, ranked by how often they come up in past papers. See what matters most, what to study first, and track every chapter in Tracker Alpha.</>}
           stats={[
             <><b>{rows.length}</b> chapters</>,
             <><b>{c11.length}</b> Class 11 · <b>{c12.length}</b> Class 12</>,
@@ -561,7 +561,7 @@ const hubPage = (): SitePage => {
   const crumbs: Crumb[] = [{ name: 'Home', path: '/' }, { name: 'Syllabus', path: '/syllabus/' }];
   const faq: Faq[] = [
     { q: `What is the difference between the JEE Main and NEET syllabus?`, a: 'Both cover Class 11 and 12 Physics and Chemistry. JEE Main adds Maths, NEET adds Biology. Chemistry differs slightly too: NEET keeps s-Block Elements, Hydrogen and p-Block groups 13 and 14, which JEE Main dropped.' },
-    { q: 'Are these syllabus pages free?', a: 'Yes. Every page here is free, and so is Tracker Alpha, the study tracker that has these chapter lists built in.' },
+    { q: 'Are these syllabus pages free?', a: 'Yes. Every guide here is free to read, with no sign-in. Tracker Alpha, the study tracker with these chapter lists built in, is invite-only for now.' },
   ];
   return {
     path: '/syllabus/',
@@ -607,7 +607,7 @@ const hubPage = (): SitePage => {
               </section>
             ))}
             <FaqBlock items={faq} />
-            <Cta text="Tracker Alpha has the full JEE and NEET syllabus built in. Track every chapter, time your study, log mock tests and keep a daily streak. Free." />
+            <Cta text="Tracker Alpha has the full JEE and NEET syllabus built in. Track every chapter, time your study, log mock tests and keep a daily streak. Invite-only for now." />
           </div>
           <Toc items={[['jee', 'JEE Main'], ['neet', 'NEET'], ['faq', 'FAQ']]} />
         </div>
@@ -639,7 +639,7 @@ export const Shell: React.FC<{ page: SitePage; pages: SitePage[] }> = ({ page, p
           <a href={examPath('NEET')} aria-current={page.section === 'neet' ? 'page' : undefined}>NEET</a>
           <a href={weightagePath('JEE')} aria-current={page.section === 'weightage' ? 'page' : undefined}>Weightage</a>
         </div>
-        <a className="btn btn-red btn-sm" href="/">Start free</a>
+        <a className="btn btn-red btn-sm" href="/">Request access</a>
       </div>
     </nav>
     <main>{page.body}</main>
@@ -648,7 +648,7 @@ export const Shell: React.FC<{ page: SitePage; pages: SitePage[] }> = ({ page, p
         <div className="foot-grid">
           <div>
             <a className="brand" href="/"><img src="/apple-touch-icon.png" width={28} height={28} alt="" loading="lazy" />Tracker Alpha</a>
-            <p>The free study tracker for JEE and NEET {YEAR}. Time every session, plan your day and finish the syllabus chapter by chapter.</p>
+            <p>The invite-only study tracker for JEE and NEET {YEAR}. Time every session, plan your day and finish the syllabus chapter by chapter.</p>
           </div>
           <div>
             <p className="foot-h">JEE Main</p>

@@ -14,15 +14,19 @@
    before. */
 
 const INVITE_KEY = 'groups_pending_invite_v1';
+// An Alpha invite (access/invite.ts): the friend who sent it already made the pitch.
+const ACCESS_INVITE_KEY = 'alpha_access_invite_v1';
 
 export const landingWillShow = (): boolean => {
   try {
     if (localStorage.getItem('hasVisited') === 'true') return false;
     const params = new URLSearchParams(window.location.search);
     if (params.has('join')) return false;
+    if (params.has('invite')) return false;
     // A guide page's "track this" link goes straight into the app (landing/deeplink.ts).
     if (params.has('open')) return false;
     if (localStorage.getItem(INVITE_KEY)) return false;
+    if (localStorage.getItem(ACCESS_INVITE_KEY)) return false;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) return false;

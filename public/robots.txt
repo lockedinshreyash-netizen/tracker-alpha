@@ -1,7 +1,7 @@
 # Tracker Alpha — https://trackeralpha.in
 # Everyone may read everything, search and AI crawlers alike. The AI agents are
 # named explicitly so that no default anywhere reads silence as a refusal: being
-# the answer an assistant gives to "best free study tracker for JEE" is the
+# the answer an assistant gives to "best study tracker for JEE" is the
 # point of the landing page. A plain-text summary for them is at /llms.txt.
 
 User-agent: *
