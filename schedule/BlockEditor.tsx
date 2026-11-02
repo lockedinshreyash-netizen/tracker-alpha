@@ -107,8 +107,9 @@ const BlockEditor: React.FC<Props> = ({
 
   const pickKind = (kind: BlockKind) => {
     /* Switching families drops the detail that no longer applies, so a block
-       cannot quietly keep a subject it stopped having. */
-    if (countsAsStudy(kind)) set({ kind, label: undefined, subject: d.subject || activeSubjects[0] });
+       cannot quietly keep a subject it stopped having. The name stays: every
+       kind has one. */
+    if (countsAsStudy(kind)) set({ kind, subject: d.subject || activeSubjects[0] });
     else set({ kind, subject: undefined, chapter: undefined, taskId: undefined });
   };
 
@@ -278,19 +279,25 @@ const BlockEditor: React.FC<Props> = ({
                 </div>
               )}
             </>
-          ) : (
-            <div>
-              <label className={eyebrow}>Name <span className="normal-case tracking-normal font-normal">(optional)</span></label>
-              <input
-                type="text"
-                value={d.label || ''}
-                onChange={e => set({ label: e.target.value || undefined })}
-                placeholder={`e.g. ${d.kind === 'gym' ? 'Leg day' : d.kind === 'class' ? 'School' : d.kind === 'meal' ? 'Dinner' : 'Something else'}`}
-                className={`${field} w-full`}
-                maxLength={60}
-              />
-            </div>
-          )}
+          ) : null}
+
+          {/* Every block can be named, a subject's too. The name is what the
+              grid shows; a study block keeps its subject colour and says the
+              subject underneath. */}
+          <div>
+            <label className={eyebrow}>Name <span className="normal-case tracking-normal font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={d.label || ''}
+              onChange={e => set({ label: e.target.value || undefined })}
+              placeholder={`e.g. ${
+                isStudy ? (d.kind === 'test' ? 'Sunday mock' : d.kind === 'revision' ? 'Formula sheet' : 'Rotation PYQs')
+                : d.kind === 'gym' ? 'Leg day' : d.kind === 'class' ? 'School' : d.kind === 'meal' ? 'Dinner' : 'Something else'
+              }`}
+              className={`${field} w-full`}
+              maxLength={60}
+            />
+          </div>
 
           {/* 3 ── When. Typed, with the common lengths one tap away. */}
           <div>

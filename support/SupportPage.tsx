@@ -372,7 +372,7 @@ const NoteCard = ({ dark, user, onSignIn, delay, onSent }: { dark: boolean; user
       className={`mk-rise rounded-2xl border p-6 sm:p-8 md:p-9 flex flex-col ${t.card}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <Eyebrow dark={dark}>Free, always</Eyebrow>
+      <Eyebrow dark={dark}>Or just say hi</Eyebrow>
       <h2 id="note-h" className={`font-display text-[28px] md:text-[32px] leading-none mt-3 ${t.heading}`} style={{ fontWeight: 900, letterSpacing: '-0.035em' }}>
         {C.noteTitle}<Stop />
       </h2>

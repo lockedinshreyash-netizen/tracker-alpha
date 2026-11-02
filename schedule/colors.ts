@@ -210,17 +210,18 @@ export const blockStyle = (
 /**
  * What to call this block on the grid.
  *
- * A linked task's own text wins, because that is the most specific thing
- * anybody knows about the block — "Finish rotational motion" tells you more
- * than "Physics". Resolved by the caller rather than looked up here, so this
- * stays a pure function of the block and nothing has to hand it a task list.
+ * A name the student typed wins over everything, study blocks included: it is
+ * the one thing on the block they chose to say. Then a linked task's own text,
+ * because "Finish rotational motion" tells you more than "Physics". Resolved
+ * by the caller rather than looked up here, so this stays a pure function of
+ * the block and nothing has to hand it a task list.
  */
 export const blockTitle = (
   block: Pick<ScheduleBlock, 'kind' | 'subject' | 'label'>,
   taskText?: string,
 ): string => {
-  if (taskText) return taskText;
   if (block.label) return block.label;
+  if (taskText) return taskText;
   if (countsAsStudy(block.kind) && block.subject) return block.subject;
   return ACTIVITIES[block.kind]?.label || 'Other';
 };

@@ -23,7 +23,7 @@ export const SUPPORT_COPY = {
   ],
   signature: 'Shreyash',
   signatureRole: 'Founder, Tracker Alpha',
-  optional: 'Entirely optional. Alpha remains free to use.',
+  optional: 'Entirely optional. It changes nothing in Alpha.',
 
   promiseTitle: 'This is 101% optional',
   promiseAccent: 'No pressure. Ever',

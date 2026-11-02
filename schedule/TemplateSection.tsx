@@ -71,7 +71,7 @@ const TemplateSection: React.FC<Props> = ({
 
   const pickKind = (kind: BlockKind) => setDraft(d => d && (
     countsAsStudy(kind)
-      ? { ...d, kind, label: undefined, subject: d.subject || activeSubjects[0] }
+      ? { ...d, kind, subject: d.subject || activeSubjects[0] }
       : { ...d, kind, subject: undefined, chapter: undefined }
   ));
 
@@ -201,19 +201,19 @@ Nothing repeats yet. Every day starts from nothing, and most of them stay there.
                 </div>
               )}
             </>
-          ) : (
-            <div>
-              <label className={label}>Name <span className="normal-case tracking-normal font-normal">(optional)</span></label>
-              <input
-                type="text"
-                value={draft.label || ''}
-                onChange={e => setDraft(d => d && ({ ...d, label: e.target.value || undefined }))}
-                placeholder="e.g. Coaching"
-                className={field}
-                maxLength={60}
-              />
-            </div>
-          )}
+          ) : null}
+
+          <div>
+            <label className={label}>Name <span className="normal-case tracking-normal font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={draft.label || ''}
+              onChange={e => setDraft(d => d && ({ ...d, label: e.target.value || undefined }))}
+              placeholder={isStudy ? 'e.g. Rotation PYQs' : 'e.g. Coaching'}
+              className={field}
+              maxLength={60}
+            />
+          </div>
 
           <div>
             <label className={label}>Start time — {formatRange(draft.start, draft.durationMins)}</label>

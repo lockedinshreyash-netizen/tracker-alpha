@@ -25,7 +25,7 @@ export const supportPage = (): SitePage => {
     path: '/support/',
     label: 'Support Alpha',
     title: 'Support Alpha | Tracker Alpha',
-    description: 'A note from the founder of Tracker Alpha, the free study tracker for JEE and NEET. Entirely optional. Alpha remains free to use.',
+    description: 'A note from the founder of Tracker Alpha, the invite-only study tracker for JEE and NEET. Support is entirely optional and changes nothing in the app.',
     crumbs,
     section: 'legal',
     faq: [],
@@ -108,7 +108,7 @@ export const supportPage = (): SitePage => {
             </section>
 
             <section className="sp-note" aria-labelledby="sp-note-h">
-              <p className="sp-kicker">Free, always</p>
+              <p className="sp-kicker">Or just say hi</p>
               <h2 id="sp-note-h">{C.noteTitle}<span className="stop">.</span></h2>
               <p className="sp-copy">{C.noteBody}</p>
               <p className="sp-copy sp-strong">{C.noteFree}</p>

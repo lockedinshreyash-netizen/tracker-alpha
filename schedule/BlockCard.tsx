@@ -61,8 +61,11 @@ const BlockCard: React.FC<Props> = ({
 
   const title = blockTitle(block, taskText);
   const isStudy = countsAsStudy(block.kind);
-  /* The subtitle is whatever the title didn't already say. */
-  const sub = isStudy ? block.chapter : (block.label ? ACTIVITIES[block.kind].label : null);
+  /* The subtitle is whatever the title didn't already say. A named study
+     block still says which subject it is. */
+  const sub = isStudy
+    ? (block.label && block.subject ? [block.subject, block.chapter].filter(Boolean).join(' · ') : block.chapter)
+    : (block.label ? ACTIVITIES[block.kind].label : null);
 
   return (
     <div

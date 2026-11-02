@@ -242,7 +242,7 @@ const subjectPage = (exam: SiteExam, subject: SiteSubject): SitePage => {
     path: subjectPath(exam, subject),
     label: `${name} ${YEAR} ${subject} syllabus`,
     title: `${name} ${YEAR} ${subject} Syllabus & Chapter Weightage | Tracker Alpha`,
-    description: `All ${rows.length} ${name} ${subject} chapters for Class 11 and 12, ranked by weightage in past papers. See which chapters matter most and which to study first. Free.`,
+    description: `All ${rows.length} ${name} ${subject} chapters for Class 11 and 12, ranked by weightage in past papers. See which chapters matter most and which to study first.`,
     crumbs,
     section: exam === 'JEE' ? 'jee' : 'neet',
     faq,
@@ -366,7 +366,7 @@ const examPage = (exam: SiteExam): SitePage => {
     title: exam === 'JEE'
       ? `JEE Main ${YEAR} Syllabus: All Chapters for PCM | Tracker Alpha`
       : `NEET ${YEAR} Syllabus: All Chapters for PCB | Tracker Alpha`,
-    description: `The full ${name} ${YEAR} syllabus: all ${total} chapters of ${listOf(subjects)} for Class 11 and 12, the exam pattern, and the most important chapters. Free.`,
+    description: `The full ${name} ${YEAR} syllabus: all ${total} chapters of ${listOf(subjects)} for Class 11 and 12, the exam pattern, and the most important chapters.`,
     crumbs,
     section: exam === 'JEE' ? 'jee' : 'neet',
     faq,
@@ -500,7 +500,7 @@ const weightagePage = (exam: SiteExam): SitePage => {
     path: weightagePath(exam),
     label: `${name} ${YEAR} chapter-wise weightage`,
     title: `${name} ${YEAR} Chapter-wise Weightage${exam === 'JEE' ? ' (PCM)' : ''} | Tracker Alpha`,
-    description: `Which ${name} chapters matter most? Every ${listOf(subjects)} chapter, grouped by weightage in past papers. Free, updated for ${YEAR}.`,
+    description: `Which ${name} chapters matter most? Every ${listOf(subjects)} chapter, grouped by weightage in past papers. Updated for ${YEAR}.`,
     crumbs,
     section: 'weightage',
     faq,
@@ -561,13 +561,13 @@ const hubPage = (): SitePage => {
   const crumbs: Crumb[] = [{ name: 'Home', path: '/' }, { name: 'Syllabus', path: '/syllabus/' }];
   const faq: Faq[] = [
     { q: `What is the difference between the JEE Main and NEET syllabus?`, a: 'Both cover Class 11 and 12 Physics and Chemistry. JEE Main adds Maths, NEET adds Biology. Chemistry differs slightly too: NEET keeps s-Block Elements, Hydrogen and p-Block groups 13 and 14, which JEE Main dropped.' },
-    { q: 'Are these syllabus pages free?', a: 'Yes. Every guide here is free to read, with no sign-in. Tracker Alpha, the study tracker with these chapter lists built in, is invite-only for now.' },
+    { q: 'Do I need an account to read these?', a: 'No. Every guide here is open to read, with no sign-in. Tracker Alpha, the study tracker with these chapter lists built in, is invite-only.' },
   ];
   return {
     path: '/syllabus/',
     label: `JEE and NEET ${YEAR} syllabus`,
     title: `JEE & NEET ${YEAR} Syllabus, Chapter by Chapter | Tracker Alpha`,
-    description: `Free chapter-wise syllabus and weightage for JEE Main ${YEAR} and NEET ${YEAR}: Physics, Chemistry, Maths and Biology for Class 11 and 12.`,
+    description: `Chapter-wise syllabus and weightage for JEE Main ${YEAR} and NEET ${YEAR}: Physics, Chemistry, Maths and Biology for Class 11 and 12.`,
     crumbs,
     section: 'syllabus',
     faq,
