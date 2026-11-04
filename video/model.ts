@@ -124,7 +124,14 @@ export const spokenTime = (seconds: number): string => {
 /* ── Player errors ──
    The codes are YouTube's (IFrame Player API, onError). `load` is ours: the
    API script itself never arrived. Every message says what happened in plain
-   words and offers the one thing that can help. */
+   words and offers the one thing that can help.
+
+   `load` is not "check your connection" unless the browser really is
+   offline. Far more often the internet is fine and something blocks
+   youtube.com/iframe_api by name: an ad blocker, a browser shield (Brave,
+   Firefox's strict mode) or a school or ISP filter. The plain embed is a
+   different URL that those usually let through, so that case offers it
+   (`plain`): the video plays, without Alpha's controls. */
 
 export type VideoErrorKind = 'invalid' | 'player' | 'missing' | 'blocked' | 'identity' | 'load';
 
@@ -137,29 +144,41 @@ export interface VideoError {
   openOnYouTube: boolean;
   /** Trying again could work. */
   retry: boolean;
+  /** YouTube's own embed, without the API, may still play it. */
+  plain: boolean;
 }
 
-export const errorFor = (code: number | null): VideoError => {
+export const errorFor = (code: number | null, online = true): VideoError => {
+  const e = (x: Omit<VideoError, 'code' | 'plain'> & { plain?: boolean }): VideoError => ({ plain: false, ...x, code });
   switch (code) {
     case 2:
-      return { kind: 'invalid', code, title: "That link doesn't point to a video.", body: 'Check it and paste it again.', openOnYouTube: false, retry: false };
+      return e({ kind: 'invalid', title: "That link doesn't point to a video.", body: 'Check it and paste it again.', openOnYouTube: false, retry: false });
     case 5:
-      return { kind: 'player', code, title: "YouTube's player failed here.", body: 'It happens. Try again.', openOnYouTube: true, retry: true };
+      return e({ kind: 'player', title: "YouTube's player failed here.", body: 'It happens. Try again.', openOnYouTube: true, retry: true });
     case 100:
-      return { kind: 'missing', code, title: 'This video is gone.', body: 'It was removed or made private.', openOnYouTube: false, retry: false };
+      return e({ kind: 'missing', title: 'This video is gone.', body: 'It was removed or made private.', openOnYouTube: false, retry: false });
     /* In practice YouTube also answers 150 for an id with no video behind it,
        not 100 as documented (seen on youtube-nocookie.com, Nov 2026). So the
        player alone cannot tell "blocked" from "gone", and the copy says both.
        Where the Data API has been asked (Discover), the caller knows which. */
     case 101:
     case 150:
-      return { kind: 'blocked', code, title: "This video won't play in Alpha.", body: 'The creator may only allow it on YouTube, or it is no longer up.', openOnYouTube: true, retry: false };
+      return e({ kind: 'blocked', title: "This video won't play in Alpha.", body: 'The creator may only allow it on YouTube, or it is no longer up.', openOnYouTube: true, retry: false });
     case 153:
-      return { kind: 'identity', code, title: "The player couldn't check where it's playing.", body: 'Reload the page and try again.', openOnYouTube: true, retry: true };
+      return e({ kind: 'identity', title: "The player couldn't check where it's playing.", body: 'Reload the page and try again.', openOnYouTube: true, retry: true });
     case null:
-      return { kind: 'load', code, title: "Couldn't reach YouTube.", body: 'Check your connection and try again.', openOnYouTube: false, retry: true };
+      return online
+        ? e({
+          kind: 'load',
+          title: "YouTube's player didn't load here.",
+          body: "Your internet is fine; something is blocking YouTube's player: an ad blocker, a browser shield or your network's filter. You can still watch, without Alpha's controls.",
+          openOnYouTube: true,
+          retry: true,
+          plain: true,
+        })
+        : e({ kind: 'load', title: "You're offline.", body: 'Connect to the internet and try again.', openOnYouTube: false, retry: true });
     default:
-      return { kind: 'player', code, title: "YouTube's player failed here.", body: 'Try again.', openOnYouTube: true, retry: true };
+      return e({ kind: 'player', title: "YouTube's player failed here.", body: 'Try again.', openOnYouTube: true, retry: true });
   }
 };
 

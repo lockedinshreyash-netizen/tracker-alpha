@@ -8,12 +8,14 @@
    case is the target, and the hover lift is CSS (learn.css), so a gesture
    never re-renders anything. */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { PageHeader, tokens, btn } from '../ui/kit';
 import CdCase from './CdCase';
 import AddSheet from './AddSheet';
 import LectureView from './LectureView';
 import CollectionSheet from './CollectionSheet';
+import EditSheet from './EditSheet';
+import { discoverEnabled } from './discover/api';
 import { useLearnStore, type LockWhy } from './useLearnStore';
 import { serverKeySource } from './keys';
 import { devKeyOn, devKeySource } from './devKey';
@@ -21,8 +23,11 @@ import { forgetLearnLibrary } from './forget';
 import { askToPersist, readBackup, saveBackup } from './backup';
 import type { LearnStore } from './store';
 import { SUBJECTS, chapterName, codeOf, collectionsInOrder, coverArt, displayTitle, isComplete, live, watchedFraction, type Lecture } from './model';
-import type { ExamPreference, Subject, TimerState } from '../types';
+import type { ChapterProgress, ExamPreference, Subject, TimerState } from '../types';
 import type { OtherSession } from './SessionStrip';
+
+/* Discover (one floating glass panel) arrives with its own chunk, the first time it is opened. */
+const DiscoverPanel = lazy(() => import('./discover/DiscoverPanel'));
 
 interface Props {
   user: { id: string } | null;
@@ -38,6 +43,8 @@ interface Props {
   onWatching: (watching: boolean) => void;
   request: LearnRequest | null;
   onRequestHandled: () => void;
+  /** Syllabus progress, for Discover's chapter list (read only). */
+  progress: ChapterProgress[];
 }
 
 /** Open the shelf on one chapter: `11|Physics|Rotational Motion`. */
@@ -46,7 +53,7 @@ export interface LearnRequest { key: string; nonce: number }
 /** What a lecture needs from App: the clock, and telling the rail to fold. */
 type Session = Pick<Props, 'timer' | 'otherSession' | 'onStartClock' | 'onOpenToday' | 'onWatching'>;
 
-export default function LearnHome({ user, dark, examPreference, currentClass, onOpenAuth, onDisable, request, onRequestHandled, ...session }: Props) {
+export default function LearnHome({ user, dark, examPreference, currentClass, onOpenAuth, onDisable, request, onRequestHandled, progress, ...session }: Props) {
   const dev = import.meta.env.DEV && devKeyOn();
   const owner = user?.id ?? (dev ? 'dev-guest' : null);
   const source = useMemo(() => (dev && owner ? devKeySource(owner) : serverKeySource), [dev, owner]);
@@ -74,6 +81,7 @@ export default function LearnHome({ user, dark, examPreference, currentClass, on
       session={session}
       request={request}
       onRequestHandled={onRequestHandled}
+      progress={progress}
     />
   );
 }
@@ -89,6 +97,7 @@ interface ShelfProps {
   session: Session;
   request: LearnRequest | null;
   onRequestHandled: () => void;
+  progress: ChapterProgress[];
 }
 
 /* A lecture is a history entry: the phone's back button (and the Play app's)
@@ -96,7 +105,7 @@ interface ShelfProps {
    about what is being watched reaches the browser's history list. */
 const LECTURE_KEY = 'learnLecture';
 
-const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, request, onRequestHandled }: ShelfProps) => {
+const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, request, onRequestHandled, progress }: ShelfProps) => {
   useSyncExternalStore(store.subscribe, store.getVersion);
   const lib = store.getLibrary();
   const [adding, setAdding] = useState(false);
@@ -108,6 +117,13 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
     setFromRect(rect);
     setOpenId(id);
     try { window.history.pushState({ ...(window.history.state ?? {}), [LECTURE_KEY]: id }, ''); } catch { /* sandboxed */ }
+  }, []);
+
+  /* Up next, from inside the room: the same history entry, a new lecture. */
+  const switchLecture = useCallback((id: string) => {
+    setFromRect(null);
+    setOpenId(id);
+    try { window.history.replaceState({ ...(window.history.state ?? {}), [LECTURE_KEY]: id }, ''); } catch { /* sandboxed */ }
   }, []);
 
   const closeLecture = useCallback(() => {
@@ -142,6 +158,37 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request]);
 
+  /* Discover: one floating glass panel (DiscoverPanel), opened over whatever
+     the shelf shows, and the toast a filed result leaves (Undo · Change
+     chapter · Watch). `discovering` is the chapter it was opened for, or ''. */
+  const discover = useMemo(() => discoverEnabled(), []);
+  const [discovering, setDiscovering] = useState<string | null>(null);
+  const [filed, setFiled] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const fileOne = useCallback((id: string) => {
+    setFiled(id);
+    setJustAdded(id);
+    askToPersist();
+  }, []);
+
+  useEffect(() => {
+    if (!filed) return;
+    const id = window.setTimeout(() => setFiled(f => (f === filed ? null : f)), 9000);
+    return () => window.clearTimeout(id);
+  }, [filed]);
+
+  useEffect(() => {
+    if (!discover || openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setDiscovering(d => d ?? ''); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [discover, openId]);
+
+  const openDiscover = (key: string | null) => setDiscovering(key ?? '');
+
   const renderCase = (l: Lecture) => (
     <CaseButton
       key={l.id}
@@ -167,35 +214,9 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
         currentClass={currentClass}
         fromRect={fromRect}
         onBack={closeLecture}
+        onSwitch={switchLecture}
         {...session}
       />
-    );
-  }
-
-  if (chapterKey) {
-    return (
-      <>
-        <ChapterShelf
-          chapterKey={chapterKey}
-          lectures={lectures}
-          dark={dark}
-          renderCase={renderCase}
-          onBack={() => setChapterKey(null)}
-          onAdd={() => setAdding(true)}
-        />
-        {adding && (
-          <AddSheet
-            store={store}
-            dark={dark}
-            examPreference={examPreference}
-            currentClass={currentClass}
-            preset={chapterKey}
-            onClose={() => setAdding(false)}
-            onAdded={id => { setAdding(false); setJustAdded(id); askToPersist(); }}
-            onOpenExisting={id => { setAdding(false); openLecture(id); }}
-          />
-        )}
-      </>
     );
   }
 
@@ -203,48 +224,115 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
     ? `${lectures.length} ${lectures.length === 1 ? 'lecture' : 'lectures'} on your shelf.`
     : 'Your shelf is empty. Put a lecture on it.';
 
-  return (
-    <div className="space-y-10 pb-16">
-      <PageHeader
-        title="Learn"
-        subtitle={subtitle}
+  let body: React.ReactNode;
+  if (chapterKey) {
+    body = (
+      <ChapterShelf
+        chapterKey={chapterKey}
+        lectures={lectures}
         dark={dark}
-        right={
-          <button type="button" onClick={() => setAdding(true)} className={`${btn} h-11 px-5 ${t.primary}`}>
-            Add lecture
-          </button>
-        }
+        renderCase={renderCase}
+        onBack={() => setChapterKey(null)}
+        onAdd={() => setAdding(true)}
+        onFind={discover ? () => openDiscover(chapterKey) : undefined}
       />
+    );
+  } else {
+    body = (
+      <div className="space-y-10 pb-16">
+        <PageHeader
+          title="Learn"
+          subtitle={subtitle}
+          dark={dark}
+          right={
+            <div className="flex items-center gap-2">
+              {discover && (
+                <button type="button" onClick={() => openDiscover(null)} className={`${btn} h-11 px-5 ${t.ghost}`} title="Find a lecture on YouTube (⌘K)">
+                  Discover
+                </button>
+              )}
+              <button type="button" onClick={() => setAdding(true)} className={`${btn} h-11 px-5 ${t.primary}`}>
+                Add lecture
+              </button>
+            </div>
+          }
+        />
 
-      {rows.length ? (
-        <>
-          <Collections
+        {rows.length ? (
+          <>
+            <Collections
+              store={store}
+              dark={dark}
+              renderCase={renderCase}
+              onEdit={setEditingCol}
+            />
+            {rows.map(row => (
+              <ShelfRow key={row.subject} label={`${row.subject} · ${row.cases.length}`} dark={dark}>
+                {row.cases.map(renderCase)}
+              </ShelfRow>
+            ))}
+          </>
+        ) : (
+          <section className={`rounded-xl border p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center gap-8 ${t.card}`}>
+            <div className="ln-empty-case" aria-hidden="true">+</div>
+            <div className="space-y-3 max-w-md">
+              <h2 className={`font-display text-2xl ${t.heading}`}>{discover ? 'Find your first lecture.' : 'Paste a YouTube lecture.'}</h2>
+              <p className={`text-sm font-ui ${t.muted}`}>
+                {discover
+                  ? 'Pick the chapter you are on and choose a lecture. It goes on the shelf with its own number.'
+                  : "It goes on the shelf under its chapter, with its own number. Shorts and playlists don't."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {discover && <button type="button" onClick={() => openDiscover(null)} className={`${btn} h-11 px-5 ${t.primary}`}>Find a lecture</button>}
+                <button type="button" onClick={() => setAdding(true)} className={`${btn} h-11 px-5 ${discover ? t.ghost : t.primary}`}>
+                  {discover ? 'Paste a link' : 'Add your first lecture'}
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <ShelfFooter store={store} dark={dark} onDisable={onDisable} />
+      </div>
+    );
+  }
+
+  const filedLecture = filed ? lib.lectures[filed] : null;
+  const editingLecture = editingId ? lib.lectures[editingId] : null;
+
+  return (
+    <>
+      {body}
+
+      {discovering !== null && discover && (
+        <Suspense fallback={null}>
+          <DiscoverPanel
+            key={discovering}
             store={store}
             dark={dark}
-            renderCase={renderCase}
-            onEdit={setEditingCol}
+            examPreference={examPreference}
+            progress={progress}
+            chapterKey={discovering || null}
+            onClose={() => setDiscovering(null)}
+            onOpen={id => { setDiscovering(null); openLecture(id); }}
+            onFiled={fileOne}
           />
-          {rows.map(row => (
-            <ShelfRow key={row.subject} label={`${row.subject} · ${row.cases.length}`} dark={dark}>
-              {row.cases.map(renderCase)}
-            </ShelfRow>
-          ))}
-        </>
-      ) : (
-        <section className={`rounded-xl border p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center gap-8 ${t.card}`}>
-          <div className="ln-empty-case" aria-hidden="true">+</div>
-          <div className="space-y-3 max-w-md">
-            <h2 className={`font-display text-2xl ${t.heading}`}>Paste a YouTube lecture.</h2>
-            <p className={`text-sm font-ui ${t.muted}`}>It goes on the shelf under its chapter, with its own number. Shorts and playlists don't.</p>
-            <button type="button" onClick={() => setAdding(true)} className={`${btn} h-11 px-5 ${t.primary}`}>Add your first lecture</button>
-          </div>
-        </section>
+        </Suspense>
       )}
-
-      <ShelfFooter store={store} dark={dark} onDisable={onDisable} />
 
       {editingCol && lib.collections[editingCol] && !lib.collections[editingCol].deletedAt && (
         <CollectionSheet store={store} collection={lib.collections[editingCol]} dark={dark} onClose={() => setEditingCol(null)} />
+      )}
+
+      {editingLecture && !editingLecture.deletedAt && (
+        <EditSheet
+          store={store}
+          lecture={editingLecture}
+          dark={dark}
+          examPreference={examPreference}
+          currentClass={currentClass}
+          onClose={() => setEditingId(null)}
+        />
       )}
 
       {adding && (
@@ -253,12 +341,24 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
           dark={dark}
           examPreference={examPreference}
           currentClass={currentClass}
+          preset={chapterKey ?? undefined}
           onClose={() => setAdding(false)}
           onAdded={id => { setAdding(false); setJustAdded(id); askToPersist(); }}
           onOpenExisting={id => { setAdding(false); openLecture(id); }}
         />
       )}
-    </div>
+
+      {filedLecture && !filedLecture.deletedAt && (
+        <div className="ln-toast" role="status">
+          <span>Filed as <b>{codeOf(filedLecture)}</b>{chapterName(filedLecture.chapterKey) ? ` · ${chapterName(filedLecture.chapterKey)}` : ' · No chapter'}</span>
+          <span className="flex items-center gap-3">
+            <button type="button" onClick={() => { store.deleteLecture(filedLecture.id); setFiled(null); }}>Undo</button>
+            <button type="button" onClick={() => { setEditingId(filedLecture.id); setFiled(null); }}>{filedLecture.chapterKey ? 'Change chapter' : 'Set chapter'}</button>
+            <button type="button" onClick={() => { setFiled(null); setDiscovering(null); openLecture(filedLecture.id); }}>Watch</button>
+          </span>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -273,9 +373,11 @@ interface ChapterShelfProps {
   renderCase: (l: Lecture) => React.ReactNode;
   onBack: () => void;
   onAdd: () => void;
+  /** Discover on this chapter, when Discover is on. */
+  onFind?: () => void;
 }
 
-const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd }: ChapterShelfProps) => {
+const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd, onFind }: ChapterShelfProps) => {
   const t = tokens(dark);
   const [cls, subject, chapter] = chapterKey.split('|');
   const here = lectures.filter(l => l.chapterKey === chapterKey).sort((a, b) => a.catalogueNo - b.catalogueNo);
@@ -290,7 +392,10 @@ const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd }:
             {here.length ? `${here.length} ${here.length === 1 ? 'lecture' : 'lectures'} for this chapter.` : 'No lectures for this chapter yet.'}
           </p>
         </div>
-        <button type="button" onClick={onAdd} className={`${btn} h-11 px-5 ${t.primary}`}>Add a lecture</button>
+        <div className="flex flex-wrap gap-2">
+          {onFind && <button type="button" onClick={onFind} className={`${btn} h-11 px-5 ${t.primary}`}>Find on YouTube</button>}
+          <button type="button" onClick={onAdd} className={`${btn} h-11 px-5 ${onFind ? t.ghost : t.primary}`}>{onFind ? 'Paste a link' : 'Add a lecture'}</button>
+        </div>
       </div>
       {here.length > 0 && (
         <ShelfRow label={`${subject} · ${chapter}`} dark={dark}>
@@ -533,7 +638,8 @@ const CaseButton = ({ lecture, dark, now, done, fraction, isNew, onOpen }: CaseP
 /* ── Locked ── */
 
 const LOCKED: Record<LockWhy, { title: string; body: string }> = {
-  offline: { title: 'Your shelf is locked.', body: 'Signing out locked it. Get online once and it opens again.' },
+  offline: { title: "You're offline.", body: 'Your shelf is locked until you sign in online once. Then it opens here, even offline.' },
+  unreachable: { title: "Couldn't reach Alpha.", body: 'Your internet works, but Alpha did not answer. A blocker or network filter may be in the way. Try again.' },
   'not-set-up': { title: "Learn isn't switched on for Alpha yet.", body: "It's coming. Your shelf will be here." },
   'not-member': { title: 'Learn is for Alpha members.', body: 'Get in with an Access Pass and your shelf opens.' },
   'signed-out': { title: 'Sign in to open your shelf.', body: 'Your shelf is locked to your account.' },
@@ -560,7 +666,7 @@ const Locked = ({ why, dark, onRetry, onSignIn, onReset }: LockedProps) => {
         <p className={`text-sm font-ui ${t.muted}`}>{copy.body}</p>
         <div className="flex flex-wrap gap-3 pt-1">
           {why === 'signed-out' && <button type="button" onClick={onSignIn} className={`${btn} h-11 px-5 ${t.primary}`}>Sign in</button>}
-          {(why === 'offline' || why === 'error') && <button type="button" onClick={onRetry} className={`${btn} h-11 px-5 ${t.primary}`}>Try again</button>}
+          {(why === 'offline' || why === 'unreachable' || why === 'error') && <button type="button" onClick={onRetry} className={`${btn} h-11 px-5 ${t.primary}`}>Try again</button>}
           {why === 'wrong-key' && onReset && (
             <button
               type="button"

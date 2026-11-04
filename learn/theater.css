@@ -1,0 +1,362 @@
+/* ── The screening room ──
+   A lecture takes the whole screen, like the book reader: the app's 1024px
+   column and the rail would leave a lecture at a third of a laptop. The room
+   is always dark (lights down, whatever the app's theme), lit only by the
+   lecture's own subject colour spilling from behind the screen.
+
+   Layout: a top bar, then the stage (the screen, its timeline, its controls)
+   beside a notes panel that can be put away. Under 1024px everything stacks
+   and the room scrolls: the screen edge to edge, then the timeline, the
+   controls, and the notes as a tab.
+
+   The screen is sized to the room: as wide as the stage allows, but never so
+   tall that its timeline and controls fall below the fold. */
+
+.th {
+  --th-bar: 60px;
+  --th-under: 148px; /* timeline + controls under the screen */
+  --th-accent: 74 144 226;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top, 0px);
+  background: #050506;
+  color: #f4f4f5;
+  font-family: var(--font-ui, 'Satoshi', system-ui, sans-serif);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The light from behind the screen. Never over the player: it sits under
+   the stage and fades out before the room's edges. */
+.th-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 42% 42%, rgb(var(--th-accent) / 0.20), transparent 72%),
+    radial-gradient(30% 30% at 70% 85%, rgb(var(--th-accent) / 0.08), transparent 70%);
+  transition: opacity 600ms ease;
+}
+.th[data-playing='true'] .th-glow { opacity: 0.55; }
+
+/* ── Top bar ── */
+
+.th-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--th-bar);
+  padding: 0 18px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.th-ib {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #d4d4d8;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.th-ib:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.th-ib:focus-visible { outline: 2px solid #e10600; outline-offset: 2px; }
+.th-ib[aria-pressed='true'] { color: #fff; background: rgba(255, 255, 255, 0.09); }
+
+.th-id { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.th-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #a1a1aa;
+  white-space: nowrap;
+}
+.th-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 19px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The clock, as a pill. */
+.th-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.th-clock:hover { background: rgba(255, 255, 255, 0.08); }
+.th-clock:focus-visible { outline: 2px solid #e10600; outline-offset: 2px; }
+.th-clock[data-kind='start'] { border-color: rgba(225, 6, 0, 0.55); }
+.th-clock[data-kind='start'][data-nudge='true'] {
+  background: #e10600;
+  border-color: #e10600;
+  animation: th-nudge 1.6s ease-in-out 2;
+}
+.th-clock .th-dot { width: 8px; height: 8px; border-radius: 999px; background: #e10600; }
+.th-clock .th-dot[data-paused='true'] { background: #71717a; }
+.th-clock .th-dot[data-live='true'] { animation: th-pulse 1.8s ease-in-out infinite; }
+.th-clock .th-time { font-variant-numeric: tabular-nums; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; }
+.th-nudge-line { font-size: 12px; color: #a1a1aa; white-space: nowrap; }
+
+@keyframes th-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes th-nudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(225, 6, 0, 0); } 50% { box-shadow: 0 0 0 6px rgba(225, 6, 0, 0.25); } }
+
+/* ── Body: stage + panel ── */
+
+.th-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  transition: grid-template-columns 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.th[data-panel='closed'] .th-body { grid-template-columns: minmax(0, 1fr) 0px; }
+
+.th-stage {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 32px 24px;
+}
+
+.th-screen {
+  width: min(100%, calc((100dvh - var(--safe-top, 0px) - var(--th-bar) - var(--th-under) - 48px) * 16 / 9));
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The player's own frame: a hairline, a deep shadow, no card. */
+.th-screen .th-frame > div {
+  border-radius: 14px !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.th-panel {
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 10, 12, 0.72);
+  display: flex;
+  flex-direction: column;
+}
+.th[data-panel='closed'] .th-panel { border-left-color: transparent; }
+.th-panel-inner { width: 380px; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+
+.th-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.th-tab {
+  position: relative;
+  padding: 10px 12px 12px;
+  border: 0;
+  background: none;
+  color: #a1a1aa;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.th-tab[aria-selected='true'] { color: #fff; }
+.th-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: #fff;
+}
+.th-tab .th-count { margin-left: 6px; color: #71717a; font-weight: 600; }
+.th-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 28px; }
+
+/* ── The timeline ── */
+
+.th-rail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+}
+.th-rail-time {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: #a1a1aa;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+.th-rail-time:last-child { text-align: right; }
+.th-track {
+  position: relative;
+  flex: 1;
+  height: 30px;
+  cursor: pointer;
+  touch-action: none;
+}
+.th-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  transition: height 150ms ease, margin-top 150ms ease;
+}
+.th-track:hover::before { height: 6px; margin-top: -3px; }
+.th-seen {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: rgb(var(--th-accent) / 0.55);
+  pointer-events: none;
+}
+.th-head {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.th-hover {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: #f4f4f5;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.th-mark {
+  position: absolute;
+  top: 0;
+  width: 18px;
+  height: 14px;
+  margin-left: -9px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.th-mark::before {
+  content: '';
+  width: 2px;
+  height: 10px;
+  border-radius: 2px;
+  background: #f4f4f5;
+  opacity: 0.85;
+}
+.th-mark[data-kind='note']::before { width: 7px; height: 7px; border-radius: 999px; background: rgb(var(--th-accent)); opacity: 1; margin-top: 2px; }
+.th-mark:focus-visible { outline: 2px solid #e10600; outline-offset: 1px; border-radius: 4px; }
+.th-mark .th-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #e4e4e7;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+.th-mark:hover .th-tip, .th-mark:focus-visible .th-tip { opacity: 1; visibility: visible; }
+.th-tip b { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; color: #fff; margin-right: 6px; }
+
+/* ── Controls under the timeline ── */
+
+.th-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.th-flash { font-size: 12px; color: #a1a1aa; }
+
+/* ── Phones and tablets: stacked, the room scrolls ── */
+
+@media (max-width: 1023px) {
+  .th-wide-only { display: none; }
+  .th { overflow-y: auto; overscroll-behavior: contain; }
+  .th-bar { position: sticky; top: 0; z-index: 3; background: rgba(5, 5, 6, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 0 8px 0 4px; gap: 6px; }
+  .th-title { font-size: 16px; }
+  .th-body { display: block; flex: none; }
+  .th-stage { overflow: visible; padding: 0 0 8px; justify-content: flex-start; }
+  .th-screen { width: 100%; min-width: 0; gap: 10px; }
+  .th-screen .th-frame > div { border-radius: 0 !important; border-left: 0 !important; border-right: 0 !important; box-shadow: none; }
+  .th-screen > :not(.th-frame) { padding: 0 16px; }
+  .th-panel { border-left: 0; background: none; overflow: visible; }
+  .th-panel-inner { width: 100%; height: auto; }
+  .th-pane { overflow: visible; }
+  .th-glow { position: fixed; }
+}
+
+@media (max-width: 520px) {
+  .th-code { display: none; }
+  .th-clock { padding: 0 11px; font-size: 12px; }
+  .th-nudge-line { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .th-body, .th-glow { transition: none; }
+  .th-clock .th-dot[data-live='true'], .th-clock[data-nudge='true'] { animation: none; }
+}

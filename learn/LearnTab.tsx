@@ -10,7 +10,7 @@
 import React, { lazy, Suspense } from 'react';
 import './learn.css';
 import LearnCover from './LearnCover';
-import type { ExamPreference, Subject, TimerState } from '../types';
+import type { ChapterProgress, ExamPreference, Subject, TimerState } from '../types';
 import type { OtherSession } from './SessionStrip';
 import type { LearnRequest } from './LearnHome';
 
@@ -33,6 +33,8 @@ interface Props {
   /** Syllabus asked for one chapter's lectures. */
   request: LearnRequest | null;
   onRequestHandled: () => void;
+  /** Syllabus progress, read by Discover's chapter list. */
+  progress: ChapterProgress[];
 }
 
 export default function LearnTab({ enabled, onEnable, onDisable, user, theme, examPreference, currentClass, onOpenAuth, ...session }: Props) {

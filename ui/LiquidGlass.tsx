@@ -345,8 +345,7 @@ const LiquidGlass = React.forwardRef<HTMLElement, Props>(function LiquidGlass(
     },
     <span
       aria-hidden="true"
-      // --lg-frost: what the lens falls back to while the page scrolls (ui/scrollCalm.ts).
-      style={{ ...layer, backdropFilter: lens, WebkitBackdropFilter: frosted, ['--lg-frost' as string]: frosted } as React.CSSProperties}
+      style={{ ...layer, backdropFilter: lens, WebkitBackdropFilter: frosted } as React.CSSProperties}
       className="lg-lens"
     />,
     <span

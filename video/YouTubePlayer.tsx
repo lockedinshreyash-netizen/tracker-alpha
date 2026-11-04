@@ -40,14 +40,21 @@ interface Props {
   /** The rate the player confirmed, which may differ from the one asked for. */
   onRate?: (rate: number) => void;
   onError?: (e: VideoError) => void;
+  /** Playing in YouTube's plain embed: Alpha's controls are off. */
+  onPlain?: () => void;
   className?: string;
+  /** Extra style for the frame (the theater sizes it to the screen). */
+  style?: React.CSSProperties;
 }
 
-type Phase = 'face' | 'loading' | 'live' | 'error';
+/* `plain` is YouTube's own embed with no API: the way to still watch when
+   something blocks the API script (see errorFor). No controller, so Alpha's
+   controls, resume and marks are off for that viewing, and the caller is told. */
+type Phase = 'face' | 'loading' | 'live' | 'error' | 'plain';
 
 const MIN_PX = 200;
 
-const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = false, onController, onState, onRate, onError, className = '' }: Props) => {
+const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = false, onController, onState, onRate, onError, onPlain, className = '', style }: Props) => {
   const [phase, setPhase] = useState<Phase>('face');
   const [error, setError] = useState<VideoError | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -55,8 +62,8 @@ const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = fa
   const attemptRef = useRef(0);
 
   // Callbacks change identity every render; the player's listeners read them from here.
-  const cb = useRef({ onController, onState, onRate, onError });
-  cb.current = { onController, onState, onRate, onError };
+  const cb = useRef({ onController, onState, onRate, onError, onPlain });
+  cb.current = { onController, onState, onRate, onError, onPlain };
 
   const teardown = useCallback(() => {
     attemptRef.current += 1;
@@ -126,7 +133,7 @@ const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = fa
         },
       });
     }).catch(() => {
-      if (attempt === attemptRef.current) fail(errorFor(null));
+      if (attempt === attemptRef.current) fail(errorFor(null, navigator.onLine !== false));
     });
   }, [videoId, startAt, fail]);
 
@@ -136,12 +143,19 @@ const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = fa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const playPlain = useCallback(() => {
+    teardown();
+    setError(null);
+    setPhase('plain');
+    cb.current.onPlain?.();
+  }, [teardown]);
+
   const frame = dark ? 'border-white/[0.08]' : 'border-zinc-200';
 
   return (
     <div
       className={`relative w-full overflow-hidden rounded-xl border bg-black ${frame} ${className}`}
-      style={{ aspectRatio: '16 / 9', minWidth: MIN_PX, minHeight: MIN_PX }}
+      style={{ aspectRatio: '16 / 9', minWidth: MIN_PX, minHeight: MIN_PX, ...style }}
     >
       <div
         ref={wrapRef}
@@ -179,7 +193,18 @@ const YouTubePlayer = ({ videoId, title, dark, startAt = 0, face, autoStart = fa
       )}
 
       {phase === 'error' && error && (
-        <VideoErrorPanel error={error} videoId={videoId} onRetry={error.retry ? start : undefined} />
+        <VideoErrorPanel error={error} videoId={videoId} onRetry={error.retry ? start : undefined} onPlain={error.plain ? playPlain : undefined} />
+      )}
+
+      {phase === 'plain' && (
+        <iframe
+          src={plainEmbedUrl(videoId, startAt)}
+          title={title}
+          className="absolute inset-0 w-full h-full"
+          style={{ border: 0 }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
       )}
     </div>
   );
@@ -195,23 +220,38 @@ const DefaultFace = ({ title }: { title: string }) => (
   </span>
 );
 
+/* The id has already been checked by shape (model.ts); it is still encoded,
+   because it is going into a URL. */
+const plainEmbedUrl = (id: string, startAt: number): string =>
+  `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&playsinline=1&autoplay=1${startAt >= 1 ? `&start=${Math.floor(startAt)}` : ''}`;
+
 interface ErrorProps {
   error: VideoError;
   videoId: string;
   onRetry?: () => void;
+  onPlain?: () => void;
 }
 
 /** Shown in place of the player, never over a live one. */
-export const VideoErrorPanel = ({ error, videoId, onRetry }: ErrorProps) => (
+export const VideoErrorPanel = ({ error, videoId, onRetry, onPlain }: ErrorProps) => (
   <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center bg-[#0B0B0D]">
     <p className="font-ui font-bold text-white text-base leading-snug max-w-sm">{error.title}</p>
     <p className="font-ui text-zinc-400 text-sm max-w-sm">{error.body}</p>
-    <div className="flex items-center gap-3 mt-1">
+    <div className="flex flex-wrap items-center justify-center gap-3 mt-1">
+      {onPlain && (
+        <button
+          type="button"
+          onClick={onPlain}
+          className="h-10 px-4 rounded-lg font-ui font-bold text-sm text-white bg-[#E10600] hover:bg-[#c90500]"
+        >
+          Watch without controls
+        </button>
+      )}
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="h-10 px-4 rounded-lg font-ui font-bold text-sm text-white bg-[#E10600] hover:bg-[#c90500]"
+          className={`h-10 px-4 rounded-lg font-ui font-bold text-sm ${onPlain ? 'text-zinc-200 border border-white/[0.12] hover:bg-white/[0.05]' : 'text-white bg-[#E10600] hover:bg-[#c90500]'}`}
         >
           Try again
         </button>

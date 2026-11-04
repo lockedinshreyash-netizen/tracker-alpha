@@ -23,18 +23,20 @@ interface Props {
   onSeek: (t: number) => void;
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
+  /** No card and no heading: the theater's panel tab is both. */
+  bare?: boolean;
 }
 
-export default function MarksPanel({ marks, dark, composerAt, onSaveNote, onCloseComposer, onSeek, onEdit, onDelete }: Props) {
+export default function MarksPanel({ marks, dark, composerAt, onSaveNote, onCloseComposer, onSeek, onEdit, onDelete, bare = false }: Props) {
   const t = tokens(dark);
   return (
-    <section className={`rounded-xl border p-5 space-y-4 ${t.card}`} aria-label="Bookmarks and notes">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className={bare ? 'space-y-4' : `rounded-xl border p-5 space-y-4 ${t.card}`} aria-label="Bookmarks and notes">
+      {!bare && <div className="flex items-baseline justify-between gap-3">
         <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>
           Bookmarks and notes
         </p>
         {marks.length > 0 && <span className={`text-[11px] font-ui ${t.faint}`}>{marks.length}</span>}
-      </div>
+      </div>}
 
       {composerAt !== null && (
         <NoteEditor

@@ -70,6 +70,56 @@ export default function SessionStrip({ timer, otherSession, subject, chapter, da
   );
 }
 
+/* ── The same clock, as the theater's top-bar pill ──
+   Start the clock while nothing runs (red-edged; filled and pulsing twice
+   when nudged), the running stopwatch, or the other session by name. A tap on
+   a running one goes to Today, where sessions are paused and ended. */
+
+interface PillProps {
+  timer: TimerState;
+  otherSession: OtherSession;
+  nudge: boolean;
+  onStart: () => boolean;
+  onOpenToday: () => void;
+}
+
+export const ClockPill = ({ timer, otherSession, nudge, onStart, onOpenToday }: PillProps) => {
+  if (isArmed(timer)) return <PillRunning timer={timer} onOpenToday={onOpenToday} />;
+  if (otherSession) {
+    return (
+      <button type="button" className="th-clock" data-kind="other" onClick={onOpenToday} title="Open Today">
+        <span className="th-dot" data-live="true" aria-hidden="true" />
+        {otherSession === 'pomodoro' ? 'Pomodoro running' : 'Sprint running'}
+      </button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-3">
+      {nudge && <span className="th-nudge-line" role="status">The clock isn't running.</span>}
+      <button type="button" className="th-clock" data-kind="start" data-nudge={nudge} onClick={() => { onStart(); }}>
+        Start the clock
+      </button>
+    </span>
+  );
+};
+
+const PillRunning = ({ timer, onOpenToday }: { timer: TimerState; onOpenToday: () => void }) => {
+  const paused = isPaused(timer);
+  const now = useSecondTick(!paused, timer.startTime ?? 0);
+  return (
+    <button
+      type="button"
+      className="th-clock"
+      data-kind="running"
+      onClick={onOpenToday}
+      title={`${paused ? 'Paused · ' : ''}${timer.subject}${timer.chapter ? ` · ${timer.chapter}` : ''} · Open Today`}
+    >
+      <span className="th-dot" data-paused={paused} data-live={!paused} aria-hidden="true" />
+      <span className="th-time">{formatTime(elapsedMs(timer, now) / 1000)}</span>
+    </button>
+  );
+};
+
 const RunningClock = ({ timer, dark }: { timer: TimerState; dark: boolean }) => {
   const paused = isPaused(timer);
   const now = useSecondTick(!paused, timer.startTime ?? 0);

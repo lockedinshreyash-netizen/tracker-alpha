@@ -1223,11 +1223,10 @@ html.android-app body { overscroll-behavior-y: none; }
   .nav-rail { transition: none; }
 }
 
-/* While the page scrolls (ui/scrollCalm.ts): glass trades its refraction for
-   the plain frosted blur, and endless decoration pauses. A backdrop filter
-   re-runs on every frame its backdrop moves, which during a scroll is every
-   frame, for every glass element on screen. */
-html.scrolling .lg-lens { backdrop-filter: var(--lg-frost) !important; }
+/* While the page scrolls (ui/scrollCalm.ts), endless decoration pauses.
+   Glass is deliberately left alone: swapping its refraction for a frosted
+   blur at the start and end of every scroll read as flicker, and measured no
+   faster on a laptop than leaving the refraction running. */
 html.scrolling .fx-root,
 html.scrolling .fx-root *,
 html.scrolling .aurora-curtain,

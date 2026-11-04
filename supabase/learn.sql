@@ -86,3 +86,156 @@ $$;
 -- Supabase grants EXECUTE to anon by name, so both are revoked explicitly.
 revoke all on function public.learn_key(text) from public, anon;
 grant execute on function public.learn_key(text) to authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 3. Discover — searching YouTube from inside Learn
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- Searches go through the Edge Function `learn-search` (supabase/functions/
+-- learn-search), which holds the YouTube API key. YouTube's quota is small
+-- (a project starts with about 100 searches a day), so every search is
+-- counted here, per student per study day (04:00 IST), against two limits:
+--   - per student: 30 searches a day (title refreshes have their own 20);
+--   - for the whole app: a ceiling set just under the quota YouTube granted,
+--     counted only on searches that really reached YouTube (cache misses).
+-- What is searched is never stored. Results are cached for a few hours
+-- under a SHA-256 of the search (the same words always give the same key),
+-- so a chapter search many students make costs YouTube one call; the cache
+-- holds YouTube's own public results, never who asked.
+--
+-- Nothing here is readable or writable by a client. Students reach only
+-- `learn_search_take` (definer, auth.uid(), members only when access.sql is
+-- installed); the cache and the global count are the Edge Function's, through
+-- the service role.
+
+create table if not exists public.learn_search_usage (
+  user_id   uuid not null references auth.users (id) on delete cascade,
+  day       date not null,
+  searches  integer not null default 0 check (searches >= 0),
+  refreshes integer not null default 0 check (refreshes >= 0),
+  -- Searches that reached YouTube (not answered from the cache).
+  misses    integer not null default 0 check (misses >= 0),
+  primary key (user_id, day)
+);
+create index if not exists learn_search_usage_day on public.learn_search_usage (day);
+alter table public.learn_search_usage enable row level security;
+revoke all on public.learn_search_usage from public, anon, authenticated;
+
+create table if not exists public.learn_search_settings (
+  id                 boolean primary key default true check (id),
+  per_user_searches  integer not null default 30 check (per_user_searches between 0 and 1000),
+  per_user_refreshes integer not null default 20 check (per_user_refreshes between 0 and 1000),
+  -- Raise this when YouTube grants more quota: about quota / 101 units.
+  daily_ceiling      integer not null default 90 check (daily_ceiling between 0 and 10000000)
+);
+insert into public.learn_search_settings (id) values (true) on conflict (id) do nothing;
+alter table public.learn_search_settings enable row level security;
+revoke all on public.learn_search_settings from public, anon, authenticated;
+
+create table if not exists public.learn_search_cache (
+  key        text primary key check (key ~ '^[0-9a-f]{64}$'),
+  results    jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists learn_search_cache_age on public.learn_search_cache (created_at);
+alter table public.learn_search_cache enable row level security;
+revoke all on public.learn_search_cache from public, anon, authenticated;
+
+/* The study day: 04:00 IST to 04:00 IST, the day everything else in Alpha
+   resets on. */
+create or replace function public.learn_study_day()
+returns date
+language sql
+stable
+as $$ select ((now() at time zone 'Asia/Kolkata') - interval '4 hours')::date $$;
+
+/* Takes one search (or one title refresh) from the caller's allowance for
+   today, or says why not. Returns
+     {"ok": true,  "remaining": 29}
+     {"ok": false, "reason": "limit" | "busy", "remaining": 0}
+   "busy" is the app-wide ceiling: YouTube's quota for today is spent. The
+   row is locked, so two tabs searching at once cannot both take the last. */
+create or replace function public.learn_search_take(p_kind text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  uid uuid := auth.uid();
+  d date := public.learn_study_day();
+  s public.learn_search_settings;
+  u public.learn_search_usage;
+  spent integer;
+begin
+  if uid is null then
+    raise exception 'not signed in' using errcode = '28000';
+  end if;
+  if to_regprocedure('public.has_access()') is not null then
+    if not public.has_access() then
+      raise exception 'not a member' using errcode = '42501';
+    end if;
+  end if;
+  if p_kind is null or p_kind not in ('search', 'refresh') then
+    raise exception 'unknown kind' using errcode = '22023';
+  end if;
+
+  select * into s from public.learn_search_settings where id;
+  insert into public.learn_search_usage (user_id, day) values (uid, d) on conflict (user_id, day) do nothing;
+  select * into u from public.learn_search_usage where user_id = uid and day = d for update;
+
+  if p_kind = 'search' then
+    if u.searches >= s.per_user_searches then
+      return jsonb_build_object('ok', false, 'reason', 'limit', 'remaining', 0);
+    end if;
+    select coalesce(sum(misses), 0) into spent from public.learn_search_usage where day = d;
+    if spent >= s.daily_ceiling then
+      return jsonb_build_object('ok', false, 'reason', 'busy', 'remaining', s.per_user_searches - u.searches);
+    end if;
+    update public.learn_search_usage set searches = searches + 1 where user_id = uid and day = d;
+    return jsonb_build_object('ok', true, 'remaining', s.per_user_searches - u.searches - 1);
+  end if;
+
+  if u.refreshes >= s.per_user_refreshes then
+    return jsonb_build_object('ok', false, 'reason', 'limit', 'remaining', 0);
+  end if;
+  update public.learn_search_usage set refreshes = refreshes + 1 where user_id = uid and day = d;
+  return jsonb_build_object('ok', true, 'remaining', s.per_user_refreshes - u.refreshes - 1);
+end;
+$$;
+
+revoke all on function public.learn_search_take(text) from public, anon;
+grant execute on function public.learn_search_take(text) to authenticated;
+revoke all on function public.learn_study_day() from public, anon;
+
+/* How many searches the caller has left today, without taking one. */
+create or replace function public.learn_search_left()
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  uid uuid := auth.uid();
+  used integer;
+  cap integer;
+begin
+  if uid is null then
+    return 0;
+  end if;
+  select per_user_searches into cap from public.learn_search_settings where id;
+  select searches into used from public.learn_search_usage where user_id = uid and day = public.learn_study_day();
+  return greatest(0, cap - coalesce(used, 0));
+end;
+$$;
+
+revoke all on function public.learn_search_left() from public, anon;
+grant execute on function public.learn_search_left() to authenticated;
+
+-- Old cache rows go after a day (results are only served for 6 hours).
+-- Optional, if pg_cron is enabled:
+--   select cron.schedule('learn-search-cache', '17 * * * *',
+--     $$ delete from public.learn_search_cache where created_at < now() - interval '1 day' $$);

@@ -106,6 +106,12 @@ test('each player error says what helps', () => {
   assert.equal(errorFor(5).retry, true);
   assert.equal(errorFor(153).kind, 'identity');
   assert.equal(errorFor(null).kind, 'load');
+  // A blocked script is not "check your connection": online, it offers the plain embed.
+  assert.equal(errorFor(null, true).plain, true);
+  assert.doesNotMatch(errorFor(null, true).body, /connection/i);
+  assert.equal(errorFor(null, false).title, "You're offline.");
+  assert.equal(errorFor(null, false).plain, false);
+  assert.equal(errorFor(150).plain, false);
   assert.equal(errorFor(999).kind, 'player');
 });
 

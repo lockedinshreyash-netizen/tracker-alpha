@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { LearnStore, LockedError, type KeySource } from './store';
 import { KeyUnavailable } from './keys';
 
-export type LockWhy = 'offline' | 'not-set-up' | 'not-member' | 'signed-out' | 'wrong-key' | 'error';
+export type LockWhy = 'offline' | 'unreachable' | 'not-set-up' | 'not-member' | 'signed-out' | 'wrong-key' | 'error';
 
 export type Opened =
   | { kind: 'opening' }
@@ -20,9 +20,9 @@ const whyOf = (e: unknown): LockWhy => {
     if (e.reason === 'wrong-key') return 'wrong-key';
     const cause = e.cause;
     if (cause instanceof KeyUnavailable) {
-      return cause.kind === 'bad-key' ? 'error' : cause.kind;
+      return cause.kind === 'bad-key' || cause.kind === 'server' ? 'error' : cause.kind;
     }
-    return 'offline';
+    return 'error';
   }
   return 'error';
 };

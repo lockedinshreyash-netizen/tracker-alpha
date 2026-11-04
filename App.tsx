@@ -2658,6 +2658,7 @@ const App: React.FC = () => {
                 onWatching={setLearnWatching}
                 request={learnRequest}
                 onRequestHandled={clearLearnRequest}
+                progress={state.progress}
               />
             </React.Suspense>
           )}

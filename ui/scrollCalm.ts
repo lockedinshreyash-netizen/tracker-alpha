@@ -2,13 +2,15 @@
    While anything on the page is scrolling, `html.scrolling` is set, and
    index.css uses it to hold the expensive things still until the page does:
 
-   - Liquid glass drops its refraction (an SVG filter chain of displacement,
-     blur, masks and merges) for the plain frosted blur it already uses before
-     its maps load. A backdrop filter re-runs on every frame its backdrop
-     changes, and during a scroll that is every frame, for every glass element
-     on screen. The bending at the rim is invisible on a page in motion anyway.
    - The festive layer and the Aurora wallpaper pause their endless animations,
-     so the compositor is not redrawing them under a moving page too.
+     so the compositor is not redrawing them under a moving page.
+
+   Liquid glass is NOT touched. It used to swap its refraction for a plain
+   frosted blur while scrolling; the instant change of look at the start and
+   end of every gesture read as the app flickering, and on a laptop scrolling
+   with the refraction left on measured just as smooth (60fps, Syllabus, five
+   glass elements). If a phone struggles, make the lens cheaper rather than
+   switching it off mid-gesture.
 
    One passive listener, capture phase so inner scrollers (the board's columns,
    a chat) count too. The class changes twice per gesture, never per frame. */

@@ -13,7 +13,7 @@ import { supabase } from '../supabaseClient';
 import { generateRawKey, keyFromB64, keyToB64 } from './crypto';
 import type { KeySource } from './store';
 
-export type KeyFailure = 'signed-out' | 'not-member' | 'not-set-up' | 'offline' | 'bad-key';
+export type KeyFailure = 'signed-out' | 'not-member' | 'not-set-up' | 'offline' | 'unreachable' | 'server' | 'bad-key';
 
 export class KeyUnavailable extends Error {
   readonly kind: KeyFailure;
@@ -23,12 +23,16 @@ export class KeyUnavailable extends Error {
   }
 }
 
+/* learn.sql's own errors, then PostgREST's "no such function". Only a
+   request that never got an answer is "offline": supabase-js reports those
+   with no code. Anything else the server said is an error, never blamed on
+   the student's connection. */
 const kindFor = (code: string | undefined): KeyFailure => {
-  // learn.sql's own errors, then PostgREST's "no such function", then the network.
   if (code === '28000') return 'signed-out';
   if (code === '42501') return 'not-member';
   if (code === 'PGRST202' || code === '42883') return 'not-set-up';
-  return 'offline';
+  if (!code) return typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'unreachable';
+  return 'server';
 };
 
 export const serverKeySource: KeySource = async () => {

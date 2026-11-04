@@ -76,6 +76,13 @@ export const loadIframeApi = (): Promise<YTNamespace> => {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (pending) return pending;
 
+  /* A previous attempt that half-arrived (iframe_api ran, its widget script
+     was blocked or timed out) leaves `YT.loading` set and a script tag
+     behind, and YouTube's loader then never tries again. Clear both so "Try
+     again" really tries again. */
+  if (window.YT && !window.YT.Player) delete (window as { YT?: unknown }).YT;
+  document.querySelectorAll(`script[src="${SRC}"], script#www-widgetapi-script`).forEach(s => s.remove());
+
   pending = new Promise<YTNamespace>((resolve, reject) => {
     const fail = (why: string) => {
       window.clearTimeout(timer);
@@ -92,13 +99,11 @@ export const loadIframeApi = (): Promise<YTNamespace> => {
       else fail('no player');
     };
 
-    if (!document.querySelector(`script[src="${SRC}"]`)) {
-      const script = document.createElement('script');
-      script.src = SRC;
-      script.async = true;
-      script.onerror = () => { script.remove(); fail('script'); };
-      document.head.appendChild(script);
-    }
+    const script = document.createElement('script');
+    script.src = SRC;
+    script.async = true;
+    script.onerror = () => { script.remove(); fail('script'); };
+    document.head.appendChild(script);
   });
   return pending;
 };

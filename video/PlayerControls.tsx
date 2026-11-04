@@ -20,10 +20,14 @@ interface Props {
   dark: boolean;
   /** Listen for the keyboard shortcuts while this strip is on screen. */
   keys?: boolean;
+  /** No card around it (the theater draws its own room). */
+  bare?: boolean;
+  /** Leave out the time: a timeline beside it already shows it. */
+  hideTime?: boolean;
   children?: React.ReactNode;
 }
 
-const PlayerControls = ({ controller, state, rate, dark, keys = true, children }: Props) => {
+const PlayerControls = ({ controller, state, rate, dark, keys = true, bare = false, hideTime = false, children }: Props) => {
   const playing = state === 'playing' || state === 'buffering';
   const off = !controller;
   // Re-asked on every state change: YouTube often reports only [1] until the video starts.
@@ -36,7 +40,7 @@ const PlayerControls = ({ controller, state, rate, dark, keys = true, children }
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border px-2 py-1.5 ${
+      className={bare ? 'flex flex-wrap items-center gap-x-2 gap-y-2' : `flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border px-2 py-1.5 ${
         dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'
       }`}
     >
@@ -70,9 +74,9 @@ const PlayerControls = ({ controller, state, rate, dark, keys = true, children }
         </button>
       </div>
 
-      <TimeReadout controller={controller} playing={playing} state={state} dark={dark} />
+      {!hideTime && <TimeReadout controller={controller} playing={playing} state={state} dark={dark} />}
 
-      <label className="ml-auto flex items-center gap-2 font-ui text-xs font-bold text-zinc-500">
+      <label className={`${bare ? 'order-last' : 'ml-auto'} flex items-center gap-2 font-ui text-xs font-bold text-zinc-500`}>
         Speed
         <select
           value={String(rate)}
