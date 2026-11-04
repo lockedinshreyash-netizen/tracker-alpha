@@ -21,6 +21,7 @@ const TABS: Record<string, TabType> = {
   mocks: 'Mocks',
   decks: 'Decks',
   notes: 'Notes',
+  learn: 'Learn',
   groups: 'Groups',
   streak: 'Streak',
   // The footers' "Support Alpha" (site/support.tsx's "Write a note" link).

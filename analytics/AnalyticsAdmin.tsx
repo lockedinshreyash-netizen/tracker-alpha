@@ -616,6 +616,7 @@ const derive = (d: Analytics) => {
     { label: 'Rewards', value: a.rewards, hint: 'Has unlocked a streak reward.' },
     { label: 'Closed-app reminders', value: a.reminders, hint: 'Push reminders switched on.' },
     ...(a.nudges !== undefined ? [{ label: 'Daily nudges', value: a.nudges, hint: 'Opted into the daily study nudges.' }] : []),
+    ...(a.learn !== undefined ? [{ label: 'Learn', value: a.learn, hint: 'Switched Learn on. What is on their shelf never leaves their device.' }] : []),
     ...(a.kept !== undefined ? [{ label: 'Kept Alpha close', value: a.kept, hint: 'Installed, bookmarked or added to their calendar on their last device.' }] : []),
   ].sort((x, y) => y.value - x.value);
 

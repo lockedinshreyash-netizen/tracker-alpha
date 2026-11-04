@@ -14,6 +14,8 @@
     "test:streak": "node scripts/test-decks.mjs streak",
     "test:timer": "node scripts/test-decks.mjs today",
     "test:reader": "node scripts/test-decks.mjs reader",
+    "test:video": "node scripts/test-decks.mjs video",
+    "test:learn": "node scripts/test-decks.mjs learn",
     "test:install": "node scripts/test-decks.mjs install",
     "extension:build": "node scripts/extension.mjs",
     "test:nudges": "node scripts/test-decks.mjs reminders",

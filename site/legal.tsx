@@ -14,7 +14,7 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-10-30';
+const POLICY_EFFECTIVE = '2026-11-04';
 const EFFECTIVE_LONG = '1 November 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
@@ -151,6 +151,7 @@ const privacyPage = (): SitePage => {
                 <li><b>Groups.</b> The groups you’re in, the messages and reactions you send, and your hours and today’s tasks, only at the level you pick for each group.</li>
                 <li><b>Decks.</b> The decks and cards you make, images you add to them, and your review history.</li>
                 <li><b>Notes.</b> Off until you turn it on. Your notes stay on your device. If you’re signed in, a copy of your pages and the images in them is stored on our servers so your other devices get them. Only you can read them. Our staff can’t. Delete a page from the trash and its copy goes too.</li>
+                <li><b>Learn.</b> Off until you turn it on. The lectures you add, their titles, your bookmarks, notes and how much you watched stay on your device, locked with a key. We keep only that key, so signing out locks your shelf and signing back in opens it. We never see what is on it. Delete your account and the key goes, so no copy can be opened again. A backup file you save yourself isn’t locked. If you start the study clock from a lecture, that session is logged like any other, with its subject and chapter.</li>
                 <li><b>Reminders.</b> To remind you when the app is closed: your device’s push address, its browser type, and the reminder itself (the task and when it’s due).</li>
                 <li><b>The new-tab extension.</b> If you install it: it copies a summary of your day (streak, today’s hours, goal, week, exam date, your open Focus Tasks, and any session running) from Alpha into your browser’s storage, so your new tab can show it. It stays on your device. The extension sends nothing anywhere.</li>
                 <li><b>Daily nudges.</b> If you turn them on: the time you usually study, and the next few days of nudges, each with today’s hours and goal in it (like “7.5h to go”). We hold only what is about to be sent, withdraw it when you log enough, and delete sent ones after a week. Turn them off and nothing more is sent.</li>
@@ -164,7 +165,7 @@ const privacyPage = (): SitePage => {
               <p>
                 When you’re signed in, we record which days you opened the app and a few numbers: hours studied,
                 number of sessions, your device type, whether the app is installed (or bookmarked, or added to your
-                calendar from the app), whether daily nudges are on, and which features you’ve used.
+                calendar from the app), whether daily nudges are on, whether Learn is on, and which features you’ve used.
                 These are numbers, never what you wrote. We mostly look at them as totals across everyone, to see
                 what is working.
               </p>
@@ -202,7 +203,7 @@ const privacyPage = (): SitePage => {
                 <li><b>Google</b> runs Analytics, Google sign-in, and push delivery for Chrome and Android.</li>
                 <li><b>Apple and Mozilla</b> deliver reminders on Safari and Firefox, if you turn them on there.</li>
                 <li><b>Font and code services</b> (Google Fonts, cdnfonts.com, the Tailwind CSS CDN) see your IP address when your browser loads them.</li>
-                <li><b>YouTube</b>, through its privacy-enhanced player, only after you press play on a video we post.</li>
+                <li><b>YouTube</b>, through its privacy-enhanced player, when you press play on a video we post or on a lecture in Learn. YouTube then gets the video, your IP address and device details, and may set its own cookies. Learn uses the YouTube API Services: by playing a video you agree to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>, and <a href="https://policies.google.com/privacy">Google’s Privacy Policy</a> applies to what YouTube collects.</li>
               </ul>
               <p>These services may store data outside India. We also share data if the law requires it.</p>
             </Section>
@@ -302,6 +303,7 @@ const deleteAccountPage = (): SitePage => {
                 <li>Your account, email address and profile, including your photo.</li>
                 <li>Your synced study history, plan, syllabus progress, tasks, mock tests and error notebook.</li>
                 <li>Your decks, cards, images and review history.</li>
+                <li>The key to your Learn shelf. Any copy of the shelf left on a device can never be opened again.</li>
                 <li>Your group memberships and messages, your Ranks entries and race chat messages.</li>
                 <li>Your reminders, feedback, notes to the founder, poll answers and usage stats.</li>
               </ul>

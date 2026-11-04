@@ -146,6 +146,15 @@ const TabIcon: React.FC<{ tab: TabType; className?: string }> = ({ tab, classNam
           <line x1="9" y1="16" x2="13.5" y2="16" />
         </svg>
       );
+    /* A disc: every lecture on the shelf is a case with one in it. */
+    case 'Learn':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="2.6" />
+          <path d="M7.4 9.2a5.4 5.4 0 0 1 2.4-2.2" />
+        </svg>
+      );
     /* A key. Nothing about the study loop, and it should not pretend to be. */
     case 'Admin':
       return (
@@ -165,11 +174,12 @@ const Sidebar: React.FC<Props> = ({ activeTab, onTabChange, theme, collapsed, on
   /* Appended, never inserted: the tabs the student uses keep the positions
      their muscle memory knows, and the console arrives at the bottom. Groups
      went in after Review for the same reason, below everything that was
-     already there. Decks followed Groups the same way, and Notes followed Decks.
+     already there. Decks followed Groups the same way, Notes followed Decks,
+     and Learn followed Notes.
      Store takes Review's slot once the Alpha Store launches (store/launch.ts),
      and Review moves into the profile page. */
   const tabs: TabType[] = [
-    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', STORE_LAUNCHED ? 'Store' : 'Review', 'Groups', 'Decks', 'Notes',
+    'Today', 'Plan', 'Syllabus', 'Streak', 'Mocks', 'Ranks', STORE_LAUNCHED ? 'Store' : 'Review', 'Groups', 'Decks', 'Notes', 'Learn',
     ...(isAdmin ? (['Admin'] as TabType[]) : []),
   ];
   const dark = theme === 'dark';

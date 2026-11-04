@@ -46,6 +46,7 @@ const DecksTab = React.lazy(() => import('./decks/DecksTab'));
 const StoreTab = React.lazy(() => import('./store/StoreTab'));
 /* Notes: the store and Yjs arrive with the tab, the editor with the first page. */
 const NotesTab = React.lazy(() => import('./notes/NotesTab'));
+const LearnTab = React.lazy(() => import('./learn/LearnTab'));
 /* Support Alpha: reached only from quick settings, Settings and the site footers. */
 const SupportPage = React.lazy(() => import('./support/SupportPage'));
 import { useFounderReplies } from './support/useFounderReplies';
@@ -104,6 +105,8 @@ import { forgetGroupsOnDevice } from './groups/publish';
 import { forgetDecksOnDevice } from './decks/forget';
 import { flushNotesBeforeSignOut, forgetNotesOnDevice } from './notes/forget';
 import { mergeNotesPref, notesOn } from './notes/pref';
+import { learnOn, mergeLearnPref } from './learn/pref';
+import { forgetLearnLibrary, lockLearnOnDevice } from './learn/forget';
 import type { NotesRequest } from './notes/NotesTab';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
@@ -254,11 +257,14 @@ const App: React.FC = () => {
   /* View-only, and deliberately not in AppState: which width a rail is at on
      this screen is not something to sync to another device. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  /* Notes is a writing room: the rail folds to its icons on the way in and
-     goes back to however it was on the way out. Above every early return. */
+  /* Notes is a writing room, and an open lecture is a screening room: the rail
+     folds to its icons on the way in and goes back to however it was on the
+     way out. Learn's shelf keeps the rail; only a lecture folds it
+     (learn/LectureView.tsx reports `learnWatching`). Above every early return. */
+  const [learnWatching, setLearnWatching] = useState(false);
   const railBeforeNotes = useRef<boolean | null>(null);
   useEffect(() => {
-    if (activeTab === 'Notes') {
+    if (activeTab === 'Notes' || (activeTab === 'Learn' && learnWatching)) {
       if (railBeforeNotes.current === null) {
         railBeforeNotes.current = sidebarCollapsed;
         setSidebarCollapsed(true);
@@ -267,7 +273,7 @@ const App: React.FC = () => {
       setSidebarCollapsed(railBeforeNotes.current);
       railBeforeNotes.current = null;
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, learnWatching]); // eslint-disable-line react-hooks/exhaustive-deps
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(() => {
     try {
       return localStorage.getItem(ONBOARDING_KEY) !== 'true';
@@ -437,6 +443,7 @@ const App: React.FC = () => {
               lastUsedTab: prev.lastUsedTab,
               theme: prev.theme,
               notes: mergeNotesPref(prev.notes, remoteState.notes),
+              learn: mergeLearnPref(prev.learn, remoteState.learn),
               examsAskedAt: laterStamp(prev.examsAskedAt, remoteState.examsAskedAt),
               // A push from another device must not reach in and restart or
               // rewind a timer running here…
@@ -508,6 +515,7 @@ const App: React.FC = () => {
               lastUsedTab: localState.lastUsedTab,
               theme: localState.theme,
               notes: mergeNotesPref(localState.notes, remoteState.notes),
+              learn: mergeLearnPref(localState.learn, remoteState.learn),
               examsAskedAt: laterStamp(localState.examsAskedAt, remoteState.examsAskedAt),
               // …and anything mid-flight on this device. See the note below.
               timer: localState.timer,
@@ -558,6 +566,7 @@ const App: React.FC = () => {
             lastUsedTab: localState.lastUsedTab,
             theme: localState.theme,
             notes: mergeNotesPref(localState.notes, remoteState.notes),
+            learn: mergeLearnPref(localState.learn, remoteState.learn),
             examsAskedAt: laterStamp(localState.examsAskedAt, remoteState.examsAskedAt),
             /* Running timers belong to the device running them, never to the
                account. Taking these from the server resurrected an already
@@ -707,12 +716,16 @@ const App: React.FC = () => {
         preventSyncOnUpdate.current = true;
         // Notes typed offline are only in the outbox; send them while the session can.
         if (user) await flushNotesBeforeSignOut(user.id);
+        // The lecture library stays on the device, locked: its cached key goes, the ciphertext stays.
+        await lockLearnOnDevice();
         await supabase.auth.signOut();
         forgetAccountOnDevice();
         setState(DEFAULT_STATE);
         setActiveTab('Today');
         window.location.href = window.location.origin;
       } catch (err) {
+        // Before the clear: the lock finds the libraries through a list kept in localStorage.
+        await lockLearnOnDevice().catch(() => undefined);
         localStorage.clear();
         window.location.href = window.location.origin;
       }
@@ -735,6 +748,8 @@ const App: React.FC = () => {
     }
     // The server session died with the account; only this device's copy is left to clear.
     await supabase.auth.signOut({ scope: 'local' }).catch(() => { /* already gone */ });
+    // Its key died with the account (learn.sql cascades), so the library here is only clutter.
+    forgetLearnLibrary(user.id);
     forgetAccountOnDevice();
     /* Signing out changes `user?.id`, which re-runs the effect that writes
        `locked_in_state_v2` before the reload lands. It must write the default,
@@ -784,6 +799,26 @@ const App: React.FC = () => {
   const setNotesEnabled = useCallback((on: boolean) => {
     setState(prev => {
       const next = { ...prev, notes: { on, at: Date.now() }, lastUpdated: Date.now() };
+      stateRef.current = next;
+      return next;
+    });
+  }, []);
+
+  /* Syllabus → Learn: open the shelf on one chapter. Held here like
+     notesRequest until the Learn tab has its library open and takes it. */
+  const [learnRequest, setLearnRequest] = useState<{ key: string; nonce: number } | null>(null);
+  const clearLearnRequest = useCallback(() => setLearnRequest(null), []);
+  const openChapterLectures = useCallback((classId: 11 | 12, subject: Subject, chapter: string) => {
+    setLearnRequest({ key: `${classId}|${subject}|${chapter}`, nonce: Date.now() });
+    handleTabChange('Learn');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Learn is opt-in the same way: until it is on, the tab is its cover page
+     and no library is opened, no key fetched, nothing loaded from YouTube. */
+  const learnEnabled = learnOn(state.learn);
+  const setLearnEnabled = useCallback((on: boolean) => {
+    setState(prev => {
+      const next = { ...prev, learn: { on, at: Date.now() }, lastUpdated: Date.now() };
       stateRef.current = next;
       return next;
     });
@@ -1843,6 +1878,28 @@ const App: React.FC = () => {
    * which is what lets adherence say a block was honoured instead of guessing
    * it from subject and hours.
    */
+  /* Learn's "Start the clock": the stopwatch, on the lecture's subject and
+     chapter, started by the student's own tap and never by a video playing
+     (YouTube's policies forbid rewarding viewing, and a looping video would
+     farm Ranks). Unlike startBlock it stays put: the student is about to
+     watch, so the clock shows inside Learn. Returns false when a session is
+     already armed; Learn says so in place rather than with an alert. */
+  const startLectureClock = useCallback((subject: Subject, chapter?: string): boolean => {
+    const current = stateRef.current;
+    if (stopwatchArmed(current.timer) || !pomodoroIsIdle(current.pomodoro) || current.sprint) return false;
+    sfx.play('session-start');
+    setState(prev => {
+      const nextState: AppState = {
+        ...prev,
+        timer: { isRunning: true, startTime: Date.now(), accumulatedMs: 0, subject, chapter },
+        lastUpdated: Date.now(),
+      };
+      stateRef.current = nextState;
+      return nextState;
+    });
+    return true;
+  }, []);
+
   const startBlock = (block: ScheduleBlock) => {
     const current = stateRef.current;
     if (stopwatchArmed(current.timer) || !pomodoroIsIdle(current.pomodoro) || current.sprint) {
@@ -2475,6 +2532,7 @@ const App: React.FC = () => {
               onTestFinished={recordTestResult}
               notesOwner={user?.id ?? 'guest'}
               onOpenNotes={notesEnabled ? openChapterNotes : undefined}
+              onOpenLectures={learnEnabled ? openChapterLectures : undefined}
             />
           )}
           {activeTab === 'Streak' && (
@@ -2577,6 +2635,29 @@ const App: React.FC = () => {
                 onOpenSyllabus={openSyllabusTab}
                 request={notesRequest}
                 onRequestHandled={clearNotesRequest}
+              />
+            </React.Suspense>
+          )}
+          {/* Lazy. Nothing in it reads or writes AppState except the on/off
+              decision: the library is device-local and encrypted (learn/store.ts). */}
+          {activeTab === 'Learn' && (
+            <React.Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+              <LearnTab
+                enabled={learnEnabled}
+                onEnable={() => setLearnEnabled(true)}
+                onDisable={() => setLearnEnabled(false)}
+                user={user}
+                theme={theme}
+                examPreference={state.examPreference || 'JEE'}
+                currentClass={state.currentClass}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+                timer={state.timer}
+                otherSession={state.sprint ? 'sprint' : !pomodoroIsIdle(state.pomodoro) ? 'pomodoro' : null}
+                onStartClock={startLectureClock}
+                onOpenToday={() => handleTabChange('Today')}
+                onWatching={setLearnWatching}
+                request={learnRequest}
+                onRequestHandled={clearLearnRequest}
               />
             </React.Suspense>
           )}

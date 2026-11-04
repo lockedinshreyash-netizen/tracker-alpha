@@ -78,7 +78,7 @@ export interface Analytics {
       plan: number; tasks: number; mocks: number; errors: number; syllabus: number;
       rewards: number; race: number; reminders: number; pomodoro: number;
       /** Absent until analytics.sql is re-run with the keep columns. */
-      nudges?: number; kept?: number;
+      nudges?: number; kept?: number; learn?: number;
     };
   };
   /** Keeping Alpha close, by method, against days active. Absent on an older SQL. */

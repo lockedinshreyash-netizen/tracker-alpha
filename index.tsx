@@ -50,6 +50,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('access') === 'debug') {
   // Invite-only: every Gate state, the member card and Console → Access, on in-memory RPCs.
   import('./access/DebugAccess').then(({ default: DebugAccess }) => ReactDOM.createRoot(rootElement).render(<DebugAccess />));
+} else if (import.meta.env.DEV && params.get('learn') === 'debug') {
+  // Alpha Video on its own: the YouTube player, its controls and keys, every error, the link reader.
+  import('./video/DebugVideo').then(({ default: DebugVideo }) => ReactDOM.createRoot(rootElement).render(<DebugVideo />));
 } else if (import.meta.env.DEV && params.get('festive') === 'debug') {
   // Every festive theme in real device-width frames, with working fireworks.
   import('./festive/DebugFestive').then(({ default: DebugFestive }) => ReactDOM.createRoot(rootElement).render(<DebugFestive />));

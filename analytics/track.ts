@@ -55,6 +55,8 @@ export interface UsageFacts {
   /** Installed, bookmarked or added to the calendar, on this device. */
   kept: boolean;
   nudges: boolean;
+  /** Learn switched on. Only the switch: the library itself never leaves the device. */
+  learn: boolean;
 }
 
 export type Platform = 'ios' | 'android' | 'desktop' | 'other';
@@ -118,6 +120,7 @@ export const usageFacts = (state: AppState): UsageFacts => {
     reminders: !!state.reminders?.push,
     ...keepFacts(),
     nudges: !!state.reminders?.nudge,
+    learn: !!state.learn?.on,
   };
 };
 

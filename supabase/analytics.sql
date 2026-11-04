@@ -125,6 +125,9 @@ create index if not exists usage_snapshots_recent on public.usage_snapshots (upd
 alter table public.usage_snapshots add column if not exists keep_method text;
 alter table public.usage_snapshots add column if not exists kept boolean not null default false;
 alter table public.usage_snapshots add column if not exists nudges boolean not null default false;
+-- Whether Learn is switched on (learn/pref.ts). Only the switch: the lecture
+-- library is device-local and encrypted, and nothing about it is sent here.
+alter table public.usage_snapshots add column if not exists learn boolean not null default false;
 alter table public.usage_snapshots drop constraint if exists usage_keep_valid;
 alter table public.usage_snapshots add constraint usage_keep_valid check (
   keep_method is null or keep_method in ('prompt', 'ios-share', 'mac-dock', 'firefox-android', 'bookmark', 'inapp', 'none')
@@ -321,7 +324,7 @@ begin
     insert into public.usage_snapshots as s (
       user_id, exam, class_level, streak, goal_hours, timer_mode, theme, plan_items, tasks,
       mocks, errors, chapters_started, chapters_done, rewards, race, reminders,
-      keep_method, kept, nudges, updated_at
+      keep_method, kept, nudges, learn, updated_at
     ) values (
       uid,
       public.analytics_text(f, 'exam', array['JEE', 'NEET']),
@@ -342,6 +345,7 @@ begin
       public.analytics_text(f, 'keep', array['prompt', 'ios-share', 'mac-dock', 'firefox-android', 'bookmark', 'inapp', 'none']),
       coalesce(public.analytics_bool(f, 'kept'), false),
       coalesce(public.analytics_bool(f, 'nudges'), false),
+      coalesce(public.analytics_bool(f, 'learn'), false),
       now()
     )
     on conflict (user_id) do update set
@@ -351,7 +355,7 @@ begin
       errors = excluded.errors, chapters_started = excluded.chapters_started,
       chapters_done = excluded.chapters_done, rewards = excluded.rewards, race = excluded.race,
       reminders = excluded.reminders, keep_method = excluded.keep_method, kept = excluded.kept,
-      nudges = excluded.nudges, updated_at = excluded.updated_at;
+      nudges = excluded.nudges, learn = excluded.learn, updated_at = excluded.updated_at;
   end if;
 end;
 $$;
@@ -821,6 +825,7 @@ begin
       'reminders', count(*) filter (where reminders),
       'pomodoro',  count(*) filter (where timer_mode = 'pomodoro'),
       'nudges',    count(*) filter (where nudges),
+      'learn',     count(*) filter (where learn),
       'kept',      count(*) filter (where kept)
     )
   ) into part

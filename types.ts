@@ -200,7 +200,7 @@ export interface ChapterProgress {
    into the student's own page, Profile, opened from the account button at the
    bottom of the rail. Until then the rail is as it was, with Review. A saved
    `lastUsedTab` is mapped to whichever of the two is drawn (App.tsx). */
-export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Profile' | 'Admin' | 'Support';
+export type TabType = 'Today' | 'Plan' | 'Syllabus' | 'Streak' | 'Mocks' | 'Ranks' | 'Review' | 'Store' | 'Groups' | 'Decks' | 'Notes' | 'Learn' | 'Profile' | 'Admin' | 'Support';
 
 /** Opt-in, per account. Nothing is published until `enabled` is true. */
 export interface LeaderboardPrefs {
@@ -881,4 +881,7 @@ export interface AppState {
   /* Notes is opt-in (notes/pref.ts): absent until the student turns it on.
      A dated decision so every merge path keeps the latest one. */
   notes?: import('./notes/pref').NotesPref;
+  /* Learn is opt-in the same way (learn/pref.ts). Only this decision syncs:
+     the lecture library is device-local and encrypted (learn/store.ts). */
+  learn?: import('./learn/pref').LearnPref;
 }

@@ -19,11 +19,15 @@ interface Props {
   /** Whose notes to look in (an account id, or 'guest') for chapters that already have a page. */
   notesOwner?: string;
   onOpenNotes?: (classId: 11 | 12, subject: Subject, chapter: string) => void;
+  /* Learn, when it is on. One link on every chapter, with no "has lectures"
+     marker: knowing which chapters have lectures would need an index outside
+     Learn's encrypted library, and that is exactly what it keeps private. */
+  onOpenLectures?: (classId: 11 | 12, subject: Subject, chapter: string) => void;
 }
 
 type SortMode = 'damage' | 'syllabus';
 
-const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference, onTestFinished, notesOwner = 'guest', onOpenNotes }) => {
+const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme, activeSubjects, examPreference, onTestFinished, notesOwner = 'guest', onOpenNotes, onOpenLectures }) => {
   const [activeSubject, setActiveSubject] = useState<Subject>('Physics');
   const [sortMode, setSortMode] = useState<SortMode>('damage');
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -250,6 +254,15 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
                     </button>
                   );
                 })()}
+                {onOpenLectures && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpenLectures(currentClass, activeSubject, chapter); }}
+                    className={`text-[11px] font-ui font-bold hover:underline ${t.muted}`}
+                    title="Lectures on your Learn shelf for this chapter"
+                  >
+                    Lectures
+                  </button>
+                )}
                 </span>
                 <span className={`text-[10px] font-ui ${t.faint} opacity-0 group-hover:opacity-100 transition-opacity`}>Tap to update</span>
               </div>
