@@ -91,7 +91,8 @@ const ntaShift = (paper: string, k: number): BankQuestion[] => {
         answer: numerical ? { value: 5 } : { option: 2 },
         figures: [ntaImage(`Q${n}. NTA question image (${subject})`), ...(numerical ? [] : ['(1) 2', '(2) 4', '(3) 6', '(4) 8'].map(ntaImage))],
         subject, classId: tagged ? 12 : null, chapter: tagged ? chapters[i % chapters.length] : null, topic: null,
-        year: Number(paper.slice(0, 4)), shift: paper, difficulty: null, confidence: null, status: 'ready', textHash: String(n),
+        year: Number(paper.slice(0, 4)), shift: paper,
+        searchText: i % 4 === 3 ? 'garbled' : 'A block of mass 2 kg slides down a smooth incline of angle 30 degrees The acceleration of the block is', difficulty: null, confidence: null, status: 'ready', textHash: String(n),
       });
     }
   });
@@ -103,7 +104,7 @@ const ntaShift = (paper: string, k: number): BankQuestion[] => {
 const fakePaper = (id: string, spec: CbtPaper['blueprint']['spec'], name: string, o: Partial<CbtPaper>): CbtPaper => ({
   id, bank: 'pyq', name, kind: spec.kind, seed: 1, questionIds: Array.from({ length: 75 }, (_, i) => `q${i}`), responses: {},
   blueprint: { exam: 'mains', spec, durationMins: 180, marking: { right: 4, wrong: -1 }, sections: [], notes: [] },
-  startedAt: null, submittedAt: null, score: null, mockId: null, createdAt: '2026-11-03T10:00:00Z', ...o,
+  startedAt: null, usedMs: null, submittedAt: null, score: null, mockId: null, createdAt: '2026-11-03T10:00:00Z', ...o,
 });
 const score = (marks: number) => ({ marks, max: 300, subjects: [] });
 
@@ -146,7 +147,7 @@ const DebugCbt: React.FC = () => {
   const [board, setBoard] = useState<'cover' | 'home' | 'home-new' | 'home-done' | null>(null);
   const [saved, setSaved] = useState<{ mock: MockTest; errors: ErrorEntry[] } | null>(null);
 
-  const build = (kind: 'full' | 'subject' | 'shift') => {
+  const build = (kind: 'full' | 'subject' | 'shift', practice = false) => {
     const spec = kind === 'full' ? { kind } as const : kind === 'shift' ? { kind, paper: '2026-0402-S1' } as const : { kind, subject: 'Physics' as CbtSubject } as const;
     const g = generatePaper({
       pyq: kind === 'shift',
@@ -154,14 +155,14 @@ const DebugCbt: React.FC = () => {
       weightOf: q => getWeight('JEE', q.classId as 11 | 12, q.subject, q.chapter as string)?.percent ?? 1.5, now: Date.now(), seed: 7,
     });
     const id = `debug-${kind}-${Date.now()}`;
-    setPaper({ id, bank: kind === 'shift' ? 'pyq' : 'private', name: paperTitle(spec), kind, blueprint: g.blueprint, seed: 7, questionIds: g.questionIds, responses: {}, startedAt: null, submittedAt: null, score: null, mockId: null, createdAt: new Date().toISOString() });
+    setPaper({ id, bank: kind === 'shift' ? 'pyq' : 'private', name: `${practice ? 'Practice · ' : ''}${paperTitle(spec)}`, kind, blueprint: { ...g.blueprint, mode: practice ? 'practice' : 'mock' }, seed: 7, questionIds: g.questionIds, responses: {}, startedAt: null, usedMs: null, submittedAt: null, score: null, mockId: null, createdAt: new Date().toISOString() });
     setSaved(null);
     setMode('exam');
   };
 
-  const submit = (responses: Record<string, Resp>, startedAt: string) => {
+  const submit = (responses: Record<string, Resp>, startedAt: string, usedMs: number) => {
     if (!paper) return;
-    const next = { ...paper, responses, startedAt, submittedAt: new Date().toISOString(), score: scorePaper({ blueprint: paper.blueprint, responses }, byId) };
+    const next = { ...paper, responses, startedAt, usedMs, submittedAt: new Date().toISOString(), score: scorePaper({ blueprint: paper.blueprint, responses }, byId) };
     setPaper(next);
     setMode('review');
   };
@@ -174,6 +175,7 @@ const DebugCbt: React.FC = () => {
         <button className="px-4 py-2 rounded-lg border" onClick={() => build('full')}>Full paper</button>
         <button className="px-4 py-2 rounded-lg border" onClick={() => build('subject')}>Physics paper</button>
         <button className="px-4 py-2 rounded-lg border" onClick={() => build('shift')}>NTA shift</button>
+        <button className="px-4 py-2 rounded-lg border" onClick={() => build('shift', true)}>Practice shift</button>
         <button className="px-4 py-2 rounded-lg border" onClick={() => setDark(d => !d)}>{dark ? 'Light' : 'Dark'}</button>
         {(['cover', 'home', 'home-new', 'home-done'] as const).map(b => (
           <button key={b} className={`px-4 py-2 rounded-lg border ${board === b ? 'bg-white/10' : ''}`} onClick={() => setBoard(x => (x === b ? null : b))}>NTA {b}</button>

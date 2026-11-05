@@ -12,7 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { ChapterProgress } from '../types';
 import { getWeight } from '../content';
 import { Chip, Segmented, Sheet, btn, subjectDot, tokens } from '../mocks/ui';
-import { BankQuestion, ChapterRef, CbtSubject, PaperSpec } from './types';
+import { BankQuestion, ChapterRef, CbtSubject, PaperMode, PaperSpec } from './types';
 import { GenInput, JEE_MAIN, chapterOf, generatePaper, newSeed, paperTitle, realShifts, refKey } from './generate';
 
 interface Props {
@@ -46,6 +46,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   const [count, setCount] = useState(20);
   const [onlyStarted, setOnlyStarted] = useState(false);
   const [seed, setSeed] = useState(newSeed);
+  const [mode, setMode] = useState<PaperMode>('mock');
 
   // Every question that can go in a paper; `tagged` are the ones with a chapter.
   const ready = useMemo(() => questions.filter(q => q.status === 'ready' && (pyq || (q.chapter && q.classId))), [questions, pyq]);
@@ -107,11 +108,11 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   const footer = (
     <div className="flex items-center gap-3">
       <span className={`flex-1 text-[12px] font-ui ${t.muted}`}>
-        {generated ? `${total} questions · ${generated.blueprint.durationMins} min` : kind === 'shift' ? 'Pick a shift.' : 'Pick at least one chapter.'}
+        {generated ? `${total} questions · ${mode === 'practice' ? 'no time limit' : `${generated.blueprint.durationMins} min`}` : kind === 'shift' ? 'Pick a shift.' : 'Pick at least one chapter.'}
       </span>
       {kind !== 'shift' && <button onClick={() => setSeed(newSeed())} disabled={!generated} className={`${btn} px-3 py-3.5 ${t.ghost}`} title="Same rules, different questions">Reshuffle</button>}
-      <button onClick={() => generated && onStart(spec, seed, generated)} disabled={!generated || !total || busy} className={`${btn} px-6 py-3.5 ${t.primary}`}>
-        {busy ? 'Building…' : 'Start paper'}
+      <button onClick={() => generated && onStart(spec, seed, { ...generated, blueprint: { ...generated.blueprint, mode } })} disabled={!generated || !total || busy} className={`${btn} px-6 py-3.5 ${t.primary}`}>
+        {busy ? 'Building…' : mode === 'practice' ? 'Start practice' : 'Start paper'}
       </button>
     </div>
   );
@@ -119,6 +120,19 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   return (
     <Sheet dark={dark} onClose={onClose} label="Build a paper" header={header} footer={footer} width="md:w-[600px]">
       <div className="px-5 md:px-7 py-6 space-y-7 font-ui">
+        <div>
+          <Segmented
+            full
+            value={mode}
+            onChange={v => setMode(v as PaperMode)}
+            dark={dark}
+            label="Mode"
+            options={[{ value: 'mock', label: 'Mock' }, { value: 'practice', label: 'Practice' }]}
+          />
+          <p className={`text-[12px] mt-2.5 ${t.muted}`}>
+            {mode === 'mock' ? 'Against the clock. Answers after you submit. Counts in your mock trends.' : 'No time limit. Check each answer as you go. Mistakes can go to your notebook.'}
+          </p>
+        </div>
         {!fixedKind && <Segmented
           full
           value={kind}

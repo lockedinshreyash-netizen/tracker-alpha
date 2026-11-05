@@ -20,7 +20,9 @@
 --   pyq_index()               what the generator needs: subject, kind, chapter…
 --   pyq_create_paper(…)       a sitting, at most 90 questions, 12 a day, kept for good
 --   pyq_paper_questions(id)   the images of their own paper's questions
---   pyq_paper_answers(id)     the answers, only once that paper is submitted
+--   pyq_paper_answers(id)     the answers, once that paper is submitted, or at
+--                             once for a practice paper (blueprint.mode =
+--                             'practice'), which checks each answer as it goes
 -- and figures are signed only for questions in a paper they own.
 
 
@@ -101,6 +103,13 @@ create table if not exists public.pyq_questions (
   -- A chapter is only ever set together with its class.
   constraint pyq_chapter_has_class check ((chapter is null) = (class_id is null))
 );
+
+-- Words to search the web with for a worked solution: the start of the
+-- question's on-device OCR, cleaned (scripts/pyq/load.py). Handed out only
+-- with the answers, so it is never a way to read the bank early.
+alter table public.pyq_questions add column if not exists search_text text;
+alter table public.pyq_questions drop constraint if exists pyq_search_text_len;
+alter table public.pyq_questions add constraint pyq_search_text_len check (char_length(search_text) <= 400);
 
 create index if not exists pyq_questions_paper on public.pyq_questions (paper, number);
 create index if not exists pyq_questions_figures on public.pyq_questions using gin (figures);
@@ -233,9 +242,16 @@ begin
 end;
 $$;
 
--- Answers exist for a sitting only after it is submitted.
-create or replace function public.pyq_paper_answers(p_paper uuid)
-returns table (id uuid, answer jsonb)
+-- Answers exist for a sitting only after it is submitted, except a practice
+-- paper, whose whole point is checking each answer as you go. That gives away
+-- nothing a mock does not: submit a mock at once and its answers arrive too,
+-- under the same 90-question, 12-a-day limits. The mode is in the blueprint,
+-- which cbt_papers_guard() freezes, so a mock cannot be turned into practice
+-- halfway through to read its answers.
+-- Its return type gained search_text, which `create or replace` cannot change.
+drop function if exists public.pyq_paper_answers(uuid);
+create function public.pyq_paper_answers(p_paper uuid)
+returns table (id uuid, answer jsonb, search_text text)
 language plpgsql
 stable
 security definer
@@ -248,11 +264,12 @@ begin
     raise exception 'not allowed' using errcode = '42501';
   end if;
   select c.question_ids into ids from public.cbt_papers c
-    where c.id = p_paper and c.user_id = auth.uid() and c.bank = 'pyq' and c.submitted_at is not null;
+    where c.id = p_paper and c.user_id = auth.uid() and c.bank = 'pyq'
+      and (c.submitted_at is not null or c.blueprint ->> 'mode' = 'practice');
   if ids is null then
     raise exception 'submit the paper first' using errcode = 'P0002';
   end if;
-  return query select q.id, q.answer from public.pyq_questions q where q.id = any (ids);
+  return query select q.id, q.answer, q.search_text from public.pyq_questions q where q.id = any (ids);
 end;
 $$;
 

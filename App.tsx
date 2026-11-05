@@ -1976,13 +1976,14 @@ const App: React.FC = () => {
   /* A finished CBT paper: its MockTest and its notebook entries in one write,
      so one sync. An entry for a question already in the notebook arrives as
      an update of that entry (same id), never a second copy. */
-  const saveCbtResult = (test: MockTest, entries: ErrorEntry[]) =>
+  // `test` is null for a CBT practice paper: its mistakes go to the notebook, but it is not a mock.
+  const saveCbtResult = (test: MockTest | null, entries: ErrorEntry[]) =>
     withMocks(m => {
       const byId = new Map(m.errors.map(e => [e.id, e]));
       entries.forEach(e => byId.set(e.id, e));
       return {
         ...m,
-        tests: m.tests.some(x => x.id === test.id) ? m.tests.map(x => (x.id === test.id ? test : x)) : [...m.tests, test],
+        tests: !test ? m.tests : m.tests.some(x => x.id === test.id) ? m.tests.map(x => (x.id === test.id ? test : x)) : [...m.tests, test],
         errors: Array.from(byId.values()),
       };
     });

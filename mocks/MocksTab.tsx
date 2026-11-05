@@ -65,7 +65,7 @@ interface Props {
     /** The shared NTA bank (pyq.sql). */
     pyq: boolean;
     /** One write: the paper's MockTest and its notebook entries together. */
-    onSaved: (mock: MockTest, errors: ErrorEntry[]) => void;
+    onSaved: (mock: MockTest | null, errors: ErrorEntry[]) => void;
   };
 }
 

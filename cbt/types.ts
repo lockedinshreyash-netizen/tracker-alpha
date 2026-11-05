@@ -35,6 +35,8 @@ export interface BankQuestion {
   confidence: number | null;
   status: QStatus;
   textHash: string;
+  /** Shared bank: words to search the web with for a solution. Arrives with the answers, never before. */
+  searchText?: string | null;
 }
 
 export interface BankSource {
@@ -67,8 +69,13 @@ export interface Section {
   ids: string[];
 }
 
+/** `mock`: answers after the paper, against the clock. `practice`: check each answer as you go, no time limit. */
+export type PaperMode = 'mock' | 'practice';
+
 export interface Blueprint {
   exam: 'mains';
+  /** Absent on papers made before modes existed: those are mocks. Fixed at creation. */
+  mode?: PaperMode;
   spec: PaperSpec;
   durationMins: number;
   marking: { right: number; wrong: number };
@@ -118,8 +125,12 @@ export interface CbtPaper {
   questionIds: string[];
   responses: Record<string, Resp>;
   startedAt: string | null;
+  /** Time the paper was open and on screen. The clock counts this, not wall time, so it pauses while you are away. Null on papers from before it existed. */
+  usedMs: number | null;
   submittedAt: string | null;
   score: PaperScore | null;
   mockId: string | null;
   createdAt: string;
 }
+
+export const modeOf = (p: { blueprint: Blueprint }): PaperMode => p.blueprint.mode ?? 'mock';

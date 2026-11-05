@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -74,8 +75,18 @@ def upload(key: str, path: str, file: pathlib.Path) -> None:
                 raise RuntimeError(f"{path}: HTTP {e.code} {e.read()[:200]!r}")
 
 
+def search_text(ocr: str) -> str | None:
+    """The start of a question's OCR as plain words and numbers, for a web search
+    for its solution. OCR garbles symbols, so only words and numbers are kept."""
+    toks = re.findall(r"[A-Za-z][A-Za-z'\-]*|\d+(?:\.\d+)?", ocr or "")
+    out = " ".join(toks[:30])[:300].strip()
+    return out or None
+
+
 def load(key: str, folder: pathlib.Path) -> str:
     b = json.loads((folder / "bundle.json").read_text())
+    ocr_file = folder / "ocr.json"
+    ocr = json.loads(ocr_file.read_text()) if ocr_file.exists() else {}
     paper = b["paper"]
     have = existing(key, paper)
     todo = [f for q in b["questions"] for f in q["figures"] if f not in have]
@@ -97,6 +108,7 @@ def load(key: str, folder: pathlib.Path) -> str:
         "class_id": q.get("classId"),
         "chapter": q.get("chapter"),
         "confidence": q.get("confidence"),
+        "search_text": search_text(ocr.get(q["ntaId"], "")),
     } for q in b["questions"]]
     call("POST", "/rest/v1/pyq_questions?on_conflict=nta_id", key, json.dumps(rows).encode(), {
         "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",

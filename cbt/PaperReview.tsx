@@ -13,9 +13,10 @@ import { ErrorEntry, ErrorReason, MockTest, MockVerdict } from '../types';
 import { OPTION_LETTERS, REASONS, REASON_ORDER } from '../mocks/model';
 import { generateId } from '../utils';
 import { Overlay, btn, pct, subjectDot, tokens } from '../mocks/ui';
-import { BankQuestion, CbtPaper, CbtSubject, Resp } from './types';
+import { BankQuestion, CbtPaper, CbtSubject, Resp, modeOf } from './types';
 import { ChapterLine, EMPTY_RESP, Outcome, buildErrors, buildMock, chapterLines, clock, outcomeOf, scorePaper } from './score';
 import Tex, { LooseFigures } from './Tex';
+import SolutionLink from './SolutionLink';
 import { NTA_CREDIT, shiftLabel } from './generate';
 
 interface Props {
@@ -53,6 +54,8 @@ const whenOf = (q: BankQuestion): string | null =>
 const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, today, onSave, onClose }) => {
   const t = tokens(dark);
   const readOnly = !onSave;
+  // Practice goes to the notebook only: no mock, so no chapter verdicts for the trends.
+  const practice = modeOf(paper) === 'practice';
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -151,6 +154,8 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
                 {row.outcome !== 'skipped' && <> · Yours: <b className={row.outcome === 'right' ? '' : dark ? 'text-rose-300' : 'text-rose-700'}>{answerText(q, r.a)}</b></>}
               </p>
             )}
+
+            <SolutionLink q={q} dark={dark} className="mt-4" />
 
             {!readOnly && row.outcome !== 'right' && !canKeep(q) && (
               <p className={`mt-5 pt-4 border-t text-[12px] ${t.rule} ${t.muted}`}>No chapter tag, so it can’t go in the error notebook.</p>
@@ -269,7 +274,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
             </div>
 
             {/* Chapters */}
-            {lines.length > 0 && (
+            {lines.length > 0 && !practice && (
               <div className={`rounded-xl border p-5 ${t.card}`}>
                 <div className="flex items-baseline justify-between gap-3">
                   <p className={`text-[10px] font-bold uppercase tracking-[0.06em] ${t.muted}`}>Chapters</p>
@@ -285,7 +290,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
           <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-2.5">
             {readOnly ? (
               <>
-                <span className={`flex-1 text-[12px] ${t.muted}`}>Saved to Mocks.</span>
+                <span className={`flex-1 text-[12px] ${t.muted}`}>{practice ? 'Practice. Not counted as a mock.' : 'Saved to Mocks.'}</span>
                 <button onClick={onClose} className={`${btn} px-6 py-3.5 ${t.ghost}`}>Done</button>
               </>
             ) : (
@@ -293,8 +298,8 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
                 <span className={`flex-1 text-[12px] ${untagged ? 'text-amber-500' : t.muted}`}>
                   {untagged ? `${untagged} still need a reason.` : `${Object.values(include).filter(Boolean).length} going to the notebook.`}
                 </span>
-                <button onClick={() => save(false)} disabled={saving} className={`${btn} px-4 py-3.5 ${t.ghost}`}>Save without notebook</button>
-                <button onClick={() => save(true)} disabled={saving || untagged > 0} className={`${btn} px-6 py-3.5 ${t.primary}`}>Save to Mocks</button>
+                <button onClick={() => save(false)} disabled={saving} className={`${btn} px-4 py-3.5 ${t.ghost}`}>{practice ? 'Done, skip the notebook' : 'Save without notebook'}</button>
+                <button onClick={() => save(true)} disabled={saving || untagged > 0} className={`${btn} px-6 py-3.5 ${t.primary}`}>{practice ? 'Save to notebook' : 'Save to Mocks'}</button>
               </>
             )}
           </div>

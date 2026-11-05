@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { subjectDot } from '../mocks/ui';
-import { BankQuestion, CbtPaper, CbtSubject } from './types';
+import { BankQuestion, CbtPaper, CbtSubject, PaperMode, modeOf } from './types';
 import { NTA_CREDIT, RealShift, realShifts, shiftLabel } from './generate';
 import { glowVars } from './PyqCover';
 import './pyq.css';
@@ -27,7 +27,8 @@ export const shiftOf = (p: CbtPaper): string | null => (p.blueprint.spec.kind ==
 export const shiftCards = (index: BankQuestion[], papers: CbtPaper[]): ShiftCard[] =>
   realShifts(index).map(s => {
     const label = shiftLabel(s.paper);
-    const sat = papers.filter(p => shiftOf(p) === s.paper).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null;
+    // Only a mock sitting counts as having sat the paper; practice is practice.
+    const sat = papers.filter(p => shiftOf(p) === s.paper && modeOf(p) === 'mock').sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null;
     return { ...s, label, day: label.split(' · ')[0].replace(/ \d{4}$/, ''), shift: Number(s.paper.slice(-1)), sat };
   });
 
@@ -48,7 +49,7 @@ interface Props {
   /** The paper or shift being opened or built, so its button can say so. */
   busy: string | null;
   now: number;
-  onShift: (card: ShiftCard) => void;
+  onShift: (card: ShiftCard, mode?: PaperMode) => void;
   onOpen: (paper: CbtPaper) => void;
   onBuild: (kind: BuildKind) => void;
 }
@@ -57,10 +58,13 @@ const SUBJECTS: CbtSubject[] = ['Maths', 'Physics', 'Chemistry'];
 
 const left = (p: CbtPaper, now: number): string => {
   if (!p.startedAt) return 'Built and waiting. The clock starts when you do.';
-  const ms = Date.parse(p.startedAt) + p.blueprint.durationMins * 60_000 - now;
+  if (modeOf(p) === 'practice') return 'Practice. Pick up where you stopped.';
+  // The clock counts time on screen (usedMs); older papers counted wall time.
+  const used = p.usedMs ?? Math.max(0, now - Date.parse(p.startedAt));
+  const ms = p.blueprint.durationMins * 60_000 - used;
   if (ms <= 0) return 'Time’s up. Open it to see your score.';
   const m = Math.ceil(ms / 60_000);
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} left. The clock kept running while you were away.`;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} left. The clock waited while you were away.`;
 };
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -107,9 +111,14 @@ export default function PyqHome({ dark, loading, questions, shifts, next, resume
         <p>Shift {next.shift} · {next.count} questions · 3 hours. Exactly as NTA set it.</p>
         <div className="pq-dots">{SUBJECTS.map(s => <span key={s}><i style={{ background: subjectDot(s) }} />{s}</span>)}</div>
       </div>
-      <button type="button" className="pq-btn pq-btn-lg" disabled={!!busy} onClick={() => onShift(next)}>
-        {busy === next.paper ? 'Getting it ready…' : 'Start paper'}
-      </button>
+      <div className="pq-actions">
+        <button type="button" className="pq-btn pq-btn-lg" disabled={!!busy} onClick={() => onShift(next)}>
+          {busy === next.paper ? 'Getting it ready…' : 'Start paper'}
+        </button>
+        <button type="button" className="pq-link" disabled={!!busy} onClick={() => onShift(next, 'practice')}>
+          {busy === `${next.paper}:practice` ? 'Getting it ready…' : 'Practise it instead'}
+        </button>
+      </div>
     </section>
   ) : (
     <section className="pq-next pq-rise">
@@ -182,7 +191,7 @@ export default function PyqHome({ dark, loading, questions, shifts, next, resume
               <button key={p.id} type="button" className="pq-row" disabled={!!busy} onClick={() => onOpen(p)}>
                 <div>
                   <b>{p.name}</b>
-                  <small>{when(p.submittedAt ?? p.createdAt)} · {p.questionIds.length} questions</small>
+                  <small>{modeOf(p) === 'practice' ? 'Practice · ' : ''}{when(p.submittedAt ?? p.createdAt)} · {p.questionIds.length} questions</small>
                 </div>
                 {reviewDue.has(p.id)
                   ? <span className="pq-pill">{busy === p.id ? 'Opening…' : 'Finish review'}</span>

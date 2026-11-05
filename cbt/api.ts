@@ -55,6 +55,17 @@ const toSource = (r: any): BankSource => ({
   id: r.id, name: r.name, fileHash: r.file_hash, pages: r.pages ?? null, extractor: r.extractor ?? null, createdAt: r.created_at,
 });
 
+/* The clock's used time rides in `responses` under CLOCK_KEY, so it needs no
+   new column (and works on every database this client may meet). It is
+   lifted out here and put back by savePaperProgress; nothing else sees it. */
+const CLOCK_KEY = '__clock';
+const splitResponses = (raw: any): { responses: Record<string, Resp>; usedMs: number | null } => {
+  const all = { ...(raw ?? {}) };
+  const clock = all[CLOCK_KEY];
+  delete all[CLOCK_KEY];
+  return { responses: all as Record<string, Resp>, usedMs: clock && Number.isFinite(clock.ms) ? Math.max(0, clock.ms) : null };
+};
+
 const toPaper = (r: any): CbtPaper => ({
   id: r.id,
   bank: r.bank === 'pyq' ? 'pyq' : 'private',
@@ -63,7 +74,7 @@ const toPaper = (r: any): CbtPaper => ({
   blueprint: r.blueprint as Blueprint,
   seed: Number(r.seed),
   questionIds: r.question_ids ?? [],
-  responses: (r.responses ?? {}) as Record<string, Resp>,
+  ...splitResponses(r.responses),
   startedAt: r.started_at ?? null,
   submittedAt: r.submitted_at ?? null,
   score: (r.score ?? null) as PaperScore | null,
@@ -254,13 +265,15 @@ export const createPaper = async (p: { name: string; kind: PaperKind; blueprint:
 
 export const savePaperProgress = async (id: string, p: {
   responses?: Record<string, Resp>;
+  /** Saved with the responses (it lives inside them). */
+  usedMs?: number;
   startedAt?: string;
   submittedAt?: string;
   score?: PaperScore;
   mockId?: string | null;
 }): Promise<void> => {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (p.responses) row.responses = p.responses;
+  if (p.responses) row.responses = p.usedMs === undefined ? p.responses : { ...p.responses, [CLOCK_KEY]: { ms: Math.round(p.usedMs) } };
   if (p.startedAt) row.started_at = p.startedAt;
   if (p.submittedAt) row.submitted_at = p.submittedAt;
   if (p.score) row.score = p.score;
@@ -350,17 +363,26 @@ export const fetchPaperQuestions = async (paperId: string): Promise<BankQuestion
   return ((data ?? []) as unknown[]).map(fromPyq);
 };
 
-/** Question id → NTA's answer. The server gives them only once the paper is submitted. */
-export const fetchPaperAnswers = async (paperId: string): Promise<Map<string, QAnswer | null>> => {
+export interface PaperAnswer { answer: QAnswer | null; searchText: string | null }
+
+/** Question id → NTA's answer and its search words. Given once the paper is submitted, or at once for practice. */
+export const fetchPaperAnswers = async (paperId: string): Promise<Map<string, PaperAnswer>> => {
   const { data, error } = await supabase.rpc('pyq_paper_answers', { p_paper: paperId });
   fail(error, 'Loading the answers');
-  return new Map(((data ?? []) as { id: string; answer: QAnswer | null }[]).map(r => [r.id, r.answer ?? null]));
+  return new Map(((data ?? []) as { id: string; answer: QAnswer | null; search_text?: string | null }[])
+    .map(r => [r.id, { answer: r.answer ?? null, searchText: r.search_text ?? null }]));
 };
+
+/** Merges answers (and search words) into a paper's questions. */
+export const withAnswers = (qs: BankQuestion[], answers: Map<string, PaperAnswer>): BankQuestion[] =>
+  qs.map(q => {
+    const a = answers.get(q.id);
+    return { ...q, answer: a?.answer ?? null, searchText: a?.searchText ?? null };
+  });
 
 /** A pyq paper's questions, with answers merged in when it has been submitted. */
 export const loadPyqPaper = async (paper: CbtPaper): Promise<BankQuestion[]> => {
   const qs = await fetchPaperQuestions(paper.id);
   if (!paper.submittedAt) return qs;
-  const answers = await fetchPaperAnswers(paper.id);
-  return qs.map(q => ({ ...q, answer: answers.get(q.id) ?? null }));
+  return withAnswers(qs, await fetchPaperAnswers(paper.id));
 };

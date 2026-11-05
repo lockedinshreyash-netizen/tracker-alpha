@@ -18,10 +18,10 @@ import { pushToast } from '../notify/toastBus';
 import { isCleared, OPTION_LETTERS } from '../mocks/model';
 import { leaks, takenMocks, topLeaks } from '../mocks/insights';
 import { Card, Eyebrow, Segmented, btn, subjectDot, tokens } from '../mocks/ui';
-import { BankQuestion, BankSource, CbtPaper, CbtSubject, PaperBank, PaperSpec, QAnswer, Resp } from './types';
+import { BankQuestion, BankSource, CbtPaper, CbtSubject, PaperBank, PaperMode, PaperSpec, QAnswer, Resp, modeOf } from './types';
 import {
   createPaper, createPyqPaper, deletePaper, deleteSource, fetchPaperAnswers, fetchPaperQuestions, fetchPapers,
-  fetchPyqIndex, fetchQuestions, fetchSources, lastSeenFrom, savePaperProgress, updateQuestion,
+  fetchPyqIndex, fetchQuestions, fetchSources, lastSeenFrom, savePaperProgress, updateQuestion, withAnswers,
 } from './api';
 import { generatePaper, JEE_MAIN, newSeed, paperTitle } from './generate';
 import { scorePaper } from './score';
@@ -45,11 +45,14 @@ interface Props {
   /** Open the paper builder as soon as the bank has loaded. */
   startGenerating?: boolean;
   onGeneratingHandled?: () => void;
-  onCbtSaved: (mock: MockTest, errors: ErrorEntry[]) => void;
+  /** `mock` is null for a practice paper: it goes to the notebook, not into the mock trends. */
+  onCbtSaved: (mock: MockTest | null, errors: ErrorEntry[]) => void;
 }
 
 /** The NTA cover is seen once per device: after a first paper or "Look around first". */
 const COVER_KEY = 'pyq_cover_seen_v1';
+/** A practice paper has no MockTest; this in `mockId` marks its review as saved. */
+const PRACTICE_SAVED = 'practice';
 
 type Active = { paper: CbtPaper; mode: 'exam' | 'review' };
 
@@ -192,10 +195,12 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   };
   const fillPyq = async (paper: CbtPaper): Promise<Map<string, BankQuestion>> => {
     const qs = await fetchPaperQuestions(paper.id);
-    if (!paper.submittedAt) return merge(qs);
-    await savePaperProgress(paper.id, { responses: paper.responses, startedAt: paper.startedAt ?? undefined, submittedAt: paper.submittedAt });
-    const answers = await fetchPaperAnswers(paper.id);
-    return merge(qs.map(q => ({ ...q, answer: answers.get(q.id) ?? null })));
+    // A practice paper shows each answer as it is checked, so the server hands its answers over at once.
+    if (!paper.submittedAt && modeOf(paper) !== 'practice') return merge(qs);
+    if (paper.submittedAt) {
+      await savePaperProgress(paper.id, { responses: paper.responses, startedAt: paper.startedAt ?? undefined, usedMs: paper.usedMs ?? undefined, submittedAt: paper.submittedAt });
+    }
+    return merge(withAnswers(qs, await fetchPaperAnswers(paper.id)));
   };
   const [opening, setOpening] = useState<string | null>(null);
   const openPaper = async (paper: CbtPaper, mode: Active['mode']) => {
@@ -237,8 +242,9 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   const cards = useMemo(() => (pyq ? shiftCards(questions, papers) : []), [pyq, questions, papers]);
 
   const inProgress = papers.filter(p => !p.submittedAt);
-  const unsaved = papers.filter(p => p.submittedAt && (!p.mockId || !mockIds.has(p.mockId)));
-  const done = papers.filter(p => p.submittedAt && p.mockId && mockIds.has(p.mockId));
+  const isSaved = (p: CbtPaper) => !!p.mockId && (p.mockId === PRACTICE_SAVED || mockIds.has(p.mockId));
+  const unsaved = papers.filter(p => p.submittedAt && !isSaved(p));
+  const done = papers.filter(p => p.submittedAt && isSaved(p));
 
   const coverage = useMemo(() => JEE_MAIN.subjects.map(s => {
     const here = ready.filter(q => q.subject === s);
@@ -257,7 +263,8 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
     setBuilding(true);
     try {
       const make = pyq ? createPyqPaper : createPaper;
-      const paper = await make({ name: paperTitle(spec), kind: spec.kind, blueprint: generated.blueprint, seed, questionIds: generated.questionIds });
+      const name = modeOf(generated) === 'practice' ? `Practice · ${paperTitle(spec).replace(/^JEE Main /, '')}` : paperTitle(spec);
+      const paper = await make({ name, kind: spec.kind, blueprint: generated.blueprint, seed, questionIds: generated.questionIds });
       if (pyq) await fillPyq(paper);
       setPapers(ps => [paper, ...ps]);
       setGenerating(false);
@@ -276,16 +283,17 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
 
   /* A real shift: open your sitting of it if there is one, else build it
      straight away (no sheet: NTA already chose the questions). */
-  const startShift = (card: ShiftCard) => {
-    if (card.sat) { openPaper(card.sat, card.sat.submittedAt ? 'review' : 'exam'); return; }
+  const startShift = (card: ShiftCard, mode: PaperMode = 'mock') => {
+    if (card.sat && mode === 'mock') { openPaper(card.sat, card.sat.submittedAt ? 'review' : 'exam'); return; }
     if (building) return;
     const seed = newSeed();
     const spec: PaperSpec = { kind: 'shift', paper: card.paper };
-    const generated = generatePaper({
+    const made = generatePaper({
       pyq: true, questions, spec, lastSeen, openErrors, weakChapters, allowedChapters: null, weightOf: () => 1, now: Date.now(), seed,
     });
+    const generated = { ...made, blueprint: { ...made.blueprint, mode } };
     seeCover();
-    setBuildingFor(card.paper);
+    setBuildingFor(mode === 'practice' ? `${card.paper}:practice` : card.paper);
     startPaper(spec, seed, generated).finally(() => setBuildingFor(null));
   };
 
@@ -296,23 +304,23 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
 
   // Stable per paper, so the exam's save timer is not re-armed on every render here.
   const activeId = active?.paper.id;
-  const onProgress = useMemo(() => (responses: Record<string, Resp>, startedAt: string) => {
+  const onProgress = useMemo(() => (responses: Record<string, Resp>, startedAt: string, usedMs: number) => {
     if (!activeId) return;
-    savePaperProgress(activeId, { responses, startedAt }).catch(() => { /* the local copy holds it; the next save retries */ });
+    savePaperProgress(activeId, { responses, startedAt, usedMs }).catch(() => { /* the local copy holds it; the next save retries */ });
   }, [activeId]);
 
-  const onSubmit = async (paper: CbtPaper, responses: Record<string, Resp>, startedAt: string) => {
+  const onSubmit = async (paper: CbtPaper, responses: Record<string, Resp>, startedAt: string, usedMs: number) => {
     const submittedAt = new Date().toISOString();
     if (pyq) {
       // No answers on the device until the server holds the paper as submitted.
-      const sent = { ...paper, responses, startedAt, submittedAt };
-      patchPaper(paper.id, { responses, startedAt, submittedAt });
+      const sent = { ...paper, responses, startedAt, usedMs, submittedAt };
+      patchPaper(paper.id, { responses, startedAt, usedMs, submittedAt });
       setActive(null);
       await openPaper(sent, 'review');
       return;
     }
     const score = scorePaper({ blueprint: paper.blueprint, responses }, byId);
-    const next = { responses, startedAt, submittedAt, score };
+    const next = { responses, startedAt, usedMs, submittedAt, score };
     patchPaper(paper.id, next);
     setActive({ paper: { ...paper, ...next }, mode: 'review' });
     try {
@@ -324,14 +332,18 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   };
 
   const onSaved = (paper: CbtPaper) => (mock: MockTest, entries: ErrorEntry[]) => {
-    onCbtSaved(mock, entries);
-    patchPaper(paper.id, { mockId: mock.id });
+    const practice = modeOf(paper) === 'practice';
+    // Practice saves no mock, so its notebook entries must not point at one.
+    const kept = practice ? entries.map(e => { if (e.mockId !== mock.id) return e; const { mockId: _drop, ...rest } = e; return rest as ErrorEntry; }) : entries;
+    onCbtSaved(practice ? null : mock, kept);
+    const mockId = practice ? PRACTICE_SAVED : mock.id;
+    patchPaper(paper.id, { mockId });
     setActive(null);
-    savePaperProgress(paper.id, { mockId: mock.id }).catch(() => { /* the mock is saved; the link is a convenience */ });
+    savePaperProgress(paper.id, { mockId }).catch(() => { /* the result is saved; the link is a convenience */ });
     pushToast({
       id: 'cbt-saved',
-      title: 'Saved to Mocks.',
-      body: entries.length ? `${entries.length} ${entries.length === 1 ? 'question' : 'questions'} in your error notebook.` : undefined,
+      title: practice ? (entries.length ? 'Saved to your notebook.' : 'Practice done.') : 'Saved to Mocks.',
+      body: kept.length ? `${kept.length} ${kept.length === 1 ? 'question' : 'questions'} in your error notebook.` : undefined,
       tone: 'neutral',
     });
   };
@@ -429,7 +441,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
             questions={byId}
             dark={dark}
             onProgress={onProgress}
-            onSubmit={(responses, startedAt) => onSubmit(active.paper, responses, startedAt)}
+            onSubmit={(responses, startedAt, usedMs) => onSubmit(active.paper, responses, startedAt, usedMs)}
             onLeave={() => { setActive(null); fetchPapers(bank).then(setPapers).catch(() => { /* the list refreshes next visit */ }); }}
           />
         )}
@@ -442,7 +454,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
             tests={tests}
             errors={errors}
             today={today}
-            onSave={active.paper.mockId && mockIds.has(active.paper.mockId) ? undefined : onSaved(active.paper)}
+            onSave={isSaved(active.paper) ? undefined : onSaved(active.paper)}
             onClose={() => setActive(null)}
           />
         )}
