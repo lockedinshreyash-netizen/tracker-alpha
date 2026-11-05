@@ -3,14 +3,17 @@
    paper (75 questions, 3 hours), one subject (25, an hour), or chosen chapters
    (any count, Main's pace). The paper is generated live as the choices change,
    so what the sheet says it will build is what Start builds — including the
-   notes about anything the bank was too thin for. */
+   notes about anything the bank was too thin for.
+
+   With `pyq` (the shared NTA bank) there is a fourth shape, a real shift sat
+   as NTA set it, and mixed papers draw from every shift. */
 
 import React, { useMemo, useState } from 'react';
 import { ChapterProgress } from '../types';
 import { getWeight } from '../content';
 import { Chip, Segmented, Sheet, btn, subjectDot, tokens } from '../mocks/ui';
 import { BankQuestion, ChapterRef, CbtSubject, PaperSpec } from './types';
-import { GenInput, JEE_MAIN, chapterOf, generatePaper, newSeed, paperTitle, refKey } from './generate';
+import { GenInput, JEE_MAIN, chapterOf, generatePaper, newSeed, paperTitle, realShifts, refKey } from './generate';
 
 interface Props {
   questions: BankQuestion[];
@@ -20,6 +23,8 @@ interface Props {
   weakChapters: Set<string>;
   dark: boolean;
   busy: boolean;
+  /** The shared NTA bank: real shifts on offer, untagged questions allowed in mixed papers. */
+  pyq?: boolean;
   onStart: (spec: PaperSpec, seed: number, generated: ReturnType<typeof generatePaper>) => void;
   onClose: () => void;
 }
@@ -27,16 +32,20 @@ interface Props {
 type Kind = PaperSpec['kind'];
 const COUNTS = [10, 15, 20, 30, 45];
 
-const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErrors, weakChapters, dark, busy, onStart, onClose }) => {
+const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErrors, weakChapters, dark, busy, pyq, onStart, onClose }) => {
   const t = tokens(dark);
-  const [kind, setKind] = useState<Kind>('full');
+  const shifts = useMemo(() => (pyq ? realShifts(questions) : []), [pyq, questions]);
+  const [kind, setKind] = useState<Kind>(() => (shifts.length ? 'shift' : 'full'));
+  const [shift, setShift] = useState<string | null>(() => shifts[0]?.paper ?? null);
   const [subject, setSubject] = useState<CbtSubject>('Physics');
   const [chosen, setChosen] = useState<ChapterRef[]>([]);
   const [count, setCount] = useState(20);
   const [onlyStarted, setOnlyStarted] = useState(false);
   const [seed, setSeed] = useState(newSeed);
 
-  const ready = useMemo(() => questions.filter(q => q.status === 'ready' && q.chapter && q.classId), [questions]);
+  // Every question that can go in a paper; `tagged` are the ones with a chapter.
+  const ready = useMemo(() => questions.filter(q => q.status === 'ready' && (pyq || (q.chapter && q.classId))), [questions, pyq]);
+  const tagged = useMemo(() => ready.filter(q => q.chapter && q.classId), [ready]);
 
   const started = useMemo(() => new Set(
     progress.filter(p => p.status !== 'not_started').map(p => `${p.classId}|${p.subject}|${p.chapter}`),
@@ -45,33 +54,36 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   // Chapters you can actually pick: the ones with ready questions, heaviest first.
   const chapterChoices = useMemo(() => {
     const m = new Map<string, { ref: ChapterRef; n: number }>();
-    ready.forEach(q => {
+    tagged.forEach(q => {
       const k = chapterOf(q);
       const cur = m.get(k) ?? { ref: { classId: q.classId as 11 | 12, subject: q.subject, chapter: q.chapter as string }, n: 0 };
       cur.n += 1;
       m.set(k, cur);
     });
     return Array.from(m.values());
-  }, [ready]);
+  }, [tagged]);
 
-  const spec: PaperSpec = kind === 'full' ? { kind } : kind === 'subject' ? { kind, subject } : { kind, chapters: chosen, count };
+  const spec: PaperSpec = kind === 'shift' ? { kind, paper: shift ?? '' }
+    : kind === 'full' ? { kind } : kind === 'subject' ? { kind, subject } : { kind, chapters: chosen, count };
 
   const generated = useMemo(() => {
     if (kind === 'chapters' && !chosen.length) return null;
+    if (kind === 'shift' && !shift) return null;
     const input: GenInput = {
+      pyq,
       questions: ready,
       spec,
       lastSeen,
       openErrors,
       weakChapters,
-      allowedChapters: onlyStarted && kind !== 'chapters' ? started : null,
+      allowedChapters: onlyStarted && !pyq && kind !== 'chapters' ? started : null,
       weightOf: q => (q.classId && q.chapter ? getWeight('JEE', q.classId, q.subject, q.chapter)?.percent ?? 1.5 : 1.5),
       now: Date.now(),
       seed,
     };
     return generatePaper(input);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, kind, subject, chosen, count, onlyStarted, seed, lastSeen, openErrors, weakChapters, started]);
+  }, [ready, kind, subject, chosen, count, onlyStarted, seed, lastSeen, openErrors, weakChapters, started, shift, pyq]);
 
   const total = generated?.questionIds.length ?? 0;
   const want = generated?.blueprint.sections.reduce((a, s) => a + s.want, 0) ?? 0;
@@ -81,7 +93,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   const header = (
     <div className="px-5 md:px-7 pt-6 pb-5 flex items-start justify-between gap-4">
       <div>
-        <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>CBT</p>
+        <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>{pyq ? 'NTA papers' : 'CBT'}</p>
         <p className={`font-display text-[22px] leading-tight mt-1.5 ${t.heading}`}>Build a paper</p>
       </div>
       <button onClick={onClose} aria-label="Close" className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
@@ -91,9 +103,9 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   const footer = (
     <div className="flex items-center gap-3">
       <span className={`flex-1 text-[12px] font-ui ${t.muted}`}>
-        {generated ? `${total} questions · ${generated.blueprint.durationMins} min` : 'Pick at least one chapter.'}
+        {generated ? `${total} questions · ${generated.blueprint.durationMins} min` : kind === 'shift' ? 'Pick a shift.' : 'Pick at least one chapter.'}
       </span>
-      <button onClick={() => setSeed(newSeed())} disabled={!generated} className={`${btn} px-3 py-3.5 ${t.ghost}`} title="Same rules, different questions">Reshuffle</button>
+      {kind !== 'shift' && <button onClick={() => setSeed(newSeed())} disabled={!generated} className={`${btn} px-3 py-3.5 ${t.ghost}`} title="Same rules, different questions">Reshuffle</button>}
       <button onClick={() => generated && onStart(spec, seed, generated)} disabled={!generated || !total || busy} className={`${btn} px-6 py-3.5 ${t.primary}`}>
         {busy ? 'Building…' : 'Start paper'}
       </button>
@@ -110,11 +122,27 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
           dark={dark}
           label="Paper"
           options={[
-            { value: 'full', label: 'Full paper', hint: '75 questions · 3 hours' },
+            ...(shifts.length ? [{ value: 'shift' as Kind, label: 'Real paper', hint: 'As NTA set it' }] : []),
+            { value: 'full', label: pyq ? 'Mixed paper' : 'Full paper', hint: '75 questions · 3 hours' },
             { value: 'subject', label: 'One subject', hint: '25 questions · 1 hour' },
             { value: 'chapters', label: 'Chapters', hint: 'Your pick' },
           ]}
         />
+
+        {kind === 'shift' && (
+          <div className="space-y-5">
+            {Array.from(new Set(shifts.map(x => x.year))).map(year => (
+              <div key={year}>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 ${t.muted}`}>{year}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {shifts.filter(x => x.year === year).map(x => (
+                    <Chip key={x.paper} on={shift === x.paper} onClick={() => setShift(x.paper)} dark={dark}>{x.label.replace(` ${year}`, '')}</Chip>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {kind === 'subject' && (
           <div className="flex flex-wrap gap-2">
@@ -142,7 +170,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
                 </div>
               );
             })}
-            {!chapterChoices.length && <p className={`text-[13px] ${t.muted}`}>No ready questions yet. Import a bundle first.</p>}
+            {!chapterChoices.length && <p className={`text-[13px] ${t.muted}`}>{pyq ? 'No chapter-tagged questions yet.' : 'No ready questions yet. Import a bundle first.'}</p>}
             <div>
               <p className={`text-[10px] font-bold uppercase tracking-[0.06em] mb-2 ${t.muted}`}>Questions</p>
               <div className="flex flex-wrap gap-1.5">
@@ -152,7 +180,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
           </div>
         )}
 
-        {kind !== 'chapters' && (
+        {kind !== 'chapters' && !pyq && (
           <label className={`flex items-center justify-between gap-3 cursor-pointer select-none rounded-xl border px-4 py-3 ${t.inset}`}>
             <span>
               <span className={`block text-[13px] font-bold ${t.heading}`}>Only chapters I’ve started</span>
@@ -182,7 +210,11 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
                 {generated.blueprint.notes.map((n, i) => <p key={i} className={`text-[11px] ${dark ? 'text-amber-300/90' : 'text-amber-700'}`}>{n}</p>)}
               </div>
             )}
-            <p className={`text-[11px] ${t.faint}`}>Picked by JEE weightage, fresh questions first, your open notebook errors back after a week.</p>
+            <p className={`text-[11px] ${t.faint}`}>
+              {kind === 'shift' ? 'NTA’s paper, in NTA’s order. Answers show after you submit.'
+                : pyq ? 'Drawn from every shift by JEE weightage, fresh questions first. Answers show after you submit.'
+                  : 'Picked by JEE weightage, fresh questions first, your open notebook errors back after a week.'}
+            </p>
           </div>
         )}
       </div>

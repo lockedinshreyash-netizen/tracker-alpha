@@ -21,6 +21,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BankQuestion, CbtPaper, CbtSubject, Resp, RespStatus } from './types';
 import { EMPTY_RESP, clock, statusCounts } from './score';
+import { NTA_CREDIT } from './generate';
 import Tex, { LooseFigures } from './Tex';
 import { Overlay, btn, subjectDot, tokens } from '../mocks/ui';
 import { OPTION_LETTERS } from '../mocks/model';
@@ -298,6 +299,7 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
               <span key={s} className="flex items-center gap-2"><Mark s={s} dark={dark}>{s === 'nv' ? 1 : ''}</Mark>{STATUS_LABEL[s]}</span>
             ))}
           </div>
+          {paper.bank === 'pyq' && <p className={`mt-6 text-[11px] ${t.faint}`}>{NTA_CREDIT}</p>}
           <button onClick={begin} className={`${btn} w-full mt-8 py-4 text-[11px] ${t.primary}`}>I’m ready. Start the clock.</button>
           <button onClick={onLeave} className={`${btn} w-full mt-2 py-3 ${t.muted}`}>Not now</button>
         </div>

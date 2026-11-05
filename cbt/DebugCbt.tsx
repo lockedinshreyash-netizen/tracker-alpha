@@ -9,7 +9,7 @@ import { getWeight } from '../content';
 import { ErrorEntry, MockTest } from '../types';
 import ErrorQuiz from '../mocks/ErrorQuiz';
 import { BankQuestion, CbtPaper, CbtSubject, Resp } from './types';
-import { generatePaper } from './generate';
+import { generatePaper, paperTitle } from './generate';
 import { scorePaper } from './score';
 import CbtExam from './CbtExam';
 import PaperReview from './PaperReview';
@@ -65,22 +65,52 @@ const fixture = (): BankQuestion[] => {
   return out;
 };
 
+/* The shared NTA bank's shape: every question and option an image, a real
+   shift sat in NTA's order, a third of the questions with no chapter tag. */
+const ntaImage = (label: string) => `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${label.length > 3 ? 520 : 90}" height="${label.length > 3 ? 70 : 36}"><rect width="100%" height="100%" fill="white"/><text x="8" y="24" font-family="Times" font-size="18">${label}</text></svg>`,
+)}`;
+const ntaFixture = (): BankQuestion[] => {
+  const out: BankQuestion[] = [];
+  let n = 0;
+  (['Maths', 'Physics', 'Chemistry'] as CbtSubject[]).forEach(subject => {
+    const chapters = getChaptersFor('JEE', 12, subject);
+    for (let i = 0; i < 25; i++) {
+      n += 1;
+      const numerical = i >= 20;
+      const tagged = n % 3 !== 0;
+      out.push({
+        id: `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`,
+        sourceId: 'pyq', number: String(n), kind: numerical ? 'numerical' : 'mcq',
+        body: '[[fig:0]]',
+        options: numerical ? null : ['[[fig:1]]', '[[fig:2]]', '[[fig:3]]', '[[fig:4]]'],
+        answer: numerical ? { value: 5 } : { option: 2 },
+        figures: [ntaImage(`Q${n}. NTA question image (${subject})`), ...(numerical ? [] : ['(1) 2', '(2) 4', '(3) 6', '(4) 8'].map(ntaImage))],
+        subject, classId: tagged ? 12 : null, chapter: tagged ? chapters[i % chapters.length] : null, topic: null,
+        year: 2026, shift: '2026-0402-S1', difficulty: null, confidence: null, status: 'ready', textHash: String(n),
+      });
+    }
+  });
+  return out;
+};
+
 const DebugCbt: React.FC = () => {
   const [dark, setDark] = useState(true);
-  const questions = useMemo(fixture, []);
+  const questions = useMemo(() => [...fixture(), ...ntaFixture()], []);
   const byId = useMemo(() => new Map(questions.map(q => [q.id, q])), [questions]);
   const [paper, setPaper] = useState<CbtPaper | null>(null);
   const [mode, setMode] = useState<'exam' | 'review' | 'quiz' | null>(null);
   const [saved, setSaved] = useState<{ mock: MockTest; errors: ErrorEntry[] } | null>(null);
 
-  const build = (kind: 'full' | 'subject') => {
-    const spec = kind === 'full' ? { kind } as const : { kind, subject: 'Physics' as CbtSubject } as const;
+  const build = (kind: 'full' | 'subject' | 'shift') => {
+    const spec = kind === 'full' ? { kind } as const : kind === 'shift' ? { kind, paper: '2026-0402-S1' } as const : { kind, subject: 'Physics' as CbtSubject } as const;
     const g = generatePaper({
-      questions, spec, lastSeen: new Map(), openErrors: new Set(), weakChapters: new Set(), allowedChapters: null,
+      pyq: kind === 'shift',
+      questions: kind === 'shift' ? questions.filter(q => q.sourceId === 'pyq') : questions.filter(q => q.sourceId !== 'pyq'), spec, lastSeen: new Map(), openErrors: new Set(), weakChapters: new Set(), allowedChapters: null,
       weightOf: q => getWeight('JEE', q.classId as 11 | 12, q.subject, q.chapter as string)?.percent ?? 1.5, now: Date.now(), seed: 7,
     });
     const id = `debug-${kind}-${Date.now()}`;
-    setPaper({ id, name: kind === 'full' ? 'JEE Main full paper' : 'Physics paper', kind, blueprint: g.blueprint, seed: 7, questionIds: g.questionIds, responses: {}, startedAt: null, submittedAt: null, score: null, mockId: null, createdAt: new Date().toISOString() });
+    setPaper({ id, bank: kind === 'shift' ? 'pyq' : 'private', name: paperTitle(spec), kind, blueprint: g.blueprint, seed: 7, questionIds: g.questionIds, responses: {}, startedAt: null, submittedAt: null, score: null, mockId: null, createdAt: new Date().toISOString() });
     setSaved(null);
     setMode('exam');
   };
@@ -99,6 +129,7 @@ const DebugCbt: React.FC = () => {
       <div className="flex flex-wrap gap-2 mt-6">
         <button className="px-4 py-2 rounded-lg border" onClick={() => build('full')}>Full paper</button>
         <button className="px-4 py-2 rounded-lg border" onClick={() => build('subject')}>Physics paper</button>
+        <button className="px-4 py-2 rounded-lg border" onClick={() => build('shift')}>NTA shift</button>
         <button className="px-4 py-2 rounded-lg border" onClick={() => setDark(d => !d)}>{dark ? 'Light' : 'Dark'}</button>
         {paper?.submittedAt && <button className="px-4 py-2 rounded-lg border" onClick={() => setMode('review')}>Review</button>}
         {saved?.errors.length ? <button className="px-4 py-2 rounded-lg border" onClick={() => setMode('quiz')}>Error test ({saved.errors.length})</button> : null}

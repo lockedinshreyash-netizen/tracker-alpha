@@ -17,7 +17,14 @@
    chapter cap — and every relaxation is written into `notes`, which the
    student reads before starting. A paper is never silently short.
 
-   Seeded (mulberry32), so a seed and a bank reproduce the same paper. */
+   Seeded (mulberry32), so a seed and a bank reproduce the same paper.
+
+   The shared NTA bank (`pyq`) runs through the same code. Its rows are all
+   answerable (the server filtered), but most carry no chapter: those are
+   bucketed by subject and paper instead (`Physics|paper|2026-0402-S1`), so a
+   full or subject paper spreads across shifts the way it spreads across
+   chapters. Chapter papers use tagged questions only. A real shift (`shift`)
+   is that paper in NTA's own order. */
 
 import { BankQuestion, Blueprint, ChapterRef, CbtSubject, PaperSpec, QKind, Section } from './types';
 
@@ -76,6 +83,8 @@ export const chapterOf = (q: Pick<BankQuestion, 'classId' | 'subject' | 'chapter
 export const refKey = (c: ChapterRef): string => `${c.classId}|${c.subject}|${c.chapter}`;
 
 export interface GenInput {
+  /** The shared NTA bank: untagged questions are allowed, bucketed by paper. */
+  pyq?: boolean;
   /** Every `ready` question in the bank. */
   questions: BankQuestion[];
   spec: PaperSpec;
@@ -178,6 +187,11 @@ const drawFrom = (pool: BankQuestion[], n: number, tally: Tally, sectionSize: nu
 
 const SUBJECT_NOUN: Record<QKind, string> = { mcq: 'MCQs', numerical: 'numericals' };
 
+/** Where a question is counted when slots are shared out: its chapter, or (untagged, shared bank) its paper. */
+const bucketOf = (q: BankQuestion): string =>
+  q.chapter && q.classId ? chapterOf(q) : `${q.subject}|paper|${q.shift}`;
+const isPaperBucket = (key: string): boolean => key.includes('|paper|');
+
 const fillSection = (
   subject: CbtSubject, kind: QKind, want: number, candidates: BankQuestion[],
   input: GenInput, rand: () => number, notes: string[], equalWeights: boolean,
@@ -194,11 +208,23 @@ const fillSection = (
     if (!eligible.length) continue;
     const byChapter = new Map<string, BankQuestion[]>();
     eligible.forEach(q => {
-      const k = chapterOf(q);
+      const k = bucketOf(q);
       byChapter.set(k, [...(byChapter.get(k) ?? []), q]);
     });
+    /* An untagged paper bucket weighs what a tagged question weighs on
+       average, per question it holds: untagged questions are a fair sample of
+       the syllabus, so they keep their share of the paper. */
+    let taggedW = 0, taggedN = 0;
+    byChapter.forEach((qs, key) => {
+      if (isPaperBucket(key)) return;
+      taggedW += Math.max(0.5, input.weightOf(qs[0]));
+      taggedN += qs.length;
+    });
+    const perQuestion = taggedN ? taggedW / taggedN : 1;
     const buckets: Bucket[] = Array.from(byChapter.entries()).map(([key, qs]) => {
-      const w = equalWeights ? 1 : Math.max(0.5, input.weightOf(qs[0]));
+      const w = equalWeights ? 1
+        : isPaperBucket(key) ? qs.length * perQuestion
+          : Math.max(0.5, input.weightOf(qs[0]));
       return {
         key,
         weight: w * (input.weakChapters.has(key) ? 1.4 : 1),
@@ -224,7 +250,7 @@ const fillSection = (
     }
   }
   if (picked.length < want) {
-    notes.push(`Only ${picked.length} of ${want} ${subject} ${SUBJECT_NOUN[kind]} in your bank. The paper is shorter.`);
+    notes.push(`Only ${picked.length} of ${want} ${subject} ${SUBJECT_NOUN[kind]} in ${input.pyq ? 'the' : 'your'} bank. The paper is shorter.`);
   }
   return shuffle(picked.map(q => q.id), rand);
 };
@@ -237,11 +263,30 @@ export const generatePaper = (input: GenInput): Generated => {
   const rand = mulberry32(input.seed);
   const notes: string[] = [];
   const pool = input.questions.filter(q =>
-    q.status === 'ready' && q.chapter && q.classId && q.answer
+    q.status === 'ready' && (input.pyq || (q.chapter && q.classId && q.answer))
     && (!input.allowedChapters || input.allowedChapters.has(chapterOf(q))),
   );
   const { spec } = input;
   const sections: Section[] = [];
+
+  if (spec.kind === 'shift') {
+    /* NTA's paper as it was set: its questions in its order, a section per
+       subject and kind in the order they first appear. A question NTA dropped
+       is not in the bank, so the paper is that much shorter, and says so. */
+    const own = pool.filter(q => q.shift === spec.paper).sort((a, b) => Number(a.number) - Number(b.number));
+    own.forEach(q => {
+      const sec = sections.find(s => s.subject === q.subject && s.kind === q.kind);
+      if (sec) { sec.ids.push(q.id); sec.want += 1; }
+      else sections.push({ subject: q.subject, kind: q.kind, want: 1, ids: [q.id] });
+    });
+    const missing = JEE_MAIN.subjects.length * (JEE_MAIN.perSubject.mcq + JEE_MAIN.perSubject.numerical) - own.length;
+    if (missing > 0) notes.push(`${missing} ${missing === 1 ? 'question' : 'questions'} NTA dropped or bonused ${missing === 1 ? 'is' : 'are'} left out.`);
+    const questionIds = sections.flatMap(s => s.ids);
+    return {
+      blueprint: { exam: 'mains', spec, durationMins: JEE_MAIN.minutesPerSubject * JEE_MAIN.subjects.length, marking: JEE_MAIN.marking, sections, notes },
+      questionIds,
+    };
+  }
 
   if (spec.kind === 'full' || spec.kind === 'subject') {
     const subjects = spec.kind === 'full' ? JEE_MAIN.subjects : [spec.subject];
@@ -289,8 +334,40 @@ export const generatePaper = (input: GenInput): Generated => {
   };
 };
 
-/** "JEE Main · Full paper", "Physics paper", "3 chapters · 30 Qs". */
+/** Shown wherever the shared bank's questions are: they are NTA's, and say so. */
+export const NTA_CREDIT = 'Questions and answer keys: National Testing Agency.';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "2026-0402-S1" → "2 Apr 2026 · Shift 1". Anything else comes back as it was. */
+export const shiftLabel = (paper: string): string => {
+  const m = /^(\d{4})-(\d{2})(\d{2})-S([12])$/.exec(paper);
+  if (!m) return paper;
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]} · Shift ${m[4]}`;
+};
+
+export interface RealShift { paper: string; label: string; year: number; count: number }
+
+/** The NTA papers that can be sat as set: 20 MCQs and 5 numericals a subject
+    (2025 on), allowing for a couple NTA dropped. 2024's papers had 10
+    numericals with 5 to attempt, so they only feed mixed papers. Newest first. */
+export const realShifts = (questions: BankQuestion[]): RealShift[] => {
+  const m = new Map<string, BankQuestion[]>();
+  questions.forEach(q => { if (q.shift) m.set(q.shift, [...(m.get(q.shift) ?? []), q]); });
+  return Array.from(m.entries()).flatMap(([paper, qs]) => {
+    const fits = JEE_MAIN.subjects.every(s => {
+      const mcq = qs.filter(q => q.subject === s && q.kind === 'mcq').length;
+      const num = qs.filter(q => q.subject === s && q.kind === 'numerical').length;
+      return mcq >= JEE_MAIN.perSubject.mcq - 2 && mcq <= JEE_MAIN.perSubject.mcq
+        && num >= JEE_MAIN.perSubject.numerical - 1 && num <= JEE_MAIN.perSubject.numerical;
+    });
+    return fits ? [{ paper, label: shiftLabel(paper), year: Number(paper.slice(0, 4)), count: qs.length }] : [];
+  }).sort((a, b) => (a.paper < b.paper ? 1 : -1));
+};
+
+/** "JEE Main · Full paper", "Physics paper", "3 chapters · 30 Qs", "2 Apr 2026 · Shift 1". */
 export const paperTitle = (spec: PaperSpec): string =>
-  spec.kind === 'full' ? 'JEE Main full paper'
+  spec.kind === 'shift' ? `JEE Main ${shiftLabel(spec.paper)}`
+  : spec.kind === 'full' ? 'JEE Main full paper'
     : spec.kind === 'subject' ? `${spec.subject} paper`
       : `${spec.chapters.length === 1 ? spec.chapters[0].chapter : `${spec.chapters.length} chapters`} · ${spec.count} Qs`;

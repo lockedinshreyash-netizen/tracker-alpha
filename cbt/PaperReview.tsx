@@ -16,6 +16,7 @@ import { Overlay, btn, pct, subjectDot, tokens } from '../mocks/ui';
 import { BankQuestion, CbtPaper, CbtSubject, Resp } from './types';
 import { ChapterLine, EMPTY_RESP, Outcome, buildErrors, buildMock, chapterLines, clock, outcomeOf, scorePaper } from './score';
 import Tex, { LooseFigures } from './Tex';
+import { NTA_CREDIT, shiftLabel } from './generate';
 
 interface Props {
   paper: CbtPaper;
@@ -43,6 +44,12 @@ const answerText = (q: BankQuestion | undefined, a: number | string | null): str
 const correctText = (q: BankQuestion | undefined): string =>
   !q?.answer ? '—' : 'option' in q.answer ? OPTION_LETTERS[q.answer.option] : String(q.answer.value);
 
+/** Only a question with a chapter can become a notebook entry (the notebook files by chapter). */
+const canKeep = (q: BankQuestion | undefined): boolean => !!q?.chapter && !!q.classId && !!q.answer;
+/** "2 Apr 2026 · Shift 1" for an NTA question, "2023 · Shift 2" for the student's own. */
+const whenOf = (q: BankQuestion): string | null =>
+  q.sourceId === 'pyq' && q.shift ? shiftLabel(q.shift) : q.year ? `${q.year}${q.shift ? ` · ${q.shift}` : ''}` : null;
+
 const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, today, onSave, onClose }) => {
   const t = tokens(dark);
   const readOnly = !onSave;
@@ -64,7 +71,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
   const lines = useMemo(() => chapterLines(paper, questions), [paper, questions]);
   const [verdicts, setVerdicts] = useState<Record<string, MockVerdict | null>>(() => Object.fromEntries(lines.map(l => [l.key, l.verdict])));
   const [reasons, setReasons] = useState<Record<string, ErrorReason>>({});
-  const [include, setInclude] = useState<Record<string, boolean>>(() => Object.fromEntries(rows.filter(r => r.outcome === 'wrong').map(r => [r.id, true])));
+  const [include, setInclude] = useState<Record<string, boolean>>(() => Object.fromEntries(rows.filter(r => r.outcome === 'wrong' && canKeep(r.q)).map(r => [r.id, true])));
   const [tab, setTab] = useState<Outcome>(rows.some(r => r.outcome === 'wrong') ? 'wrong' : 'skipped');
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,7 +115,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
         <button type="button" onClick={() => setOpen(o => (o === row.id ? null : row.id))} aria-expanded={isOpen} className={`w-full text-left px-5 py-3.5 flex items-center gap-3 ${t.hover}`}>
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: subjectDot(row.subject) }} />
           <span className={`text-[13px] font-bold w-14 shrink-0 ${t.heading}`}>{row.subject.slice(0, 4)} {row.n}</span>
-          <span className={`text-[12px] truncate flex-1 ${t.muted}`}>{q?.chapter ?? 'Deleted question'}</span>
+          <span className={`text-[12px] truncate flex-1 ${t.muted}`}>{q ? q.chapter ?? 'No chapter tag' : 'Deleted question'}</span>
           {!readOnly && include[row.id] && (
             <span className={`text-[10px] font-bold ${reasons[row.id] ? (dark ? 'text-emerald-400' : 'text-emerald-600') : 'text-amber-500'}`}>{reasons[row.id] ? REASONS[reasons[row.id]].label : 'Why?'}</span>
           )}
@@ -116,7 +123,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
         </button>
         {isOpen && q && (
           <div className="px-5 pb-5 pl-[38px] mk-fade">
-            <div className="flex items-center gap-2 mb-2">{outcomeBadge(row.outcome)}{q.year && <span className={`text-[11px] ${t.faint}`}>{q.year}{q.shift ? ` · ${q.shift}` : ''}</span>}</div>
+            <div className="flex items-center gap-2 mb-2">{outcomeBadge(row.outcome)}{whenOf(q) && <span className={`text-[11px] ${t.faint}`}>{whenOf(q)}</span>}</div>
             <div className={`text-[15px] leading-relaxed ${t.heading}`}>
               <Tex text={q.body} figures={q.figures} />
               <LooseFigures body={q.body} options={q.options} figures={q.figures} />
@@ -145,7 +152,10 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
               </p>
             )}
 
-            {!readOnly && row.outcome !== 'right' && (
+            {!readOnly && row.outcome !== 'right' && !canKeep(q) && (
+              <p className={`mt-5 pt-4 border-t text-[12px] ${t.rule} ${t.muted}`}>No chapter tag, so it can’t go in the error notebook.</p>
+            )}
+            {!readOnly && row.outcome !== 'right' && canKeep(q) && (
               <div className={`mt-5 pt-4 border-t ${t.rule}`}>
                 <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
                   <span className={`text-[12px] font-bold ${t.heading}`}>Add to error notebook</span>
@@ -211,6 +221,7 @@ const PaperReview: React.FC<Props> = ({ paper, questions, dark, tests, errors, t
               <p className={`text-[13px] mt-2 ${t.body}`}>
                 {right.length} right · {wrong.length} wrong (−{negatives}) · {skipped.length} left · accuracy {pct(accuracy)} · {clock(timeUsed)} used
               </p>
+              {paper.bank === 'pyq' && <p className={`text-[11px] mt-1.5 ${t.faint}`}>{NTA_CREDIT}</p>}
               <div className="mt-5 space-y-2">
                 {score.subjects.map(s => (
                   <div key={s.subject} className="flex items-center gap-3">

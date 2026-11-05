@@ -8,7 +8,7 @@ import { ErrorEntry, MockTest } from '../types';
 import { pushToast } from '../notify/toastBus';
 import { Overlay, tokens } from '../mocks/ui';
 import { BankQuestion, CbtPaper } from './types';
-import { fetchPaper, fetchQuestionsById } from './api';
+import { fetchPaper, fetchQuestionsById, loadPyqPaper } from './api';
 import PaperReview from './PaperReview';
 
 interface Props {
@@ -30,7 +30,7 @@ const PaperViewer: React.FC<Props> = ({ paperId, dark, tests, errors, today, onC
       try {
         const paper = await fetchPaper(paperId);
         if (!paper) throw new Error('This paper is no longer in your bank.');
-        const qs = await fetchQuestionsById(paper.questionIds);
+        const qs = paper.bank === 'pyq' ? await loadPyqPaper(paper) : await fetchQuestionsById(paper.questionIds);
         if (live) setData({ paper, questions: new Map(qs.map(q => [q.id, q])) });
       } catch (e) {
         if (!live) return;

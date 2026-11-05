@@ -1,0 +1,752 @@
+{
+ "3475772544": {
+  "subject": "Chemistry",
+  "key": "12|The p-Block Elements (Groups 15-18)",
+  "ambiguous": false
+ },
+ "691121590": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": false
+ },
+ "603421959": {
+  "subject": "Chemistry",
+  "key": "11|Classification of Elements & Periodicity",
+  "ambiguous": false
+ },
+ "695278229": {
+  "subject": "Maths",
+  "key": "12|Relations & Functions",
+  "ambiguous": false
+ },
+ "6952782139": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "603421815": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": false
+ },
+ "533543891": {
+  "subject": "Chemistry",
+  "key": "12|The p-Block Elements (Groups 15-18)",
+  "ambiguous": false
+ },
+ "6911218": {
+  "subject": "Maths",
+  "key": "11|Statistics",
+  "ambiguous": false
+ },
+ "533543466": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": false
+ },
+ "9561771063": {
+  "subject": "Maths",
+  "key": "12|Differential Equations",
+  "ambiguous": false
+ },
+ "691121189": {
+  "subject": "Physics",
+  "key": "12|Electrostatic Potential & Capacitance",
+  "ambiguous": true
+ },
+ "68019114081": {
+  "subject": "Maths",
+  "key": "11|Statistics",
+  "ambiguous": false
+ },
+ "691121556": {
+  "subject": "Physics",
+  "key": "11|Motion in a Plane",
+  "ambiguous": false
+ },
+ "87827055883": {
+  "subject": "Maths",
+  "key": "11|Permutations & Combinations",
+  "ambiguous": true
+ },
+ "68019114693": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": false
+ },
+ "533543830": {
+  "subject": "Maths",
+  "key": "12|Determinants",
+  "ambiguous": false
+ },
+ "6911211264": {
+  "subject": "Chemistry",
+  "key": "12|Aldehydes, Ketones & Carboxylic Acids",
+  "ambiguous": false
+ },
+ "691121469": {
+  "subject": "Maths",
+  "key": "12|Integrals",
+  "ambiguous": true
+ },
+ "9561771272": {
+  "subject": "Physics",
+  "key": "12|Moving Charges & Magnetism",
+  "ambiguous": false
+ },
+ "533543846": {
+  "subject": "Maths",
+  "key": "11|Trigonometric Functions",
+  "ambiguous": false
+ },
+ "6034212254": {
+  "subject": "Physics",
+  "key": "11|System of Particles & Rotational Motion",
+  "ambiguous": false
+ },
+ "691121592": {
+  "subject": "Chemistry",
+  "key": "12|Aldehydes, Ketones & Carboxylic Acids",
+  "ambiguous": true
+ },
+ "6911211237": {
+  "subject": "Physics",
+  "key": "12|Electrostatic Potential & Capacitance",
+  "ambiguous": false
+ },
+ "68019114153": {
+  "subject": "Chemistry",
+  "key": "12|Amines",
+  "ambiguous": false
+ },
+ "347577100": {
+  "subject": "Maths",
+  "key": "11|Limits & Derivatives",
+  "ambiguous": false
+ },
+ "603421771": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "695278257": {
+  "subject": "Physics",
+  "key": "12|Dual Nature of Radiation & Matter",
+  "ambiguous": false
+ },
+ "3475772140": {
+  "subject": "Chemistry",
+  "key": "12|Electrochemistry",
+  "ambiguous": false
+ },
+ "6034212258": {
+  "subject": "Physics",
+  "key": "12|Electric Charges & Fields",
+  "ambiguous": false
+ },
+ "9561771276": {
+  "subject": "Chemistry",
+  "key": "11|Structure of Atom",
+  "ambiguous": false
+ },
+ "68019114605": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "695278429": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "87827056145": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": true
+ },
+ "4058591247": {
+  "subject": "Physics",
+  "key": "11|Mechanical Properties of Solids",
+  "ambiguous": false
+ },
+ "9561771065": {
+  "subject": "Maths",
+  "key": "12|Three Dimensional Geometry",
+  "ambiguous": false
+ },
+ "691121558": {
+  "subject": "Physics",
+  "key": "11|Mechanical Properties of Fluids",
+  "ambiguous": false
+ },
+ "4058591187": {
+  "subject": "Chemistry",
+  "key": "11|Chemical Bonding & Molecular Structure",
+  "ambiguous": false
+ },
+ "6034212263": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "87827056084": {
+  "subject": "Maths",
+  "key": "12|Differential Equations",
+  "ambiguous": false
+ },
+ "347577101": {
+  "subject": "Physics",
+  "key": "11|Units & Measurements",
+  "ambiguous": false
+ },
+ "533543398": {
+  "subject": "Maths",
+  "key": "12|Matrices",
+  "ambiguous": false
+ },
+ "6952782195": {
+  "subject": "Chemistry",
+  "key": "12|d- & f-Block Elements",
+  "ambiguous": true
+ },
+ "4058591162": {
+  "subject": "Physics",
+  "key": "12|Electromagnetic Induction",
+  "ambiguous": false
+ },
+ "68019114394": {
+  "subject": "Chemistry",
+  "key": "11|Some Basic Concepts of Chemistry",
+  "ambiguous": false
+ },
+ "695278233": {
+  "subject": "Maths",
+  "key": "11|Permutations & Combinations",
+  "ambiguous": false
+ },
+ "9561771117": {
+  "subject": "Chemistry",
+  "key": "11|Chemical Bonding & Molecular Structure",
+  "ambiguous": false
+ },
+ "87827056064": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "533543847": {
+  "subject": "Maths",
+  "key": "12|Relations & Functions",
+  "ambiguous": true
+ },
+ "4058591136": {
+  "subject": "Physics",
+  "key": "11|Motion in a Straight Line",
+  "ambiguous": false
+ },
+ "695278357": {
+  "subject": "Chemistry",
+  "key": "12|Chemical Kinetics",
+  "ambiguous": false
+ },
+ "691121552": {
+  "subject": "Physics",
+  "key": "11|Units & Measurements",
+  "ambiguous": false
+ },
+ "691121204": {
+  "subject": "Chemistry",
+  "key": "11|Thermodynamics",
+  "ambiguous": false
+ },
+ "695278383": {
+  "subject": "Maths",
+  "key": "11|Statistics",
+  "ambiguous": false
+ },
+ "4058591211": {
+  "subject": "Maths",
+  "key": "12|Three Dimensional Geometry",
+  "ambiguous": false
+ },
+ "68019114152": {
+  "subject": "Chemistry",
+  "key": "11|Hydrocarbons",
+  "ambiguous": true
+ },
+ "4058591178": {
+  "subject": "Chemistry",
+  "key": "11|Organic Chemistry: Basic Principles & Techniques",
+  "ambiguous": false
+ },
+ "9561771219": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": true
+ },
+ "4058591150": {
+  "subject": "Physics",
+  "key": "12|Dual Nature of Radiation & Matter",
+  "ambiguous": false
+ },
+ "68019114618": {
+  "subject": "Maths",
+  "key": "11|Conic Sections",
+  "ambiguous": false
+ },
+ "533543851": {
+  "subject": "Maths",
+  "key": "12|Integrals",
+  "ambiguous": false
+ },
+ "87827055964": {
+  "subject": "Chemistry",
+  "key": "12|Coordination Compounds",
+  "ambiguous": true
+ },
+ "533543408": {
+  "subject": "Physics",
+  "key": "11|Motion in a Plane",
+  "ambiguous": false
+ },
+ "405859888": {
+  "subject": "Physics",
+  "key": "11|Oscillations",
+  "ambiguous": false
+ },
+ "4058591151": {
+  "subject": "Physics",
+  "key": "12|Atoms",
+  "ambiguous": false
+ },
+ "695278419": {
+  "subject": "Physics",
+  "key": "12|Dual Nature of Radiation & Matter",
+  "ambiguous": false
+ },
+ "68019114126": {
+  "subject": "Chemistry",
+  "key": "11|Equilibrium",
+  "ambiguous": false
+ },
+ "691121162": {
+  "subject": "Maths",
+  "key": "11|Conic Sections",
+  "ambiguous": true
+ },
+ "695278268": {
+  "subject": "Physics",
+  "key": "12|Current Electricity",
+  "ambiguous": false
+ },
+ "68019114367": {
+  "subject": "Physics",
+  "key": "11|Laws of Motion",
+  "ambiguous": false
+ },
+ "691121503": {
+  "subject": "Chemistry",
+  "key": "11|Chemical Bonding & Molecular Structure",
+  "ambiguous": false
+ },
+ "695278382": {
+  "subject": "Maths",
+  "key": "11|Sequences & Series",
+  "ambiguous": false
+ },
+ "695278420": {
+  "subject": "Physics",
+  "key": "12|Semiconductor Electronics",
+  "ambiguous": false
+ },
+ "533543379": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "68019114148": {
+  "subject": "Chemistry",
+  "key": "12|Chemical Kinetics",
+  "ambiguous": false
+ },
+ "695278288": {
+  "subject": "Chemistry",
+  "key": "11|Organic Chemistry: Basic Principles & Techniques",
+  "ambiguous": false
+ },
+ "87827056143": {
+  "subject": "Chemistry",
+  "key": "12|Aldehydes, Ketones & Carboxylic Acids",
+  "ambiguous": false
+ },
+ "3475772091": {
+  "subject": "Maths",
+  "key": "11|Sequences & Series",
+  "ambiguous": false
+ },
+ "533543387": {
+  "subject": "Maths",
+  "key": "12|Integrals",
+  "ambiguous": false
+ },
+ "4058591154": {
+  "subject": "Physics",
+  "key": "11|Units & Measurements",
+  "ambiguous": false
+ },
+ "34757790": {
+  "subject": "Maths",
+  "key": "12|Three Dimensional Geometry",
+  "ambiguous": false
+ },
+ "87827056097": {
+  "subject": "Physics",
+  "key": "12|Electrostatic Potential & Capacitance",
+  "ambiguous": false
+ },
+ "87827056121": {
+  "subject": "Chemistry",
+  "key": "12|Electrochemistry",
+  "ambiguous": false
+ },
+ "4058591208": {
+  "subject": "Maths",
+  "key": "11|Conic Sections",
+  "ambiguous": false
+ },
+ "405859839": {
+  "subject": "Maths",
+  "key": "12|Matrices",
+  "ambiguous": false
+ },
+ "691121159": {
+  "subject": "Maths",
+  "key": "11|Statistics",
+  "ambiguous": false
+ },
+ "603421753": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "695278307": {
+  "subject": "Maths",
+  "key": "12|Probability",
+  "ambiguous": false
+ },
+ "3475772546": {
+  "subject": "Chemistry",
+  "key": "12|Coordination Compounds",
+  "ambiguous": false
+ },
+ "691121527": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "4058591145": {
+  "subject": "Physics",
+  "key": "12|Current Electricity",
+  "ambiguous": false
+ },
+ "3475772501": {
+  "subject": "Maths",
+  "key": "12|Vector Algebra",
+  "ambiguous": false
+ },
+ "691121154": {
+  "subject": "Maths",
+  "key": "11|Sequences & Series",
+  "ambiguous": false
+ },
+ "695278442": {
+  "subject": "Chemistry",
+  "key": "11|Organic Chemistry: Basic Principles & Techniques",
+  "ambiguous": true
+ },
+ "4058591283": {
+  "subject": "Chemistry",
+  "key": "12|Biomolecules",
+  "ambiguous": false
+ },
+ "4058591189": {
+  "subject": "Chemistry",
+  "key": "12|Electrochemistry",
+  "ambiguous": false
+ },
+ "4058591259": {
+  "subject": "Chemistry",
+  "key": "11|Redox Reactions",
+  "ambiguous": false
+ },
+ "4058591205": {
+  "subject": "Maths",
+  "key": "12|Applications of Integrals",
+  "ambiguous": false
+ },
+ "68019114335": {
+  "subject": "Maths",
+  "key": "11|Complex Numbers & Quadratic Equations",
+  "ambiguous": false
+ },
+ "695278252": {
+  "subject": "Physics",
+  "key": "11|Mechanical Properties of Solids",
+  "ambiguous": false
+ },
+ "4058591203": {
+  "subject": "Maths",
+  "key": "11|Limits & Derivatives",
+  "ambiguous": false
+ },
+ "68019114147": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "603421773": {
+  "subject": "Maths",
+  "key": "12|Probability",
+  "ambiguous": false
+ },
+ "68019114640": {
+  "subject": "Physics",
+  "key": "12|Nuclei",
+  "ambiguous": false
+ },
+ "695278333": {
+  "subject": "Physics",
+  "key": "11|Thermodynamics",
+  "ambiguous": false
+ },
+ "4058591078": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "603421951": {
+  "subject": "Chemistry",
+  "key": "11|Some Basic Concepts of Chemistry",
+  "ambiguous": false
+ },
+ "3475772524": {
+  "subject": "Physics",
+  "key": "12|Electric Charges & Fields",
+  "ambiguous": true
+ },
+ "68019114624": {
+  "subject": "Maths",
+  "key": "12|Relations & Functions",
+  "ambiguous": false
+ },
+ "405859854": {
+  "subject": "Maths",
+  "key": "11|Trigonometric Functions",
+  "ambiguous": false
+ },
+ "68019114373": {
+  "subject": "Physics",
+  "key": "12|Current Electricity",
+  "ambiguous": false
+ },
+ "533543414": {
+  "subject": "Physics",
+  "key": "11|Thermodynamics",
+  "ambiguous": false
+ },
+ "9561771280": {
+  "subject": "Chemistry",
+  "key": "11|Classification of Elements & Periodicity",
+  "ambiguous": false
+ },
+ "6034212209": {
+  "subject": "Maths",
+  "key": "11|Sets",
+  "ambiguous": true
+ },
+ "9561771125": {
+  "subject": "Chemistry",
+  "key": "12|The p-Block Elements (Groups 15-18)",
+  "ambiguous": true
+ },
+ "9561771300": {
+  "subject": "Chemistry",
+  "key": "12|Electrochemistry",
+  "ambiguous": false
+ },
+ "9561771053": {
+  "subject": "Maths",
+  "key": "11|Statistics",
+  "ambiguous": false
+ },
+ "68019114390": {
+  "subject": "Physics",
+  "key": "12|Moving Charges & Magnetism",
+  "ambiguous": false
+ },
+ "4058591123": {
+  "subject": "Maths",
+  "key": "12|Probability",
+  "ambiguous": false
+ },
+ "6911217": {
+  "subject": "Maths",
+  "key": "11|Sets",
+  "ambiguous": true
+ },
+ "603421948": {
+  "subject": "Physics",
+  "key": "11|Kinetic Theory",
+  "ambiguous": false
+ },
+ "695278374": {
+  "subject": "Chemistry",
+  "key": "11|Equilibrium",
+  "ambiguous": true
+ },
+ "34757788": {
+  "subject": "Maths",
+  "key": "11|Trigonometric Functions",
+  "ambiguous": false
+ },
+ "533543827": {
+  "subject": "Maths",
+  "key": "12|Inverse Trigonometric Functions",
+  "ambiguous": true
+ },
+ "533543388": {
+  "subject": "Maths",
+  "key": "12|Integrals",
+  "ambiguous": true
+ },
+ "68019114338": {
+  "subject": "Maths",
+  "key": "11|Straight Lines",
+  "ambiguous": false
+ },
+ "68019114680": {
+  "subject": "Chemistry",
+  "key": "12|Aldehydes, Ketones & Carboxylic Acids",
+  "ambiguous": false
+ },
+ "87827055945": {
+  "subject": "Chemistry",
+  "key": "12|The p-Block Elements (Groups 15-18)",
+  "ambiguous": true
+ },
+ "68019114655": {
+  "subject": "Physics",
+  "key": "12|Wave Optics",
+  "ambiguous": false
+ },
+ "695278240": {
+  "subject": "Maths",
+  "key": "12|Three Dimensional Geometry",
+  "ambiguous": false
+ },
+ "87827055889": {
+  "subject": "Maths",
+  "key": "12|Integrals",
+  "ambiguous": false
+ },
+ "405859869": {
+  "subject": "Physics",
+  "key": "11|Work, Energy & Power",
+  "ambiguous": false
+ },
+ "347577578": {
+  "subject": "Chemistry",
+  "key": "11|Some Basic Concepts of Chemistry",
+  "ambiguous": true
+ },
+ "603421954": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "68019114687": {
+  "subject": "Chemistry",
+  "key": "12|Solutions",
+  "ambiguous": false
+ },
+ "6034212255": {
+  "subject": "Physics",
+  "key": "11|Thermal Properties of Matter",
+  "ambiguous": false
+ },
+ "34757785": {
+  "subject": "Maths",
+  "key": "11|Straight Lines",
+  "ambiguous": false
+ },
+ "347577584": {
+  "subject": "Chemistry",
+  "key": "12|Coordination Compounds",
+  "ambiguous": true
+ },
+ "533543875": {
+  "subject": "Physics",
+  "key": "12|Current Electricity",
+  "ambiguous": false
+ },
+ "533543458": {
+  "subject": "Chemistry",
+  "key": "11|Structure of Atom",
+  "ambiguous": false
+ },
+ "9561771064": {
+  "subject": "Maths",
+  "key": "11|Conic Sections",
+  "ambiguous": false
+ },
+ "6952782189": {
+  "subject": "Chemistry",
+  "key": "11|Chemical Bonding & Molecular Structure",
+  "ambiguous": false
+ },
+ "695278343": {
+  "subject": "Physics",
+  "key": "11|Mechanical Properties of Solids",
+  "ambiguous": false
+ },
+ "6911211212": {
+  "subject": "Maths",
+  "key": "11|Conic Sections",
+  "ambiguous": false
+ },
+ "68019114120": {
+  "subject": "Physics",
+  "key": "12|Moving Charges & Magnetism",
+  "ambiguous": true
+ },
+ "68019114401": {
+  "subject": "Chemistry",
+  "key": "11|Classification of Elements & Periodicity",
+  "ambiguous": false
+ },
+ "533543437": {
+  "subject": "Chemistry",
+  "key": "11|Chemical Bonding & Molecular Structure",
+  "ambiguous": false
+ },
+ "6911211215": {
+  "subject": "Maths",
+  "key": "12|Vector Algebra",
+  "ambiguous": false
+ },
+ "68019114095": {
+  "subject": "Physics",
+  "key": "11|Laws of Motion",
+  "ambiguous": false
+ },
+ "3475772503": {
+  "subject": "Maths",
+  "key": "11|Limits & Derivatives",
+  "ambiguous": false
+ },
+ "69112137": {
+  "subject": "Physics",
+  "key": "12|Semiconductor Electronics",
+  "ambiguous": true
+ }
+}
