@@ -53,3 +53,9 @@ twa/*.idsig
 
 # The packed new-tab extension (npm run extension:build)
 dist-extension/
+
+# PYQ importer: venv, downloaded NTA PDFs, built bundles, secrets
+scripts/pyq/.venv/
+scripts/pyq/papers/
+scripts/pyq/out/
+scripts/pyq/.env

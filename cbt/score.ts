@@ -111,7 +111,7 @@ export const MISTAKE_OF: Record<ErrorReason, MockMistake> = {
   unstudied: 'unstudied',
 };
 
-const SCOPE_OF = { full: 'full', subject: 'part', chapters: 'chapter' } as const satisfies Record<CbtPaper['kind'], MockScope>;
+const SCOPE_OF = { full: 'full', subject: 'part', chapters: 'chapter', shift: 'full' } as const satisfies Record<CbtPaper['kind'], MockScope>;
 
 export const CBT_SERIES = 'Alpha CBT';
 

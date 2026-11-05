@@ -5,7 +5,11 @@
 
    It owns the CBT's server state — the bank, the sources, the papers — and
    opens the exam and the review over the page. What a finished paper becomes
-   in Mocks and the notebook is handed up through `onCbtSaved`, one write. */
+   in Mocks and the notebook is handed up through `onCbtSaved`, one write.
+
+   `bank="pyq"` is the same screen over the shared NTA bank (supabase/pyq.sql):
+   no import, queue or sources, papers made by the server, a paper's images
+   fetched when it opens, and its answers only once it is submitted. */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChapterProgress, ErrorEntry, MockTest } from '../types';
@@ -14,12 +18,12 @@ import { pushToast } from '../notify/toastBus';
 import { isCleared, OPTION_LETTERS } from '../mocks/model';
 import { leaks, takenMocks, topLeaks } from '../mocks/insights';
 import { Card, Eyebrow, Segmented, btn, subjectDot, tokens } from '../mocks/ui';
-import { BankQuestion, BankSource, CbtPaper, CbtSubject, PaperSpec, QAnswer, Resp } from './types';
+import { BankQuestion, BankSource, CbtPaper, CbtSubject, PaperBank, PaperSpec, QAnswer, Resp } from './types';
 import {
-  createPaper, deletePaper, deleteSource, fetchPapers, fetchQuestions, fetchSources, lastSeenFrom,
-  savePaperProgress, updateQuestion,
+  createPaper, createPyqPaper, deletePaper, deleteSource, fetchPaperAnswers, fetchPaperQuestions, fetchPapers,
+  fetchPyqIndex, fetchQuestions, fetchSources, lastSeenFrom, savePaperProgress, updateQuestion,
 } from './api';
-import { generatePaper, JEE_MAIN, paperTitle } from './generate';
+import { generatePaper, JEE_MAIN, NTA_CREDIT, paperTitle } from './generate';
 import { scorePaper } from './score';
 import { importBundle, parseBundle, ParsedBundle } from './bundle';
 import GenerateSheet from './GenerateSheet';
@@ -29,6 +33,8 @@ import Tex, { LooseFigures } from './Tex';
 
 interface Props {
   userId: string;
+  /** `pyq`: the shared NTA bank. Defaults to the student's own. */
+  bank?: PaperBank;
   tests: MockTest[];
   errors: ErrorEntry[];
   progress: ChapterProgress[];
@@ -130,8 +136,9 @@ const QueueItem: React.FC<{ q: BankQuestion; dark: boolean; left: number; onSave
 
 /* ── The view ── */
 
-const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dark, startGenerating, onGeneratingHandled, onCbtSaved }) => {
+const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, progress, today, dark, startGenerating, onGeneratingHandled, onCbtSaved }) => {
   const t = tokens(dark);
+  const pyq = bank === 'pyq';
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
@@ -150,7 +157,9 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
     setLoading(true);
     setLoadError(null);
     try {
-      const [qs, ss, ps] = await Promise.all([fetchQuestions(), fetchSources(), fetchPapers()]);
+      const [qs, ss, ps] = pyq
+        ? await Promise.all([fetchPyqIndex(), Promise.resolve([] as BankSource[]), fetchPapers('pyq')])
+        : await Promise.all([fetchQuestions(), fetchSources(), fetchPapers('private')]);
       setQuestions(qs);
       setSources(ss);
       setPapers(ps);
@@ -159,8 +168,47 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pyq]);
   useEffect(() => { load(); }, [load]);
+
+  /* The shared bank's index has no images or answers. Opening a paper fetches
+     its questions; a submitted one is saved first (idempotent, so a submit
+     that never reached the server is retried here) and then its answers,
+     which the server gives only for a submitted paper. Merged into the same
+     `questions` the rest of this screen reads. */
+  const merge = (qs: BankQuestion[]) => {
+    const fresh = new Map(qs.map(q => [q.id, q]));
+    setQuestions(cur => cur.map(q => fresh.get(q.id) ?? q).concat(qs.filter(q => !cur.some(c => c.id === q.id))));
+    return fresh;
+  };
+  const fillPyq = async (paper: CbtPaper): Promise<Map<string, BankQuestion>> => {
+    const qs = await fetchPaperQuestions(paper.id);
+    if (!paper.submittedAt) return merge(qs);
+    await savePaperProgress(paper.id, { responses: paper.responses, startedAt: paper.startedAt ?? undefined, submittedAt: paper.submittedAt });
+    const answers = await fetchPaperAnswers(paper.id);
+    return merge(qs.map(q => ({ ...q, answer: answers.get(q.id) ?? null })));
+  };
+  const [opening, setOpening] = useState<string | null>(null);
+  const openPaper = async (paper: CbtPaper, mode: Active['mode']) => {
+    if (!pyq) { setActive({ paper, mode }); return; }
+    if (opening) return;
+    setOpening(paper.id);
+    try {
+      const byIdNow = await fillPyq(paper);
+      if (mode === 'review' && !paper.score) {
+        const score = scorePaper(paper, byIdNow);
+        patchPaper(paper.id, { score });
+        savePaperProgress(paper.id, { score }).catch(() => { /* worked out again from the answers next time */ });
+        paper = { ...paper, score };
+        clearRun(paper.id);
+      }
+      setActive({ paper, mode });
+    } catch (e) {
+      pushToast({ id: 'cbt-open', title: mode === 'review' ? 'The answers didn’t load.' : 'Couldn’t open the paper.', body: `${errMessage(e)} Your answers are safe. Try again.`, tone: 'neutral' });
+    } finally {
+      setOpening(null);
+    }
+  };
 
   useEffect(() => {
     if (startGenerating && !loading) { setGenerating(true); onGeneratingHandled?.(); }
@@ -198,7 +246,9 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
   const startPaper = async (spec: PaperSpec, seed: number, generated: ReturnType<typeof generatePaper>) => {
     setBuilding(true);
     try {
-      const paper = await createPaper({ name: paperTitle(spec), kind: spec.kind, blueprint: generated.blueprint, seed, questionIds: generated.questionIds });
+      const make = pyq ? createPyqPaper : createPaper;
+      const paper = await make({ name: paperTitle(spec), kind: spec.kind, blueprint: generated.blueprint, seed, questionIds: generated.questionIds });
+      if (pyq) await fillPyq(paper);
       setPapers(ps => [paper, ...ps]);
       setGenerating(false);
       setActive({ paper, mode: 'exam' });
@@ -223,6 +273,14 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
 
   const onSubmit = async (paper: CbtPaper, responses: Record<string, Resp>, startedAt: string) => {
     const submittedAt = new Date().toISOString();
+    if (pyq) {
+      // No answers on the device until the server holds the paper as submitted.
+      const sent = { ...paper, responses, startedAt, submittedAt };
+      patchPaper(paper.id, { responses, startedAt, submittedAt });
+      setActive(null);
+      await openPaper(sent, 'review');
+      return;
+    }
     const score = scorePaper({ blueprint: paper.blueprint, responses }, byId);
     const next = { responses, startedAt, submittedAt, score };
     patchPaper(paper.id, next);
@@ -331,7 +389,9 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
     <div className="space-y-6 font-ui">
       <div className="flex flex-wrap gap-2.5">
         <button onClick={() => setGenerating(true)} disabled={!ready.length} className={`${btn} px-5 py-3 ${t.primary}`}>+ Build a paper</button>
-        <button onClick={() => fileRef.current?.click()} disabled={!!importing} className={`${btn} px-4 py-3 ${t.ghost}`}>Import bundle</button>
+        {pyq
+          ? <span className={`self-center text-[11px] ${t.faint}`}>{ready.length.toLocaleString('en-IN')} questions from {new Set(ready.map(q => q.shift)).size} NTA shifts · {NTA_CREDIT}</span>
+          : <button onClick={() => fileRef.current?.click()} disabled={!!importing} className={`${btn} px-4 py-3 ${t.ghost}`}>Import bundle</button>}
         <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickFile(f); }} />
       </div>
 
@@ -364,7 +424,7 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
       )}
 
       {/* The bank in numbers */}
-      <div className="grid grid-cols-3 gap-3">
+      {!pyq && <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Ready', n: ready.length, sub: 'can go in a paper' },
           { label: 'To check', n: review.length, sub: 'read with doubt' },
@@ -376,9 +436,9 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
             <p className={`text-[11px] mt-1 ${t.muted}`}>{x.sub}</p>
           </Card>
         ))}
-      </div>
+      </div>}
 
-      {!questions.length && (
+      {!questions.length && !pyq && (
         <Card dark={dark} className="p-8 md:p-10">
           <p className={`font-display text-[26px] md:text-[32px] leading-tight ${t.heading}`}>Your bank is empty.</p>
           <p className={`text-[13px] mt-2 max-w-md ${t.body}`}>Run the extractor on a PYQ PDF on your laptop (scripts/qbank). It makes a .json bundle. Import it here.</p>
@@ -392,12 +452,12 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
           <div className={`divide-y ${dark ? 'divide-white/[0.05]' : 'divide-zinc-100'}`}>
             {inProgress.map(p => paperRow(p, (
               <div className="flex gap-2 shrink-0">
-                <button onClick={() => discard(p)} className={`${btn} px-3 py-2.5 ${t.muted} hover:text-[#E10600]`}>Delete</button>
-                <button onClick={() => setActive({ paper: p, mode: 'exam' })} className={`${btn} px-4 py-2.5 ${t.primary}`}>{p.startedAt ? 'Resume' : 'Start'}</button>
+                {!pyq && <button onClick={() => discard(p)} className={`${btn} px-3 py-2.5 ${t.muted} hover:text-[#E10600]`}>Delete</button>}
+                <button onClick={() => openPaper(p, 'exam')} disabled={!!opening} className={`${btn} px-4 py-2.5 ${t.primary}`}>{opening === p.id ? 'Opening…' : p.startedAt ? 'Resume' : 'Start'}</button>
               </div>
             )))}
             {unsaved.map(p => paperRow(p, (
-              <button onClick={() => setActive({ paper: p, mode: 'review' })} className={`${btn} px-4 py-2.5 shrink-0 ${t.primary}`}>Finish review</button>
+              <button onClick={() => openPaper(p, 'review')} disabled={!!opening} className={`${btn} px-4 py-2.5 shrink-0 ${t.primary}`}>{opening === p.id ? 'Opening…' : 'Finish review'}</button>
             )))}
           </div>
         </Card>
@@ -434,7 +494,7 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
       )}
 
       {/* Coverage */}
-      {ready.length > 0 && (
+      {ready.length > 0 && !pyq && (
         <Card dark={dark} className="overflow-hidden">
           <button onClick={() => setShowCoverage(s => !s)} className={`w-full px-5 md:px-6 py-4 flex items-center gap-3 text-left ${t.hover}`}>
             <Eyebrow dark={dark} className="flex-1">What’s in the bank</Eyebrow>
@@ -465,7 +525,7 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
           <div className="px-5 md:px-6 pt-5 pb-2"><Eyebrow dark={dark}>Papers taken</Eyebrow></div>
           <div className={`divide-y ${dark ? 'divide-white/[0.05]' : 'divide-zinc-100'}`}>
             {done.slice(0, 10).map(p => paperRow(p, (
-              <button onClick={() => setActive({ paper: p, mode: 'review' })} className={`${btn} px-4 py-2.5 shrink-0 ${t.ghost}`}>Review</button>
+              <button onClick={() => openPaper(p, 'review')} disabled={!!opening} className={`${btn} px-4 py-2.5 shrink-0 ${t.ghost}`}>{opening === p.id ? 'Opening…' : 'Review'}</button>
             )))}
           </div>
         </Card>
@@ -498,6 +558,7 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
           weakChapters={weakChapters}
           dark={dark}
           busy={building}
+          pyq={pyq}
           onStart={startPaper}
           onClose={() => setGenerating(false)}
         />
@@ -511,7 +572,7 @@ const BankView: React.FC<Props> = ({ userId, tests, errors, progress, today, dar
           dark={dark}
           onProgress={onProgress}
           onSubmit={(responses, startedAt) => onSubmit(active.paper, responses, startedAt)}
-          onLeave={() => { setActive(null); fetchPapers().then(setPapers).catch(() => { /* the list refreshes next visit */ }); }}
+          onLeave={() => { setActive(null); fetchPapers(bank).then(setPapers).catch(() => { /* the list refreshes next visit */ }); }}
         />
       )}
       {active?.mode === 'review' && (

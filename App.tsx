@@ -82,6 +82,7 @@ import { mergeSprints, normalizeSprint, normalizeSprints } from './today/sprint'
 import { SprintCommit, useSprint } from './today/useSprint';
 import { useAdmin } from './admin/useAdmin';
 import { useFeature } from './cbt/useFeature';
+import { usePyq } from './cbt/usePyq';
 import AdminTab from './admin/AdminTab';
 import { FESTIVE_LABEL, useFestiveOptOut, useFestiveTheme } from './festive/useFestiveTheme';
 /* Lazy: a student on an ordinary day downloads none of the festive artwork. */
@@ -304,6 +305,7 @@ const App: React.FC = () => {
      decides only whether the Question bank is drawn, and every query behind it
      is re-checked by RLS. See supabase/cbt.sql. */
   const cbtEnabled = useFeature(user, 'cbt');
+  const pyqOpen = usePyq(user);
 
   /* ── App-wide announcements ──
      Checked on the way into Today and nowhere else, which is the whole
@@ -2571,7 +2573,7 @@ const App: React.FC = () => {
               onRecordAttempts={recordAttempts}
               onAddTopic={addMockTopic}
               onForgetTopic={forgetMockTopic}
-              cbt={cbtEnabled && user ? { userId: user.id, onSaved: saveCbtResult } : undefined}
+              cbt={(cbtEnabled || pyqOpen) && user ? { userId: user.id, own: cbtEnabled, pyq: pyqOpen, onSaved: saveCbtResult } : undefined}
             />
           )}
           {activeTab === 'Ranks' && (

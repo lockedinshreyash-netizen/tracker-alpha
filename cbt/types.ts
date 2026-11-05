@@ -23,7 +23,7 @@ export interface BankQuestion {
   /** Four, for an MCQ; null for a numerical. Same markup as `body`. */
   options: string[] | null;
   answer: QAnswer | null;
-  /** Paths in the private `qbank` bucket. */
+  /** Paths in the private `qbank` bucket, or `pyq:<paper>/<file>` in the shared `pyq` bucket. */
   figures: string[];
   subject: CbtSubject;
   classId: 11 | 12 | null;
@@ -48,14 +48,16 @@ export interface BankSource {
 
 /* ── Papers ── */
 
-export type PaperKind = 'full' | 'subject' | 'chapters';
+export type PaperKind = 'full' | 'subject' | 'chapters' | 'shift';
 
 export interface ChapterRef { classId: 11 | 12; subject: CbtSubject; chapter: string }
 
 export type PaperSpec =
   | { kind: 'full' }
   | { kind: 'subject'; subject: CbtSubject }
-  | { kind: 'chapters'; chapters: ChapterRef[]; count: number };
+  | { kind: 'chapters'; chapters: ChapterRef[]; count: number }
+  /** A real NTA paper (`2026-0402-S1`), sat as it was set. Shared bank only. */
+  | { kind: 'shift'; paper: string };
 
 export interface Section {
   subject: CbtSubject;
@@ -103,8 +105,12 @@ export interface PaperScore {
   subjects: SubjectScore[];
 }
 
+/** `private`: the student's own bank (cbt.sql). `pyq`: the shared NTA bank (pyq.sql). */
+export type PaperBank = 'private' | 'pyq';
+
 export interface CbtPaper {
   id: string;
+  bank: PaperBank;
   name: string;
   kind: PaperKind;
   blueprint: Blueprint;

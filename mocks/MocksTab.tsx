@@ -57,9 +57,13 @@ interface Props {
   paperPresets?: PaperPreset[];
   /** Their main exam is one of those. */
   mainIsPreset?: boolean;
-  /** Present only for an account holding the `cbt` feature. */
+  /** Present only for an account holding the `cbt` feature or the shared NTA bank (`pyq_open()`). */
   cbt?: {
     userId: string;
+    /** Their own private bank (`cbt`). */
+    own: boolean;
+    /** The shared NTA bank (pyq.sql). */
+    pyq: boolean;
     /** One write: the paper's MockTest and its notebook entries together. */
     onSaved: (mock: MockTest, errors: ErrorEntry[]) => void;
   };
@@ -102,6 +106,9 @@ const MocksTab: React.FC<Props> = ({
   const [openId, setOpenId] = useState<string | null>(null);
   const [startGenerating, setStartGenerating] = useState(false);
   const [reviewPaper, setReviewPaper] = useState<string | null>(null);
+  // Both banks (the founder): the shared one first, "My bank" one tap away.
+  const [ownBank, setOwnBank] = useState(false);
+  const bank = cbt && cbt.own && (!cbt.pyq || ownBank) ? 'private' : 'pyq';
   const closeReview = useCallback(() => setReviewPaper(null), []);
   const doneGenerating = useCallback(() => setStartGenerating(false), []);
   // A remembered "bank" view on an account without the feature is just Mocks.
@@ -293,7 +300,7 @@ const MocksTab: React.FC<Props> = ({
           <p className={`text-[13px] font-ui mt-2 ${t.muted}`}>
             {view === 'mocks'
               ? everything.length ? `${everything.length} taken${upcoming.length ? ` · ${upcoming.length} planned` : ''}. Every one makes the next one count.` : 'Plan them. Take them. Learn from every one.'
-              : view === 'bank' ? 'Your PYQs, as real CBT papers.'
+              : view === 'bank' ? (bank === 'pyq' ? 'Real JEE Main papers, sat like the real CBT.' : 'Your PYQs, as real CBT papers.')
                 : `${errors.length} saved · ${openErrors} still to beat.`}
           </p>
         </div>
@@ -312,7 +319,20 @@ const MocksTab: React.FC<Props> = ({
 
       {view === 'bank' && cbt ? (
         <Suspense fallback={<Card dark={dark} className="p-10 text-center"><p className={`text-[13px] font-ui ${t.muted}`}>Opening your question bank…</p></Card>}>
+          {cbt.own && cbt.pyq && (
+            <div className="flex justify-end mb-4">
+              <Segmented
+                value={bank}
+                onChange={v => setOwnBank(v === 'private')}
+                dark={dark}
+                label="Bank"
+                options={[{ value: 'pyq', label: 'NTA papers' }, { value: 'private', label: 'My bank' }]}
+              />
+            </div>
+          )}
           <BankView
+            key={bank}
+            bank={bank}
             userId={cbt.userId}
             tests={tests}
             errors={errors}
