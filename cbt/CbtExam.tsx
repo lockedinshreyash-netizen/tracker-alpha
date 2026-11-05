@@ -23,6 +23,7 @@ import { BankQuestion, CbtPaper, CbtSubject, Resp, RespStatus } from './types';
 import { EMPTY_RESP, clock, statusCounts } from './score';
 import { NTA_CREDIT } from './generate';
 import Tex, { LooseFigures } from './Tex';
+import { usePreload } from './figures';
 import { Overlay, btn, subjectDot, tokens } from '../mocks/ui';
 import { OPTION_LETTERS } from '../mocks/model';
 
@@ -106,6 +107,10 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
   const submitted = useRef(false);
   const responsesRef = useRef(responses);
   responsesRef.current = responses;
+
+  // Every figure in the paper, fetched while the instructions are read.
+  const allFigures = useMemo(() => slots.flatMap(s => questions.get(s.id)?.figures ?? []), [slots, questions]);
+  const preload = usePreload(allFigures);
 
   const slot = slots[idx];
   const q = slot ? questions.get(slot.id) : undefined;
@@ -299,7 +304,17 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
               <span key={s} className="flex items-center gap-2"><Mark s={s} dark={dark}>{s === 'nv' ? 1 : ''}</Mark>{STATUS_LABEL[s]}</span>
             ))}
           </div>
-          {paper.bank === 'pyq' && <p className={`mt-6 text-[11px] ${t.faint}`}>{NTA_CREDIT}</p>}
+          {preload.total > 0 && (
+            <div className="mt-6">
+              <div className={`h-1 rounded-full overflow-hidden ${dark ? 'bg-white/[0.06]' : 'bg-zinc-100'}`}>
+                <div className={`h-full transition-all ${preload.done >= preload.total ? 'bg-emerald-500' : dark ? 'bg-white/40' : 'bg-zinc-400'}`} style={{ width: `${(preload.done / preload.total) * 100}%` }} />
+              </div>
+              <p className={`text-[11px] mt-1.5 tabular-nums ${t.muted}`}>
+                {preload.done >= preload.total ? 'Every question is loaded. A dropped connection won’t stop you.' : `Loading the questions… ${Math.round((preload.done / preload.total) * 100)}%`}
+              </p>
+            </div>
+          )}
+          {paper.bank === 'pyq' && <p className={`mt-4 text-[11px] ${t.faint}`}>{NTA_CREDIT}</p>}
           <button onClick={begin} className={`${btn} w-full mt-8 py-4 text-[11px] ${t.primary}`}>I’m ready. Start the clock.</button>
           <button onClick={onLeave} className={`${btn} w-full mt-2 py-3 ${t.muted}`}>Not now</button>
         </div>

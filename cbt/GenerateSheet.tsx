@@ -25,6 +25,8 @@ interface Props {
   busy: boolean;
   /** The shared NTA bank: real shifts on offer, untagged questions allowed in mixed papers. */
   pyq?: boolean;
+  /** Open on this kind of paper, with the kind picker hidden (a tile already chose it). */
+  kind?: Kind;
   onStart: (spec: PaperSpec, seed: number, generated: ReturnType<typeof generatePaper>) => void;
   onClose: () => void;
 }
@@ -32,10 +34,12 @@ interface Props {
 type Kind = PaperSpec['kind'];
 const COUNTS = [10, 15, 20, 30, 45];
 
-const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErrors, weakChapters, dark, busy, pyq, onStart, onClose }) => {
+const KIND_TITLE: Record<Kind, string> = { full: 'Mixed paper', subject: 'One subject', chapters: 'Chapters', shift: 'Real paper' };
+
+const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErrors, weakChapters, dark, busy, pyq, kind: fixedKind, onStart, onClose }) => {
   const t = tokens(dark);
   const shifts = useMemo(() => (pyq ? realShifts(questions) : []), [pyq, questions]);
-  const [kind, setKind] = useState<Kind>(() => (shifts.length ? 'shift' : 'full'));
+  const [kind, setKind] = useState<Kind>(() => fixedKind ?? (shifts.length ? 'shift' : 'full'));
   const [shift, setShift] = useState<string | null>(() => shifts[0]?.paper ?? null);
   const [subject, setSubject] = useState<CbtSubject>('Physics');
   const [chosen, setChosen] = useState<ChapterRef[]>([]);
@@ -94,7 +98,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
     <div className="px-5 md:px-7 pt-6 pb-5 flex items-start justify-between gap-4">
       <div>
         <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.08em] ${t.muted}`}>{pyq ? 'NTA papers' : 'CBT'}</p>
-        <p className={`font-display text-[22px] leading-tight mt-1.5 ${t.heading}`}>Build a paper</p>
+        <p className={`font-display text-[22px] leading-tight mt-1.5 ${t.heading}`}>{fixedKind ? KIND_TITLE[fixedKind] : 'Build a paper'}</p>
       </div>
       <button onClick={onClose} aria-label="Close" className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
     </div>
@@ -115,7 +119,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
   return (
     <Sheet dark={dark} onClose={onClose} label="Build a paper" header={header} footer={footer} width="md:w-[600px]">
       <div className="px-5 md:px-7 py-6 space-y-7 font-ui">
-        <Segmented
+        {!fixedKind && <Segmented
           full
           value={kind}
           onChange={setKind}
@@ -127,7 +131,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
             { value: 'subject', label: 'One subject', hint: '25 questions · 1 hour' },
             { value: 'chapters', label: 'Chapters', hint: 'Your pick' },
           ]}
-        />
+        />}
 
         {kind === 'shift' && (
           <div className="space-y-5">
