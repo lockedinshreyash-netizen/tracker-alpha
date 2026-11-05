@@ -20,10 +20,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BankQuestion, CbtPaper, CbtSubject, Resp, RespStatus, modeOf } from './types';
-import { EMPTY_RESP, clock, outcomeOf, statusCounts } from './score';
+import { EMPTY_RESP, clock, statusCounts } from './score';
 import { NTA_CREDIT } from './generate';
 import Tex, { LooseFigures } from './Tex';
-import SolutionLink from './SolutionLink';
 import { usePreload } from './figures';
 import { Overlay, btn, subjectDot, tokens } from '../mocks/ui';
 import { OPTION_LETTERS } from '../mocks/model';
@@ -260,14 +259,6 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
     write(cur => (hasDraft ? { ...cur, a: draft, s: 'amr' } : { ...cur, a: null, s: 'mr' }));
     if (idx + 1 < slots.length) moveTo(idx + 1);
   };
-  /* Practice: lock the pick in and see whether it was right. Same saved
-     state as Save & Next, so the review and the score read it unchanged. */
-  const check = () => {
-    if (!slot || !hasDraft) return;
-    write(cur => ({ ...cur, a: draft, s: 'ans' }));
-  };
-  const checked = practice && resp.a !== null && (resp.s === 'ans' || resp.s === 'amr');
-  const result = checked && q ? outcomeOf(q, resp) : null;
   const clearResponse = () => {
     if (!slot) return;
     setDraft(null);
@@ -322,7 +313,7 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
         <div className={`shrink-0 flex items-center gap-3 px-4 md:px-6 h-14 border-b ${t.rule}`}>
           <button onClick={leave} aria-label="Leave the paper" title="Leave. The clock stops until you're back" className={`w-9 h-9 -ml-2 rounded-full flex items-center justify-center ${t.hover} ${t.muted}`}>✕</button>
           <div className="min-w-0 flex-1">
-            <p className={`text-[9px] font-bold uppercase tracking-[0.1em] ${t.muted}`}>{practice ? 'Practice · answers as you go' : 'Mock · JEE Main pattern'}</p>
+            <p className={`text-[9px] font-bold uppercase tracking-[0.1em] ${t.muted}`}>{practice ? 'Practice · no time limit' : 'Mock · JEE Main pattern'}</p>
             <p className={`text-[14px] font-bold truncate ${t.heading}`}>{paper.name}</p>
           </div>
           {phase !== 'instructions' && timer}
@@ -341,15 +332,11 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-5 md:px-8 py-8 md:py-12 mk-rise">
           <p className={`font-display text-[32px] md:text-[42px] leading-[1.05] ${t.heading}`}>{slots.length} questions. {practice ? 'No time limit.' : `${paper.blueprint.durationMins} minutes.`}</p>
-          <p className={`font-accent text-[19px] mt-2 ${t.muted}`}>{practice ? 'Check each answer as you go.' : 'Treat it like the real one.'}</p>
+          <p className={`font-accent text-[19px] mt-2 ${t.muted}`}>{practice ? 'Take your time. Answers when you finish.' : 'Treat it like the real one.'}</p>
           <div className={`mt-8 rounded-2xl border p-5 md:p-6 space-y-3 text-[13px] ${t.card}`}>
             <p className={t.body}><b className={t.heading}>Section A</b> · {mcq} single-correct MCQs. <b className={t.heading}>Section B</b> · {num} numerical answers, typed on the keypad.</p>
             <p className={t.body}>Marking: <b className={t.heading}>+{right}</b> right, <b className={t.heading}>{wrong}</b> wrong, 0 left blank. Same for numericals.</p>
-            {practice ? (
-              <p className={t.body}>Pick an answer and tap <b className={t.heading}>Check</b>. You see at once if it was right. A checked answer is locked in.</p>
-            ) : (
-              <p className={t.body}>An answer counts only after <b className={t.heading}>Save & Next</b> or <b className={t.heading}>Mark for Review & Next</b>. Moving away without saving drops it, just like NTA.</p>
-            )}
+            <p className={t.body}>An answer counts only after <b className={t.heading}>Save & Next</b> or <b className={t.heading}>Mark for Review & Next</b>. Moving away without saving drops it, just like NTA.</p>
             <p className={t.body}>The clock only runs while this paper is on your screen. Switch away or close it and the clock stops until you're back.{practice ? '' : ' At zero, the paper submits itself.'}</p>
           </div>
           {paper.blueprint.notes.length > 0 && (
@@ -387,7 +374,7 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-5 md:px-8 py-8 md:py-12 mk-rise">
           <p className={`font-display text-[30px] md:text-[38px] leading-[1.05] ${t.heading}`}>{practice ? 'Finish practice?' : 'Submit the paper?'}</p>
-          <p className={`text-[13px] mt-2 ${t.muted}`}>{practice ? `${clock(spentMs)} spent. Questions you skipped stay unanswered.` : `${clock(Math.max(0, left))} still on the clock. You can’t change anything after this.`}</p>
+          <p className={`text-[13px] mt-2 ${t.muted}`}>{practice ? `${clock(spentMs)} spent. You see the answers right after.` : `${clock(Math.max(0, left))} still on the clock. You can’t change anything after this.`}</p>
           <div className={`mt-6 rounded-2xl border overflow-x-auto ${t.card}`}>
             <table className="w-full text-[12px] tabular-nums">
               <thead>
@@ -490,20 +477,15 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
                       <div className="mt-6 space-y-2.5">
                         {q.options.map((o, i) => {
                           const on = draft === i;
-                          const isKey = checked && !!q.answer && 'option' in q.answer && q.answer.option === i;
-                          const isMiss = checked && resp.a === i && !isKey;
                           return (
                             <button
                               key={i}
                               type="button"
-                              onClick={() => { if (!checked) setDraft(i); }}
+                              onClick={() => setDraft(i)}
                               aria-pressed={on}
-                              disabled={checked}
-                              className={`w-full flex items-start gap-3.5 p-3.5 rounded-xl border text-left transition-all disabled:cursor-default ${isKey
-                                ? dark ? 'border-emerald-400/70 bg-emerald-400/10' : 'border-emerald-500 bg-emerald-50'
-                                : isMiss ? dark ? 'border-rose-400/70 bg-rose-400/10' : 'border-rose-400 bg-rose-50'
-                                  : on && !checked ? dark ? 'border-white bg-white/[0.06]' : 'border-zinc-900 bg-zinc-50'
-                                    : dark ? `border-white/[0.08] bg-[#111114] ${checked ? 'opacity-60' : 'hover:border-white/[0.2]'}` : `border-zinc-200 bg-white shadow-sm ${checked ? 'opacity-60' : 'hover:border-zinc-400'}`}`}
+                              className={`w-full flex items-start gap-3.5 p-3.5 rounded-xl border text-left transition-all ${on
+                                ? dark ? 'border-white bg-white/[0.06]' : 'border-zinc-900 bg-zinc-50'
+                                : dark ? 'border-white/[0.08] bg-[#111114] hover:border-white/[0.2]' : 'border-zinc-200 bg-white hover:border-zinc-400 shadow-sm'}`}
                             >
                               <span className={`w-7 h-7 shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-black ${on ? (dark ? 'border-white bg-white text-black' : 'border-zinc-900 bg-zinc-900 text-white') : dark ? 'border-white/[0.18] text-zinc-400' : 'border-zinc-300 text-zinc-500'}`}>
                                 {OPTION_LETTERS[i]}
@@ -527,21 +509,10 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
                         </div>
                       </div>
                     )}
-                    {checked && result && (
-                      <div className={`mt-5 flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-bold mk-fade ${result === 'right'
-                        ? dark ? 'bg-emerald-400/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
-                        : dark ? 'bg-rose-400/10 text-rose-300' : 'bg-rose-50 text-rose-700'}`}>
-                        <span className="text-[18px]">{result === 'right' ? '✓' : '✕'}</span>
-                        {result === 'right' ? `Right. +${paper.blueprint.marking.right}`
-                          : !q.answer ? 'No answer key for this one.'
-                            : `Wrong. The answer is ${'option' in q.answer ? OPTION_LETTERS[q.answer.option] : q.answer.value}.`}
-                      </div>
-                    )}
-                    {checked && <SolutionLink q={q} dark={dark} className="mt-3" />}
-                    {!practice && resp.a !== null && draft !== resp.a && (
+                    {resp.a !== null && draft !== resp.a && (
                       <p className={`text-[11px] mt-4 ${dark ? 'text-amber-300' : 'text-amber-700'}`}>Not saved. Your saved answer is still {typeof resp.a === 'number' ? OPTION_LETTERS[resp.a] : resp.a}.</p>
                     )}
-                    {!practice && resp.a === null && hasDraft && (
+                    {resp.a === null && hasDraft && (
                       <p className={`text-[11px] mt-4 ${dark ? 'text-amber-300' : 'text-amber-700'}`}>Not saved yet.</p>
                     )}
                   </>
@@ -552,29 +523,14 @@ const CbtExam: React.FC<Props> = ({ paper, questions, dark, onProgress, onSubmit
 
           {/* Actions. Phone: the two saves on top, navigation under them. */}
           <div className={`shrink-0 border-t px-3 md:px-6 py-3 grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center ${t.rule} ${dark ? 'bg-[#0B0B0D]' : 'bg-[#FAFAF9]'}`}>
-            {practice ? (
-              checked ? (
-                <button onClick={() => go(idx + 1)} disabled={idx >= slots.length - 1} className={`${btn} col-span-2 px-6 py-3 ${t.primary}`}>Next question ›</button>
-              ) : (
-                <>
-                  <button onClick={check} disabled={!hasDraft} className={`${btn} px-6 py-3 bg-[#16a34a] text-white hover:bg-[#15803d]`}>Check</button>
-                  <button onClick={() => go(idx + 1)} disabled={idx >= slots.length - 1} className={`${btn} px-4 py-3 ${t.ghost}`}>Skip</button>
-                </>
-              )
-            ) : (
-              <>
-                <button onClick={saveNext} className={`${btn} px-4 py-3 bg-[#16a34a] text-white hover:bg-[#15803d]`}>Save & Next</button>
-                <button onClick={markNext} className={`${btn} px-4 py-3 bg-[#7c3aed] text-white hover:bg-[#6d28d9]`}>
-                  <span className="md:hidden">Mark & Next</span><span className="hidden md:inline">Mark for Review & Next</span>
-                </button>
-              </>
-            )}
+            <button onClick={saveNext} className={`${btn} px-4 py-3 bg-[#16a34a] text-white hover:bg-[#15803d]`}>Save & Next</button>
+            <button onClick={markNext} className={`${btn} px-4 py-3 bg-[#7c3aed] text-white hover:bg-[#6d28d9]`}>
+              <span className="md:hidden">Mark & Next</span><span className="hidden md:inline">Mark for Review & Next</span>
+            </button>
             <div className="col-span-2 flex items-center gap-2 md:contents">
-              {!practice && (
-                <button onClick={clearResponse} className={`${btn} px-3 md:px-4 py-3 ${t.ghost}`}>
-                  <span className="md:hidden">Clear</span><span className="hidden md:inline">Clear Response</span>
-                </button>
-              )}
+              <button onClick={clearResponse} className={`${btn} px-3 md:px-4 py-3 ${t.ghost}`}>
+                <span className="md:hidden">Clear</span><span className="hidden md:inline">Clear Response</span>
+              </button>
               <div className="flex-1" />
               <button onClick={() => setPaletteOpen(true)} className={`md:hidden ${btn} px-3 py-3 ${t.ghost}`}>Palette</button>
               <button onClick={() => go(idx - 1)} disabled={idx === 0} aria-label="Back" className={`${btn} px-3 py-3 ${t.ghost}`}>‹<span className="hidden md:inline"> Back</span></button>

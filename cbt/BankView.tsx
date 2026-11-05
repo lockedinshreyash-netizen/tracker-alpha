@@ -195,11 +195,8 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   };
   const fillPyq = async (paper: CbtPaper): Promise<Map<string, BankQuestion>> => {
     const qs = await fetchPaperQuestions(paper.id);
-    // A practice paper shows each answer as it is checked, so the server hands its answers over at once.
-    if (!paper.submittedAt && modeOf(paper) !== 'practice') return merge(qs);
-    if (paper.submittedAt) {
-      await savePaperProgress(paper.id, { responses: paper.responses, startedAt: paper.startedAt ?? undefined, usedMs: paper.usedMs ?? undefined, submittedAt: paper.submittedAt });
-    }
+    if (!paper.submittedAt) return merge(qs);
+    await savePaperProgress(paper.id, { responses: paper.responses, startedAt: paper.startedAt ?? undefined, usedMs: paper.usedMs ?? undefined, submittedAt: paper.submittedAt });
     return merge(withAnswers(qs, await fetchPaperAnswers(paper.id)));
   };
   const [opening, setOpening] = useState<string | null>(null);

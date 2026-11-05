@@ -20,9 +20,7 @@
 --   pyq_index()               what the generator needs: subject, kind, chapter…
 --   pyq_create_paper(…)       a sitting, at most 90 questions, 12 a day, kept for good
 --   pyq_paper_questions(id)   the images of their own paper's questions
---   pyq_paper_answers(id)     the answers, once that paper is submitted, or at
---                             once for a practice paper (blueprint.mode =
---                             'practice'), which checks each answer as it goes
+--   pyq_paper_answers(id)     the answers, only once that paper is submitted
 -- and figures are signed only for questions in a paper they own.
 
 
@@ -242,12 +240,7 @@ begin
 end;
 $$;
 
--- Answers exist for a sitting only after it is submitted, except a practice
--- paper, whose whole point is checking each answer as you go. That gives away
--- nothing a mock does not: submit a mock at once and its answers arrive too,
--- under the same 90-question, 12-a-day limits. The mode is in the blueprint,
--- which cbt_papers_guard() freezes, so a mock cannot be turned into practice
--- halfway through to read its answers.
+-- Answers exist for a sitting only after it is submitted, practice or mock.
 -- Its return type gained search_text, which `create or replace` cannot change.
 drop function if exists public.pyq_paper_answers(uuid);
 create function public.pyq_paper_answers(p_paper uuid)
@@ -264,8 +257,7 @@ begin
     raise exception 'not allowed' using errcode = '42501';
   end if;
   select c.question_ids into ids from public.cbt_papers c
-    where c.id = p_paper and c.user_id = auth.uid() and c.bank = 'pyq'
-      and (c.submitted_at is not null or c.blueprint ->> 'mode' = 'practice');
+    where c.id = p_paper and c.user_id = auth.uid() and c.bank = 'pyq' and c.submitted_at is not null;
   if ids is null then
     raise exception 'submit the paper first' using errcode = 'P0002';
   end if;

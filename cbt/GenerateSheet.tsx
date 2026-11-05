@@ -130,7 +130,7 @@ const GenerateSheet: React.FC<Props> = ({ questions, progress, lastSeen, openErr
             options={[{ value: 'mock', label: 'Mock' }, { value: 'practice', label: 'Practice' }]}
           />
           <p className={`text-[12px] mt-2.5 ${t.muted}`}>
-            {mode === 'mock' ? 'Against the clock. Answers after you submit. Counts in your mock trends.' : 'No time limit. Check each answer as you go. Mistakes can go to your notebook.'}
+            {mode === 'mock' ? 'Against the clock. Answers after you submit. Counts in your mock trends.' : 'No time limit. Answers when you finish. Mistakes can go to your notebook, but it isn’t counted as a mock.'}
           </p>
         </div>
         {!fixedKind && <Segmented
