@@ -73,7 +73,10 @@ type View = 'mocks' | 'errors' | 'bank';
 /* `scope` absent means "the sensible default": full-syllabus mocks when there
    are any, because a full paper is the benchmark and a chapter test averaged
    into it inflates every number on the page. */
-interface Prefs { view: View; exam: ExamFilter; scope?: ScopeFilter; metric: Metric }
+/* `viewPicked` marks a view the student chose. Every pref write used to save
+   `view: 'mocks'` along with a filter change, so a stored 'mocks' alone says
+   nothing: without the flag, the Question bank (when there is one) opens first. */
+interface Prefs { view: View; viewPicked?: boolean; exam: ExamFilter; scope?: ScopeFilter; metric: Metric }
 const PREFS_KEY = 'mocks_view_v1';
 const loadPrefs = (): Prefs => {
   const fallback: Prefs = { view: 'mocks', exam: 'all', metric: 'score' };
@@ -112,7 +115,8 @@ const MocksTab: React.FC<Props> = ({
   const closeReview = useCallback(() => setReviewPaper(null), []);
   const doneGenerating = useCallback(() => setStartGenerating(false), []);
   // A remembered "bank" view on an account without the feature is just Mocks.
-  const view: View = prefs.view === 'bank' && !cbt ? 'mocks' : prefs.view;
+  const chosen: View = prefs.viewPicked ? prefs.view : cbt ? 'bank' : 'mocks';
+  const view: View = chosen === 'bank' && !cbt ? 'mocks' : chosen;
 
   const { tests, errors } = mocks;
 
@@ -306,13 +310,13 @@ const MocksTab: React.FC<Props> = ({
         </div>
         <Segmented
           value={view}
-          onChange={v => setPref({ view: v })}
+          onChange={v => setPref({ view: v, viewPicked: true })}
           dark={dark}
           label="View"
           options={[
+            ...(cbt ? [{ value: 'bank' as View, label: 'Question bank' }] : []),
             { value: 'mocks', label: 'Mocks' },
             { value: 'errors', label: <>Error notebook{openErrors ? <span className="ml-1 px-1.5 rounded-full bg-[#E10600] text-white text-[10px] leading-[16px]">{openErrors}</span> : null}</> },
-            ...(cbt ? [{ value: 'bank' as View, label: 'Question bank' }] : []),
           ]}
         />
       </div>
@@ -373,7 +377,7 @@ const MocksTab: React.FC<Props> = ({
             <div className="flex flex-wrap gap-2.5 mt-8">
               <button onClick={() => setPlan({ test: null, past: false })} className={`${btn} px-6 py-4 ${t.primary}`}>Plan a mock</button>
               <button onClick={() => setPlan({ test: null, past: true })} className={`${btn} px-5 py-4 ${t.ghost}`}>Log one you took</button>
-              {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank' }); }} className={`${btn} px-5 py-4 ${t.ghost}`}>Take a CBT paper</button>}
+              {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank', viewPicked: true }); }} className={`${btn} px-5 py-4 ${t.ghost}`}>Take a CBT paper</button>}
             </div>
           </div>
         </Card>
@@ -382,7 +386,7 @@ const MocksTab: React.FC<Props> = ({
           <div className="flex flex-wrap gap-2.5">
             <button onClick={() => setPlan({ test: null, past: false })} className={`${btn} px-5 py-3 ${t.primary}`}>+ Plan a mock</button>
             <button onClick={() => setPlan({ test: null, past: true })} className={`${btn} px-4 py-3 ${t.ghost}`}>Log one you took</button>
-            {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank' }); }} className={`${btn} px-4 py-3 ${t.ghost}`}>Take a CBT paper</button>}
+            {cbt && <button onClick={() => { setStartGenerating(true); setPref({ view: 'bank', viewPicked: true }); }} className={`${btn} px-4 py-3 ${t.ghost}`}>Take a CBT paper</button>}
           </div>
 
           {next && nextReadiness ? (
