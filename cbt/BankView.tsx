@@ -23,13 +23,15 @@ import {
   createPaper, createPyqPaper, deletePaper, deleteSource, fetchPaperAnswers, fetchPaperQuestions, fetchPapers,
   fetchPyqIndex, fetchQuestions, fetchSources, lastSeenFrom, savePaperProgress, updateQuestion,
 } from './api';
-import { generatePaper, JEE_MAIN, NTA_CREDIT, paperTitle } from './generate';
+import { generatePaper, JEE_MAIN, newSeed, paperTitle } from './generate';
 import { scorePaper } from './score';
 import { importBundle, parseBundle, ParsedBundle } from './bundle';
 import GenerateSheet from './GenerateSheet';
 import CbtExam, { clearRun } from './CbtExam';
 import PaperReview from './PaperReview';
 import Tex, { LooseFigures } from './Tex';
+import PyqCover from './PyqCover';
+import PyqHome, { ShiftCard, shiftCards } from './PyqHome';
 
 interface Props {
   userId: string;
@@ -45,6 +47,9 @@ interface Props {
   onGeneratingHandled?: () => void;
   onCbtSaved: (mock: MockTest, errors: ErrorEntry[]) => void;
 }
+
+/** The NTA cover is seen once per device: after a first paper or "Look around first". */
+const COVER_KEY = 'pyq_cover_seen_v1';
 
 type Active = { paper: CbtPaper; mode: 'exam' | 'review' };
 
@@ -151,6 +156,10 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   const [pending, setPending] = useState<{ name: string; bundle: ParsedBundle } | null>(null);
   const [importing, setImporting] = useState<{ done: number; total: number } | null>(null);
   const [showCoverage, setShowCoverage] = useState(false);
+  // The shared bank's home: which builder tile was tapped, which shift is being built, the cover.
+  const [genKind, setGenKind] = useState<PaperSpec['kind'] | undefined>(undefined);
+  const [buildingFor, setBuildingFor] = useState<string | null>(null);
+  const [coverSeen, setCoverSeen] = useState(() => { try { return localStorage.getItem(COVER_KEY) === '1'; } catch { return false; } });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -225,6 +234,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
     topLeaks(leaks(takenMocks(tests), 'JEE'), 20).filter(l => !l.topic).map(l => `${l.classId}|${l.subject}|${l.chapter}`),
   ), [tests]);
   const mockIds = useMemo(() => new Set(tests.map(x => x.id)), [tests]);
+  const cards = useMemo(() => (pyq ? shiftCards(questions, papers) : []), [pyq, questions, papers]);
 
   const inProgress = papers.filter(p => !p.submittedAt);
   const unsaved = papers.filter(p => p.submittedAt && (!p.mockId || !mockIds.has(p.mockId)));
@@ -257,6 +267,26 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
     } finally {
       setBuilding(false);
     }
+  };
+
+  const seeCover = () => {
+    setCoverSeen(true);
+    try { localStorage.setItem(COVER_KEY, '1'); } catch { /* the cover shows again next visit; harmless */ }
+  };
+
+  /* A real shift: open your sitting of it if there is one, else build it
+     straight away (no sheet: NTA already chose the questions). */
+  const startShift = (card: ShiftCard) => {
+    if (card.sat) { openPaper(card.sat, card.sat.submittedAt ? 'review' : 'exam'); return; }
+    if (building) return;
+    const seed = newSeed();
+    const spec: PaperSpec = { kind: 'shift', paper: card.paper };
+    const generated = generatePaper({
+      pyq: true, questions, spec, lastSeen, openErrors, weakChapters, allowedChapters: null, weightOf: () => 1, now: Date.now(), seed,
+    });
+    seeCover();
+    setBuildingFor(card.paper);
+    startPaper(spec, seed, generated).finally(() => setBuildingFor(null));
   };
 
   const patchPaper = (id: string, p: Partial<CbtPaper>) => {
@@ -358,6 +388,9 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
   };
 
   /* ── Render ── */
+  if (loading && pyq) {
+    return <PyqHome dark={dark} loading questions={0} shifts={[]} next={null} resume={null} history={[]} reviewDue={new Set()} busy={null} now={0} onShift={() => {}} onOpen={() => {}} onBuild={() => {}} />;
+  }
   if (loading) {
     return <Card dark={dark} className="p-10 text-center"><p className={`text-[13px] font-ui ${t.muted}`}>Opening your question bank…</p></Card>;
   }
@@ -368,6 +401,89 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
         <p className={`text-[12px] font-ui mt-1 ${t.muted}`}>{loadError}</p>
         <button onClick={load} className={`${btn} px-4 py-2.5 mt-4 ${t.ghost}`}>Try again</button>
       </Card>
+    );
+  }
+
+  const overlays = (
+    <>
+        {generating && (
+          <GenerateSheet
+            questions={questions}
+            progress={progress}
+            lastSeen={lastSeen}
+            openErrors={openErrors}
+            weakChapters={weakChapters}
+            dark={dark}
+            busy={building}
+            pyq={pyq}
+            kind={pyq ? genKind : undefined}
+            onStart={startPaper}
+            onClose={() => { setGenerating(false); setGenKind(undefined); }}
+          />
+        )}
+
+        {active?.mode === 'exam' && (
+          <CbtExam
+            key={active.paper.id}
+            paper={active.paper}
+            questions={byId}
+            dark={dark}
+            onProgress={onProgress}
+            onSubmit={(responses, startedAt) => onSubmit(active.paper, responses, startedAt)}
+            onLeave={() => { setActive(null); fetchPapers(bank).then(setPapers).catch(() => { /* the list refreshes next visit */ }); }}
+          />
+        )}
+        {active?.mode === 'review' && (
+          <PaperReview
+            key={active.paper.id}
+            paper={active.paper}
+            questions={byId}
+            dark={dark}
+            tests={tests}
+            errors={errors}
+            today={today}
+            onSave={active.paper.mockId && mockIds.has(active.paper.mockId) ? undefined : onSaved(active.paper)}
+            onClose={() => setActive(null)}
+          />
+        )}
+    </>
+  );
+
+  if (pyq) {
+    const resume = papers.find(p => !p.submittedAt) ?? null;
+    const next = cards.find(c => !c.sat) ?? null;
+    const tagged = ready.length ? (ready.filter(q => q.chapter).length / ready.length) * 100 : 0;
+    return (
+      <>
+        {!coverSeen && papers.length === 0 ? (
+          <PyqCover
+            dark={dark}
+            questions={ready.length}
+            shifts={cards.length}
+            tagged={tagged}
+            nextLabel={next?.label ?? null}
+            busy={!!buildingFor}
+            onStart={() => (next ? startShift(next) : seeCover())}
+            onBrowse={seeCover}
+          />
+        ) : (
+          <PyqHome
+            dark={dark}
+            questions={ready.length}
+            shifts={cards}
+            next={next}
+            resume={resume}
+            history={papers.filter(p => p.submittedAt).slice(0, 8)}
+            reviewDue={new Set(unsaved.map(p => p.id))}
+            busy={opening ?? buildingFor}
+            now={Date.now()}
+            onShift={startShift}
+            onOpen={p => openPaper(p, p.submittedAt ? 'review' : 'exam')}
+            onBuild={k => { setGenKind(k); setGenerating(true); }}
+          />
+        )}
+        {overlays}
+      </>
     );
   }
 
@@ -389,9 +505,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
     <div className="space-y-6 font-ui">
       <div className="flex flex-wrap gap-2.5">
         <button onClick={() => setGenerating(true)} disabled={!ready.length} className={`${btn} px-5 py-3 ${t.primary}`}>+ Build a paper</button>
-        {pyq
-          ? <span className={`self-center text-[11px] ${t.faint}`}>{ready.length.toLocaleString('en-IN')} questions from {new Set(ready.map(q => q.shift)).size} NTA shifts · {NTA_CREDIT}</span>
-          : <button onClick={() => fileRef.current?.click()} disabled={!!importing} className={`${btn} px-4 py-3 ${t.ghost}`}>Import bundle</button>}
+        <button onClick={() => fileRef.current?.click()} disabled={!!importing} className={`${btn} px-4 py-3 ${t.ghost}`}>Import bundle</button>
         <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickFile(f); }} />
       </div>
 
@@ -424,7 +538,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
       )}
 
       {/* The bank in numbers */}
-      {!pyq && <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Ready', n: ready.length, sub: 'can go in a paper' },
           { label: 'To check', n: review.length, sub: 'read with doubt' },
@@ -436,9 +550,9 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
             <p className={`text-[11px] mt-1 ${t.muted}`}>{x.sub}</p>
           </Card>
         ))}
-      </div>}
+      </div>
 
-      {!questions.length && !pyq && (
+      {!questions.length && (
         <Card dark={dark} className="p-8 md:p-10">
           <p className={`font-display text-[26px] md:text-[32px] leading-tight ${t.heading}`}>Your bank is empty.</p>
           <p className={`text-[13px] mt-2 max-w-md ${t.body}`}>Run the extractor on a PYQ PDF on your laptop (scripts/qbank). It makes a .json bundle. Import it here.</p>
@@ -452,7 +566,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
           <div className={`divide-y ${dark ? 'divide-white/[0.05]' : 'divide-zinc-100'}`}>
             {inProgress.map(p => paperRow(p, (
               <div className="flex gap-2 shrink-0">
-                {!pyq && <button onClick={() => discard(p)} className={`${btn} px-3 py-2.5 ${t.muted} hover:text-[#E10600]`}>Delete</button>}
+                <button onClick={() => discard(p)} className={`${btn} px-3 py-2.5 ${t.muted} hover:text-[#E10600]`}>Delete</button>
                 <button onClick={() => openPaper(p, 'exam')} disabled={!!opening} className={`${btn} px-4 py-2.5 ${t.primary}`}>{opening === p.id ? 'Opening…' : p.startedAt ? 'Resume' : 'Start'}</button>
               </div>
             )))}
@@ -494,7 +608,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
       )}
 
       {/* Coverage */}
-      {ready.length > 0 && !pyq && (
+      {ready.length > 0 && (
         <Card dark={dark} className="overflow-hidden">
           <button onClick={() => setShowCoverage(s => !s)} className={`w-full px-5 md:px-6 py-4 flex items-center gap-3 text-left ${t.hover}`}>
             <Eyebrow dark={dark} className="flex-1">What’s in the bank</Eyebrow>
@@ -549,45 +663,7 @@ const BankView: React.FC<Props> = ({ userId, bank = 'private', tests, errors, pr
         </Card>
       )}
 
-      {generating && (
-        <GenerateSheet
-          questions={questions}
-          progress={progress}
-          lastSeen={lastSeen}
-          openErrors={openErrors}
-          weakChapters={weakChapters}
-          dark={dark}
-          busy={building}
-          pyq={pyq}
-          onStart={startPaper}
-          onClose={() => setGenerating(false)}
-        />
-      )}
-
-      {active?.mode === 'exam' && (
-        <CbtExam
-          key={active.paper.id}
-          paper={active.paper}
-          questions={byId}
-          dark={dark}
-          onProgress={onProgress}
-          onSubmit={(responses, startedAt) => onSubmit(active.paper, responses, startedAt)}
-          onLeave={() => { setActive(null); fetchPapers(bank).then(setPapers).catch(() => { /* the list refreshes next visit */ }); }}
-        />
-      )}
-      {active?.mode === 'review' && (
-        <PaperReview
-          key={active.paper.id}
-          paper={active.paper}
-          questions={byId}
-          dark={dark}
-          tests={tests}
-          errors={errors}
-          today={today}
-          onSave={active.paper.mockId && mockIds.has(active.paper.mockId) ? undefined : onSaved(active.paper)}
-          onClose={() => setActive(null)}
-        />
-      )}
+      {overlays}
     </div>
   );
 };

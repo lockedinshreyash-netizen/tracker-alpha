@@ -42,3 +42,47 @@ export const useFigureUrls = (paths: string[]): Record<string, string> => {
   }, [key]);
   return urls;
 };
+
+/* ── Preloading a whole paper ──
+   The exam asks for this the moment it opens, so every figure is signed and
+   in the browser's cache before the clock starts: no question shows a blank
+   frame on a slow connection, and a dropped connection mid-paper costs
+   nothing already fetched. The <img> tags later ask for the same signed URL
+   (one cache, above), so they are served from the HTTP cache. Six at a
+   time, so a 300-figure paper does not open 300 connections. */
+
+const isRemote = (p: string) => !p.startsWith('data:') && !p.startsWith('http');
+
+export const usePreload = (paths: string[]): { done: number; total: number } => {
+  const key = paths.join('\n');
+  const [done, setDone] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const remote = Array.from(new Set(paths.filter(isRemote)));
+    const local = paths.length - paths.filter(isRemote).length;
+    setDone(local);
+    if (!remote.length) return;
+    (async () => {
+      try { await signAll(remote); } catch { /* unsigned figures load when shown, as before */ }
+      const queue = [...remote];
+      const one = async (): Promise<void> => {
+        const p = queue.shift();
+        if (!p || !live) return;
+        const url = fresh(p);
+        if (url) {
+          await new Promise<void>(res => {
+            const img = new Image();
+            img.onload = img.onerror = () => res();
+            img.src = url;
+          });
+        }
+        if (live) setDone(d => d + 1);
+        return one();
+      };
+      await Promise.all(Array.from({ length: 6 }, one));
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return { done: Math.min(done, paths.length), total: paths.length };
+};
