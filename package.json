@@ -23,7 +23,8 @@
     "test:store": "node scripts/test-decks.mjs store",
     "test:exams": "node scripts/test-decks.mjs content",
     "android:build": "node scripts/android.mjs build",
-    "android:fingerprint": "node scripts/android.mjs fingerprint"
+    "android:fingerprint": "node scripts/android.mjs fingerprint",
+    "test:mocks": "node scripts/test-decks.mjs mocks"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.0",

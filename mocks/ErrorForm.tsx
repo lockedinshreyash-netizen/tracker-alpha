@@ -11,6 +11,7 @@ import { SingleChapterPicker, TopicChips } from './ChapterPicker';
 import { OPTION_LETTERS, REASONS, REASON_ORDER } from './model';
 import { Sheet, btn, subjectDot, tokens } from './ui';
 import { QFigures, QText, answerOf } from './QText';
+import { parsePastedQuestion } from './paste';
 
 export interface ErrorDraft {
   id?: string;
@@ -74,6 +75,45 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
   const qRef = useRef<HTMLTextAreaElement>(null);
   const optRefs = useRef<(HTMLInputElement | null)[]>([]);
   const set = (p: Partial<ErrorDraft>) => setD(prev => ({ ...prev, ...p }));
+  /* The last paste that was split into fields, kept so Undo can put it back
+     exactly as pasted. Cleared by the next edit to the question or options. */
+  const [split, setSplit] = useState<{ before: ErrorDraft; raw: string; into: 'question' | number; answer: boolean } | null>(null);
+
+  /* Paste a whole question — number, text, four options, maybe "Ans: B" — and
+     it fills steps 1–3 at once. Only when the paste really has four options,
+     and never over options already typed (unless the paste lands in an
+     option box, which can only mean "these are the options"). */
+  const onPasteBlock = (e: React.ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>, into: 'question' | number) => {
+    const raw = e.clipboardData.getData('text/plain');
+    if (!raw.trim()) return;
+    const p = parsePastedQuestion(raw);
+    if (!p.options) return;
+    if (into === 'question') {
+      const el = e.currentTarget;
+      const replacesAll = !d.question.trim() || (el.selectionStart === 0 && el.selectionEnd === el.value.length);
+      if (!replacesAll || d.options.some(o => o.trim())) return;
+    }
+    e.preventDefault();
+    const answer = p.correct !== null && d.correct === null;
+    setSplit({ before: d, raw, into, answer });
+    set({
+      options: p.options,
+      question: p.question && (into === 'question' || !d.question.trim()) ? p.question : d.question,
+      ...(answer ? { correct: p.correct } : {}),
+    });
+  };
+
+  const undoSplit = () => {
+    if (!split) return;
+    const { before, raw, into } = split;
+    if (into === 'question') setD({ ...before, question: raw.trim().slice(0, 1500) });
+    else {
+      const options = [...before.options] as ErrorDraft['options'];
+      options[into] = raw.replace(/\s+/g, ' ').trim().slice(0, 300);
+      setD({ ...before, options });
+    }
+    setSplit(null);
+  };
 
   useEffect(() => { setD(initial); qRef.current?.focus(); }, [initial]);
   useEffect(() => {
@@ -97,6 +137,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
     const options = [...d.options] as ErrorDraft['options'];
     options[i] = v;
     set({ options });
+    setSplit(null);
   };
 
   const header = (
@@ -140,14 +181,15 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
             </div>
           </Step>
         ) : (<>
-        <Step n={1} title="Question" done={filled.question} dark={dark}>
+        <Step n={1} title="Question" hint="Paste it with the options" done={filled.question} dark={dark}>
           <textarea
             ref={qRef}
             value={d.question}
-            onChange={e => set({ question: e.target.value })}
+            onChange={e => { set({ question: e.target.value }); setSplit(null); }}
+            onPaste={e => onPasteBlock(e, 'question')}
             maxLength={1500}
             rows={3}
-            placeholder="Type the question. Describe any figure in a line — “Block on 30° incline, μ = 0.2…”"
+            placeholder="Type or paste the question. Describe any figure in a line — “Block on 30° incline, μ = 0.2…”"
             className={`${t.input} resize-none leading-relaxed`}
           />
         </Step>
@@ -161,6 +203,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
                   ref={el => { optRefs.current[i] = el; }}
                   value={o}
                   onChange={e => setOption(i, e.target.value)}
+                  onPaste={e => onPasteBlock(e, i)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); optRefs.current[i + 1]?.focus(); } }}
                   maxLength={300}
                   placeholder={`Option ${OPTION_LETTERS[i]}`}
@@ -169,6 +212,17 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
               </div>
             ))}
           </div>
+          {split && (
+            <div role="status" className={`mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-[12px] font-ui ${dark ? 'bg-emerald-500/[0.08] text-emerald-200' : 'bg-emerald-50 text-emerald-800'}`}>
+              <svg className="mt-[1px] shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5L20 7" /></svg>
+              <span className="flex-1">
+                Split into the question and 4 options.
+                {split.answer && d.correct !== null && <> Answer {OPTION_LETTERS[d.correct]} taken from your paste.</>}
+                {' '}Check them.
+              </span>
+              <button type="button" onClick={undoSplit} className="shrink-0 font-bold underline underline-offset-2">Undo</button>
+            </div>
+          )}
         </Step>
 
         <Step n={3} title="Correct option" done={filled.correct} dark={dark}>
