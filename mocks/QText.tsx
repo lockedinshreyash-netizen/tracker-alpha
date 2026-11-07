@@ -6,6 +6,7 @@
 
 import React, { Suspense } from 'react';
 import { ErrorEntry } from '../types';
+import { OPTION_LETTERS } from './model';
 
 const Tex = React.lazy(() => import('../cbt/Tex'));
 const Loose = React.lazy(() => import('../cbt/Tex').then(m => ({ default: m.LooseFigures })));
@@ -29,6 +30,7 @@ export const QFigures: React.FC<{ e: Pick<ErrorEntry, 'qbankId' | 'figures' | 'q
   );
 };
 
-/** What the right answer reads as: an option's text, or the numerical value. */
+/** What the right answer reads as: an option's text, the numerical value, or
+    for a pictured question with no options typed, its letter. */
 export const answerOf = (e: Pick<ErrorEntry, 'numeric' | 'options' | 'correct'>): string =>
-  e.numeric !== undefined ? String(e.numeric) : e.options[e.correct];
+  e.numeric !== undefined ? String(e.numeric) : e.options[e.correct] || OPTION_LETTERS[e.correct];

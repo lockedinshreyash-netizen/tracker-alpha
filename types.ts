@@ -779,9 +779,9 @@ export type ErrorReason = 'concept' | 'silly' | 'calculation' | 'misread' | 'tim
 /**
  * One question the student got wrong, kept to be re-attempted.
  *
- * Text only. Most JEE questions have a figure, and an image in the synced
- * jsonb blob would make every keystroke upload it again; the student types
- * what matters ("block on incline, μ = 0.2") and the figure stays in the book.
+ * Typed text, or a pasted picture of the question (`image`). The picture
+ * itself never enters the synced jsonb blob, which would upload it again on
+ * every change: it stays on the device that pasted it (mocks/images.ts).
  */
 export interface ErrorEntry {
   id: string;
@@ -804,6 +804,10 @@ export interface ErrorEntry {
   figures?: string[];
   /** A numerical-answer question. `options` are then four empty strings and `correct` is 0. */
   numeric?: number;
+  /* A pasted picture of the question (and usually its options), kept on the
+     device that pasted it (mocks/images.ts); only its id rides in the blob.
+     `question` and `options` may then be empty: the picture is the question. */
+  image?: string;
   createdAt: number;
   updatedAt: number;
   /* Re-attempt history. Two right in a row clears it — once can be luck. */

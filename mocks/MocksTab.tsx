@@ -19,6 +19,7 @@ import { pushToast } from '../notify/toastBus';
 import ErrorForm, { ErrorDraft, draftFrom, emptyDraft } from './ErrorForm';
 import ErrorNotebook from './ErrorNotebook';
 import ErrorQuiz from './ErrorQuiz';
+import { sweepErrorImages } from './images';
 import PlanSheet, { PlanDraft } from './PlanSheet';
 import ResultSheet from './ResultSheet';
 import TrendChart, { METRIC_LABEL, Metric } from './TrendChart';
@@ -57,6 +58,10 @@ interface Props {
   paperPresets?: PaperPreset[];
   /** Their main exam is one of those. */
   mainIsPreset?: boolean;
+  /** Whose pasted question pictures these are on this device: the user id, or 'guest'. */
+  imageOwner: string;
+  /** The first cloud pull has landed, so `mocks.errors` is the whole notebook and unused pictures can be tidied. */
+  imagesSettled: boolean;
   /** Present only for an account holding the `cbt` feature or the shared NTA bank (`pyq_open()`). */
   cbt?: {
     userId: string;
@@ -91,7 +96,7 @@ type ErrorCtx = { draft: ErrorDraft; mock?: MockTest };
 const MocksTab: React.FC<Props> = ({
   mocks, progress, examPreference: pref, subjects, today, theme,
   onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic, cbt,
-  paperPresets = [], mainIsPreset = false,
+  paperPresets = [], mainIsPreset = false, imageOwner, imagesSettled,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -108,6 +113,16 @@ const MocksTab: React.FC<Props> = ({
   const [quiz, setQuiz] = useState<{ title: string; ids: string[] } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [startGenerating, setStartGenerating] = useState(false);
+
+  /* Once per visit, after the notebook is complete: forget pictures no error
+     uses any more (mocks/images.ts says which, and waits a week). */
+  useEffect(() => {
+    if (!imagesSettled) return;
+    const inUse = new Set(mocks.errors.flatMap(e => (e.image ? [e.image] : [])));
+    const timer = window.setTimeout(() => { void sweepErrorImages(imageOwner, inUse); }, 3000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per owner, not per edit
+  }, [imageOwner, imagesSettled]);
   const [reviewPaper, setReviewPaper] = useState<string | null>(null);
   // Both banks (the founder): the shared one first, "My bank" one tap away.
   const [ownBank, setOwnBank] = useState(false);
@@ -220,6 +235,7 @@ const MocksTab: React.FC<Props> = ({
     if (d.why.trim()) entry.why = d.why.trim();
     if (d.topic) entry.topic = d.topic;
     if (d.mockId) entry.mockId = d.mockId;
+    if (d.image) entry.image = d.image;
     if (existing?.lastResult) entry.lastResult = existing.lastResult;
     if (existing?.lastAttemptAt) entry.lastAttemptAt = existing.lastAttemptAt;
     onUpsertError(entry);
@@ -255,7 +271,7 @@ const MocksTab: React.FC<Props> = ({
     const gone = errors.filter(e => ids.includes(e.id));
     if (!gone.length) return;
     onDeleteErrors(gone.map(e => e.id));
-    const excerpt = gone[0].question.replace(/\s+/g, ' ');
+    const excerpt = gone[0].question.replace(/\s+/g, ' ') || (gone[0].image ? `Picture question · ${gone[0].chapter}` : '');
     pushToast({
       id: 'mk-errors-deleted',
       title: gone.length === 1 ? 'Error deleted.' : `${gone.length} errors deleted.`,
@@ -502,6 +518,7 @@ const MocksTab: React.FC<Props> = ({
           suggestedChapters={errorSuggestions}
           library={mocks.topics}
           mockName={errorCtx.mock?.name}
+          imageOwner={imageOwner}
           dark={dark}
           onSave={saveError}
           onDelete={id => { removeErrors([id]); setErrorCtx(null); }}

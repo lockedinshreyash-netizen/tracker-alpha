@@ -17,6 +17,7 @@ import { CLEAR_STREAK, OPTION_LETTERS, REASONS, isCleared } from './model';
 import { practiceOrder } from './insights';
 import { Overlay, btn, subjectDot, tokens } from './ui';
 import { QFigures, QText, answerOf } from './QText';
+import ErrorImage from './ErrorImage';
 
 /* Numerical answers match to two decimals, the way NTA rounds them. */
 const numericRight = (typed: string, value: number): boolean => {
@@ -40,7 +41,11 @@ const shuffle = <T,>(xs: T[]): T[] => {
   return a;
 };
 
-const build = (errors: ErrorEntry[]): Q[] => practiceOrder(errors).map(e => ({ e, order: shuffle([0, 1, 2, 3]) }));
+/* A pictured question whose options live only in the picture keeps A–D in
+   place: the letters are printed in it, so shuffling them would scramble the
+   answer, not the memory of it. */
+const pictureOnly = (e: ErrorEntry): boolean => !!e.image && e.options.every(o => !o);
+const build = (errors: ErrorEntry[]): Q[] => practiceOrder(errors).map(e => ({ e, order: pictureOnly(e) ? [0, 1, 2, 3] : shuffle([0, 1, 2, 3]) }));
 
 const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) => {
   const t = tokens(dark);
@@ -211,7 +216,8 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
             <p className={`text-[10px] font-ui font-bold uppercase tracking-[0.06em] ${t.muted}`}>Still wrong</p>
             {missed.map(e => (
               <div key={e.id} className={`rounded-xl border p-4 ${t.card}`}>
-                <p className={`text-[13px] font-ui leading-relaxed line-clamp-3 whitespace-pre-wrap ${t.heading}`}><QText e={e} text={e.question} /></p>
+                {e.image && <ErrorImage id={e.image} dark={dark} maxHeight={120} className={e.question ? 'mb-2' : ''} />}
+                {e.question && <p className={`text-[13px] font-ui leading-relaxed line-clamp-3 whitespace-pre-wrap ${t.heading}`}><QText e={e} text={e.question} /></p>}
                 <p className={`text-[12px] font-ui mt-2 ${dark ? 'text-emerald-400' : 'text-emerald-700'}`}>✓ <QText e={e} text={answerOf(e)} compact /></p>
                 {e.why && <p className={`text-[12px] font-ui mt-1 ${t.muted}`}>{e.why}</p>}
               </div>
@@ -239,7 +245,8 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
           <span className={`text-[11px] font-ui ${t.faint}`}>Attempt {q.e.attempts + 1}{q.e.lastResult === 'wrong' ? ' · missed last time' : ''}</span>
         )}
       </div>
-      <p className={`text-[18px] md:text-[21px] font-ui font-semibold leading-relaxed whitespace-pre-wrap ${t.heading}`}><QText e={q.e} text={q.e.question} /></p>
+      {q.e.image && <ErrorImage id={q.e.image} dark={dark} maxHeight={Math.round(window.innerHeight * 0.55)} className={q.e.question ? 'mb-4' : ''} />}
+      {q.e.question && <p className={`text-[18px] md:text-[21px] font-ui font-semibold leading-relaxed whitespace-pre-wrap ${t.heading}`}><QText e={q.e} text={q.e.question} /></p>}
       <QFigures e={q.e} />
 
       {isNumeric ? (
@@ -285,7 +292,7 @@ const ErrorQuiz: React.FC<Props> = ({ title, errors, dark, onFinish, onClose }) 
               }`}>
                 {state === 'right' ? '✓' : state === 'wrong' ? '✕' : OPTION_LETTERS[slot]}
               </span>
-              <span className={`text-[15px] font-ui whitespace-pre-wrap ${t.heading}`}><QText e={q.e} text={q.e.options[orig]} compact /></span>
+              <span className={`text-[15px] font-ui whitespace-pre-wrap ${q.e.options[orig] ? t.heading : t.muted}`}>{q.e.options[orig] ? <QText e={q.e} text={q.e.options[orig]} compact /> : `Option ${OPTION_LETTERS[orig]}`}</span>
             </button>
           );
         })}

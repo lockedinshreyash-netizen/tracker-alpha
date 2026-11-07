@@ -335,6 +335,8 @@ const ERROR_REASONS: ErrorReason[] = REASON_ORDER;
    anything typed by hand — and cutting it mid-expression breaks the render —
    so those get a wider cap. Figures are paths, never image data. */
 const FIGURE_PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[\w.-]{1,80}$/;
+/** A pasted picture's id (mocks/images.ts). The picture itself stays on the device. */
+export const IMAGE_ID = /^ei_[a-z0-9]{8,40}$/;
 const MAX_ERROR_FIGURES = 12;
 
 const normalizeError = (raw: unknown): ErrorEntry | null => {
@@ -342,11 +344,12 @@ const normalizeError = (raw: unknown): ErrorEntry | null => {
   if (!e || typeof e.id !== 'string' || !e.id) return null;
   const fromBank = typeof e.qbankId === 'string' && /^[0-9a-f-]{36}$/.test(e.qbankId);
   const numeric = fromBank && typeof e.numeric === 'number' && Number.isFinite(e.numeric) ? e.numeric : undefined;
-  const question = text(e.question, fromBank ? 4000 : 1500);
-  if (!question || !Array.isArray(e.options) || e.options.length !== 4) return null;
+  const image = !fromBank && typeof e.image === 'string' && IMAGE_ID.test(e.image) ? e.image : undefined;
+  const question = text(e.question, fromBank ? 4000 : 1500) ?? '';
+  if ((!question && !image) || !Array.isArray(e.options) || e.options.length !== 4) return null;
   const options = e.options.map(o => (typeof o === 'string' ? o.trim().slice(0, fromBank ? 800 : 300) : ''));
-  // A numerical question has no options to fill.
-  if (numeric === undefined && options.some(o => !o)) return null;
+  // A numerical question has no options to fill; a picture usually shows them.
+  if (numeric === undefined && !image && options.some(o => !o)) return null;
   if (e.correct !== 0 && e.correct !== 1 && e.correct !== 2 && e.correct !== 3) return null;
   const chapter = normalizeChapter({ classId: e.classId, subject: e.subject, chapter: e.chapter });
   if (!chapter) return null;
@@ -369,6 +372,7 @@ const normalizeError = (raw: unknown): ErrorEntry | null => {
   const topic = typeof e.topic === 'string' ? cleanTopic(e.topic) : '';
   if (topic) out.topic = topic;
   if (typeof e.mockId === 'string' && e.mockId) out.mockId = e.mockId.slice(0, 64);
+  if (image) out.image = image;
   if (fromBank) {
     out.qbankId = e.qbankId;
     const figures = (Array.isArray(e.figures) ? e.figures : []).filter((f): f is string => typeof f === 'string' && FIGURE_PATH.test(f)).slice(0, MAX_ERROR_FIGURES);

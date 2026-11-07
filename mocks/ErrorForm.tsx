@@ -12,6 +12,8 @@ import { OPTION_LETTERS, REASONS, REASON_ORDER } from './model';
 import { Sheet, btn, subjectDot, tokens } from './ui';
 import { QFigures, QText, answerOf } from './QText';
 import { parsePastedQuestion } from './paste';
+import { imageFrom, saveErrorImage } from './images';
+import ErrorImage from './ErrorImage';
 
 export interface ErrorDraft {
   id?: string;
@@ -23,6 +25,8 @@ export interface ErrorDraft {
   chapter: Pick<MockChapter, 'classId' | 'subject' | 'chapter'> | null;
   topic: string;
   mockId?: string;
+  /** A pasted picture of the question (mocks/images.ts). */
+  image?: string;
   /* An error from a CBT paper: its question and answer come from the bank and
      are shown, not edited — retyping LaTeX by hand would only break it. */
   bank?: Pick<ErrorEntry, 'qbankId' | 'figures' | 'numeric'>;
@@ -34,7 +38,7 @@ export const emptyDraft = (seed?: Partial<ErrorDraft>): ErrorDraft => ({
 
 export const draftFrom = (e: ErrorEntry): ErrorDraft => ({
   id: e.id, question: e.question, options: [...e.options] as ErrorDraft['options'], correct: e.correct, reason: e.reason,
-  why: e.why ?? '', chapter: { classId: e.classId, subject: e.subject, chapter: e.chapter }, topic: e.topic ?? '', mockId: e.mockId,
+  why: e.why ?? '', chapter: { classId: e.classId, subject: e.subject, chapter: e.chapter }, topic: e.topic ?? '', mockId: e.mockId, image: e.image,
   ...(e.qbankId ? { bank: { qbankId: e.qbankId, figures: e.figures, numeric: e.numeric } } : {}),
 });
 
@@ -45,6 +49,8 @@ interface Props {
   suggestedChapters: Pick<MockChapter, 'classId' | 'subject' | 'chapter'>[];
   library: Record<string, string[]>;
   mockName?: string;
+  /** Whose pictures these are on this device: the user id, or 'guest'. */
+  imageOwner: string;
   dark: boolean;
   onSave: (draft: ErrorDraft, again: boolean) => void;
   onDelete?: (id: string) => void;
@@ -69,7 +75,7 @@ const Step: React.FC<{ n: number; title: string; hint?: string; done: boolean; d
   );
 };
 
-const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters, library, mockName, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic }) => {
+const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters, library, mockName, imageOwner, dark, onSave, onDelete, onClose, onAddTopic, onForgetTopic }) => {
   const t = tokens(dark);
   const [d, setD] = useState<ErrorDraft>(initial);
   const qRef = useRef<HTMLTextAreaElement>(null);
@@ -84,6 +90,8 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
      and never over options already typed (unless the paste lands in an
      option box, which can only mean "these are the options"). */
   const onPasteBlock = (e: React.ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>, into: 'question' | number) => {
+    // A screenshot wins over any text that came with it (the window listener takes it).
+    if (imageFrom(e.clipboardData.files)) return;
     const raw = e.clipboardData.getData('text/plain');
     if (!raw.trim()) return;
     const p = parsePastedQuestion(raw);
@@ -115,7 +123,42 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
     setSplit(null);
   };
 
-  useEffect(() => { setD(initial); qRef.current?.focus(); }, [initial]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [adding, setAdding] = useState(false);
+  const [imageError, setImageError] = useState('');
+  // A picture usually shows the options, so their boxes wait behind a link.
+  const [typeOptions, setTypeOptions] = useState(false);
+
+  useEffect(() => { setD(initial); setTypeOptions(false); setImageError(''); qRef.current?.focus(); }, [initial]);
+
+  const addImage = (file: File) => {
+    if (adding) return;
+    setAdding(true);
+    setImageError('');
+    saveErrorImage(file, imageOwner)
+      .then(image => set({ image }))
+      .catch((err: unknown) => setImageError(err instanceof Error ? err.message : 'Couldn’t add that picture.'))
+      .finally(() => setAdding(false));
+  };
+
+  /* A screenshot pasted anywhere while the form is open — ⌘V / Ctrl+V, or
+     long-press Paste in the question box — becomes the question's picture.
+     A paste the text splitter already took is left alone. */
+  const addImageRef = useRef(addImage);
+  addImageRef.current = addImage;
+  const bankEntry = !!initial.bank;
+  useEffect(() => {
+    if (bankEntry) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented) return;
+      const file = imageFrom(e.clipboardData?.files);
+      if (!file) return;
+      e.preventDefault();
+      addImageRef.current(file);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [bankEntry]);
   useEffect(() => {
     const el = qRef.current;
     if (!el) return;
@@ -124,14 +167,14 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
   }, [d.question]);
 
   const filled = {
-    question: d.question.trim().length > 0,
-    options: d.bank?.numeric !== undefined || d.options.every(o => o.trim()),
+    question: d.question.trim().length > 0 || !!d.image,
+    options: d.bank?.numeric !== undefined || !!d.image || d.options.every(o => o.trim()),
     correct: d.correct !== null,
     reason: d.reason !== null,
     chapter: d.chapter !== null,
   };
   const ready = Object.values(filled).every(Boolean);
-  const missing = !filled.question ? 'Type the question.' : !filled.options ? 'Fill all four options.' : !filled.correct ? 'Mark the right answer.' : !filled.reason ? 'Say why you got it wrong.' : !filled.chapter ? 'Pick the chapter.' : '';
+  const missing = adding ? 'Adding the picture…' : !filled.question ? 'Paste or type the question.' : !filled.options ? 'Fill all four options.' : !filled.correct ? 'Mark the right answer.' : !filled.reason ? 'Say why you got it wrong.' : !filled.chapter ? 'Pick the chapter.' : '';
 
   const setOption = (i: number, v: string) => {
     const options = [...d.options] as ErrorDraft['options'];
@@ -159,9 +202,9 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
       )}
       <span className={`flex-1 text-[11px] font-ui ${t.muted} hidden sm:block truncate`}>{missing}</span>
       {!d.id && (
-        <button onClick={() => onSave(d, true)} disabled={!ready} className={`${btn} px-4 py-3.5 ml-auto ${t.ghost}`}>Save & add another</button>
+        <button onClick={() => onSave(d, true)} disabled={!ready || adding} className={`${btn} px-4 py-3.5 ml-auto ${t.ghost}`}>Save & add another</button>
       )}
-      <button onClick={() => onSave(d, false)} disabled={!ready} className={`${btn} px-5 py-3.5 ${d.id ? 'ml-auto' : ''} ${t.primary}`}>Save</button>
+      <button onClick={() => onSave(d, false)} disabled={!ready || adding} className={`${btn} px-5 py-3.5 ${d.id ? 'ml-auto' : ''} ${t.primary}`}>Save</button>
     </div>
   );
 
@@ -181,20 +224,61 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
             </div>
           </Step>
         ) : (<>
-        <Step n={1} title="Question" hint="Paste it with the options" done={filled.question} dark={dark}>
-          <textarea
-            ref={qRef}
-            value={d.question}
-            onChange={e => { set({ question: e.target.value }); setSplit(null); }}
-            onPaste={e => onPasteBlock(e, 'question')}
-            maxLength={1500}
-            rows={3}
-            placeholder="Type or paste the question. Describe any figure in a line — “Block on 30° incline, μ = 0.2…”"
-            className={`${t.input} resize-none leading-relaxed`}
-          />
+        <Step n={1} title="Question" hint={d.image ? undefined : 'Paste a screenshot or the text'} done={filled.question} dark={dark}>
+          <div
+            onDragOver={e => { if (Array.from(e.dataTransfer.items).some(i => i.kind === 'file')) e.preventDefault(); }}
+            onDrop={e => { const f = imageFrom(e.dataTransfer.files); if (f) { e.preventDefault(); addImage(f); } }}
+          >
+            {d.image && (
+              <div className="relative inline-block max-w-full mb-2.5 mk-fade">
+                <ErrorImage id={d.image} dark={dark} maxHeight={360} />
+                <button
+                  type="button"
+                  onClick={() => set({ image: undefined })}
+                  aria-label="Remove the picture"
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-black/70 text-white text-[12px] hover:bg-black"
+                >✕</button>
+              </div>
+            )}
+            {adding && <p className={`text-[12px] font-ui mb-2.5 ${t.muted}`}>Adding the picture…</p>}
+            {imageError && <p role="alert" className="text-[12px] font-ui mb-2.5 text-[#E10600]">{imageError}</p>}
+            <textarea
+              ref={qRef}
+              value={d.question}
+              onChange={e => { set({ question: e.target.value }); setSplit(null); }}
+              onPaste={e => onPasteBlock(e, 'question')}
+              maxLength={1500}
+              rows={d.image ? 1 : 3}
+              placeholder={d.image ? 'Add a line about it (optional)' : 'Paste a screenshot of the question, or type it.'}
+              className={`${t.input} resize-none leading-relaxed`}
+            />
+            {!d.image && !adding && (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className={`mt-2 inline-flex items-center gap-2 text-[12px] font-ui font-bold ${t.muted} ${dark ? 'hover:text-white' : 'hover:text-zinc-900'}`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="2" /><path d="M21 17l-5-5-7 7" /></svg>
+                Add a picture
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={e => { const f = imageFrom(e.target.files); e.target.value = ''; if (f) addImage(f); }}
+            />
+          </div>
         </Step>
 
-        <Step n={2} title="Options" done={filled.options} dark={dark}>
+        <Step n={2} title="Options" hint={d.image && (typeOptions || d.options.some(o => o.trim())) ? 'Optional' : undefined} done={filled.options} dark={dark}>
+          {d.image && !typeOptions && d.options.every(o => !o.trim()) ? (
+            <p className={`text-[13px] font-ui ${t.muted}`}>
+              They’re in the picture.{' '}
+              <button type="button" onClick={() => setTypeOptions(true)} className={`font-bold underline underline-offset-2 ${t.heading}`}>Type them anyway</button>
+            </p>
+          ) : (
           <div className="space-y-2">
             {d.options.map((o, i) => (
               <div key={i} className="flex items-center gap-2.5">
@@ -212,6 +296,7 @@ const ErrorForm: React.FC<Props> = ({ initial, pref, subjects, suggestedChapters
               </div>
             ))}
           </div>
+          )}
           {split && (
             <div role="status" className={`mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-[12px] font-ui ${dark ? 'bg-emerald-500/[0.08] text-emerald-200' : 'bg-emerald-50 text-emerald-800'}`}>
               <svg className="mt-[1px] shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5L20 7" /></svg>

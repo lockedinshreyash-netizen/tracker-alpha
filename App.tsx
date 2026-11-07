@@ -752,6 +752,8 @@ const App: React.FC = () => {
     await supabase.auth.signOut({ scope: 'local' }).catch(() => { /* already gone */ });
     // Its key died with the account (learn.sql cascades), so the library here is only clutter.
     forgetLearnLibrary(user.id);
+    // Pasted question pictures live only on this device (mocks/images.ts); the account's go with it.
+    await import('./mocks/images').then(m => m.forgetErrorImages(user.id)).catch(() => undefined);
     forgetAccountOnDevice();
     /* Signing out changes `user?.id`, which re-runs the effect that writes
        `locked_in_state_v2` before the reload lands. It must write the default,
@@ -2574,6 +2576,8 @@ const App: React.FC = () => {
               onRecordAttempts={recordAttempts}
               onAddTopic={addMockTopic}
               onForgetTopic={forgetMockTopic}
+              imageOwner={user?.id ?? 'guest'}
+              imagesSettled={syncSettled}
               cbt={(cbtEnabled || pyqOpen) && user ? { userId: user.id, own: cbtEnabled, pyq: pyqOpen, onSaved: saveCbtResult } : undefined}
             />
           )}
