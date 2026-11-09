@@ -153,6 +153,26 @@ export const cleanSections = (raw: Section[], pages: number): Section[] => {
   return out.slice(0, BOOK_LIMITS.sections);
 };
 
+/* A chapter added by hand: it starts on `start` and runs to the page before
+   the next chapter (or the end). A chapter it lands inside is cut short just
+   before it; one that started on the same page is replaced. Pages no chapter
+   claimed before stay unclaimed, so an unmatched stretch (an appendix, a
+   chapter outside the syllabus) is not swallowed by its neighbour. */
+export const addChapterAt = (sections: Section[], start: number, chapterKey: string, pages: number): Section[] => {
+  if (!isChapterKey(chapterKey) || start < 1 || start > pages) return sections;
+  const sorted = [...sections].sort((a, b) => a.from - b.from);
+  const inside = sorted.find(s => start >= s.from && start <= s.to);
+  const next = sorted.find(s => s.from > start);
+  const to = inside ? inside.to : next ? next.from - 1 : pages;
+  const kept = sorted
+    .filter(s => s.from !== start)
+    .map(s => (s === inside && s.from < start ? { ...s, to: start - 1 } : s));
+  return cleanSections([...kept, { from: start, to, chapterKey }], pages);
+};
+
+/** Takes away the chapter starting on `from`. Its pages become unclaimed. */
+export const removeChapterAt = (sections: Section[], from: number): Section[] => sections.filter(s => s.from !== from);
+
 export const sectionAt = (book: Pick<Book, 'sections'>, page: number): Section | undefined =>
   book.sections.find(s => page >= s.from && page <= s.to);
 

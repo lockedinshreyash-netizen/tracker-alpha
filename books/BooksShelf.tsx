@@ -24,7 +24,7 @@ import {
   type Book, type BookKind, type BookSubject,
 } from './model';
 import {
-  StorageFullError, askToPersist, deleteFile, filesOnDevice, fingerprintOf, forgetThumbUrl, formatBytes, saveFile, saveThumb,
+  StorageFullError, askToPersist, deleteFile, filesOnDevice, getFile, fingerprintOf, forgetThumbUrl, formatBytes, saveFile, saveThumb,
   storageInfo, thumbUrl, type StorageInfo,
 } from './files';
 import './books.css';
@@ -64,21 +64,28 @@ const kickerOf = (b: Book): string | null =>
 
 /* ── One book on the shelf ── */
 
-const BookButton = ({ book, owner, missing, progress, width, onOpen }: {
-  book: Book; owner: string; missing: boolean; progress: number; width: number; onOpen: () => void;
+const BookButton = ({ book, owner, missing, progress, width, onOpen, onEdit }: {
+  book: Book; owner: string; missing: boolean; progress: number; width: number; onOpen: () => void; onEdit: () => void;
 }) => {
   const thumb = useThumb(owner, book.fingerprint, !!book.cover.firstPage);
   return (
-    <button type="button" className="ln-pick bk-pick" onClick={onOpen} style={{ width }}>
-      <Cover
-        id={book.id} title={book.title} kind={book.kind} subject={book.subject} cover={book.cover}
-        width={width} kicker={kickerOf(book)} progress={progress} thumb={thumb} missing={missing}
-      />
+    <span className="bk-pick" style={{ width }}>
+      <button type="button" className="ln-pick" onClick={onOpen} aria-label={`${missing ? 'Add the file for' : 'Read'} ${book.title}`}>
+        <Cover
+          id={book.id} title={book.title} kind={book.kind} subject={book.subject} cover={book.cover}
+          width={width} kicker={kickerOf(book)} progress={progress} thumb={thumb} missing={missing}
+        />
+      </button>
       <span className="bk-meta">
-        <span className="bk-meta-title">{book.title}</span>
+        <span className="bk-meta-row">
+          <span className="bk-meta-title">{book.title}</span>
+          <button type="button" className="bk-edit" onClick={onEdit} aria-label={`Edit ${book.title}: title, chapters, cover`} title="Edit title, chapters, cover">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+          </button>
+        </span>
         <span className="bk-meta-sub">{missing ? 'File on another device' : `${KIND_LABEL[book.kind]} · ${book.pages} ${book.pages === 1 ? 'page' : 'pages'}`}</span>
       </span>
-    </button>
+    </span>
   );
 };
 
@@ -256,6 +263,7 @@ export default function BooksShelf({ store, dark, examPreference, currentClass, 
       progress={progressOf(b)}
       width={width}
       onOpen={() => openBook(b)}
+      onEdit={() => setEditing(b.id)}
     />
   );
 
@@ -441,6 +449,29 @@ const EditSheet = ({ store, book, fileHere, exam, dark, onAddFile, onOpen, onRem
   });
   const [confirm, setConfirm] = useState(false);
   const thumb = useThumb(store.owner, book.fingerprint, true);
+  const [finding, setFinding] = useState<'idle' | 'busy' | 'none' | 'done'>('idle');
+  /** Bumped when the map is found again, so the fields start over on it (one chapter or several). */
+  const [rev, setRev] = useState(0);
+
+  /* Read the book's contents again with today's rules: its bookmarks or its
+     printed Contents, never every page. Nothing is saved until Save. */
+  const findAgain = async () => {
+    setFinding('busy');
+    try {
+      const blob = await getFile(store.owner, book.fingerprint);
+      if (!blob) { setFinding('none'); return; }
+      const { inspectPdf } = await import('./pdf');
+      const facts = await inspectPdf(new File([blob], `${book.title}.pdf`, { type: 'application/pdf' }));
+      const refs = chapterRefs(subjectsFor(exam) as BookSubject[], (c, sub) => getChaptersFor(exam, c, sub));
+      const p = proposeMap({ ...facts, title: book.title }, refs);
+      if (!p.sections.length) { setFinding('none'); return; }
+      setDraft(d => ({ ...d, subject: p.subject ?? d.subject, classId: p.classId ?? d.classId, sections: p.sections }));
+      setRev(r => r + 1);
+      setFinding('done');
+    } catch {
+      setFinding('none');
+    }
+  };
 
   const save = () => {
     store.updateBook(book.id, {
@@ -497,7 +528,20 @@ const EditSheet = ({ store, book, fileHere, exam, dark, onAddFile, onOpen, onRem
             This book's file is on another device. Add the same PDF here to read it; your marks come with it.
           </p>
         )}
-        <BookFields id={book.id} draft={draft} onChange={setDraft} pages={book.pages} exam={exam} dark={dark} thumb={thumb} />
+        {fileHere && (
+          <div className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${t.inset}`}>
+            <span className={`text-[13px] font-ui ${t.body}`} role="status">
+              {finding === 'busy' ? 'Reading the contents…'
+                : finding === 'done' ? (draft.sections.length === 1 ? 'Found 1 chapter. Check it, then Save.' : `Found ${draft.sections.length} chapters. Check them, then Save.`)
+                  : finding === 'none' ? "Couldn't find a contents page. Add the chapters below."
+                    : 'Chapters wrong? Alpha can read the contents again.'}
+            </span>
+            <button type="button" onClick={() => void findAgain()} disabled={finding === 'busy'} className={`${btn} h-9 px-4 ${t.ghost}`}>
+              Find chapters again
+            </button>
+          </div>
+        )}
+        <BookFields key={rev} id={book.id} draft={draft} onChange={setDraft} pages={book.pages} exam={exam} dark={dark} thumb={thumb} />
       </div>
     </Sheet>
   );

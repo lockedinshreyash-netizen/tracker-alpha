@@ -243,6 +243,7 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
           dark={dark}
           onClose={() => setReading(null)}
           links={bookLinks}
+          exam={examPreference}
           {...session}
         />
       </Suspense>

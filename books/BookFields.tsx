@@ -15,7 +15,7 @@ import { SUBJECT_COLORS } from '../schedule/colors';
 import { ChapterField, subjectsFor, type ClassId } from '../learn/LectureFields';
 import { Cover, COVER_DESIGNS, defaultDesign } from './Cover';
 import {
-  BOOK_KINDS, KIND_LABEL, chapterOfKey, cleanSections,
+  BOOK_KINDS, KIND_LABEL, addChapterAt, chapterOfKey, cleanSections,
   type BookCover, type BookKind, type BookSubject, type Section,
 } from './model';
 import type { ExamPreference } from '../types';
@@ -156,13 +156,18 @@ const PageMap = ({ draft, pages, exam, dark, onChange }: {
   const put = (next: Section[]) => onChange({ sections: next });
   const num = `${t.input} !w-[76px] text-center tabular-nums`;
 
+  /* Adding by hand: a chapter and the page it starts on. It runs to the next
+     chapter, and cuts short a chapter it lands inside (books/model.ts). */
+  const used = new Set(rows.map(r => r.chapterKey));
+  const [newChapter, setNewChapter] = useState('');
+  const [newStart, setNewStart] = useState('');
+  const start = Math.round(Number(newStart));
+  const canAdd = !!newChapter && Number.isFinite(start) && start >= 1 && start <= pages;
   const add = () => {
-    const last = rows[rows.length - 1];
-    const from = last ? Math.min(pages, last.to + 1) : 1;
-    const used = new Set(rows.map(r => chapterOfKey(r.chapterKey)));
-    const next = chapters.find(c => !used.has(c)) ?? chapters[0];
-    if (!next) return;
-    put(cleanSections([...rows, { from, to: pages, chapterKey: `${cls}|${subject}|${next}` }], pages));
+    if (!canAdd) return;
+    put(addChapterAt(rows, start, `${cls}|${subject}|${newChapter}`, pages));
+    setNewChapter('');
+    setNewStart('');
   };
 
   return (
@@ -175,7 +180,7 @@ const PageMap = ({ draft, pages, exam, dark, onChange }: {
         options={[{ value: '11', label: 'Class 11' }, { value: '12', label: 'Class 12' }]}
       />
       {rows.length === 0 && (
-        <p className={`text-[13px] font-ui ${t.muted}`}>No chapters found in this file. Add the ones you know; you can change them any time.</p>
+        <p className={`text-[13px] font-ui ${t.muted}`}>No chapters yet. Add each one below with the page it starts on. Or open the book, go to a chapter's first page, and add it from Contents.</p>
       )}
       <ul className="space-y-2">
         {rows.map((r, i) => {
@@ -224,7 +229,25 @@ const PageMap = ({ draft, pages, exam, dark, onChange }: {
           );
         })}
       </ul>
-      <button type="button" onClick={add} className={`${btn} h-9 px-4 ${t.ghost}`}>Add a chapter</button>
+      <div className={`rounded-lg border p-3 space-y-2 ${t.inset}`}>
+        <span className={`block text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Add a chapter</span>
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+          <select className={`${t.input} sm:flex-1 min-w-0`} value={newChapter} onChange={e => setNewChapter(e.target.value)} aria-label="Chapter to add">
+            <option value="">Choose the chapter</option>
+            {chapters.map(c => <option key={c} value={c}>{c}{used.has(`${cls}|${subject}|${c}`) ? ' · already added' : ''}</option>)}
+          </select>
+          <span className="flex items-center gap-2">
+            <span className={`text-[11px] font-ui whitespace-nowrap ${t.faint}`}>starts on p.</span>
+            <input
+              type="number" inputMode="numeric" min={1} max={pages} className={num} value={newStart} placeholder="1"
+              onChange={e => setNewStart(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+              aria-label="Page the chapter starts on"
+            />
+            <button type="button" onClick={add} disabled={!canAdd} className={`${btn} h-10 px-4 ${t.primary}`}>Add</button>
+          </span>
+        </div>
+      </div>
       <p className={`text-[11px] font-ui ${t.faint}`}>{pages} pages in this file.</p>
     </div>
   );

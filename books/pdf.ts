@@ -12,7 +12,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { OutlineEntry } from './model';
 import { pageText } from './anchors';
-import { headingIn } from './mapping';
+import { isContentsPage, opensWith, parseContents, pickChapterEntries, toPdfPages } from './mapping';
 
 type Pdfjs = typeof import('pdfjs-dist');
 
@@ -53,12 +53,12 @@ export const openPdf = async (data: ArrayBuffer | Uint8Array): Promise<PDFDocume
   }
 };
 
-/** A PDF's outline, flattened to the first two levels, each entry resolved to a 1-based page. */
-export const outlineOf = async (doc: PDFDocumentProxy): Promise<OutlineEntry[]> => {
+/** A PDF's bookmarks, three levels deep, each resolved to a 1-based page and kept with its depth. */
+export const outlineOf = async (doc: PDFDocumentProxy): Promise<(OutlineEntry & { depth: number })[]> => {
   let outline: Awaited<ReturnType<PDFDocumentProxy['getOutline']>> = null;
   try { outline = await doc.getOutline(); } catch { return []; }
   if (!outline) return [];
-  const out: OutlineEntry[] = [];
+  const out: (OutlineEntry & { depth: number })[] = [];
   const pageOf = async (dest: unknown): Promise<number | null> => {
     try {
       const explicit = typeof dest === 'string' ? await doc.getDestination(dest) : dest;
@@ -70,11 +70,11 @@ export const outlineOf = async (doc: PDFDocumentProxy): Promise<OutlineEntry[]> 
   };
   const walk = async (items: typeof outline, depth: number) => {
     for (const item of items ?? []) {
-      if (out.length >= 300) return;
+      if (out.length >= 600) return;
       const page = await pageOf(item.dest);
       const title = (item.title ?? '').replace(/\s+/g, ' ').trim();
-      if (page && title) out.push({ title, page });
-      if (depth < 1 && item.items?.length) await walk(item.items, depth + 1);
+      if (page && title) out.push({ title, page, depth });
+      if (depth < 2 && item.items?.length) await walk(item.items, depth + 1);
     }
   };
   await walk(outline, 0);
@@ -131,29 +131,90 @@ export const textOfPage = async (doc: PDFDocumentProxy, pageNo: number): Promise
   return pageText(content.items.filter((x): x is { str: string; hasEOL: boolean } & typeof x => 'str' in x)).text;
 };
 
-/* NCERT's own PDFs carry no outline, but every chapter opens with a heading
-   like "CHAPTER TWO / MOTION IN A STRAIGHT LINE" (or "Chapter 2" and the
-   title) in the first lines of its page. Reading the top of every page finds
-   them, so a whole book can still be mapped to the syllabus in one pass. */
-
-export const headingsOf = async (doc: PDFDocumentProxy, onProgress?: (done: number) => void, limit = 800): Promise<OutlineEntry[]> => {
-  const out: OutlineEntry[] = [];
-  const n = Math.min(doc.numPages, limit);
-  for (let p = 1; p <= n; p++) {
-    try {
-      const top = (await textOfPage(doc, p)).slice(0, 220);
-      const title = headingIn(top);
-      if (title && !out.some(e => e.page === p)) out.push({ title, page: p });
-    } catch { /* an unreadable page names nothing */ }
-    if (p % 10 === 0) onProgress?.(p / n);
+/* A page's text as lines, the way it is printed. pdf.js hands text over in
+   pieces (a word can be three), so pieces are grouped by their baseline and
+   ordered left to right, with a space only where the page leaves a gap. */
+export const linesOfPage = async (doc: PDFDocumentProxy, pageNo: number): Promise<string[]> => {
+  const page = await doc.getPage(pageNo);
+  const content = await page.getTextContent();
+  type Piece = { s: string; x: number; y: number; w: number; h: number };
+  const pieces: Piece[] = [];
+  for (const it of content.items) {
+    if (!('str' in it) || !it.str) continue;
+    const t = it.transform as number[];
+    pieces.push({ s: it.str, x: t[4], y: t[5], w: it.width ?? 0, h: Math.abs(t[3]) || it.height || 10 });
   }
-  return out;
+  pieces.sort((a, b) => b.y - a.y || a.x - b.x);
+  const lines: Piece[][] = [];
+  for (const p of pieces) {
+    const line = lines[lines.length - 1];
+    if (line && Math.abs(line[0].y - p.y) <= Math.max(2, p.h * 0.45)) line.push(p);
+    else lines.push([p]);
+  }
+  return lines.map(line => {
+    line.sort((a, b) => a.x - b.x);
+    let text = '';
+    let end = -Infinity;
+    for (const p of line) {
+      const gap = p.x - end;
+      if (text && gap > p.h * 0.18 && !/\s$/.test(text) && !/^\s/.test(p.s)) text += ' ';
+      text += p.s;
+      end = p.x + p.w;
+    }
+    return text.replace(/\s+/g, ' ').trim();
+  }).filter(Boolean);
+};
+
+const FRONT_PAGES = 40;
+const SEARCH_AHEAD = 60;
+
+/* The printed Contents, read from the front of the book only: the first
+   Contents page within the first 40, and the pages after it while they go on
+   listing chapters. Printed page numbers become PDF pages through the PDF's
+   page labels, else through one offset measured by finding the first
+   chapter's title at the top of a page a little after its printed number. */
+export const findContents = async (doc: PDFDocumentProxy, onProgress?: (done: number) => void): Promise<OutlineEntry[]> => {
+  // Up to 40 pages of front matter in a textbook; a short file is not searched end to end for one.
+  const front = Math.min(doc.numPages, FRONT_PAGES, Math.max(10, Math.ceil(doc.numPages * 0.1)));
+  const pages: string[][] = [];
+  let last = 0;
+  for (let p = 1; p <= front; p++) {
+    onProgress?.((p / front) * 0.6);
+    let lines: string[];
+    try { lines = await linesOfPage(doc, p); } catch { continue; }
+    if (!pages.length) {
+      if (isContentsPage(lines) && parseContents([lines]).length >= 2) { pages.push(lines); last = p; }
+    } else if (parseContents([lines]).length >= 2) {
+      pages.push(lines);
+      last = p;
+    } else break;
+  }
+  const entries = parseContents(pages);
+  if (entries.length < 2) return [];
+
+  let labels: (string | null)[] | null = null;
+  try { labels = await doc.getPageLabels(); } catch { labels = null; }
+  if (labels && entries.every(e => labels!.includes(String(e.printed)))) return toPdfPages(entries, doc.numPages, { labels });
+
+  for (const e of entries.slice(0, 3)) {
+    const from = Math.max(last + 1, e.printed);
+    const to = Math.min(doc.numPages, e.printed + SEARCH_AHEAD);
+    for (let p = from; p <= to; p++) {
+      onProgress?.(0.6 + ((p - from) / Math.max(1, to - from)) * 0.4);
+      try {
+        const top = (await linesOfPage(doc, p)).slice(0, 8).join(' ');
+        if (opensWith(top, e.title)) return toPdfPages(entries, doc.numPages, { offset: p - e.printed });
+      } catch { /* try the next page */ }
+    }
+  }
+  return [];
 };
 
 export interface PdfFacts {
   pages: number;
   title: string;
-  outline: OutlineEntry[];
+  /** Chapters only, from the bookmarks or the printed Contents. Empty for a one-chapter file. */
+  chapters: OutlineEntry[];
   /** The top of page 1, to guess a one-chapter file's chapter from. */
   firstText: string;
   thumb: Blob | null;
@@ -182,11 +243,12 @@ export const inspectPdf = async (file: File, onProgress?: (done: number) => void
     const [own, thumb, firstText] = await Promise.all([
       outlineOf(doc),
       renderThumb(doc).catch(() => null),
-      textOfPage(doc, 1).then(t => t.slice(0, 400)).catch(() => ''),
+      linesOfPage(doc, 1).then(l => l.slice(0, 12).join('\n')).catch(() => ''),
     ]);
-    // No outline in the file: look for chapter headings instead (only worth it past a chapter's length).
-    const outline = own.length || doc.numPages < 40 ? own : await headingsOf(doc, onProgress);
-    return { pages: doc.numPages, title, outline, firstText, thumb };
+    // The book's own contents only: its bookmarks, else its printed Contents pages. Never every page.
+    let chapters = pickChapterEntries(own, doc.numPages);
+    if (chapters.length < 2 && doc.numPages >= 40) chapters = await findContents(doc, onProgress);
+    return { pages: doc.numPages, title, chapters, firstText, thumb };
   } finally {
     void doc.destroy();
   }

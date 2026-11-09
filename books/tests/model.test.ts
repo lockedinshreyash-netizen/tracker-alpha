@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BOOK_TOMBSTONE_MS, addBook, addBookMark, cleanSections, deleteBook, deleteBookMark, emptyShelf, fractionRead, liveBooks,
+  BOOK_TOMBSTONE_MS, addBook, addBookMark, addChapterAt, cleanSections, removeChapterAt, deleteBook, deleteBookMark, emptyShelf, fractionRead, liveBooks,
   marksOf, mergeRuns, normalizeBook, normalizeBookMark, proposeSections, pruneShelf, recordReading, restoreBookMark,
   sectionAt, sectionsFor, shelfFrom, updateBook, updateBookMark, type NewBook, type Shelf,
 } from '../model';
@@ -134,4 +134,27 @@ test('records from disk are validated field by field', () => {
   assert.equal(normalizeBook({ ...good, cover: { design: '<script>', finish: 'gold' } })?.cover.design, '');
   const s = shelfFrom({ books: [good, { junk: true }], bookMarks: [null], bookProgress: [] });
   assert.equal(Object.keys(s.books).length, 1);
+});
+
+test('a chapter added by hand starts on its page and runs to the next chapter', () => {
+  const k = (c: string) => `11|Physics|${c}`;
+  let s = addChapterAt([], 21, k('Motion in a Straight Line'), 60);
+  assert.deepEqual(s, [{ from: 21, to: 60, chapterKey: k('Motion in a Straight Line') }]);
+  s = addChapterAt(s, 1, k('Units & Measurements'), 60);
+  assert.deepEqual(s.map(x => [x.from, x.to]), [[1, 20], [21, 60]]);
+  // Landing inside a chapter cuts it short there.
+  s = addChapterAt(s, 41, k('Motion in a Plane'), 60);
+  assert.deepEqual(s.map(x => [x.from, x.to, x.chapterKey.split('|')[2]]), [
+    [1, 20, 'Units & Measurements'], [21, 40, 'Motion in a Straight Line'], [41, 60, 'Motion in a Plane'],
+  ]);
+  // The same start page replaces the chapter there.
+  s = addChapterAt(s, 41, k('Laws of Motion'), 60);
+  assert.equal(s[2].chapterKey, k('Laws of Motion'));
+  // A gap stays a gap: a chapter added in it runs only to the next chapter.
+  const gap = [{ from: 1, to: 10, chapterKey: k('Units & Measurements') }, { from: 30, to: 60, chapterKey: k('Waves') }];
+  assert.deepEqual(addChapterAt(gap, 15, k('Gravitation'), 60).map(x => [x.from, x.to]), [[1, 10], [15, 29], [30, 60]]);
+  // Out of range or not a chapter: nothing changes.
+  assert.equal(addChapterAt(gap, 99, k('Gravitation'), 60), gap);
+  assert.equal(addChapterAt(gap, 5, 'nope', 60), gap);
+  assert.deepEqual(removeChapterAt(gap, 30), [gap[0]]);
 });

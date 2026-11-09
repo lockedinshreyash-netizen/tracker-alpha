@@ -26,7 +26,9 @@ import './room.css';
 import { ClockPill, type OtherSession } from '../learn/SessionStrip';
 import { place, coarse } from '../reader/Panels';
 import type { LearnStore } from '../learn/store';
-import type { Subject, TimerState } from '../types';
+import type { ExamPreference, Subject, TimerState } from '../types';
+import { getChaptersFor } from '../constants';
+import { subjectsFor } from '../learn/LectureFields';
 import { getFile } from './files';
 import { loadPdfjs, openPdf, outlineOf, renderSnip, textOfPage, NotAPdfError } from './pdf';
 import { layerText, offsetAt, rangeAt, rectsOf } from './dom';
@@ -34,8 +36,8 @@ import type { BookLinks } from './links';
 import { fitView, swipeTurns, viewIndexOf, viewsOf, type PageLayout } from './layout';
 import { contextOf, quoteOf, searchPage, snapToWords } from './anchors';
 import {
-  MARK_COLORS, chapterOfKey, marksOf, sectionAt, mergeRuns,
-  type Book, type BookMark, type MarkColor, type OutlineEntry, type PageRect, type PageRun,
+  MARK_COLORS, addChapterAt, chapterOfKey, marksOf, removeChapterAt, sectionAt, mergeRuns,
+  type Book, type BookMark, type BookSubject, type MarkColor, type OutlineEntry, type PageRect, type PageRun,
 } from './model';
 
 /** What a mark can become elsewhere in Alpha (Decks, Notes, the error notebook). Wired by App. */
@@ -67,6 +69,8 @@ interface Props {
   onWatching: (watching: boolean) => void;
   /** Decks, Notes and the error notebook (App). Absent on the design board. */
   links?: BookLinks;
+  /** Which syllabus a chapter added by hand comes from. */
+  exam?: ExamPreference;
 }
 
 type PageColor = 'paper' | 'sepia' | 'night';
@@ -226,7 +230,7 @@ const PageView = memo(({ doc, n, width, height, near, marks, bookmarked, snippin
 
 interface Selected { page: number; start: number; end: number; quote: string; rects: PageRect[]; box: DOMRect }
 
-export default function BookRoom({ store, book, startPage, dark: _dark, onClose, timer, otherSession, onStartClock, onOpenToday, onWatching, links }: Props) {
+export default function BookRoom({ store, book, startPage, dark: _dark, onClose, timer, otherSession, onStartClock, onOpenToday, onWatching, links, exam = 'JEE' }: Props) {
   useSyncExternalStore(store.subscribe, store.getVersion);
   const lib = store.getLibrary();
   const owner = store.owner;
@@ -249,7 +253,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   const [drawer, setDrawer] = useState<null | 'contents' | 'marks' | 'search'>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; action?: { label: string; run: () => void } } | null>(null);
   const [lastColor, setLastColor] = useState<MarkColor>('yellow');
-  const [goTo, setGoTo] = useState(false);
+  const pageFieldRef = useRef<(() => void) | null>(null);
   const [card, setCard] = useState<MarkSource | null>(null);
   const [layoutPref, setLayoutPref] = useState<PageLayout>(readLayout);
   const [stage, setStage] = useState<[number, number]>([window.innerWidth, window.innerHeight]);
@@ -511,7 +515,28 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
     return m;
   }, [marks]);
   const bookmarks = useMemo(() => new Set(marks.filter(m => m.kind === 'bookmark').map(m => m.page)), [marks]);
-  const chapterAt = (page: number) => sectionAt(book, page)?.chapterKey;
+  /* The record as it is now: chapters added from the drawer land in the store, not in the prop the shelf passed. */
+  const bk = lib.books[book.id] ?? book;
+  const chapterAt = (page: number) => sectionAt(bk, page)?.chapterKey;
+
+  /* Chapters by hand, from the page being read. The book takes the chapter's
+     subject and class when it had none. Undo puts the old map back. */
+  const addChapterHere = (key: string) => {
+    const before = bk.sections;
+    const [cls, subj, name] = key.split('|');
+    store.updateBook(book.id, {
+      sections: addChapterAt(before, current, key, bk.pages),
+      ...(bk.subject ? {} : { subject: subj as BookSubject }),
+      ...(bk.classId ? {} : { classId: Number(cls) as 11 | 12 }),
+    });
+    setToast({ text: `${name} starts on page ${current}.`, undo: () => store.updateBook(book.id, { sections: before }) });
+  };
+  const removeChapter = (from: number) => {
+    const before = bk.sections;
+    const gone = before.find(x => x.from === from);
+    store.updateBook(book.id, { sections: removeChapterAt(before, from) });
+    if (gone) setToast({ text: `${chapterOfKey(gone.chapterKey)} taken off this book.`, undo: () => store.updateBook(book.id, { sections: before }) });
+  };
 
   /* A selection inside one page's text layer, snapped to whole words. */
   useEffect(() => {
@@ -627,7 +652,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement)?.closest?.('input, textarea, [contenteditable="true"]');
       if (e.key === 'Escape') {
-        if (noteFor || goTo) return;
+        if (noteFor) return;
         if (menu) { setMenu(null); return; }
         if (selected) { clearSelection(); return; }
         if (snipping) { setSnipping(false); return; }
@@ -653,6 +678,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       }
       else if (e.key === '+' || e.key === '=') zoomStep(1);
       else if (e.key === '-') zoomStep(-1);
+      else if (e.key.toLowerCase() === 'g') { e.preventDefault(); pageFieldRef.current?.(); }
       else if (e.key.toLowerCase() === 'b') toggleBookmark();
       else if (e.key.toLowerCase() === 's') setSnipping(s => !s);
       else if (e.key.toLowerCase() === 'n') setDrawer(d => (d === 'marks' ? null : 'marks'));
@@ -881,9 +907,13 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       )}
 
       <footer className="bk-foot">
-        <button type="button" className="bk-pageno" onClick={() => setGoTo(true)} title="Go to a page">
-          {layout === 'spread' && views[viewIndex]?.length === 2 ? `${views[viewIndex][0]}–${views[viewIndex][1]}` : current} <span>/ {total}</span>
-        </button>
+        <PageField
+          label={layout === 'spread' && views[viewIndex]?.length === 2 ? `${views[viewIndex][0]}–${views[viewIndex][1]}` : String(current)}
+          current={current}
+          total={total}
+          onGo={p => jump(p)}
+          focusRef={pageFieldRef}
+        />
         <span className="bk-foot-group" role="radiogroup" aria-label="Page layout">
           <LayoutButton value="scroll" on={layout === 'scroll'} label="Scroll down" onPick={chooseLayout} />
           <LayoutButton value="flip" on={layout === 'flip'} label="Flip pages" onPick={chooseLayout} />
@@ -948,18 +978,18 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
         </Suspense>
       )}
 
-      {goTo && (
-        <GoTo total={total} current={current} onGo={p => { setGoTo(false); jump(p); }} onClose={() => setGoTo(false)} />
-      )}
 
       {drawer && doc && (
         <Drawer
           tab={drawer}
           onTab={setDrawer}
           doc={doc}
-          book={book}
+          book={bk}
           marks={marks}
           current={current}
+          exam={exam}
+          onAddChapter={addChapterHere}
+          onRemoveChapter={removeChapter}
           onJump={p => { jump(p); if (phone) setDrawer(null); }}
           onClose={() => setDrawer(null)}
         />
@@ -1062,25 +1092,48 @@ const NoteEditor = ({ mark, onDone }: { mark: BookMark; onDone: (text: string) =
   );
 };
 
-/* ── Go to a page ── */
+/* ── Go to a page: the page number in the bottom bar is a field ──
+   Tap it (or press G) and type: Enter jumps, Esc or tapping away puts the
+   current page back. A number past the end goes to the last page. While
+   it is not being typed in it shows where you are, "2–3" in a spread. */
 
-const GoTo = ({ total, current, onGo, onClose }: { total: number; current: number; onGo: (p: number) => void; onClose: () => void }) => {
-  const [v, setV] = useState(String(current));
+const PageField = ({ label, current, total, onGo, focusRef }: {
+  label: string;
+  current: number;
+  total: number;
+  onGo: (p: number) => void;
+  focusRef: React.MutableRefObject<(() => void) | null>;
+}) => {
+  const [typing, setTyping] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  focusRef.current = () => { ref.current?.focus(); ref.current?.select(); };
+  const go = () => {
+    const n = Math.round(Number(typing));
+    if (typing !== null && typing.trim() && Number.isFinite(n)) onGo(Math.min(total, Math.max(1, n)));
+    setTyping(null);
+    ref.current?.blur();
+  };
+  const width = `${Math.max(2, String(total).length, (typing ?? label).length) + 0.5}ch`;
   return (
-    <>
-      <div className="bk-scrim" onClick={onClose} />
-      <form
-        className="bk-sheet bk-goto"
-        onSubmit={e => { e.preventDefault(); const n = Math.round(Number(v)); if (n >= 1 && n <= total) onGo(n); }}
-      >
-        <label htmlFor="bk-goto">Go to page</label>
-        <div className="bk-goto-row">
-          <input id="bk-goto" autoFocus type="number" inputMode="numeric" min={1} max={total} value={v} onChange={e => setV(e.target.value)} />
-          <span>of {total}</span>
-          <button type="submit" className="bk-btn bk-primary">Go</button>
-        </div>
-      </form>
-    </>
+    <label className="bk-pageno" title="Type a page number and press Enter (G)">
+      <input
+        ref={ref}
+        className="bk-pageno-input"
+        value={typing ?? label}
+        inputMode="numeric"
+        enterKeyHint="go"
+        aria-label={`Page ${current} of ${total}. Type a page number to go there.`}
+        style={{ width }}
+        onFocus={e => { setTyping(String(current)); requestAnimationFrame(() => e.target.select()); }}
+        onChange={e => setTyping(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); go(); }
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTyping(null); ref.current?.blur(); }
+        }}
+        onBlur={() => setTyping(null)}
+      />
+      <span>/ {total}</span>
+    </label>
   );
 };
 
@@ -1093,11 +1146,14 @@ interface DrawerProps {
   book: Book;
   marks: BookMark[];
   current: number;
+  exam: ExamPreference;
+  onAddChapter: (chapterKey: string) => void;
+  onRemoveChapter: (from: number) => void;
   onJump: (page: number) => void;
   onClose: () => void;
 }
 
-const Drawer = ({ tab, onTab, doc, book, marks, current, onJump, onClose }: DrawerProps) => {
+const Drawer = ({ tab, onTab, doc, book, marks, current, exam, onAddChapter, onRemoveChapter, onJump, onClose }: DrawerProps) => {
   const [outline, setOutline] = useState<OutlineEntry[] | null>(null);
   useEffect(() => { void outlineOf(doc).then(setOutline, () => setOutline([])); }, [doc]);
 
@@ -1114,16 +1170,19 @@ const Drawer = ({ tab, onTab, doc, book, marks, current, onJump, onClose }: Draw
       <div className="bk-drawer-body">
         {tab === 'contents' && (
           <>
-            {book.sections.length > 0 && (
-              <section>
-                <h4>Syllabus chapters</h4>
-                {book.sections.map(s => (
-                  <button key={`${s.chapterKey}-${s.from}`} type="button" className="bk-row-btn" data-on={current >= s.from && current <= s.to ? 'true' : undefined} onClick={() => onJump(s.from)}>
-                    <span>{chapterOfKey(s.chapterKey)}</span><span className="bk-pg">p. {s.from}</span>
+            <section>
+              <h4>Chapters</h4>
+              {book.sections.length === 0 && <p className="bk-dim">No chapters yet. Go to the page a chapter starts on and add it here.</p>}
+              {[...book.sections].sort((a, b) => a.from - b.from).map(sec => (
+                <div key={`${sec.chapterKey}-${sec.from}`} className="bk-chap-row" data-on={current >= sec.from && current <= sec.to ? 'true' : undefined}>
+                  <button type="button" className="bk-row-btn" onClick={() => onJump(sec.from)}>
+                    <span>{chapterOfKey(sec.chapterKey)}</span><span className="bk-pg">p. {sec.from}–{sec.to}</span>
                   </button>
-                ))}
-              </section>
-            )}
+                  <button type="button" className="bk-chap-x" onClick={() => onRemoveChapter(sec.from)} aria-label={`Take ${chapterOfKey(sec.chapterKey)} off this book`} title="Take off this book">×</button>
+                </div>
+              ))}
+              <ChapterAdder book={book} current={current} exam={exam} onAdd={onAddChapter} />
+            </section>
             <section>
               <h4>In the file</h4>
               {outline === null ? <p className="bk-dim">Reading…</p> : outline.length === 0 ? <p className="bk-dim">This PDF has no contents of its own.</p> : outline.map((o, i) => (
@@ -1151,6 +1210,62 @@ const Drawer = ({ tab, onTab, doc, book, marks, current, onJump, onClose }: Draw
         {tab === 'search' && <Search doc={doc} onJump={onJump} />}
       </div>
     </aside>
+  );
+};
+
+/* ── This page starts a chapter ──
+   The way to map a book by hand: go to where a chapter begins (the page
+   field, or the book's own contents), then name it. Subject first when the
+   book has none, then class, then the chapter, from the student's syllabus. */
+const ChapterAdder = ({ book, current, exam, onAdd }: { book: Book; current: number; exam: ExamPreference; onAdd: (key: string) => void }) => {
+  const subjects = subjectsFor(exam) as BookSubject[];
+  const [open, setOpen] = useState(false);
+  const [subject, setSubject] = useState<BookSubject>(book.subject && subjects.includes(book.subject) ? book.subject : subjects[0]);
+  const [cls, setCls] = useState<11 | 12>(book.classId ?? 11);
+  const chapters = getChaptersFor(exam, cls, subject);
+  const taken = new Set(book.sections.map(x => x.chapterKey));
+  const [chapter, setChapter] = useState('');
+  const here = sectionAt(book, current);
+
+  if (!open) {
+    return (
+      <button type="button" className="bk-add-chap" onClick={() => setOpen(true)}>
+        <span aria-hidden="true">+</span> Page {current} starts a chapter
+      </button>
+    );
+  }
+  return (
+    <form
+      className="bk-adder"
+      onSubmit={e => { e.preventDefault(); if (!chapter) return; onAdd(`${cls}|${subject}|${chapter}`); setChapter(''); setOpen(false); }}
+    >
+      <p className="bk-adder-lead">
+        Which chapter starts on page {current}?
+        {here && <span> It is in {chapterOfKey(here.chapterKey)} now; that chapter will end on page {current - 1}.</span>}
+      </p>
+      {!book.subject && (
+        <div className="bk-adder-chips" role="radiogroup" aria-label="Subject">
+          {subjects.map(x => (
+            <button key={x} type="button" role="radio" aria-checked={subject === x} onClick={() => { setSubject(x); setChapter(''); }}>{x}</button>
+          ))}
+        </div>
+      )}
+      <div className="bk-adder-chips" role="radiogroup" aria-label="Class">
+        {([11, 12] as const).map(c => (
+          <button key={c} type="button" role="radio" aria-checked={cls === c} onClick={() => { setCls(c); setChapter(''); }}>Class {c}</button>
+        ))}
+      </div>
+      <select className="bk-input" value={chapter} onChange={e => setChapter(e.target.value)} aria-label="Chapter" autoFocus>
+        <option value="">Choose the chapter</option>
+        {chapters.map(c => (
+          <option key={c} value={c}>{c}{taken.has(`${cls}|${subject}|${c}`) ? ' · already in this book' : ''}</option>
+        ))}
+      </select>
+      <div className="bk-adder-actions">
+        <button type="button" className="bk-btn" onClick={() => setOpen(false)}>Cancel</button>
+        <button type="submit" className="bk-btn bk-primary" disabled={!chapter}>Add from page {current}</button>
+      </div>
+    </form>
   );
 };
 
