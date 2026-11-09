@@ -24,17 +24,22 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import {
   INKS, MAX_STROKES, PENS, SHAPES, STAMPS, commit, constrain, emptyBoard, erasedBy, fitView, historyOf, isPen, isShape,
   normalizeBoard, panBy, pushPoint, redo, roundPts, simplify, sizeFor, speedPressure, stampBox, stampById, stampStrokes,
-  toScreen, toWorld, undo, zoomAt, boxFrom, inkIn, type Background, type Board, type Box, type History, type ShapeKind, type StampDef, type Stroke, type StrokeKind,
+  toScreen, toWorld, undo, zoomAt, boxFrom, inkIn, cornersOf, imageAt, imagesIn, moveBy, placeImage, resizeImage, type Corner, type Background, type Board, type Box, type History, type ShapeKind, type StampDef, type Stroke, type StrokeKind,
   type Tool, type View,
 } from './board';
-import { SHEETS, drawBackground, drawStroke, drawStrokes, exportRegion, type SheetColor } from './boardDraw';
-import { getBoard, saveBoard } from './files';
+import { SHEETS, drawBackground, drawStroke, drawStrokes, exportRegion, type ImageCache, type SheetColor } from './boardDraw';
+import { getBoard, getBoardImage, pruneBoardImages, saveBoard, saveBoardImage } from './files';
+import { centreOf, moveEnd, perfect, recognize, scaleShape, shapePoints, type Pt, type Shape } from './quickshape';
 import './board.css';
 
 const PREFS_KEY = 'bk_board_prefs_v1';
 type SizeIx = 0 | 1 | 2;
-interface Prefs { tool: Tool; color: string; custom: string; shape: ShapeKind; stamp: string; size: Partial<Record<StrokeKind | 'eraser' | 'stamp', SizeIx>> }
-const DEFAULT_PREFS: Prefs = { tool: 'pen', color: 'ink', custom: '#0ca678', shape: 'line', stamp: 'benzene', size: {} };
+interface Prefs { tool: Tool; color: string; custom: string; shape: ShapeKind; stamp: string; size: Partial<Record<StrokeKind | 'eraser' | 'stamp', SizeIx>>; snap: boolean }
+const DEFAULT_PREFS: Prefs = { tool: 'pen', color: 'ink', custom: '#0ca678', shape: 'line', stamp: 'benzene', size: {}, snap: true };
+/** How long a pen must rest at the end of a stroke before it snaps to a shape (Procreate waits about as long). */
+const HOLD_MS = 450;
+/** A resting hand still trembles: movement under this many px does not restart the wait. */
+const HOLD_SLOP = 4;
 
 const readPrefs = (): Prefs => {
   try {
@@ -74,6 +79,12 @@ interface Props {
   onClose: () => void;
   /** A snip of the board, sent to a flashcard or the chapter's notes (the reader wires it; absent on the design board). */
   onSend?: (to: 'card' | 'notes', image: Blob) => void;
+  /** A diagram sent from the page, to be placed on the board; `key` tells one sending from the next. */
+  incoming?: { key: number; blob: Blob } | null;
+  /** The board has placed the incoming diagram (or could not): the sender can forget it. */
+  onIncomingDone?: () => void;
+  /** Start snipping the page, straight to this board. */
+  onFromPage?: () => void;
 }
 
 /* ── Icons ── */
@@ -118,7 +129,7 @@ const StampPic = ({ s }: { s: StampDef }) => {
 
 /* ── The panel ── */
 
-export default function Whiteboard({ owner, bookId, color, dock, size, minSize, maxSize, defaultSize, onResize, max, onMax, onClose, onSend }: Props) {
+export default function Whiteboard({ owner, bookId, color, dock, size, minSize, maxSize, defaultSize, onResize, max, onMax, onClose, onSend, incoming, onIncomingDone, onFromPage }: Props) {
   const [prefs, setPrefs] = useState<Prefs>(readPrefs);
   const [bg, setBg] = useState<Background>('dots');
   const [, setVersion] = useState(0);
@@ -153,10 +164,19 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
   }, [menu]);
   const [loaded, setLoaded] = useState(false);
   const [panning, setPanning] = useState(false);
+  /** The selected diagram's id (React's copy, for the bar; the gestures read S.current.sel). */
+  const [selected, setSelectedState] = useState<string | null>(null);
   /** Where the snip's bar sits (sheet px), once a snip is let go; `empty` when there is no ink in it. */
   const [snipAt, setSnipAt] = useState<null | { x: number; y: number; empty: boolean }>(null);
   const [snipBusy, setSnipBusy] = useState<null | 'card' | 'notes' | 'copy' | 'copied'>(null);
   const snipBarRef = useRef<HTMLDivElement>(null);
+  /** What a stroke snapped to: shown while it is held, then for a few seconds with a way back to the freehand. */
+  const [snapChip, setSnapChip] = useState<null | { label: string; id?: string; orig?: Stroke }>(null);
+  useEffect(() => {
+    if (!snapChip?.id) return;
+    const t = window.setTimeout(() => setSnapChip(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [snapChip]);
   /* The bar is centred under the snip, then measured and kept wholly on the sheet. */
   useLayoutEffect(() => {
     const bar = snipBarRef.current, sheetEl = bar?.parentElement;
@@ -191,6 +211,12 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     cursor: null as null | { x: number; y: number; r: number },
     /** The snip being dragged or waiting for an answer, in world units. */
     snip: null as null | Box,
+    /** Decoded pictures by id, and ones being fetched. */
+    images: new Map() as ImageCache,
+    fetching: new Set<string>(),
+    /** The selected diagram, and where a drag is putting it (not committed until release). */
+    sel: null as string | null,
+    moved: new Map<string, number[]>(),
     space: false,
     penSeen: false,
     dirty: false,
@@ -212,7 +238,7 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     if (s.baseDirty) {
       const b = s.base.getContext('2d')!;
       drawBackground(b, s.view, s.w, s.h, s.bg, s.sheet, s.dpr);
-      drawStrokes(b, s.hist.present, s.view, s.w, s.h, s.sheet, s.dpr, s.hidden);
+      drawStrokes(b, s.hist.present, s.view, s.w, s.h, s.sheet, s.dpr, s.hidden, s.images, s.moved);
       s.baseDirty = false;
     }
     const ctx = canvas.getContext('2d')!;
@@ -239,6 +265,24 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
       ctx.lineWidth = 1.5;
       ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
       ctx.setLineDash([]);
+    }
+    const sel = s.sel ? s.hist.present.find(st => st.id === s.sel) : null;
+    if (sel) {
+      // The selected diagram: a frame and four corner handles, in screen space so they stay one size.
+      const pts = s.moved.get(sel.id) ?? sel.pts;
+      const [ax, ay] = toScreen(s.view, pts[0], pts[1]);
+      const [bx, by] = toScreen(s.view, pts[2], pts[3]);
+      ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
+      ctx.strokeStyle = '#3d8eeb';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(ax, ay, bx - ax, by - ay);
+      for (const [hx, hy] of [[ax, ay], [bx, ay], [bx, by], [ax, by]]) {
+        ctx.beginPath();
+        ctx.arc(hx, hy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.stroke();
+      }
     }
     if (s.cursor) {
       ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
@@ -299,6 +343,27 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     scheduleSave(1200);
   }, [request, scheduleSave]);
 
+  /* ── Pictures: fetched from the device and decoded once, then drawn from memory ── */
+
+  const decodeImages = useCallback(() => {
+    const s = S.current;
+    for (const id of imagesIn(s.hist.present)) {
+      if (s.images.has(id) || s.fetching.has(id)) continue;
+      s.fetching.add(id);
+      getBoardImage(owner, id)
+        .then(blob => (blob ? createImageBitmap(blob) : null))
+        .then(bmp => { if (bmp) { s.images.set(id, bmp); request(true); } })
+        .catch(() => undefined)
+        .finally(() => s.fetching.delete(id));
+    }
+  }, [owner, request]);
+
+  const select = useCallback((id: string | null) => {
+    S.current.sel = id;
+    setSelectedState(id);
+    request();
+  }, [request]);
+
   /* ── Load this book's board ── */
 
   useEffect(() => {
@@ -309,12 +374,17 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
       const b = normalizeBoard(raw, bookId);
       const s = S.current;
       s.hist = historyOf(b.strokes);
+      s.sel = null;
+      setSelectedState(null);
+      // Pictures this board no longer uses go; undo only reaches back within a visit, so this is the moment.
+      void pruneBoardImages(owner, bookId, imagesIn(b.strokes)).catch(() => undefined);
       s.view = b.view;
       s.bg = b.bg;
       setBg(b.bg);
       setZoomPct(Math.round(b.view.z * 100));
       setVersion(v => v + 1);
       setLoaded(true);
+      decodeImages();
       request(true);
     }, () => { if (live) setLoaded(true); });
     return () => { live = false; };
@@ -347,13 +417,21 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
   /* ── Gestures ── */
 
   type Gesture =
-    | { mode: 'draw'; id: number; stroke: Stroke; lx: number; ly: number; lt: number; p: number }
+    | {
+      mode: 'draw'; id: number; stroke: Stroke; lx: number; ly: number; lt: number; p: number;
+      /** Where the pen came to rest, and the wait before it snaps. */
+      hx: number; hy: number; timer: number;
+      /** Once snapped: the shape as recognised, as adjusted since, the freehand it replaced, and what the adjusting measures from. */
+      snapped?: { base: Shape; shape: Shape; label: string; orig: Stroke; c: Pt; d0: number; p: number };
+    }
     | { mode: 'shape'; id: number; kind: ShapeKind; wx: number; wy: number }
     | { mode: 'stamp'; id: number; stamp: StampDef; wx: number; wy: number; sx: number; sy: number; moved: boolean }
     | { mode: 'erase'; id: number; wx: number; wy: number; r: number }
     | { mode: 'pan'; id: number; sx: number; sy: number; view: View }
     | { mode: 'pinch'; ids: [number, number]; d0: number; mx: number; my: number; view: View }
-    | { mode: 'snip'; id: number; wx: number; wy: number };
+    | { mode: 'snip'; id: number; wx: number; wy: number }
+    | { mode: 'imgmove'; id: number; img: string; wx: number; wy: number; pts: number[] }
+    | { mode: 'imgsize'; id: number; img: string; corner: Corner; pts: number[] };
   const G = useRef<Gesture | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const rect = useRef<DOMRect | null>(null);
@@ -368,7 +446,32 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
 
   const finishLive = () => { S.current.live = []; };
 
+  /* ── Hold to snap ── */
+
+  const holdFor = (g: Extract<Gesture, { mode: 'draw' }>) => {
+    window.clearTimeout(g.timer);
+    if (!prefsRef.current.snap || g.snapped) return;
+    g.timer = window.setTimeout(() => trySnap(g), HOLD_MS);
+  };
+
+  const trySnap = (g: Extract<Gesture, { mode: 'draw' }>) => {
+    const s = S.current;
+    if (G.current !== g || g.snapped) return;
+    const rec = recognize(g.stroke.pts, 16 / s.view.z);
+    if (!rec) return;
+    // The brush keeps a steady width once snapped; the other pens ignore pressure.
+    const p = g.stroke.kind === 'brush' ? 0.7 : 0.5;
+    const c = centreOf(rec.shape);
+    const [hx, hy] = toWorld(s.view, g.hx, g.hy);
+    g.snapped = { base: rec.shape, shape: rec.shape, label: rec.label, orig: { ...g.stroke, pts: g.stroke.pts.slice() }, c, d0: Math.max(1 / s.view.z, Math.hypot(hx - c[0], hy - c[1])), p };
+    s.live = [{ ...g.stroke, pts: shapePoints(rec.shape, p) }];
+    setSnapChip({ label: rec.label });
+    try { navigator.vibrate?.(8); } catch { /* not on this device */ }
+    request();
+  };
+
   const startPinch = () => {
+    if (G.current?.mode === 'draw') window.clearTimeout(G.current.timer);
     const ids = [...touches.current.keys()].slice(0, 2) as [number, number];
     const [a, b] = ids.map(id => touches.current.get(id)!);
     finishLive(); // a finger that began a line and then became a pinch drew nothing
@@ -381,6 +484,7 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     if (!loaded) return;
     setMenu(null);
     if (S.current.snip) clearSnip();
+    setSnapChip(null);
     wrapRef.current?.focus({ preventScroll: true });
     rect.current = wrapRef.current!.getBoundingClientRect();
     const [x, y] = local(e);
@@ -395,6 +499,24 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     const tool = prefsRef.current.tool;
     const [wx, wy] = toWorld(s.view, x, y);
     const fingerWhilePen = e.pointerType === 'touch' && s.penSeen;
+    // A corner of the selected diagram resizes it, whatever the tool.
+    const sel = s.sel ? s.hist.present.find(st => st.id === s.sel) : null;
+    if (sel && e.button === 0 && !s.space) {
+      const c = cornersOf(sel).findIndex(([cx, cy]) => { const [hx, hy] = toScreen(s.view, cx, cy); return Math.hypot(hx - x, hy - y) <= (e.pointerType === 'touch' ? 22 : 12); });
+      if (c >= 0) { G.current = { mode: 'imgsize', id: e.pointerId, img: sel.id, corner: c as Corner, pts: sel.pts }; return; }
+    }
+    // The Move tool picks up a diagram; on empty sheet it moves the view.
+    if (tool === 'hand' && e.button === 0 && !s.space && !fingerWhilePen) {
+      const hit = imageAt(s.hist.present, wx, wy);
+      if (hit) {
+        select(hit.id);
+        G.current = { mode: 'imgmove', id: e.pointerId, img: hit.id, wx, wy, pts: hit.pts };
+        return;
+      }
+      if (s.sel) select(null);
+    } else if (s.sel && !s.space && e.button === 0) {
+      select(null); // drawing on it puts the selection away
+    }
     if (tool === 'hand' || s.space || e.button === 1 || fingerWhilePen) {
       G.current = { mode: 'pan', id: e.pointerId, sx: x, sy: y, view: s.view };
       setPanning(true);
@@ -430,7 +552,9 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     const kind = tool as StrokeKind;
     const p = e.pointerType === 'pen' ? Math.max(0.05, e.pressure || 0.5) : 0.8;
     const stroke: Stroke = { id: newId(), kind, color, w: strokeWidth(kind), pts: [wx, wy, p] };
-    G.current = { mode: 'draw', id: e.pointerId, stroke, lx: x, ly: y, lt: e.timeStamp, p };
+    const draw: Gesture = { mode: 'draw', id: e.pointerId, stroke, lx: x, ly: y, lt: e.timeStamp, p, hx: x, hy: y, timer: 0 };
+    G.current = draw;
+    holdFor(draw);
     s.live = [stroke];
     request();
   };
@@ -459,6 +583,12 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     }
     if (g.id !== e.pointerId) return;
     if (g.mode === 'pan') { setView(panBy(g.view, x - g.sx, y - g.sy)); return; }
+    if (g.mode === 'imgmove' || g.mode === 'imgsize') {
+      const [px, py] = toWorld(s.view, x, y);
+      s.moved.set(g.img, g.mode === 'imgmove' ? moveBy(g.pts, px - g.wx, py - g.wy) : resizeImage(g.pts, g.corner, px, py, e.shiftKey, 16 / s.view.z));
+      request(true);
+      return;
+    }
     const [wx, wy] = toWorld(s.view, x, y);
     if (g.mode === 'snip') {
       s.snip = boxFrom(g.wx, g.wy, wx, wy);
@@ -484,6 +614,22 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
       request();
       return;
     }
+    // Snapped and still held: the shape follows the hand. A line's end goes where the pen goes;
+    // anything else grows or shrinks about its middle. Shift makes it exact.
+    if (g.snapped) {
+      const sn = g.snapped;
+      const [px, py] = toWorld(s.view, x, y);
+      let shape: Shape;
+      if (sn.base.type === 'line') shape = moveEnd(sn.base, [px, py], e.shiftKey);
+      else {
+        shape = scaleShape(sn.base, Math.max(0.05, Math.hypot(px - sn.c[0], py - sn.c[1]) / sn.d0));
+        if (e.shiftKey) shape = perfect(shape);
+      }
+      sn.shape = shape;
+      s.live = [{ ...g.stroke, pts: shapePoints(shape, sn.p) }];
+      request();
+      return;
+    }
     // A freehand stroke: every sample the browser kept, not only the last.
     const events = (e.nativeEvent.getCoalescedEvents?.() ?? []).length ? e.nativeEvent.getCoalescedEvents() : [e.nativeEvent];
     for (const ev of events) {
@@ -497,6 +643,8 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
       }
       if (pushPoint(g.stroke.pts, px, py, p, 0.75 / s.view.z)) { g.lx = ex; g.ly = ey; g.lt = ev.timeStamp; g.p = p; }
     }
+    // The pen moved on: the wait to snap starts again from here.
+    if (Math.hypot(x - g.hx, y - g.hy) > HOLD_SLOP) { g.hx = x; g.hy = y; holdFor(g); }
     request();
   };
 
@@ -513,8 +661,16 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     if (g.id === -1) { if (!touches.current.size) G.current = null; return; }
     if (g.id !== e.pointerId) return;
     G.current = null;
+    if (g.mode === 'draw') window.clearTimeout(g.timer);
     setPanning(false);
     if (g.mode === 'pan') return;
+    if (g.mode === 'imgmove' || g.mode === 'imgsize') {
+      const pts = s.moved.get(g.img);
+      s.moved.delete(g.img);
+      if (pts && e.type !== 'pointercancel') setStrokes(s.hist.present.map(st => (st.id === g.img ? { ...st, pts: roundPts(pts) } : st)));
+      else request(true);
+      return;
+    }
     if (g.mode === 'snip') {
       const b = s.snip;
       const [x0, y0] = b ? toScreen(s.view, b.x0, b.y0) : [0, 0];
@@ -556,6 +712,14 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
       setStrokes([...s.hist.present, { ...st, pts: roundPts(st.pts) }]);
       return;
     }
+    if (g.mode === 'draw' && g.snapped) {
+      // Kept as the pen that drew it, so a snapped highlighter line is still a highlighter.
+      const shaped: Stroke = { ...st, pts: roundPts(shapePoints(g.snapped.shape, g.snapped.p)) };
+      const orig: Stroke = { ...g.snapped.orig, pts: roundPts(simplify(g.snapped.orig.pts, 0.35 / s.view.z)) };
+      setStrokes([...s.hist.present, shaped]);
+      setSnapChip({ label: g.snapped.label, id: shaped.id, orig });
+      return;
+    }
     const pts = roundPts(simplify(st.pts, 0.35 / s.view.z));
     setStrokes([...s.hist.present, { ...st, pts }]);
   };
@@ -584,8 +748,61 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
 
   /* ── Actions ── */
 
-  const doUndo = useCallback(() => { const s = S.current; s.hist = undo(s.hist); setVersion(v => v + 1); request(true); scheduleSave(); }, [request, scheduleSave]);
-  const doRedo = useCallback(() => { const s = S.current; s.hist = redo(s.hist); setVersion(v => v + 1); request(true); scheduleSave(); }, [request, scheduleSave]);
+  const afterHistory = useCallback(() => {
+    const s = S.current;
+    if (s.sel && !s.hist.present.some(st => st.id === s.sel)) select(null);
+    decodeImages();
+    setVersion(v => v + 1);
+    request(true);
+    scheduleSave();
+  }, [request, scheduleSave, select, decodeImages]);
+  const doUndo = useCallback(() => { const s = S.current; s.hist = undo(s.hist); afterHistory(); }, [afterHistory]);
+  const doRedo = useCallback(() => { const s = S.current; s.hist = redo(s.hist); afterHistory(); }, [afterHistory]);
+
+  /* ── Diagrams ── */
+
+  /** Put a picture on the board, in the middle of the view, selected and ready to move or resize. */
+  const addImage = useCallback(async (blob: Blob) => {
+    const s = S.current;
+    const id = newId().replace(/[^a-z0-9]/g, '').slice(0, 24) || Math.random().toString(36).slice(2, 12);
+    const bmp = await createImageBitmap(blob);
+    await saveBoardImage(owner, { id, bookId, blob });
+    s.images.set(id, bmp);
+    const stroke: Stroke = { id: newId(), kind: 'image', color: 'ink', w: 0, pts: roundPts(placeImage(s.view, s.w, s.h, bmp.width, bmp.height)), img: id };
+    setStrokes([...s.hist.present, stroke]);
+    select(stroke.id);
+    setPref({ tool: 'hand' });
+    setNotice(null);
+  }, [owner, bookId, setStrokes, select, setPref]);
+
+  const [notice, setNotice] = useState<string | null>(null);
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!incoming || !loaded || handled.current === incoming.key) return;
+    handled.current = incoming.key;
+    addImage(incoming.blob).catch(e => setNotice(e instanceof Error && e.message.includes('space') ? e.message : "Couldn't bring that picture over.")).finally(() => onIncomingDone?.());
+  }, [incoming, loaded, addImage, onIncomingDone]);
+
+  const selStroke = selected ? S.current.hist.present.find(st => st.id === selected) ?? null : null;
+  const toggleFade = () => {
+    if (!selStroke) return;
+    setStrokes(S.current.hist.present.map(st => (st.id === selStroke.id ? { ...st, fade: !st.fade || undefined } : st)));
+  };
+  const deleteSelected = () => {
+    if (!selStroke) return;
+    setStrokes(S.current.hist.present.filter(st => st.id !== selStroke.id));
+    select(null);
+  };
+  const drawOnIt = () => { select(null); setPref({ tool: prefs.tool === 'hand' ? 'pen' : prefs.tool }); wrapRef.current?.focus(); };
+
+  /* A picture pasted onto the board lands like one sent from the page. */
+  const onPaste = (e: React.ClipboardEvent) => {
+    const file = [...(e.clipboardData?.files ?? [])].find(f => f.type.startsWith('image/'));
+    if (!file) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void addImage(file).catch(() => setNotice("Couldn't add that picture."));
+  };
   const fit = () => {
     const s = S.current;
     setView(fitView(s.hist.present, s.w, s.h) ?? { x: -s.w / 2, y: -s.h / 2, z: 1 });
@@ -596,8 +813,17 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
 
   /* ── Snips ── */
 
+  /* The snap was not wanted: the stroke goes back to how it was drawn, as one more step of undo. */
+  const keepFreehand = () => {
+    const c = snapChip;
+    if (!c?.id || !c.orig) return;
+    const orig = c.orig;
+    setStrokes(S.current.hist.present.map(st => (st.id === c.id ? orig : st)));
+    setSnapChip(null);
+  };
+
   const clearSnip = () => { S.current.snip = null; setSnipAt(null); setSnipBusy(null); request(); };
-  const snipImage = () => (S.current.snip ? exportRegion(S.current.hist.present, S.current.snip) : Promise.resolve(null));
+  const snipImage = () => (S.current.snip ? exportRegion(S.current.hist.present, S.current.snip, 1600, S.current.images) : Promise.resolve(null));
 
   const sendSnip = async (to: 'card' | 'notes') => {
     if (!onSend) return;
@@ -632,6 +858,8 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
     else if (k === 'e') setPref({ tool: 'eraser' });
     else if (k === 'h') setPref({ tool: 'hand' });
     else if (k === 's') setPref({ tool: 'snip' });
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && S.current.sel) deleteSelected();
+    else if (e.key === 'Escape' && S.current.sel) select(null);
     else if (e.key === 'Escape') { if (S.current.snip) clearSnip(); else if (menu) setMenu(null); else if (max) onMax(false); else wrapRef.current?.blur(); }
     else handled = false;
     if (handled) { e.preventDefault(); e.stopPropagation(); }
@@ -717,12 +945,22 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
                   </button>
                 ))}
               </div>
+              <button type="button" role="menuitemcheckbox" aria-checked={prefs.snap} className="bkw-mi bkw-check" onClick={() => setPref({ snap: !prefs.snap })}>
+                <span>Snap shapes<small>Hold at the end of a stroke to straighten a line or round a circle.</small></span>
+                <i aria-hidden="true" />
+              </button>
               <button type="button" role="menuitem" className="bkw-mi" onClick={() => { setMenu(null); fit(); }}>Show all my work</button>
               <button type="button" role="menuitem" className="bkw-mi" data-danger="true" onClick={clear} disabled={!hist.present.length}>Clear the board</button>
               <p className="bkw-menu-note">Clearing can be undone. The board is saved on this device, with this book.</p>
             </div>
           )}
         </div>
+        {onFromPage && (
+          <button type="button" className="bkw-ib bkw-from" onClick={onFromPage} aria-label="Bring a diagram from the page" title="Bring a diagram from the page">
+            <I d="M6.5 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6.5 19.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8.6 8.4l4.4 3.6M8.6 15.6l4.4-3.6M14 12h7M18 9l3 3-3 3" />
+            {(max || dock === 'bottom' || size >= 400) && <span>From the page</span>}
+          </button>
+        )}
         <button type="button" className="bkw-ib" onClick={() => onMax(!max)} aria-pressed={max} aria-label={max ? 'Back beside the book' : 'Full screen'} title={max ? 'Back beside the book' : 'Full screen'}>
           {max ? <I d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <I d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
         </button>
@@ -831,6 +1069,7 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
         data-panning={panning ? 'true' : undefined}
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
+        onPaste={onPaste}
         style={{ background: sheet.bg }}
       >
         <canvas
@@ -843,6 +1082,21 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
           onPointerLeave={onLeave}
           onContextMenu={e => e.preventDefault()}
         />
+        {selStroke && (
+          <div className="bkw-selbar" role="toolbar" aria-label="Diagram" onPointerDown={e => e.stopPropagation()}>
+            <span className="bkw-selhint">Drag to move · corners resize</span>
+            <button type="button" onClick={drawOnIt}>Draw on it</button>
+            <button type="button" onClick={toggleFade} aria-pressed={!!selStroke.fade}>{selStroke.fade ? 'Full' : 'Fade'}</button>
+            <button type="button" className="bkw-seldel" onClick={deleteSelected}>Delete</button>
+          </div>
+        )}
+        {notice && <p className="bkw-notice" role="alert" onClick={() => setNotice(null)}>{notice}</p>}
+        {snapChip && (
+          <div className="bkw-snapchip" role="status" onPointerDown={e => e.stopPropagation()}>
+            <span>{snapChip.label}</span>
+            {snapChip.id && snapChip.orig && <button type="button" onClick={keepFreehand}>Keep freehand</button>}
+          </div>
+        )}
         {snipAt && (
           <div ref={snipBarRef} className="bkw-snipbar" role="toolbar" aria-label="Send the snip" style={{ left: snipAt.x, top: snipAt.y }} onPointerDown={e => e.stopPropagation()}>
             {snipAt.empty ? (
@@ -863,6 +1117,7 @@ export default function Whiteboard({ owner, bookId, color, dock, size, minSize, 
           <p className="bkw-empty" style={{ color: sheet.dark ? 'rgba(255,255,255,0.4)' : 'rgba(24,24,27,0.4)' }}>
             Scratch space for this book. Work the sum here.
             <span>Scroll or two fingers to move · ⌘ + scroll or pinch to zoom</span>
+            {prefs.snap && <span>Hold at the end of a stroke to snap it to a shape</span>}
           </p>
         )}
         <div className="bkw-zoom">

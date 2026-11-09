@@ -18,8 +18,9 @@
 
 export type PenKind = 'pen' | 'pencil' | 'marker' | 'brush';
 export type ShapeKind = 'line' | 'arrow' | 'rect' | 'ellipse';
-export type StrokeKind = PenKind | ShapeKind;
-export type Tool = StrokeKind | 'eraser' | 'hand' | 'stamp' | 'snip';
+/** 'image' is a picture on the board (a diagram snipped from the page): moved and resized, drawn over, never erased. */
+export type StrokeKind = PenKind | ShapeKind | 'image';
+export type Tool = Exclude<StrokeKind, 'image'> | 'eraser' | 'hand' | 'stamp' | 'snip';
 export type Background = 'dots' | 'grid' | 'lines' | 'blank';
 
 export interface Stroke {
@@ -30,6 +31,10 @@ export interface Stroke {
   /** Width in world units. */
   w: number;
   pts: number[];
+  /** An image's picture, by id in the book's `boardImages` store (books/files.ts). */
+  img?: string;
+  /** An image shown faint, so working drawn over it stands out. */
+  fade?: boolean;
 }
 
 export interface View { x: number; y: number; z: number }
@@ -58,6 +63,7 @@ export const SIZES: Record<StrokeKind | 'eraser', [number, number, number]> = {
   rect: [2, 3.5, 6],
   ellipse: [2, 3.5, 6],
   eraser: [8, 16, 32],
+  image: [0, 0, 0],
 };
 /** Stamps draw with the shapes' widths. */
 export const sizeFor = (tool: StrokeKind | 'eraser' | 'stamp', i: 0 | 1 | 2): number => SIZES[tool === 'stamp' ? 'line' : tool][i];
@@ -178,6 +184,7 @@ const segDist = (px: number, py: number, ax: number, ay: number, bx: number, by:
 
 /** Does a circle of radius `r` at (x, y) touch the stroke's ink? */
 export const hits = (s: Stroke, x: number, y: number, r: number): boolean => {
+  if (s.kind === 'image') return inImage(s, x, y, r);
   const b = boxOf(s);
   if (x < b.x0 - r || x > b.x1 + r || y < b.y0 - r || y > b.y1 + r) return false;
   const reach = r + s.w / 2;
@@ -204,7 +211,7 @@ export const erasedBy = (strokes: Stroke[], ax: number, ay: number, bx: number, 
   const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / Math.max(1, r * 0.75)));
   const out: string[] = [];
   for (const s of strokes) {
-    if (skip.has(s.id)) continue;
+    if (skip.has(s.id) || s.kind === 'image') continue; // the eraser takes ink, never the diagram under it
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       if (hits(s, ax + (bx - ax) * t, ay + (by - ay) * t, r)) { out.push(s.id); break; }
@@ -280,7 +287,8 @@ export const fitView = (strokes: Stroke[], w: number, h: number, margin = 40): V
 /* ── Reading a saved board back ── */
 
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-const KINDS: StrokeKind[] = [...PENS, ...SHAPES];
+const KINDS: StrokeKind[] = [...PENS, ...SHAPES, 'image'];
+const IMG_ID = /^[a-z0-9]{6,40}$/;
 
 export const normalizeBoard = (raw: unknown, bookId: string): Board => {
   const b = emptyBoard(bookId);
@@ -298,6 +306,11 @@ export const normalizeBoard = (raw: unknown, bookId: string): Board => {
     const kind = o.kind as StrokeKind;
     const pts = Array.isArray(o.pts) ? o.pts.filter((p): p is number => typeof p === 'number' && Number.isFinite(p)) : [];
     if (isPen(kind) ? pts.length < 3 || pts.length % 3 : pts.length !== 4) continue;
+    if (kind === 'image') {
+      if (typeof o.img !== 'string' || !IMG_ID.test(o.img)) continue;
+      b.strokes.push({ id: o.id, kind, color: 'ink', w: 0, pts: pts.slice(0, 4), img: o.img, ...(o.fade === true ? { fade: true } : {}) });
+      continue;
+    }
     const color = o.color === 'ink' || (typeof o.color === 'string' && HEX.test(o.color)) ? o.color : 'ink';
     b.strokes.push({ id: o.id, kind, color, w: Math.min(500, Math.max(0.05, num(o.w, 2))), pts: pts.slice(0, MAX_PTS) });
   }
@@ -422,3 +435,62 @@ export const stampStrokes = (s: StampDef, x0: number, y0: number, x1: number, y1
   for (const [ccx, ccy, r] of s.circles ?? []) out.push({ id: id(n++), kind: 'ellipse', color, w, pts: [X(ccx - r), Y(ccy - r), X(ccx + r), Y(ccy + r)] });
   return out;
 };
+
+/* ── Images: diagrams brought over from the page ── */
+
+/** Inside an image's box (plus `r`)? */
+export const inImage = (s: Stroke, x: number, y: number, r = 0): boolean => {
+  const [x0, y0, x1, y1] = s.pts;
+  return x >= Math.min(x0, x1) - r && x <= Math.max(x0, x1) + r && y >= Math.min(y0, y1) - r && y <= Math.max(y0, y1) + r;
+};
+
+/** The topmost image under a point. Images sit under all ink, so ink never hides one from a tap. */
+export const imageAt = (strokes: Stroke[], x: number, y: number): Stroke | null => {
+  for (let i = strokes.length - 1; i >= 0; i--) if (strokes[i].kind === 'image' && inImage(strokes[i], x, y)) return strokes[i];
+  return null;
+};
+
+/** Every picture a board still uses (the rest can be deleted from the device). */
+export const imagesIn = (strokes: Stroke[]): Set<string> => new Set(strokes.flatMap(s => (s.kind === 'image' && s.img ? [s.img] : [])));
+
+export type Corner = 0 | 1 | 2 | 3; // top-left, top-right, bottom-right, bottom-left
+
+export const cornersOf = (s: Stroke): [number, number][] => {
+  const [x0, y0, x1, y1] = s.pts;
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+};
+
+/**
+ * A picture `pw`×`ph` px placed in the middle of the view, at most 70% of
+ * it either way and never larger than half its pixels (a 1600 px snip of a
+ * page lands about the size the page showed it).
+ */
+export const placeImage = (v: View, w: number, h: number, pw: number, ph: number): number[] => {
+  const k = Math.min((0.7 * w) / v.z / pw, (0.7 * h) / v.z / ph, 0.5 / v.z);
+  const iw = pw * k, ih = ph * k;
+  const cx = v.x + w / 2 / v.z, cy = v.y + h / 2 / v.z;
+  return [cx - iw / 2, cy - ih / 2, cx + iw / 2, cy + ih / 2];
+};
+
+/**
+ * Drag corner `c` of an image to (x, y): the opposite corner stays put. The
+ * picture keeps its shape unless `free` (Shift); it never turns inside out
+ * or shrinks below `min`.
+ */
+export const resizeImage = (pts: number[], c: Corner, x: number, y: number, free: boolean, min: number): number[] => {
+  const [x0, y0, x1, y1] = pts;
+  const corners: [number, number][] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  const [ax, ay] = corners[(c + 2) % 4];
+  const [cx, cy] = corners[c];
+  const sx = Math.sign(cx - ax) || 1, sy = Math.sign(cy - ay) || 1;
+  let w = Math.max(min, (x - ax) * sx);
+  let h = Math.max(min, (y - ay) * sy);
+  if (!free) {
+    const aspect = Math.abs(x1 - x0) / Math.max(1e-6, Math.abs(y1 - y0));
+    if (w / h > aspect) h = w / aspect; else w = h * aspect;
+  }
+  const nx = ax + sx * w, ny = ay + sy * h;
+  return [Math.min(ax, nx), Math.min(ay, ny), Math.max(ax, nx), Math.max(ay, ny)];
+};
+
+export const moveBy = (pts: number[], dx: number, dy: number): number[] => [pts[0] + dx, pts[1] + dy, pts[2] + dx, pts[3] + dy];

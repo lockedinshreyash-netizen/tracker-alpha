@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  boxFrom, commit, constrain, emptyBoard, inkIn, erasedBy, fitView, hits, historyOf, normalizeBoard, panBy, pushPoint, redo, simplify,
+  boxFrom, commit, constrain, emptyBoard, imageAt, imagesIn, inkIn, moveBy, placeImage, resizeImage, erasedBy, fitView, hits, historyOf, normalizeBoard, panBy, pushPoint, redo, simplify,
   speedPressure, STAMPS, stampBox, stampById, stampStrokes, toScreen, toWorld, undo, zoomAt, type Stroke,
 } from '../board';
 
@@ -155,4 +155,44 @@ test('a snip is the box between the corners, and knows whether it holds any ink'
   assert.equal(inkIn([line], boxFrom(40, -5, 60, 5)), true);
   assert.equal(inkIn([line], boxFrom(40, 50, 60, 80)), false);
   assert.equal(inkIn([], boxFrom(0, 0, 10, 10)), false);
+});
+
+test('a diagram lands in the middle of the view, no bigger than 70% of it', () => {
+  const pts = placeImage({ x: 0, y: 0, z: 1 }, 800, 600, 1600, 400);
+  close((pts[0] + pts[2]) / 2, 400); close((pts[1] + pts[3]) / 2, 300);
+  assert.ok(pts[2] - pts[0] <= 560 + 1e-9);
+  close((pts[2] - pts[0]) / (pts[3] - pts[1]), 4); // its shape is kept
+});
+
+test('dragging a corner keeps the picture shape and the opposite corner still; Shift frees it', () => {
+  const pts = [0, 0, 200, 100];
+  // Bottom-right corner out to (300, 120): wider wins, height follows at 2:1.
+  assert.deepEqual(resizeImage(pts, 2, 300, 120, false, 10), [0, 0, 300, 150]);
+  // Top-left corner in: the bottom-right corner stays at (200, 100).
+  const tl = resizeImage(pts, 0, 100, 60, false, 10);
+  assert.deepEqual([tl[2], tl[3]], [200, 100]);
+  close((tl[2] - tl[0]) / (tl[3] - tl[1]), 2);
+  assert.deepEqual(resizeImage(pts, 2, 300, 300, true, 10), [0, 0, 300, 300]);
+  // Dragged past the opposite corner, it stops at the minimum instead of turning inside out.
+  const tiny = resizeImage(pts, 2, -50, -50, true, 10);
+  assert.deepEqual(tiny, [0, 0, 10, 10]);
+});
+
+test('a tap finds the diagram under it; the eraser never takes one', () => {
+  const img: Stroke = { id: 'i', kind: 'image', color: 'ink', w: 0, pts: [0, 0, 100, 100], img: 'abc123' };
+  const ink = pen('p', [10, 50, 1, 90, 50, 1]);
+  assert.equal(imageAt([img, ink], 50, 50)?.id, 'i');
+  assert.equal(imageAt([img, ink], 150, 50), null);
+  assert.deepEqual(erasedBy([img, ink], 50, 40, 50, 60, 4, new Set()), ['p']);
+  assert.deepEqual([...imagesIn([img, ink])], ['abc123']);
+  assert.deepEqual(moveBy([0, 0, 10, 10], 5, -5), [5, -5, 15, 5]);
+});
+
+test('a saved diagram reads back; one with a bad picture id does not', () => {
+  const b = normalizeBoard({ strokes: [
+    { id: 'a', kind: 'image', pts: [0, 0, 10, 10], img: 'abc123', fade: true, color: '#ff0000', w: 5 },
+    { id: 'b', kind: 'image', pts: [0, 0, 10, 10], img: '../../etc' },
+    { id: 'c', kind: 'image', pts: [0, 0, 10], img: 'abc123' },
+  ] }, 'book');
+  assert.deepEqual(b.strokes, [{ id: 'a', kind: 'image', color: 'ink', w: 0, pts: [0, 0, 10, 10], img: 'abc123', fade: true }]);
 });

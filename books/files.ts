@@ -6,6 +6,7 @@
    files   fingerprint → { fingerprint, blob, bytes, savedAt }
    thumbs  fingerprint → { fingerprint, blob }   page 1, small, for the cover
    boards  bookId → the book's whiteboard (books/board.ts), since version 2
+   boardImages  id → { id, bookId, blob }: diagrams brought to a board, since version 3
 
    Keyed by the file's SHA-256, not the book's id: the file is the content,
    so the same PDF added on a second device (or re-added after removing it)
@@ -18,10 +19,11 @@
 
 import { booksDbName, trackLearnConnection, untrackLearnConnection } from '../learn/forget';
 
-const VERSION = 2;
+const VERSION = 3;
 const FILES = 'files';
 const THUMBS = 'thumbs';
 const BOARDS = 'boards';
+const BOARD_IMAGES = 'boardImages';
 
 interface FileRow { fingerprint: string; blob: Blob; bytes: number; savedAt: number }
 interface ThumbRow { fingerprint: string; blob: Blob }
@@ -50,6 +52,7 @@ const open = (owner: string): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(FILES)) db.createObjectStore(FILES, { keyPath: 'fingerprint' });
       if (!db.objectStoreNames.contains(THUMBS)) db.createObjectStore(THUMBS, { keyPath: 'fingerprint' });
       if (!db.objectStoreNames.contains(BOARDS)) db.createObjectStore(BOARDS, { keyPath: 'bookId' });
+      if (!db.objectStoreNames.contains(BOARD_IMAGES)) db.createObjectStore(BOARD_IMAGES, { keyPath: 'id' }).createIndex('bookId', 'bookId');
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -160,6 +163,41 @@ export const saveBoard = (owner: string, row: { bookId: string }): Promise<void>
     const tx = db.transaction(BOARDS, 'readwrite');
     tx.objectStore(BOARDS).put(row);
     await done(tx);
+  });
+
+/* A diagram on a board: the picture is kept apart from the board's row, which only names it. */
+
+export class BoardImageFullError extends Error {
+  constructor() { super('This device is out of space for pictures.'); }
+}
+
+export const saveBoardImage = (owner: string, row: { id: string; bookId: string; blob: Blob }): Promise<void> =>
+  withDb(owner, async db => {
+    try {
+      const tx = db.transaction(BOARD_IMAGES, 'readwrite');
+      tx.objectStore(BOARD_IMAGES).put(row);
+      await done(tx);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') throw new BoardImageFullError();
+      throw e;
+    }
+  });
+
+export const getBoardImage = (owner: string, id: string): Promise<Blob | null> =>
+  withDb(owner, async db => {
+    const row = (await wrap(db.transaction(BOARD_IMAGES).objectStore(BOARD_IMAGES).get(id))) as { blob: Blob } | undefined;
+    return row?.blob ?? null;
+  });
+
+/** Delete this book's pictures that the board no longer uses. Run when a board opens, so undo within a visit can always bring one back. */
+export const pruneBoardImages = (owner: string, bookId: string, keep: Set<string>): Promise<number> =>
+  withDb(owner, async db => {
+    const tx = db.transaction(BOARD_IMAGES, 'readwrite');
+    const ids = (await wrap(tx.objectStore(BOARD_IMAGES).index('bookId').getAllKeys(bookId))) as string[];
+    const gone = ids.filter(id => !keep.has(id));
+    for (const id of gone) tx.objectStore(BOARD_IMAGES).delete(id);
+    await done(tx);
+    return gone.length;
   });
 
 export interface StorageInfo { used: number; quota: number; persisted: boolean }

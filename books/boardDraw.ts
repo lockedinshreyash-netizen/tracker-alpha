@@ -16,13 +16,17 @@ import { arrowHead, boxOf, isPen, overlaps, shapeOutline, viewBox, type Backgrou
 
 export type SheetColor = 'paper' | 'sepia' | 'night' | 'oled';
 
-export interface Sheet { bg: string; ink: string; mark: string; dark: boolean }
+export interface Sheet {
+  bg: string; ink: string; mark: string; dark: boolean;
+  /** How a picture from the page is shown on this sheet: the same treatment the reader gives the page itself. */
+  imageFilter: string;
+}
 
 export const SHEETS: Record<SheetColor, Sheet> = {
-  paper: { bg: '#ffffff', ink: '#18181b', mark: 'rgba(24, 24, 27, 0.16)', dark: false },
-  sepia: { bg: '#fbf5e6', ink: '#2e2416', mark: 'rgba(80, 60, 30, 0.2)', dark: false },
-  night: { bg: '#1c1c1f', ink: '#f4f4f5', mark: 'rgba(255, 255, 255, 0.13)', dark: true },
-  oled: { bg: '#000000', ink: '#fafafa', mark: 'rgba(255, 255, 255, 0.16)', dark: true },
+  paper: { bg: '#ffffff', ink: '#18181b', mark: 'rgba(24, 24, 27, 0.16)', dark: false, imageFilter: 'none' },
+  sepia: { bg: '#fbf5e6', ink: '#2e2416', mark: 'rgba(80, 60, 30, 0.2)', dark: false, imageFilter: 'sepia(0.35) saturate(0.85) brightness(0.97)' },
+  night: { bg: '#1c1c1f', ink: '#f4f4f5', mark: 'rgba(255, 255, 255, 0.13)', dark: true, imageFilter: 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(0.92)' },
+  oled: { bg: '#000000', ink: '#fafafa', mark: 'rgba(255, 255, 255, 0.16)', dark: true, imageFilter: 'invert(1) hue-rotate(180deg) contrast(1.25)' },
 };
 
 export const inkOf = (color: string, sheet: Sheet): string => (color === 'ink' ? sheet.ink : color);
@@ -71,7 +75,29 @@ const dot = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, col
   ctx.fill();
 };
 
-export const drawStroke = (ctx: CanvasRenderingContext2D, s: Stroke, sheet: Sheet) => {
+/** Pictures by id, decoded once (books/Whiteboard.tsx keeps them). */
+export type ImageCache = Map<string, CanvasImageSource & { width: number; height: number }>;
+
+/** A picture from the page, filtered for the sheet like the page itself; a dashed box until it has loaded. */
+export const drawImage = (ctx: CanvasRenderingContext2D, s: Stroke, sheet: Sheet, images?: ImageCache) => {
+  const [x0, y0, x1, y1] = s.pts;
+  const bmp = s.img ? images?.get(s.img) : undefined;
+  ctx.save();
+  if (bmp) {
+    if (s.fade) ctx.globalAlpha = 0.4;
+    if (sheet.imageFilter !== 'none') ctx.filter = sheet.imageFilter;
+    ctx.drawImage(bmp, x0, y0, x1 - x0, y1 - y0);
+  } else {
+    ctx.strokeStyle = sheet.mark;
+    ctx.lineWidth = 1.5 / Math.max(0.1, ctx.getTransform().a);
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  ctx.restore();
+};
+
+export const drawStroke = (ctx: CanvasRenderingContext2D, s: Stroke, sheet: Sheet, images?: ImageCache) => {
+  if (s.kind === 'image') { drawImage(ctx, s, sheet, images); return; }
   const color = inkOf(s.color, sheet);
   const n = s.pts.length / 3;
   ctx.save();
@@ -128,13 +154,20 @@ export const drawStroke = (ctx: CanvasRenderingContext2D, s: Stroke, sheet: Shee
 };
 
 /** Every visible stroke, skipping those being erased. */
-export const drawStrokes = (ctx: CanvasRenderingContext2D, strokes: Stroke[], v: View, w: number, h: number, sheet: Sheet, dpr: number, hidden?: Set<string>) => {
+/** Every visible stroke, skipping those being erased. Pictures first: ink is always drawn over a diagram. */
+export const drawStrokes = (
+  ctx: CanvasRenderingContext2D, strokes: Stroke[], v: View, w: number, h: number, sheet: Sheet, dpr: number,
+  hidden?: Set<string>, images?: ImageCache, moved?: Map<string, number[]>,
+) => {
   const vb = viewBox(v, w, h);
   ctx.setTransform(dpr * v.z, 0, 0, dpr * v.z, -v.x * v.z * dpr, -v.y * v.z * dpr);
-  for (const s of strokes) {
-    if (hidden?.has(s.id)) continue;
-    if (!overlaps(boxOf(s), vb)) continue;
-    drawStroke(ctx, s, sheet);
+  for (const pass of [true, false]) {
+    for (const raw of strokes) {
+      if ((raw.kind === 'image') !== pass || hidden?.has(raw.id)) continue;
+      const s = moved?.has(raw.id) ? { ...raw, pts: moved.get(raw.id)! } : raw;
+      if (!overlaps(s === raw ? boxOf(s) : { x0: Math.min(s.pts[0], s.pts[2]), y0: Math.min(s.pts[1], s.pts[3]), x1: Math.max(s.pts[0], s.pts[2]), y1: Math.max(s.pts[1], s.pts[3]) }, vb)) continue;
+      drawStroke(ctx, s, sheet, images);
+    }
   }
 };
 
@@ -144,7 +177,7 @@ export const drawStrokes = (ctx: CanvasRenderingContext2D, strokes: Stroke[], v:
  * colour, because it will be read on a card or a page that has its own.
  * The longer side is at most `maxSide` px, and at most 4× the board's units.
  */
-export const exportRegion = (strokes: Stroke[], b: Box, maxSide = 1600): Promise<Blob | null> => {
+export const exportRegion = (strokes: Stroke[], b: Box, maxSide = 1600, images?: ImageCache): Promise<Blob | null> => {
   const ww = Math.max(1, b.x1 - b.x0), wh = Math.max(1, b.y1 - b.y0);
   const k = Math.min(maxSide / Math.max(ww, wh), 4);
   const cw = Math.max(1, Math.round(ww * k)), ch = Math.max(1, Math.round(wh * k));
@@ -154,6 +187,6 @@ export const exportRegion = (strokes: Stroke[], b: Box, maxSide = 1600): Promise
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = SHEETS.paper.bg;
   ctx.fillRect(0, 0, cw, ch);
-  drawStrokes(ctx, strokes, { x: b.x0, y: b.y0, z: k }, cw, ch, SHEETS.paper, 1);
+  drawStrokes(ctx, strokes, { x: b.x0, y: b.y0, z: k }, cw, ch, SHEETS.paper, 1, undefined, images);
   return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
 };

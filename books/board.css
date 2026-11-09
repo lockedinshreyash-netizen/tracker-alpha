@@ -251,3 +251,68 @@
 .bkw-sheet[data-tool='snip'] .bkw-canvas { cursor: crosshair; }
 @keyframes bkw-in { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .bkw-snipbar { animation: none; } }
+
+/* Hold to snap: what the stroke became, and the way back. Bottom-left, clear of the zoom pill. */
+.bkw-snapchip {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 3px 3px 12px;
+  border-radius: 999px;
+  background: var(--bk-bar, rgba(28, 28, 31, 0.92));
+  border: 1px solid var(--bk-line, rgba(255, 255, 255, 0.08));
+  box-shadow: var(--bk-shadow, 0 10px 24px rgba(0, 0, 0, 0.4));
+  font: 700 12px/1 var(--font-ui, sans-serif);
+  color: var(--bk-ink, #fff);
+  animation: bkw-chip 140ms ease-out;
+}
+.bkw-snapchip:not(:has(button)) { padding-right: 12px; height: 34px; }
+.bkw-snapchip button { height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--bk-hover, rgba(255, 255, 255, 0.07)); color: var(--bk-text, #e4e4e7); font: 700 12px/1 var(--font-ui, sans-serif); cursor: pointer; }
+.bkw-snapchip button:hover { background: var(--bk-press, rgba(255, 255, 255, 0.12)); color: var(--bk-ink, #fff); }
+@keyframes bkw-chip { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bkw-snapchip { animation: none; } }
+
+/* A setting in the board's menu: words on the left, a switch on the right. */
+.bkw-check { display: flex; align-items: center; gap: 12px; }
+.bkw-check span { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.bkw-check small { font-weight: 500; font-size: 11px; line-height: 1.35; color: var(--bk-faint, #71717a); }
+.bkw-check i { position: relative; flex-shrink: 0; width: 30px; height: 18px; border-radius: 999px; background: var(--bk-press, rgba(255, 255, 255, 0.12)); transition: background 150ms ease; }
+.bkw-check i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 999px; background: var(--bk-pop, #1f1f23); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 150ms ease; }
+.bkw-check[aria-checked='true'] i { background: var(--bk-ink, #fff); }
+.bkw-check[aria-checked='true'] i::after { transform: translateX(12px); }
+
+/* "From the page": the one labelled button in the header, because it is the way a diagram gets here. */
+.bkw-from { width: auto; padding: 0 10px 0 8px; gap: 6px; grid-auto-flow: column; color: var(--bk-text, #e4e4e7); font: 700 12px/1 var(--font-ui, sans-serif); white-space: nowrap; }
+@media (max-width: 380px) { .bkw-from span { display: none; } }
+
+/* A selected diagram: what you can do with it, along the top of the sheet. */
+.bkw-selbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 20px);
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--bk-pop, #1f1f23);
+  border: 1px solid var(--bk-line-strong, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--bk-shadow, 0 12px 30px rgba(0, 0, 0, 0.45));
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bkw-selbar button { height: 30px; padding: 0 11px; border: 0; border-radius: 8px; background: none; color: var(--bk-ink, #fff); font: 700 12px/1 var(--font-ui, sans-serif); cursor: pointer; flex-shrink: 0; }
+.bkw-selbar button:hover { background: var(--bk-hover, rgba(255, 255, 255, 0.07)); }
+.bkw-selbar button[aria-pressed='true'] { background: var(--bk-press, rgba(255, 255, 255, 0.12)); }
+.bkw-selbar .bkw-seldel { color: #e5484d; }
+.bkw-selhint { padding: 0 8px; font-size: 11px; color: var(--bk-faint, #71717a); flex-shrink: 0; }
+@media (max-width: 520px) { .bkw-selhint { display: none; } }
+.bkw-notice { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 4; margin: 0; padding: 8px 12px; border-radius: 10px; background: #e5484d; color: #fff; font: 700 12px/1.3 var(--font-ui, sans-serif); cursor: pointer; }

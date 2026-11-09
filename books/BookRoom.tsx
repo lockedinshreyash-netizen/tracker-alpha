@@ -284,6 +284,11 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   const [boardOpen, setBoardOpen] = useState(false);
   const [boardMax, setBoardMax] = useState(false);
   const [boardSize, setBoardSize] = useState(readBoardSize);
+  /** A diagram on its way to the board, and whether the snip being made is for the board (no mark is left on the page). */
+  const [toBoard, setToBoard] = useState<{ key: number; blob: Blob } | null>(null);
+  const [snipForBoard, setSnipForBoard] = useState(false);
+  const snipForBoardRef = useRef(false);
+  snipForBoardRef.current = snipForBoard;
   const [layoutPref, setLayoutPref] = useState<PageLayout>(readLayout);
   const [stage, setStage] = useState<[number, number]>([window.innerWidth, window.innerHeight]);
   /** The paged track's slide: where it is dragged to, and whether it is animating a turn. */
@@ -686,8 +691,23 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, current]);
 
+  /* A part of the page, rendered sharp, onto the board (opened if it was closed). */
+  const sendToBoard = useCallback(async (page: number, rect: PageRect) => {
+    if (!doc) return;
+    const blob = await renderSnip(doc, page, rect).catch(() => null);
+    if (!blob) { setToast({ text: "Couldn't copy that part of the page." }); return; }
+    setBoardOpen(true);
+    setToBoard({ key: Date.now(), blob });
+  }, [doc]);
+
   const onSnip = useCallback((page: number, rect: PageRect) => {
     setSnipping(false);
+    if (snipForBoardRef.current) {
+      // Straight to the board: a copy to work on, not a mark on the book.
+      setSnipForBoard(false);
+      void sendToBoard(page, rect);
+      return;
+    }
     const id = store.addBookMark({ bookId: book.id, kind: 'snip', page, rects: [rect], color: 'blue' });
     if (!id) return;
     // Open its menu right away: a snip is almost always made to be sent somewhere.
@@ -697,7 +717,9 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       const [x, y, w, h] = rect;
       setMenu({ mark: m, box: new DOMRect(pageBox.left + x * pageBox.width, pageBox.top + y * pageBox.height, w * pageBox.width, h * pageBox.height) });
     }
-  }, [store, book.id]);
+  }, [store, book.id, sendToBoard]);
+
+  useEffect(() => { if (!snipping) setSnipForBoard(false); }, [snipping]);
 
   const onMarkTap = useCallback((mark: BookMark, box: DOMRect) => { clearSelection(); setMenu({ mark, box }); }, []);
 
@@ -1011,7 +1033,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       </footer>
       <div className="bk-progress" aria-hidden="true"><span style={{ width: `${(current / Math.max(1, total)) * 100}%` }} /></div>
 
-      {snipping && <div className="bk-hint" role="status">Drag over the part of the page you want. Esc to stop.</div>}
+      {snipping && <div className="bk-hint" role="status">{snipForBoard ? 'Drag over the diagram to bring it to the board. Esc to stop.' : 'Drag over the part of the page you want. Esc to stop.'}</div>}
 
       {selected && !menu && (
         <Tools box={selected.box}>
@@ -1039,6 +1061,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
           )}
           {menu.mark.note && <p className="bk-menu-note">{menu.mark.note}</p>}
           <button type="button" className="bk-menu-item" onClick={() => { setNoteFor(menu.mark.id); setMenu(null); }}>{menu.mark.note ? 'Edit note' : 'Add a note'}</button>
+          {menu.mark.kind === 'snip' && menu.mark.rects?.[0] && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void sendToBoard(m.page, m.rects![0]); }}>Work on it in the board</button>}
           {links && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('makeCard', m); }}>Make a flashcard</button>}
           {links && (menu.mark.kind === 'highlight' || menu.mark.kind === 'snip') && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('toNotes', m); }}>Add to chapter notes</button>}
           {links && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('logMistake', m); }}>Log as a mistake</button>}
@@ -1067,6 +1090,9 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
             onMax={setBoardMax}
             onClose={() => { setBoardOpen(false); setBoardMax(false); }}
             onSend={links ? sendBoard : undefined}
+            incoming={toBoard}
+            onIncomingDone={() => setToBoard(null)}
+            onFromPage={() => { setBoardMax(false); setMenu(null); setSnipForBoard(true); setSnipping(true); }}
           />
         </Suspense>
       )}
