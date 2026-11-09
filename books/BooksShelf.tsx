@@ -27,6 +27,7 @@ import {
   StorageFullError, askToPersist, deleteFile, filesOnDevice, getFile, fingerprintOf, forgetThumbUrl, formatBytes, saveFile, saveThumb,
   storageInfo, thumbUrl, type StorageInfo,
 } from './files';
+import { isStaleChunkError, reloadForUpdate } from '../ui/staleDeploy';
 import './books.css';
 
 interface Props {
@@ -102,7 +103,7 @@ const Row = ({ label, dark, children }: { label: React.ReactNode; dark: boolean;
 type Adding =
   | { step: 'reading'; name: string; progress: number }
   | { step: 'form'; file: File; fingerprint: string; pages: number; thumb: Blob | null; thumbUrl: string | null; draft: Draft; id: string }
-  | { step: 'error'; message: string };
+  | { step: 'error'; message: string; reload?: boolean };
 
 const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 
@@ -179,7 +180,12 @@ export default function BooksShelf({ store, dark, examPreference, currentClass, 
         thumbUrl: facts.thumb ? URL.createObjectURL(facts.thumb) : null, draft, id,
       });
     } catch (e) {
-      setAdding({ step: 'error', message: e instanceof Error ? e.message : 'This PDF could not be read.' });
+      // An older tab than the latest deploy cannot load the PDF reader's code; the page reloads (ui/staleDeploy.ts).
+      if (isStaleChunkError(e)) {
+        if (!reloadForUpdate()) setAdding({ step: 'error', message: "Alpha couldn't load the PDF reader. Check your connection, then reload and add the book again.", reload: true });
+        return;
+      }
+      setAdding({ step: 'error', message: e instanceof Error && !/^[A-Z][a-z]+Error\b/.test(e.message) ? e.message : 'This PDF could not be read.' });
     }
   }, [owner, refs, currentClass, dark, refresh, store]);
 
@@ -414,8 +420,11 @@ const AddSheet = ({ adding, exam, dark, onChange, onSave, onClose }: {
       <button type="button" onClick={onSave} disabled={!adding.draft.title.trim()} className={`${btn} h-11 px-6 ${t.primary}`}>Put it on the shelf</button>
     </div>
   ) : (
-    <div className="flex justify-end">
+    <div className="flex justify-end gap-2">
       <button type="button" onClick={onClose} className={`${btn} h-11 px-5 ${t.ghost}`}>{adding.step === 'error' ? 'Close' : 'Cancel'}</button>
+      {adding.step === 'error' && adding.reload && (
+        <button type="button" onClick={() => window.location.reload()} className={`${btn} h-11 px-5 ${t.primary}`}>Reload</button>
+      )}
     </div>
   );
   return (

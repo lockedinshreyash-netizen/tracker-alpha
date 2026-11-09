@@ -4,6 +4,7 @@ import App from './App';
 import { landingWillShow } from './landing/gate';
 import { setLandingClock } from './landing/clock';
 import { installScrollCalm } from './ui/scrollCalm';
+import { installStaleDeployReload } from './ui/staleDeploy';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,6 +15,8 @@ const params = new URLSearchParams(location.search);
 
 // Glass and endless animations hold still while the page scrolls (ui/scrollCalm.ts).
 installScrollCalm();
+// A tab older than the latest deploy reloads onto it when a lazy screen's code is gone (ui/staleDeploy.ts).
+installStaleDeployReload();
 
 /* Dev-only contact sheet for the share cards (`?share=debug`). Lazily imported
    so it never reaches a production bundle, and checked before App mounts so the
