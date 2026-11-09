@@ -258,9 +258,9 @@ const SyllabusTab: React.FC<Props> = ({ currentClass, progress, onToggle, theme,
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpenLectures(currentClass, activeSubject, chapter); }}
                     className={`text-[11px] font-ui font-bold hover:underline ${t.muted}`}
-                    title="Lectures on your Learn shelf for this chapter"
+                    title="Lectures and book pages on your Learn shelf for this chapter"
                   >
-                    Lectures
+                    Learn
                   </button>
                 )}
                 </span>

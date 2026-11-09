@@ -27,6 +27,8 @@ export interface ErrorDraft {
   mockId?: string;
   /** A pasted picture of the question (mocks/images.ts). */
   image?: string;
+  /** Where in a book it came from (a snip or a highlight, books/). */
+  source?: ErrorEntry['source'];
   /* An error from a CBT paper: its question and answer come from the bank and
      are shown, not edited — retyping LaTeX by hand would only break it. */
   bank?: Pick<ErrorEntry, 'qbankId' | 'figures' | 'numeric'>;
@@ -38,7 +40,7 @@ export const emptyDraft = (seed?: Partial<ErrorDraft>): ErrorDraft => ({
 
 export const draftFrom = (e: ErrorEntry): ErrorDraft => ({
   id: e.id, question: e.question, options: [...e.options] as ErrorDraft['options'], correct: e.correct, reason: e.reason,
-  why: e.why ?? '', chapter: { classId: e.classId, subject: e.subject, chapter: e.chapter }, topic: e.topic ?? '', mockId: e.mockId, image: e.image,
+  why: e.why ?? '', chapter: { classId: e.classId, subject: e.subject, chapter: e.chapter }, topic: e.topic ?? '', mockId: e.mockId, image: e.image, source: e.source,
   ...(e.qbankId ? { bank: { qbankId: e.qbankId, figures: e.figures, numeric: e.numeric } } : {}),
 });
 

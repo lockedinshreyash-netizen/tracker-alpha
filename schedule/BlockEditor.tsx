@@ -51,6 +51,8 @@ interface Props {
   onReset: () => void;
   onEngage: () => void;
   onClose: () => void;
+  /** Learn's shelf for this block's chapter: its lectures and book pages. Present while Learn is on. */
+  onOpenMaterial?: (classId: 11 | 12, subject: Subject, chapter: string) => void;
 }
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
@@ -87,7 +89,7 @@ const LIFE_KINDS = BLOCK_KINDS.filter(k => !countsAsStudy(k));
 const BlockEditor: React.FC<Props> = ({
   draft, dayBlocks, recurring, customDays, moved, canEngage, weekdayName, theme, colors,
   activeSubjects, openTasks, currentClass, examPreference,
-  onSave, onDelete, onDeleteSeries, onReset, onEngage, onClose,
+  onSave, onDelete, onDeleteSeries, onReset, onEngage, onClose, onOpenMaterial,
 }) => {
   const dark = theme === 'dark';
   const [d, setD] = useState<EditorDraft>(draft);
@@ -405,6 +407,12 @@ This runs to 4 AM, where the day ends. Add another block tomorrow for the rest.
               </button>
             )}
           </div>
+
+          {d.id && isStudy && d.subject && d.chapter && onOpenMaterial && (
+            <div className="flex justify-center pt-3">
+              <button onClick={() => onOpenMaterial(currentClass, d.subject!, d.chapter!)} className={quiet}>Study material · {d.chapter}</button>
+            </div>
+          )}
 
           {d.id && (
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4">

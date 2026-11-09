@@ -808,6 +808,10 @@ export interface ErrorEntry {
      device that pasted it (mocks/images.ts); only its id rides in the blob.
      `question` and `options` may then be empty: the picture is the question. */
   image?: string;
+  /* Where it was found, when it came from a book on the student's Learn shelf
+     (books/): the book's id and page, and the snip's rectangle as page
+     fractions. Ids only; the book itself never leaves that device. */
+  source?: { bookId: string; page: number; rect?: [number, number, number, number] };
   createdAt: number;
   updatedAt: number;
   /* Re-attempt history. Two right in a row clears it — once can be luck. */

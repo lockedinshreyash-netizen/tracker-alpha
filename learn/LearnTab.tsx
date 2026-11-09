@@ -13,6 +13,7 @@ import LearnCover from './LearnCover';
 import type { ChapterProgress, ExamPreference, Subject, TimerState } from '../types';
 import type { OtherSession } from './SessionStrip';
 import type { LearnRequest } from './LearnHome';
+import type { BookLinks } from '../books/links';
 
 const LearnHome = lazy(() => import('./LearnHome'));
 
@@ -35,6 +36,8 @@ interface Props {
   onRequestHandled: () => void;
   /** Syllabus progress, read by Discover's chapter list. */
   progress: ChapterProgress[];
+  /** What a book's reading room may reach: Decks, Notes, the error notebook. */
+  bookLinks?: BookLinks;
 }
 
 export default function LearnTab({ enabled, onEnable, onDisable, user, theme, examPreference, currentClass, onOpenAuth, ...session }: Props) {

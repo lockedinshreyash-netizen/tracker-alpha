@@ -45,6 +45,8 @@ interface Props {
     opts?: { clearOverrideOn?: string },
   ) => void;
   onDeleteRule: (id: string) => void;
+  /** Learn's chapter shelf (lectures and book pages), while Learn is on. */
+  onOpenMaterial?: (classId: 11 | 12, subject: Subject, chapter: string) => void;
   onStartBlock: (block: ScheduleBlock) => void;
 }
 
@@ -69,7 +71,7 @@ interface PendingMove {
 const PlanTab: React.FC<Props> = ({
   schedule, logs, timer, theme, activeSubjects, tasks, currentClass, examPreference,
   onAddBlock, onUpdateBlock, onDeleteBlock, onResetInstance, onSetColor,
-  onAddRule, onUpdateRule, onDeleteRule, onStartBlock,
+  onAddRule, onUpdateRule, onDeleteRule, onStartBlock, onOpenMaterial,
 }) => {
   const dark = theme === 'dark';
   const today = getISTDateString();
@@ -322,6 +324,7 @@ const PlanTab: React.FC<Props> = ({
       onReset={resetDraft}
       onEngage={engageDraft}
       onClose={closeEditor}
+      onOpenMaterial={onOpenMaterial}
     />
   );
 

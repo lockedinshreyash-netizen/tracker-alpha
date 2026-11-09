@@ -14,8 +14,8 @@ import React from 'react';
 import type { Crumb, SitePage } from './pages';
 
 /* The date the policy last changed. Not the deploy date. */
-const POLICY_EFFECTIVE = '2026-11-04';
-const EFFECTIVE_LONG = '1 November 2026';
+const POLICY_EFFECTIVE = '2026-11-09';
+const EFFECTIVE_LONG = '9 November 2026';
 const EMAIL = 'lockinhq@gmail.com';
 
 const Mail: React.FC<{ subject?: string }> = ({ subject }) => (
@@ -152,6 +152,7 @@ const privacyPage = (): SitePage => {
                 <li><b>Decks.</b> The decks and cards you make, images you add to them, and your review history.</li>
                 <li><b>Notes.</b> Off until you turn it on. Your notes stay on your device. If you’re signed in, a copy of your pages and the images in them is stored on our servers so your other devices get them. Only you can read them. Our staff can’t. Delete a page from the trash and its copy goes too.</li>
                 <li><b>Learn.</b> Off until you turn it on. The lectures you add, their titles, your bookmarks, notes and how much you watched stay on your device, locked with a key. We keep only that key, so signing out locks your shelf and signing back in opens it. We never see what is on it. Delete your account and the key goes, so no copy can be opened again. A backup file you save yourself isn’t locked. If you start the study clock from a lecture, that session is logged like any other, with its subject and chapter.</li>
+                <li><b>Books in Learn.</b> The PDFs you add stay on your device. We never upload them, and we never see them. Their titles, which pages are which chapter, your highlights, notes, snips and where you stopped are stored with your Learn shelf, locked the same way. The PDF files themselves are not locked: anyone using this device can open them, like any file you download. When you send something from a book somewhere else in Alpha, it goes where that feature keeps things: a flashcard to your decks on our server, a quote to your notes, a mistake to your error notebook.</li>
                 <li><b>Discover</b> (searching YouTube from Learn). What you search passes through our server to YouTube and is not kept. We count your searches each day, to keep within YouTube’s limits, and delete the count with your account. For a few hours we keep YouTube’s results for a search, filed under a scrambled code of the words searched and not linked to you, so the next student searching the same words doesn’t cost another request. A lecture you add from Discover starts with YouTube’s title, which we refresh from YouTube before it is 30 days old.</li>
                 <li><b>Reminders.</b> To remind you when the app is closed: your device’s push address, its browser type, and the reminder itself (the task and when it’s due).</li>
                 <li><b>The new-tab extension.</b> If you install it: it copies a summary of your day (streak, today’s hours, goal, week, exam date, your open Focus Tasks, and any session running) from Alpha into your browser’s storage, so your new tab can show it. It stays on your device. The extension sends nothing anywhere.</li>
@@ -305,6 +306,7 @@ const deleteAccountPage = (): SitePage => {
                 <li>Your synced study history, plan, syllabus progress, tasks, mock tests and error notebook.</li>
                 <li>Your decks, cards, images and review history.</li>
                 <li>The key to your Learn shelf. Any copy of the shelf left on a device can never be opened again.</li>
+                <li>The books you added to Learn, from the device you delete your account on.</li>
                 <li>Your group memberships and messages, your Ranks entries and race chat messages.</li>
                 <li>Your reminders, feedback, notes to the founder, poll answers and usage stats.</li>
               </ul>

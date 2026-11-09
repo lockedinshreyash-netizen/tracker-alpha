@@ -1,0 +1,84 @@
+/* ── Books: the shelf and its sheets ──
+   Hand-written and scoped under Learn's `.ln` root (learn/learn.css), so the
+   ledge, the lift and the light/dark variables are Learn's own. */
+
+.bk-row { gap: 26px; align-items: flex-end; padding-bottom: 14px; }
+
+.bk-pick { flex-shrink: 0; }
+
+.bk-cover {
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 220ms ease;
+  filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.38)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+.ln[data-theme='light'] .bk-cover {
+  filter: drop-shadow(0 12px 14px rgba(60, 50, 30, 0.2)) drop-shadow(0 2px 4px rgba(60, 50, 30, 0.16));
+}
+
+@media (hover: hover) {
+  .bk-pick:hover .bk-cover { transform: translateY(-6px) rotate(-0.6deg); }
+}
+
+.bk-meta { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; min-width: 0; }
+.bk-meta-title {
+  font: 600 12px/1.3 var(--font-ui, 'Satoshi', system-ui, sans-serif);
+  color: var(--ln-ink, currentColor);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bk-meta-sub {
+  font: 500 11px/1.3 var(--font-ui, 'Satoshi', system-ui, sans-serif);
+  color: #71717a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The empty shelf: three covers fanned like books set down on a desk. */
+.bk-fan { position: relative; width: 236px; height: 170px; flex-shrink: 0; }
+.bk-fan > span { position: absolute; top: 8px; }
+.bk-fan > span:nth-child(1) { left: 0; transform: rotate(-9deg); }
+.bk-fan > span:nth-child(2) { left: 64px; transform: rotate(-1deg); z-index: 1; top: 0; }
+.bk-fan > span:nth-child(3) { left: 128px; transform: rotate(8deg); top: 10px; }
+
+/* Cover picker swatches. Selection is ink, never red. */
+.bk-swatch {
+  display: flex;
+  justify-content: center;
+  padding: 6px 4px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+.bk-swatch .bk-cover { filter: none; }
+.bk-swatch.is-on { border-color: currentColor; background: rgba(127, 127, 127, 0.1); }
+.bk-swatch:focus-visible { outline: 2px solid #e10600; outline-offset: 2px; }
+
+/* Reading a file: one hairline. */
+.bk-bar { height: 3px; border-radius: 2px; background: rgba(127, 127, 127, 0.2); overflow: hidden; }
+.bk-bar > span { display: block; height: 100%; background: #e10600; transition: width 300ms ease; }
+
+/* A PDF dragged over the window. */
+.bk-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.bk-drop-card {
+  padding: 28px 36px;
+  border-radius: 16px;
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font: 700 15px/1.3 var(--font-ui, 'Satoshi', system-ui, sans-serif);
+  background: rgba(17, 17, 20, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-cover, .bk-bar > span { transition: none; }
+}

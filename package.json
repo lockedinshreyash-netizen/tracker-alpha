@@ -24,7 +24,8 @@
     "test:exams": "node scripts/test-decks.mjs content",
     "android:build": "node scripts/android.mjs build",
     "android:fingerprint": "node scripts/android.mjs fingerprint",
-    "test:mocks": "node scripts/test-decks.mjs mocks"
+    "test:mocks": "node scripts/test-decks.mjs mocks",
+    "test:books": "node scripts/test-decks.mjs books"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.0",
@@ -45,6 +46,7 @@
     "@tiptap/suggestion": "3.32.0",
     "@tiptap/y-tiptap": "3.0.10",
     "katex": "^0.16.47",
+    "pdfjs-dist": "4.10.38",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "ts-fsrs": "5.4.2",

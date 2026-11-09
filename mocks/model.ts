@@ -373,6 +373,13 @@ const normalizeError = (raw: unknown): ErrorEntry | null => {
   if (topic) out.topic = topic;
   if (typeof e.mockId === 'string' && e.mockId) out.mockId = e.mockId.slice(0, 64);
   if (image) out.image = image;
+  const src = e.source as { bookId?: unknown; page?: unknown; rect?: unknown } | undefined;
+  if (src && typeof src.bookId === 'string' && /^[A-Za-z0-9_-]{6,40}$/.test(src.bookId)
+    && typeof src.page === 'number' && Number.isInteger(src.page) && src.page >= 1 && src.page <= 20000) {
+    const rect = Array.isArray(src.rect) && src.rect.length === 4 && src.rect.every(n => typeof n === 'number' && n >= 0 && n <= 1)
+      ? (src.rect as [number, number, number, number]) : undefined;
+    out.source = { bookId: src.bookId, page: src.page, ...(rect ? { rect } : {}) };
+  }
   if (fromBank) {
     out.qbankId = e.qbankId;
     const figures = (Array.isArray(e.figures) ? e.figures : []).filter((f): f is string => typeof f === 'string' && FIGURE_PATH.test(f)).slice(0, MAX_ERROR_FIGURES);

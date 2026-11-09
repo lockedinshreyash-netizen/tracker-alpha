@@ -20,6 +20,8 @@ interface Props {
   /** Instant; the container offers Undo. */
   onDelete: (ids: string[]) => void;
   onTest: (title: string, ids: string[]) => void;
+  /** Open the book page an error came from (Learn's Books), when it has one. */
+  onOpenSource?: (e: ErrorEntry) => void;
 }
 
 type Status = 'all' | 'open' | 'cleared';
@@ -58,7 +60,7 @@ const PileCard: React.FC<{ p: ErrorPile; dark: boolean; onTest: () => void; i: n
   );
 };
 
-const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; onDelete: () => void }> = ({ e, dark, onEdit, onDelete }) => {
+const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; onDelete: () => void; onOpenSource?: () => void }> = ({ e, dark, onEdit, onDelete, onOpenSource }) => {
   const t = tokens(dark);
   const [open, setOpen] = useState(false);
   return (
@@ -99,6 +101,9 @@ const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; on
           {e.why && <p className={`font-accent text-[15px] mt-3 ${t.heading}`}>“{e.why}”</p>}
           <div className="flex items-center gap-2 mt-4">
             <button onClick={onEdit} className={`${btn} px-4 py-2.5 ${t.ghost}`}>Edit</button>
+            {e.source && onOpenSource && (
+              <button onClick={onOpenSource} className={`${btn} px-4 py-2.5 ${t.ghost}`}>Open in book · p. {e.source.page}</button>
+            )}
             <button onClick={onDelete} aria-label="Delete this error" className={`${btn} px-4 py-2.5 ${t.muted} hover:text-[#E10600]`}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
@@ -112,7 +117,7 @@ const ErrorCard: React.FC<{ e: ErrorEntry; dark: boolean; onEdit: () => void; on
   );
 };
 
-const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit, onDelete, onTest }) => {
+const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit, onDelete, onTest, onOpenSource }) => {
   const t = tokens(dark);
   const [subject, setSubject] = useState<Subject | 'all'>('all');
   const [status, setStatus] = useState<Status>('open');
@@ -251,7 +256,7 @@ const ErrorNotebook: React.FC<Props> = ({ errors, subjects, dark, onAdd, onEdit,
           </div>
         </div>
         <div className={`divide-y border-t ${dark ? 'divide-white/[0.05] border-white/[0.05]' : 'divide-zinc-100 border-zinc-100'}`}>
-          {filtered.slice(0, limit).map(e => <ErrorCard key={e.id} e={e} dark={dark} onEdit={() => onEdit(e)} onDelete={() => onDelete([e.id])} />)}
+          {filtered.slice(0, limit).map(e => <ErrorCard key={e.id} e={e} dark={dark} onEdit={() => onEdit(e)} onDelete={() => onDelete([e.id])} onOpenSource={onOpenSource ? () => onOpenSource(e) : undefined} />)}
           {!filtered.length && <p className={`px-6 py-8 text-center text-[13px] font-ui ${t.muted}`}>{status === 'open' && !q ? 'Nothing unresolved here. Clean.' : 'No errors match.'}</p>}
         </div>
         {filtered.length > limit && (

@@ -25,11 +25,16 @@ import {
   type AddResult, type ImportResult, type LecturePatch, type Library, type LibraryExport, type NewLecture,
   type NewMark, type WatchUpdate,
 } from './model';
+import {
+  addBook, addBookMark, deleteBook, deleteBookMark, recordReading, restoreBookMark, touchBook, updateBook, updateBookMark,
+  type AddBookResult, type BookPatch, type MarkColor, type NewBook, type NewBookMark, type ReadingUpdate, type Shelf,
+} from '../books/model';
 import { importKey, isSealed, makeCheck, seal, unseal, verifyCheck, type Sealed } from './crypto';
 import { KEY_SLOT, KV, dbNameFor, rememberLearnDb, trackLearnConnection, untrackLearnConnection } from './forget';
 
-const VERSION = 1;
-const ROWS = ['lectures', 'collections', 'marks', 'progress'] as const;
+/* v2 added the books stores (books/model.ts): same sealing, same slots. */
+const VERSION = 2;
+const ROWS = ['lectures', 'collections', 'marks', 'progress', 'books', 'bookMarks', 'bookProgress'] as const;
 type RowStore = typeof ROWS[number];
 const COUNTERS_SLOT = 'kv:counters';
 
@@ -167,15 +172,17 @@ export class LearnStore {
       }));
       return out.filter(x => x !== null);
     };
-    const [lectures, collections, marks, progress] = await Promise.all(ROWS.map(read));
+    const [lectures, collections, marks, progress, books, bookMarks, bookProgress] = await Promise.all(ROWS.map(read));
     const sealedCounters = await kvGet<Sealed>(db, 'counters');
     let counters: unknown = null;
     if (isSealed(sealedCounters)) {
       try { counters = await unseal(key, COUNTERS_SLOT, sealedCounters); } catch { unreadable++; }
     }
-    const raw = libraryFrom({ lectures, collections, marks, progress, counters });
+    const raw = libraryFrom({ lectures, collections, marks, progress, counters, books, bookMarks, bookProgress });
     unreadable += lectures.length - Object.keys(raw.lectures).length + collections.length - Object.keys(raw.collections).length
-      + marks.length - Object.keys(raw.marks).length + progress.length - Object.keys(raw.progress).length;
+      + marks.length - Object.keys(raw.marks).length + progress.length - Object.keys(raw.progress).length
+      + books.length - Object.keys(raw.books).length + bookMarks.length - Object.keys(raw.bookMarks).length
+      + bookProgress.length - Object.keys(raw.bookProgress).length;
     const lib = prune(raw, now);
     const stale: [RowStore, string][] = [];
     for (const s of ROWS) for (const id of Object.keys(raw[s])) if (!(id in lib[s])) stale.push([s, id]);
@@ -302,6 +309,37 @@ export class LearnStore {
 
   /** Called by the player rarely (on pause, on hide, every few seconds at most), never per frame. */
   recordWatch(lectureId: string, w: WatchUpdate, now = Date.now()): void { this.commit(recordWatch(this.lib, lectureId, w, now)); }
+
+  /* ── Books (books/model.ts). The verbs return a Shelf spread over the whole library. ── */
+
+  private commitShelf(next: Shelf): void { this.commit(next as Library); }
+
+  addBook(input: NewBook, now = Date.now()): AddBookResult {
+    const res = addBook(this.lib, input, newId('book'), now);
+    this.commitShelf(res.shelf);
+    return res;
+  }
+
+  updateBook(id: string, patch: BookPatch, now = Date.now()): void { this.commitShelf(updateBook(this.lib, id, patch, now)); }
+  touchBook(id: string, now = Date.now()): void { this.commitShelf(touchBook(this.lib, id, now)); }
+  deleteBook(id: string, now = Date.now()): void { this.commitShelf(deleteBook(this.lib, id, now)); }
+
+  addBookMark(input: NewBookMark, now = Date.now()): string | null {
+    const id = newId('bm');
+    const next = addBookMark(this.lib, input, id, now);
+    if (next === this.lib) return null;
+    this.commitShelf(next);
+    return id;
+  }
+
+  updateBookMark(id: string, patch: { color?: MarkColor; note?: string | null }, now = Date.now()): void {
+    this.commitShelf(updateBookMark(this.lib, id, patch, now));
+  }
+  deleteBookMark(id: string, now = Date.now()): void { this.commitShelf(deleteBookMark(this.lib, id, now)); }
+  restoreBookMark(id: string, now = Date.now()): void { this.commitShelf(restoreBookMark(this.lib, id, now)); }
+
+  /** Called by the reader rarely (on close, on hide, every 30 s at most), never per scroll. */
+  recordReading(bookId: string, u: ReadingUpdate, now = Date.now()): void { this.commitShelf(recordReading(this.lib, bookId, u, now)); }
 
   exportLibrary(now = Date.now()): LibraryExport { return exportLibrary(this.lib, now); }
 

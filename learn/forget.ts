@@ -10,6 +10,11 @@
 
 export const dbNameFor = (owner: string): string => `alpha-learn-${owner}`;
 
+/* Books' PDFs (books/files.ts) live in a database of their own, unsealed and
+   never uploaded. Sign-out keeps them, like the sealed library: the files are
+   the student's own copies, and the records that name them stay locked. */
+export const booksDbName = (owner: string): string => `alpha-books-${owner}`;
+
 const DBS_KEY = 'alpha_learn_dbs_v1';
 export const KV = 'kv';
 export const KEY_SLOT = 'key';
@@ -70,5 +75,6 @@ export const forgetLearnLibrary = (owner: string): void => {
   openConnections.clear();
   const name = dbNameFor(owner);
   try { indexedDB.deleteDatabase(name); } catch { /* gone */ }
+  try { indexedDB.deleteDatabase(booksDbName(owner)); } catch { /* gone */ }
   try { localStorage.setItem(DBS_KEY, JSON.stringify(readList().filter(n => n !== name))); } catch { /* full */ }
 };

@@ -35,6 +35,8 @@ const TABS: Record<string, TabType> = {
 export interface DeepLink {
   tab: TabType;
   exam?: ExamPreference;
+  /** `/?open=learn&book=<id>&page=<n>`: a book on the student's own Learn shelf, from a note or a card. */
+  book?: { id: string; page?: number };
 }
 
 export const readDeepLink = (): DeepLink | null => {
@@ -43,7 +45,12 @@ export const readDeepLink = (): DeepLink | null => {
     const tab = TABS[(params.get('open') ?? '').toLowerCase()];
     if (!tab) return null;
     const exam = params.get('exam');
-    return { tab, exam: exam === 'JEE' || exam === 'NEET' ? exam : undefined };
+    const bookId = params.get('book');
+    const page = Number(params.get('page'));
+    const book = tab === 'Learn' && bookId && /^[A-Za-z0-9_-]{6,40}$/.test(bookId)
+      ? { id: bookId, ...(Number.isInteger(page) && page > 0 ? { page } : {}) }
+      : undefined;
+    return { tab, exam: exam === 'JEE' || exam === 'NEET' ? exam : undefined, ...(book ? { book } : {}) };
   } catch {
     return null;
   }
@@ -55,6 +62,8 @@ export const settleDeepLink = (): void => {
     const url = new URL(window.location.href);
     url.searchParams.delete('open');
     url.searchParams.delete('exam');
+    url.searchParams.delete('book');
+    url.searchParams.delete('page');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   } catch { /* the parameters stay; harmless */ }
 };

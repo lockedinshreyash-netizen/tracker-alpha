@@ -62,6 +62,11 @@ interface Props {
   imageOwner: string;
   /** The first cloud pull has landed, so `mocks.errors` is the whole notebook and unused pictures can be tidied. */
   imagesSettled: boolean;
+  /** A mistake sent from a book (Learn's Books): open the error form on it. */
+  request?: { seed: Partial<ErrorDraft>; nonce: number } | null;
+  onRequestHandled?: () => void;
+  /** Open the book page an error came from. */
+  onOpenBook?: (bookId: string, page: number) => void;
   /** Present only for an account holding the `cbt` feature or the shared NTA bank (`pyq_open()`). */
   cbt?: {
     userId: string;
@@ -96,7 +101,7 @@ type ErrorCtx = { draft: ErrorDraft; mock?: MockTest };
 const MocksTab: React.FC<Props> = ({
   mocks, progress, examPreference: pref, subjects, today, theme,
   onUpsertMock, onDeleteMock, onUpsertError, onDeleteErrors, onRestoreErrors, onRecordAttempts, onAddTopic, onForgetTopic, cbt,
-  paperPresets = [], mainIsPreset = false, imageOwner, imagesSettled,
+  paperPresets = [], mainIsPreset = false, imageOwner, imagesSettled, request, onRequestHandled, onOpenBook,
 }) => {
   const dark = theme === 'dark';
   const t = tokens(dark);
@@ -208,6 +213,15 @@ const MocksTab: React.FC<Props> = ({
     setOpenId(id);
   };
 
+  /* From a book: the notebook, with the form open on what was sent. */
+  useEffect(() => {
+    if (!request) return;
+    setPref({ view: 'errors', viewPicked: true });
+    setErrorCtx({ draft: emptyDraft(request.seed) });
+    onRequestHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
   const openErrorForm = (mock?: MockTest, entry?: ErrorEntry) => {
     setErrorCtx({ draft: entry ? draftFrom(entry) : emptyDraft({ mockId: mock?.id }), mock });
   };
@@ -236,6 +250,7 @@ const MocksTab: React.FC<Props> = ({
     if (d.topic) entry.topic = d.topic;
     if (d.mockId) entry.mockId = d.mockId;
     if (d.image) entry.image = d.image;
+    if (d.source) entry.source = d.source;
     if (existing?.lastResult) entry.lastResult = existing.lastResult;
     if (existing?.lastAttemptAt) entry.lastAttemptAt = existing.lastAttemptAt;
     onUpsertError(entry);
@@ -373,6 +388,7 @@ const MocksTab: React.FC<Props> = ({
           onEdit={e => openErrorForm(tests.find(x => x.id === e.mockId), e)}
           onDelete={removeErrors}
           onTest={(title, ids) => setQuiz({ title, ids })}
+          onOpenSource={onOpenBook ? e => onOpenBook(e.source!.bookId, e.source!.page) : undefined}
         />
       ) : !tests.length ? (
         <Card dark={dark} className="relative overflow-hidden">

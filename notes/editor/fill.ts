@@ -5,7 +5,7 @@
 import { getSchema, resolveExtensions, type JSONContent } from '@tiptap/core';
 import { MarkdownManager } from '@tiptap/markdown';
 import { prosemirrorJSONToYXmlFragment } from '@tiptap/y-tiptap';
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import { contentExtensions } from './extensions';
 import type { NotesEnv } from './env';
 import { protectMath, restoreMath } from './markdown';
@@ -42,4 +42,18 @@ export const markdownToDoc = (text: string): { title: string | null; json: JSONC
   }
   if (!json.content?.length) json.content = [{ type: 'paragraph' }];
   return { title, json };
+};
+
+/* Adding to the end of a page that may already hold writing (a quote sent
+   from a book). Built in a scratch document, then copied in as one change,
+   so the page's own content is never touched and two devices appending at
+   once both keep their block. */
+export const appendToDoc = (doc: Y.Doc, json: JSONContent): void => {
+  const scratch = new Y.Doc();
+  const tmp = scratch.getXmlFragment('default');
+  prosemirrorJSONToYXmlFragment(tools().schema, json, tmp);
+  const nodes = tmp.toArray().map(n => (n as Y.XmlElement | Y.XmlText).clone());
+  const frag = doc.getXmlFragment('default');
+  doc.transact(() => frag.insert(frag.length, nodes));
+  scratch.destroy();
 };

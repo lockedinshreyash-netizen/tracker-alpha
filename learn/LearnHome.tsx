@@ -9,7 +9,7 @@
    never re-renders anything. */
 
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { PageHeader, tokens, btn } from '../ui/kit';
+import { PageHeader, Segmented, tokens, btn } from '../ui/kit';
 import CdCase from './CdCase';
 import AddSheet from './AddSheet';
 import LectureView from './LectureView';
@@ -22,12 +22,23 @@ import { devKeyOn, devKeySource } from './devKey';
 import { forgetLearnLibrary } from './forget';
 import { askToPersist, readBackup, saveBackup } from './backup';
 import type { LearnStore } from './store';
+import { Cover } from '../books/Cover';
+import type { BookLinks } from '../books/links';
+import { sectionsFor, fractionRead, type Book, type Section } from '../books/model';
 import { SUBJECTS, chapterName, codeOf, collectionsInOrder, coverArt, displayTitle, isComplete, live, watchedFraction, type Lecture } from './model';
 import type { ChapterProgress, ExamPreference, Subject, TimerState } from '../types';
 import type { OtherSession } from './SessionStrip';
 
 /* Discover (one floating glass panel) arrives with its own chunk, the first time it is opened. */
 const DiscoverPanel = lazy(() => import('./discover/DiscoverPanel'));
+/* Books (the student's own PDFs) are a chunk of their own too, and pdf.js another behind that. */
+const BooksShelf = lazy(() => import('../books/BooksShelf'));
+const BookRoom = lazy(() => import('../books/BookRoom'));
+
+/* Which shelf was last on screen, per device: a view, not data. */
+type ShelfView = 'lectures' | 'books';
+const VIEW_KEY = 'learn_view_v1';
+const readView = (): ShelfView => { try { return localStorage.getItem(VIEW_KEY) === 'books' ? 'books' : 'lectures'; } catch { return 'lectures'; } };
 
 interface Props {
   user: { id: string } | null;
@@ -45,15 +56,16 @@ interface Props {
   onRequestHandled: () => void;
   /** Syllabus progress, for Discover's chapter list (read only). */
   progress: ChapterProgress[];
+  bookLinks?: BookLinks;
 }
 
-/** Open the shelf on one chapter: `11|Physics|Rotational Motion`. */
-export interface LearnRequest { key: string; nonce: number }
+/** Open the shelf on one chapter (`11|Physics|Rotational Motion`), or a book at a page. */
+export interface LearnRequest { key?: string; book?: { id: string; page?: number }; nonce: number }
 
 /** What a lecture needs from App: the clock, and telling the rail to fold. */
 type Session = Pick<Props, 'timer' | 'otherSession' | 'onStartClock' | 'onOpenToday' | 'onWatching'>;
 
-export default function LearnHome({ user, dark, examPreference, currentClass, onOpenAuth, onDisable, request, onRequestHandled, progress, ...session }: Props) {
+export default function LearnHome({ user, dark, examPreference, currentClass, onOpenAuth, onDisable, request, onRequestHandled, progress, bookLinks, ...session }: Props) {
   const dev = import.meta.env.DEV && devKeyOn();
   const owner = user?.id ?? (dev ? 'dev-guest' : null);
   const source = useMemo(() => (dev && owner ? devKeySource(owner) : serverKeySource), [dev, owner]);
@@ -82,6 +94,7 @@ export default function LearnHome({ user, dark, examPreference, currentClass, on
       request={request}
       onRequestHandled={onRequestHandled}
       progress={progress}
+      bookLinks={bookLinks}
     />
   );
 }
@@ -98,6 +111,7 @@ interface ShelfProps {
   request: LearnRequest | null;
   onRequestHandled: () => void;
   progress: ChapterProgress[];
+  bookLinks?: BookLinks;
 }
 
 /* A lecture is a history entry: the phone's back button (and the Play app's)
@@ -105,7 +119,7 @@ interface ShelfProps {
    about what is being watched reaches the browser's history list. */
 const LECTURE_KEY = 'learnLecture';
 
-const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, request, onRequestHandled, progress }: ShelfProps) => {
+const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, request, onRequestHandled, progress, bookLinks }: ShelfProps) => {
   useSyncExternalStore(store.subscribe, store.getVersion);
   const lib = store.getLibrary();
   const [adding, setAdding] = useState(false);
@@ -149,14 +163,29 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
   const [editingCol, setEditingCol] = useState<string | null>(null);
   /** The chapter shelf on screen, from Syllabus's "Lectures". */
   const [chapterKey, setChapterKey] = useState<string | null>(null);
+  const [view, setViewState] = useState<ShelfView>(readView);
+  const setView = (v: ShelfView) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
+  /** The book open in the reading room, and where to open it. */
+  const [reading, setReading] = useState<{ id: string; page?: number } | null>(null);
 
   useEffect(() => {
     if (!request) return;
-    setChapterKey(request.key);
+    if (request.key) setChapterKey(request.key);
+    if (request.book) setReading(request.book);
     if (openId) closeLecture();
     onRequestHandled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request]);
+
+  const switcher = (
+    <Segmented
+      value={view}
+      onChange={setView}
+      dark={dark}
+      label="Shelf"
+      options={[{ value: 'lectures', label: 'Lectures' }, { value: 'books', label: 'Books' }]}
+    />
+  );
 
   /* Discover: one floating glass panel (DiscoverPanel), opened over whatever
      the shelf shows, and the toast a filed result leaves (Undo · Change
@@ -202,6 +231,24 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
     />
   );
 
+  const readingBook = reading ? lib.books[reading.id] : null;
+  if (readingBook && !readingBook.deletedAt) {
+    return (
+      <Suspense fallback={<div className="fixed inset-0 z-[100] bg-[#0B0B0D]" aria-busy="true" />}>
+        <BookRoom
+          key={readingBook.id}
+          store={store}
+          book={readingBook}
+          startPage={reading?.page}
+          dark={dark}
+          onClose={() => setReading(null)}
+          links={bookLinks}
+          {...session}
+        />
+      </Suspense>
+    );
+  }
+
   const open = openId ? lib.lectures[openId] : null;
   if (open && !open.deletedAt) {
     return (
@@ -232,10 +279,33 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
         lectures={lectures}
         dark={dark}
         renderCase={renderCase}
+        books={sectionsFor(lib, chapterKey)}
+        renderBook={(b, sec) => (
+          <button key={`${b.id}-${sec.from}`} type="button" className="ln-pick" onClick={() => setReading({ id: b.id, page: sec.from })} style={{ width: 120 }}>
+            <Cover
+              id={b.id} title={b.title} kind={b.kind} subject={b.subject} cover={b.cover} width={120}
+              kicker={sec.from === 1 && sec.to === b.pages ? null : `Pages ${sec.from}–${sec.to}`}
+              progress={fractionRead(lib.bookProgress[b.id], sec.from, sec.to)}
+            />
+          </button>
+        )}
         onBack={() => setChapterKey(null)}
         onAdd={() => setAdding(true)}
         onFind={discover ? () => openDiscover(chapterKey) : undefined}
       />
+    );
+  } else if (view === 'books') {
+    body = (
+      <Suspense fallback={<div className="h-[60vh]" aria-busy="true" />}>
+        <BooksShelf
+          store={store}
+          dark={dark}
+          examPreference={examPreference}
+          currentClass={currentClass}
+          switcher={switcher}
+          onOpen={(id, page) => setReading({ id, page })}
+        />
+      </Suspense>
     );
   } else {
     body = (
@@ -246,6 +316,7 @@ const Shelf = ({ store, dark, examPreference, currentClass, onDisable, session, 
           dark={dark}
           right={
             <div className="flex items-center gap-2">
+              {switcher}
               {discover && (
                 <button type="button" onClick={() => openDiscover(null)} className={`${btn} h-11 px-5 ${t.ghost}`} title="Find a lecture on YouTube (⌘K)">
                   Discover
@@ -371,13 +442,16 @@ interface ChapterShelfProps {
   lectures: Lecture[];
   dark: boolean;
   renderCase: (l: Lecture) => React.ReactNode;
+  /** Book pages filed under this chapter (books/model.ts sectionsFor). */
+  books: { book: Book; section: Section }[];
+  renderBook: (b: Book, s: Section) => React.ReactNode;
   onBack: () => void;
   onAdd: () => void;
   /** Discover on this chapter, when Discover is on. */
   onFind?: () => void;
 }
 
-const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd, onFind }: ChapterShelfProps) => {
+const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, books, renderBook, onBack, onAdd, onFind }: ChapterShelfProps) => {
   const t = tokens(dark);
   const [cls, subject, chapter] = chapterKey.split('|');
   const here = lectures.filter(l => l.chapterKey === chapterKey).sort((a, b) => a.catalogueNo - b.catalogueNo);
@@ -390,6 +464,7 @@ const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd, o
           <h1 className={`font-accent text-[30px] md:text-[40px] leading-tight ${t.heading}`} style={{ overflowWrap: 'anywhere' }}>{chapter}</h1>
           <p className={`text-[13px] font-ui ${t.muted}`}>
             {here.length ? `${here.length} ${here.length === 1 ? 'lecture' : 'lectures'} for this chapter.` : 'No lectures for this chapter yet.'}
+            {books.length ? ` ${books.length} in your books.` : ''}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -398,8 +473,13 @@ const ChapterShelf = ({ chapterKey, lectures, dark, renderCase, onBack, onAdd, o
         </div>
       </div>
       {here.length > 0 && (
-        <ShelfRow label={`${subject} · ${chapter}`} dark={dark}>
+        <ShelfRow label={`Lectures · ${here.length}`} dark={dark}>
           {here.map(renderCase)}
+        </ShelfRow>
+      )}
+      {books.length > 0 && (
+        <ShelfRow label={`In your books · ${books.length}`} dark={dark}>
+          {books.map(({ book, section }) => renderBook(book, section))}
         </ShelfRow>
       )}
     </div>

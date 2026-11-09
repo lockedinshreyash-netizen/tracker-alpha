@@ -20,6 +20,9 @@ import { soundForTaskMove } from './sound/moments';
 const BookReader = React.lazy(() => import('./rewards/BookReader'));
 import { Recommendation } from './today/recommend';
 import MocksTab from './mocks/MocksTab';
+// Already in the main bundle through MocksTab: a mistake sent from a book uses them directly.
+import { saveErrorImage } from './mocks/images';
+import { parsePastedQuestion } from './mocks/paste';
 import { applyAttempts, mergeMocks, normalizeMocks, paperPresets } from './mocks/model';
 import { normalizeTarget, prefOf, streamOf, targetExams, type ExamTarget, type Stream } from './content/exams';
 import ExamLaunch from './exams/ExamLaunch';
@@ -109,6 +112,9 @@ import { mergeNotesPref, notesOn } from './notes/pref';
 import { learnOn, mergeLearnPref } from './learn/pref';
 import { forgetLearnLibrary, lockLearnOnDevice } from './learn/forget';
 import type { NotesRequest } from './notes/NotesTab';
+import type { LearnRequest } from './learn/LearnHome';
+import type { ErrorDraft } from './mocks/ErrorForm';
+import type { BookLinks, BookSource } from './books/links';
 import { useActivityPing } from './analytics/useActivityPing';
 import { forgetAnalyticsOnDevice } from './analytics/track';
 import { deleteAccount } from './account/deleteAccount';
@@ -810,12 +816,40 @@ const App: React.FC = () => {
 
   /* Syllabus → Learn: open the shelf on one chapter. Held here like
      notesRequest until the Learn tab has its library open and takes it. */
-  const [learnRequest, setLearnRequest] = useState<{ key: string; nonce: number } | null>(null);
+  const [learnRequest, setLearnRequest] = useState<LearnRequest | null>(() => (deepLink?.book ? { book: deepLink.book, nonce: 1 } : null));
   const clearLearnRequest = useCallback(() => setLearnRequest(null), []);
   const openChapterLectures = useCallback((classId: 11 | 12, subject: Subject, chapter: string) => {
     setLearnRequest({ key: `${classId}|${subject}|${chapter}`, nonce: Date.now() });
     handleTabChange('Learn');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* A book on the Learn shelf at a page: from an error's "Open in book", a note's link. */
+  const openBook = useCallback((id: string, page?: number) => {
+    setLearnRequest({ book: { id, page }, nonce: Date.now() });
+    handleTabChange('Learn');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* A mistake sent from a book: Mocks opens the error form on it. The snip
+     becomes the question's picture (mocks/images.ts), owned like any other. */
+  const [mocksRequest, setMocksRequest] = useState<{ seed: Partial<ErrorDraft>; nonce: number } | null>(null);
+  const clearMocksRequest = useCallback(() => setMocksRequest(null), []);
+  const logMistakeFromBook = useCallback(async (src: BookSource) => {
+    const [cls, subject, chapter] = (src.chapterKey ?? '').split('|');
+    const seed: Partial<ErrorDraft> = { source: { bookId: src.bookId, page: src.page, ...(src.rect ? { rect: src.rect } : {}) } };
+    if ((cls === '11' || cls === '12') && subject && chapter) seed.chapter = { classId: Number(cls) as 11 | 12, subject: subject as Subject, chapter };
+    if (src.image) {
+      try {
+        seed.image = await saveErrorImage(src.image, user?.id ?? 'guest');
+      } catch { /* the form still opens; a picture can be pasted there */ }
+    }
+    if (src.quote) {
+      const q = parsePastedQuestion(src.quote);
+      seed.question = q.question || src.quote;
+      if (q.options) seed.options = q.options;
+      if (q.correct !== null) seed.correct = q.correct;
+    }
+    setMocksRequest({ seed, nonce: Date.now() });
+    handleTabChange('Mocks');
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Learn is opt-in the same way: until it is on, the tab is its cover page
      and no library is opened, no key fetched, nothing loaded from YouTube. */
@@ -827,6 +861,23 @@ const App: React.FC = () => {
       return next;
     });
   }, []);
+
+  /* What a book's reading room may reach (books/links.ts): a deck on the
+     account, the chapter's notes page, the error notebook. */
+  const bookLinks = useMemo<BookLinks>(() => ({
+    userId: user?.id ?? null,
+    notes: {
+      owner: user?.id ?? 'guest',
+      signedIn: !!user,
+      on: notesEnabled,
+      enable: () => setNotesEnabled(true),
+      open: (key: string) => {
+        const [cls, subject, chapter] = key.split('|');
+        if ((cls === '11' || cls === '12') && subject && chapter) openChapterNotes(Number(cls) as 11 | 12, subject as Subject, chapter);
+      },
+    },
+    logMistake: src => { void logMistakeFromBook(src); },
+  }), [user?.id, notesEnabled, setNotesEnabled, openChapterNotes, logMistakeFromBook]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Through goHome first: a tab change while /u/<handle> is showing would
      otherwise switch tabs invisibly behind the profile page. */
@@ -2524,6 +2575,7 @@ const App: React.FC = () => {
               onUpdateRule={updateRule}
               onDeleteRule={deleteRule}
               onStartBlock={startBlock}
+              onOpenMaterial={learnEnabled ? openChapterLectures : undefined}
             />
           )}
           {activeTab === 'Syllabus' && (
@@ -2578,6 +2630,9 @@ const App: React.FC = () => {
               onForgetTopic={forgetMockTopic}
               imageOwner={user?.id ?? 'guest'}
               imagesSettled={syncSettled}
+              request={mocksRequest}
+              onRequestHandled={clearMocksRequest}
+              onOpenBook={learnEnabled ? openBook : undefined}
               cbt={(cbtEnabled || pyqOpen) && user ? { userId: user.id, own: cbtEnabled, pyq: pyqOpen, onSaved: saveCbtResult } : undefined}
             />
           )}
@@ -2666,6 +2721,7 @@ const App: React.FC = () => {
                 request={learnRequest}
                 onRequestHandled={clearLearnRequest}
                 progress={state.progress}
+                bookLinks={bookLinks}
               />
             </React.Suspense>
           )}

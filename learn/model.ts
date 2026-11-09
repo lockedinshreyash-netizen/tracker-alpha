@@ -10,6 +10,11 @@
    another device removed. Tombstones are pruned after 60 days, like the
    reader's. */
 
+import {
+  emptyShelf, normalizeBook, normalizeBookMark, normalizeBookProgress, pruneShelf, shelfFrom,
+  type Book, type BookMark, type BookProgress, type Shelf,
+} from '../books/model';
+
 export type LearnSubject = 'Physics' | 'Chemistry' | 'Maths' | 'Biology';
 export type SubjectCode = 'PHY' | 'CHE' | 'MAT' | 'BIO';
 export type TitleSource = 'youtube' | 'student';
@@ -76,7 +81,9 @@ export interface Progress {
   deletedAt?: number;
 }
 
-export interface Library {
+/* Books (books/model.ts) share the library, so they are sealed with the same
+   key, kept in the same database and pruned on the same clock. */
+export interface Library extends Shelf {
   lectures: Record<string, Lecture>;
   collections: Record<string, Collection>;
   marks: Record<string, Mark>;
@@ -107,6 +114,7 @@ export const emptyLibrary = (): Library => ({
   marks: {},
   progress: {},
   counters: { PHY: 0, CHE: 0, MAT: 0, BIO: 0 },
+  ...emptyShelf(),
 });
 
 export const isLive = (r: { deletedAt?: number }): boolean => !r.deletedAt;
@@ -461,6 +469,7 @@ export const prune = (lib: Library, now: number): Library => {
     collections: keep(lib.collections),
     marks: keep(lib.marks),
     progress: keep(lib.progress),
+    ...pruneShelf(lib, now),
   };
 };
 
@@ -587,6 +596,10 @@ export interface LibraryExport {
   marks: Mark[];
   progress: Progress[];
   counters: Library['counters'];
+  /** Books' records and marks. Never the files: a backup is a small JSON, and the PDFs are the student's own. */
+  books?: Book[];
+  bookMarks?: BookMark[];
+  bookProgress?: BookProgress[];
 }
 
 export const exportLibrary = (lib: Library, now: number): LibraryExport => ({
@@ -597,6 +610,9 @@ export const exportLibrary = (lib: Library, now: number): LibraryExport => ({
   marks: live(lib.marks),
   progress: live(lib.progress),
   counters: lib.counters,
+  books: live(lib.books),
+  bookMarks: live(lib.bookMarks).filter(m => lib.books[m.bookId] && !lib.books[m.bookId].deletedAt),
+  bookProgress: live(lib.bookProgress).filter(p => lib.books[p.bookId] && !lib.books[p.bookId].deletedAt),
 });
 
 export interface ImportReport {
@@ -704,6 +720,39 @@ export const importLibrary = (lib: Library, raw: unknown, now: number): ImportRe
     out = { ...out, collections: { ...out.collections, [c.id]: { ...c, lectureIds: [...new Set(ids)] } } };
   }
 
+  /* Books: a book already here by its file (fingerprint) keeps its own id,
+     and the file's marks move onto it. A deletion here is final. */
+  const bookRemap = new Map<string, string>();
+  for (const b of take(src.books, normalizeBook)) {
+    if (b.deletedAt) continue;
+    const mine = out.books[b.id] ?? Object.values(out.books).find(x => x.fingerprint === b.fingerprint);
+    if (mine) {
+      bookRemap.set(b.id, mine.id);
+      if (isLive(mine) && b.updatedAt > mine.updatedAt) {
+        out = { ...out, books: { ...out.books, [mine.id]: { ...b, id: mine.id } } };
+        report.updated++;
+      }
+      continue;
+    }
+    out = { ...out, books: { ...out.books, [b.id]: b } };
+    bookRemap.set(b.id, b.id);
+    report.added++;
+  }
+  for (const m of take(src.bookMarks, normalizeBookMark)) {
+    const target = bookRemap.get(m.bookId);
+    if (!target || m.deletedAt) continue;
+    const mine = out.bookMarks[m.id];
+    if (mine && (!isLive(mine) || mine.updatedAt >= m.updatedAt)) continue;
+    out = { ...out, bookMarks: { ...out.bookMarks, [m.id]: { ...m, bookId: target } } };
+  }
+  for (const p of take(src.bookProgress, normalizeBookProgress)) {
+    const target = bookRemap.get(p.bookId);
+    if (!target || p.deletedAt) continue;
+    const mine = out.bookProgress[target];
+    if (mine && isLive(mine) && mine.updatedAt >= p.updatedAt) continue;
+    out = { ...out, bookProgress: { ...out.bookProgress, [target]: { ...p, bookId: target } } };
+  }
+
   return { ok: true, lib: out, report };
 };
 
@@ -714,6 +763,9 @@ export const libraryFrom = (parts: {
   marks: unknown[];
   progress: unknown[];
   counters: unknown;
+  books?: unknown[];
+  bookMarks?: unknown[];
+  bookProgress?: unknown[];
 }): Library => {
   const byId = <T,>(rows: unknown[], fn: (x: unknown) => T | null, key: (t: T) => string) =>
     Object.fromEntries(rows.map(fn).filter((x): x is T => !!x).map(x => [key(x), x]));
@@ -723,5 +775,6 @@ export const libraryFrom = (parts: {
     marks: byId(parts.marks, normalizeMark, m => m.id),
     progress: byId(parts.progress, normalizeProgress, p => p.lectureId),
     counters: normalizeCounters(parts.counters),
+    ...shelfFrom(parts),
   };
 };
