@@ -73,7 +73,11 @@ interface Props {
   exam?: ExamPreference;
 }
 
-type PageColor = 'paper' | 'sepia' | 'night';
+/* Original, sepia, night (soft: grey page, off-white text), and OLED: a pure
+   black page in a pure black room with pure white text, so an OLED screen
+   lights only the letters. */
+type PageColor = 'paper' | 'sepia' | 'night' | 'oled';
+const PAGE_COLOR_LABEL: Record<PageColor, string> = { paper: 'Original', sepia: 'Sepia', night: 'Night', oled: 'OLED black' };
 const COLOR_KEY = 'bk_page_v1';
 const LAYOUT_KEY = 'bk_layout_v1';
 const readLayout = (): PageLayout => {
@@ -85,7 +89,7 @@ const ZOOMS = [0.6, 0.75, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2, 2.5];
 const NEAR = 2;
 
 const readColor = (): PageColor => {
-  try { const v = localStorage.getItem(COLOR_KEY); return v === 'sepia' || v === 'night' ? v : 'paper'; } catch { return 'paper'; }
+  try { const v = localStorage.getItem(COLOR_KEY); return v === 'sepia' || v === 'night' || v === 'oled' ? v : 'paper'; } catch { return 'paper'; }
 };
 
 interface Pos { page: number; offset: number; at: number }
@@ -925,8 +929,8 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
           <button type="button" className="th-ib" onClick={() => zoomStep(1)} aria-label="Bigger">+</button>
         </span>
         <span className="bk-foot-group" role="radiogroup" aria-label="Page colour">
-          {(['paper', 'sepia', 'night'] as PageColor[]).map(c => (
-            <button key={c} type="button" role="radio" aria-checked={color === c} className="bk-pc" data-pc={c} onClick={() => setColor(c)} aria-label={c === 'paper' ? 'Original' : c === 'sepia' ? 'Sepia' : 'Night'} />
+          {(['paper', 'sepia', 'night', 'oled'] as PageColor[]).map(c => (
+            <button key={c} type="button" role="radio" aria-checked={color === c} className="bk-pc" data-pc={c} onClick={() => setColor(c)} aria-label={PAGE_COLOR_LABEL[c]} title={PAGE_COLOR_LABEL[c]} />
           ))}
         </span>
       </footer>

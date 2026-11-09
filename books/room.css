@@ -541,3 +541,42 @@
 .bk-adder-chips button[aria-checked='true'] { background: #fff; color: #18181b; border-color: #fff; }
 .bk-adder select.bk-input { appearance: auto; }
 .bk-adder-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── OLED black ──
+   Pure black everywhere the eye rests, pure white text. Inverting a white
+   page gives exactly #000 and its black text exactly #fff; the contrast lift
+   pulls anti-aliased greys toward the two ends, and the hue turn keeps a
+   figure's colours roughly where they were. Edges are 1px hairlines, never
+   shadows: a shadow on black is a grey glow, and on OLED a grey pixel is lit. */
+.bk-room[data-color='oled'] { background: #000; color: #fff; }
+.bk-room[data-color='oled'] .bk-top {
+  background: #000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom-color: #1f1f1f;
+}
+.bk-room[data-color='oled'] .bk-title-main { color: #fff; }
+.bk-room[data-color='oled'] .bk-page,
+.bk-room[data-color='oled'] .bk-track .bk-page { background: #000; box-shadow: 0 0 0 1px #1f1f1f; }
+.bk-room[data-color='oled'] .bk-canvas { filter: invert(1) hue-rotate(180deg) contrast(1.25); }
+.bk-room[data-color='oled'] .bk-page-wait { background: none; animation: none; }
+.bk-room[data-color='oled'] .bk-page-no { color: #555; }
+.bk-room[data-color='oled'] .bk-hl { mix-blend-mode: screen; opacity: 0.42; }
+.bk-room[data-color='oled'] .textLayer ::selection { background: rgba(61, 142, 235, 0.45); }
+.bk-room[data-color='oled'] .bk-foot { background: #000; border-color: #2a2a2a; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.bk-room[data-color='oled'] .bk-progress { background: #000; }
+.bk-room[data-color='oled'] .bk-turn { background: none; color: #fff; }
+.bk-room[data-color='oled'] .bk-turn:hover { background: #111; }
+.bk-room[data-color='oled'] .bk-drawer { background: #000; border-color: #1f1f1f; box-shadow: none; }
+.bk-room[data-color='oled'] .bk-drawer-tabs { border-bottom-color: #1f1f1f; }
+.bk-room[data-color='oled'] .bk-tools-pop,
+.bk-room[data-color='oled'] .bk-menu,
+.bk-room[data-color='oled'] .bk-sheet { background: #000; border-color: #2a2a2a; box-shadow: none; }
+.bk-room[data-color='oled'] .bk-sw[aria-pressed='true'] i { box-shadow: 0 0 0 2px #000, 0 0 0 3.5px #fff; }
+.bk-room[data-color='oled'] .bk-sheet textarea,
+.bk-room[data-color='oled'] .bk-input,
+.bk-room[data-color='oled'] .bk-search input { background: #000; border-color: #2a2a2a; }
+.bk-room[data-color='oled'] .bk-adder { background: #000; border-color: #2a2a2a; }
+.bk-room[data-color='oled'] .bk-pc[aria-checked='true'] { box-shadow: 0 0 0 2px #000, 0 0 0 3.5px #fff; }
+/* The swatch: a black dot drawn with a white ring, so it reads as black on the bar. */
+.bk-pc[data-pc='oled'] { background: #000; border: 1.5px solid #fff; }
