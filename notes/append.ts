@@ -16,9 +16,20 @@ import { templateById } from './templates';
 
 export interface ChapterRef { key: string; chapter: string; subject: string }
 
-export const appendToChapter = async (owner: string, signedIn: boolean, ref: ChapterRef, blocks: JSONContent[]): Promise<string> => {
+/**
+ * Append blocks to the chapter's page. With `image`, the picture (a snip of a
+ * page or of the whiteboard) is stored the way a pasted picture is
+ * (notes/files.ts: compressed, kept on this device, uploaded by sync) and
+ * goes in first, as a full-width image block.
+ */
+export const appendToChapter = async (owner: string, signedIn: boolean, ref: ChapterRef, blocks: JSONContent[], image?: Blob): Promise<string> => {
   const store = await acquireStore(owner, signedIn);
   try {
+    if (image) {
+      const { storeImage } = await import('./files');
+      const img = await storeImage(store, image);
+      blocks = [{ type: 'noteImage', attrs: { id: img.id, w: img.w, h: img.h, size: 'full' } }, ...blocks];
+    }
     const { appendToDoc, fillDoc } = await import('./editor/fill');
     const tree = buildTree(store.pages());
     let id = tree.live.find(p => p.chapter === ref.key)?.id;

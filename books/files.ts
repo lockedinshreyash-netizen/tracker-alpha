@@ -5,6 +5,7 @@
 
    files   fingerprint → { fingerprint, blob, bytes, savedAt }
    thumbs  fingerprint → { fingerprint, blob }   page 1, small, for the cover
+   boards  bookId → the book's whiteboard (books/board.ts), since version 2
 
    Keyed by the file's SHA-256, not the book's id: the file is the content,
    so the same PDF added on a second device (or re-added after removing it)
@@ -17,9 +18,10 @@
 
 import { booksDbName, trackLearnConnection, untrackLearnConnection } from '../learn/forget';
 
-const VERSION = 1;
+const VERSION = 2;
 const FILES = 'files';
 const THUMBS = 'thumbs';
+const BOARDS = 'boards';
 
 interface FileRow { fingerprint: string; blob: Blob; bytes: number; savedAt: number }
 interface ThumbRow { fingerprint: string; blob: Blob }
@@ -47,6 +49,7 @@ const open = (owner: string): Promise<IDBDatabase> => {
       const db = req.result;
       if (!db.objectStoreNames.contains(FILES)) db.createObjectStore(FILES, { keyPath: 'fingerprint' });
       if (!db.objectStoreNames.contains(THUMBS)) db.createObjectStore(THUMBS, { keyPath: 'fingerprint' });
+      if (!db.objectStoreNames.contains(BOARDS)) db.createObjectStore(BOARDS, { keyPath: 'bookId' });
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -143,6 +146,21 @@ export const forgetThumbUrl = (owner: string, fingerprint: string): void => {
   void thumbUrls.get(key)?.then(u => { if (u) URL.revokeObjectURL(u); });
   thumbUrls.delete(key);
 };
+
+/* ── The book's whiteboard ──
+   One row per book, written whole (debounced by the board). Kept with the
+   book's files: on this device only, kept on sign-out, gone with the
+   account. A removed book keeps its board, so restoring the book brings it back. */
+
+export const getBoard = (owner: string, bookId: string): Promise<unknown | null> =>
+  withDb(owner, async db => ((await wrap(db.transaction(BOARDS).objectStore(BOARDS).get(bookId))) as unknown) ?? null);
+
+export const saveBoard = (owner: string, row: { bookId: string }): Promise<void> =>
+  withDb(owner, async db => {
+    const tx = db.transaction(BOARDS, 'readwrite');
+    tx.objectStore(BOARDS).put(row);
+    await done(tx);
+  });
 
 export interface StorageInfo { used: number; quota: number; persisted: boolean }
 

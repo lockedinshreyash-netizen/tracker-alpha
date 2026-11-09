@@ -648,3 +648,21 @@
 .bk-room .th-clock:hover { background: var(--bk-hover, rgba(255, 255, 255, 0.08)); }
 .bk-room .th-clock[data-kind='start'] { border-color: rgba(225, 6, 0, 0.55); }
 .bk-room .th-clock[data-kind='start'][data-nudge='true'] { color: #fff; }
+
+/* ── The whiteboard (books/Whiteboard.tsx, books/board.css) ──
+   Beside the book on a laptop (--bk-board, its width) or under it on a
+   phone (--bk-board-h, its height); both are 0px while it is closed. The
+   book, its bars and its arrows move over to make room rather than sitting
+   under it. */
+.bk-top { right: var(--bk-board, 0px); }
+.bk-scroll { margin-right: var(--bk-board, 0px); margin-bottom: var(--bk-board-h, 0px); }
+.bk-foot { left: calc((100% - var(--bk-board, 0px)) / 2); bottom: calc(14px + var(--bk-board-h, 0px) + env(safe-area-inset-bottom, 0px)); }
+.bk-room[data-board='bottom'] .bk-foot { bottom: calc(10px + var(--bk-board-h, 0px)); }
+.bk-hint { left: calc((100% - var(--bk-board, 0px)) / 2); }
+.bk-turn[data-side='next'] { right: calc(10px + var(--bk-board, 0px)); }
+.bk-turn { top: calc((100% - var(--bk-board-h, 0px)) / 2); }
+.bk-drawer { right: var(--bk-board, 0px); }
+.bk-progress { right: var(--bk-board, 0px); bottom: var(--bk-board-h, 0px); }
+/* On a phone the page's padding at the foot sits above the board, and the foot pill is the board's neighbour. */
+.bk-room[data-board='bottom'] .bk-scroll { padding-bottom: 64px; }
+.bk-toast { left: calc((100% - var(--bk-board, 0px)) / 2); bottom: calc(76px + var(--bk-board-h, 0px) + env(safe-area-inset-bottom, 0px)); }

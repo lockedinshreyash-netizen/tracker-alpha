@@ -50,12 +50,33 @@ export interface MarkSource {
   /** A snip, rendered sharp. */
   image?: Blob;
   rect?: PageRect;
+  /** Drawn on the whiteboard beside this page, not cut from the page itself. */
+  from?: 'board';
 }
 
 type Send = 'makeCard' | 'toNotes' | 'logMistake';
 
 /* The flashcard sheet loads the Decks API, so it arrives only when asked for. */
 const CardSheet = lazy(() => import('./CardSheet'));
+/* The whiteboard is its own chunk too: a reader who never opens it never downloads it. */
+const Whiteboard = lazy(() => import('./Whiteboard'));
+
+/* The board's size is this device's (width beside the book, height under it on a phone). */
+const BOARD_SIZE_KEY = 'bk_board_size_v1';
+const BOARD_SIDE_MIN = 300;
+const BOARD_BOTTOM_MIN = 200;
+const BOARD_SIDE_DEFAULT = 440;
+const boardSideDefault = () => Math.round(Math.min(BOARD_SIDE_DEFAULT, window.innerWidth * 0.4));
+const boardBottomDefault = () => Math.round(window.innerHeight * 0.45);
+const readBoardSize = (): { side: number; bottom: number } => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BOARD_SIZE_KEY) ?? 'null') as { side?: unknown; bottom?: unknown } | null;
+    return {
+      side: typeof raw?.side === 'number' ? raw.side : boardSideDefault(),
+      bottom: typeof raw?.bottom === 'number' ? raw.bottom : boardBottomDefault(),
+    };
+  } catch { return { side: boardSideDefault(), bottom: boardBottomDefault() }; }
+};
 
 interface Props {
   store: LearnStore;
@@ -260,6 +281,9 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   const [lastColor, setLastColor] = useState<MarkColor>('yellow');
   const pageFieldRef = useRef<(() => void) | null>(null);
   const [card, setCard] = useState<MarkSource | null>(null);
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [boardMax, setBoardMax] = useState(false);
+  const [boardSize, setBoardSize] = useState(readBoardSize);
   const [layoutPref, setLayoutPref] = useState<PageLayout>(readLayout);
   const [stage, setStage] = useState<[number, number]>([window.innerWidth, window.innerHeight]);
   /** The paged track's slide: where it is dragged to, and whether it is animating a turn. */
@@ -305,8 +329,25 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   }, []);
 
   const phone = viewW < 768;
-  // Two pages side by side need the width of a tablet; a phone flips one at a time instead.
-  const layout: PageLayout = layoutPref === 'spread' && viewW < 700 ? 'flip' : layoutPref;
+  /* The whiteboard: beside the book on a laptop, under it on a phone. The book makes room for it. */
+  const viewH = window.innerHeight;
+  const boardDock: 'side' | 'bottom' = viewW >= 760 ? 'side' : 'bottom';
+  const boardBounds = boardDock === 'side'
+    ? { min: BOARD_SIDE_MIN, max: Math.max(BOARD_SIDE_MIN, viewW - 320), def: boardSideDefault() }
+    : { min: BOARD_BOTTOM_MIN, max: Math.max(BOARD_BOTTOM_MIN, Math.round(viewH * 0.8)), def: boardBottomDefault() };
+  const boardPx = Math.round(Math.min(boardBounds.max, Math.max(boardBounds.min, boardDock === 'side' ? boardSize.side : boardSize.bottom)));
+  const boardSide = boardOpen && boardDock === 'side' ? boardPx : 0;
+  const availW = viewW - boardSide;
+  const resizeBoard = useCallback((px: number) => {
+    setBoardSize(prev => {
+      const next = boardDock === 'side' ? { ...prev, side: px } : { ...prev, bottom: px };
+      try { localStorage.setItem(BOARD_SIZE_KEY, JSON.stringify(next)); } catch { /* private */ }
+      return next;
+    });
+  }, [boardDock]);
+  const toggleBoard = () => { setBoardOpen(o => !o); setBoardMax(false); };
+  // Two pages side by side need the width of a tablet; a phone (or a book squeezed by the board) flips one at a time instead.
+  const layout: PageLayout = layoutPref === 'spread' && availW < 700 ? 'flip' : layoutPref;
   const paged = layout !== 'scroll';
   const chooseLayout = (l: PageLayout) => {
     setLayoutPref(l);
@@ -316,7 +357,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
     // The same page stays in front whichever way it is laid out.
     if (l === 'scroll') requestAnimationFrame(() => requestAnimationFrame(() => scrollToPageRef.current(page)));
   };
-  const fitW = Math.min(viewW - (phone ? 12 : 96), 920);
+  const fitW = Math.min(availW - (phone ? 12 : 96), 920);
   const pageW = Math.round(fitW * zoom);
   const sizeOf = useCallback((n: number): [number, number] => {
     const s = sizesRef.current.get(n) ?? base;
@@ -610,25 +651,40 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       links.logMistake({ bookId: book.id, bookTitle: book.title, page: src.page, chapterKey: src.chapterKey, quote: src.quote, image: src.image, rect: src.rect });
       return;
     }
-    // To the chapter's notes page, staying here.
+    await toChapterNotes(src, m.note);
+  };
+
+  /* To the chapter's notes page, staying here: a quote, a page snip or a board snip, with where it came from. */
+  const toChapterNotes = async (src: MarkSource, note?: string) => {
+    if (!links) return;
     const key = src.chapterKey;
-    if (!key || !src.quote?.trim()) { setToast({ text: 'File this page under a chapter first (Edit on the shelf).' }); return; }
+    if (!key) { setToast({ text: 'File this page under a chapter first (Edit on the shelf).' }); return; }
+    if (!src.quote?.trim() && !src.image) return;
     const [, subject, chapter] = key.split('|');
     if (!links.notes.on) links.notes.enable();
     const href = `/?open=learn&book=${encodeURIComponent(book.id)}&page=${src.page}`;
+    const where = src.from === 'board' ? `Worked beside ${book.title}, p. ${src.page}` : `${book.title}, p. ${src.page}`;
     const blocks = [
-      { type: 'blockquote', content: textToBlocks(src.quote) },
-      ...(m.note ? textToBlocks(m.note) : []),
-      { type: 'paragraph', content: [{ type: 'text', text: `${book.title}, p. ${src.page}`, marks: [{ type: 'italic' }, { type: 'link', attrs: { href } }] }] },
+      ...(src.quote?.trim() ? [{ type: 'blockquote', content: textToBlocks(src.quote) }] : []),
+      ...(note ? textToBlocks(note) : []),
+      { type: 'paragraph', content: [{ type: 'text', text: where, marks: [{ type: 'italic' }, { type: 'link', attrs: { href } }] }] },
     ];
     try {
       const { appendToChapter } = await import('../notes/append');
-      await appendToChapter(links.notes.owner, links.notes.signedIn, { key, chapter, subject }, blocks);
+      await appendToChapter(links.notes.owner, links.notes.signedIn, { key, chapter, subject }, blocks, src.image);
       setToast({ text: `Added to your ${chapter} notes.`, action: { label: 'Open', run: () => links.notes.open(key) } });
     } catch {
       setToast({ text: "Couldn't add it to your notes." });
     }
   };
+
+  /* A snip of the whiteboard: filed under the chapter of the page that is open beside it. */
+  const sendBoard = useCallback((to: 'card' | 'notes', image: Blob) => {
+    const src: MarkSource = { book, page: current, chapterKey: chapterAt(current), image, from: 'board' };
+    if (to === 'card') setCard(src);
+    else void toChapterNotes(src);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, current]);
 
   const onSnip = useCallback((page: number, rect: PageRect) => {
     setSnipping(false);
@@ -690,6 +746,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
       else if (e.key.toLowerCase() === 's') setSnipping(s => !s);
       else if (e.key.toLowerCase() === 'n') setDrawer(d => (d === 'marks' ? null : 'marks'));
       else if (e.key.toLowerCase() === 'c') setDrawer(d => (d === 'contents' ? null : 'contents'));
+      else if (e.key.toLowerCase() === 'w') toggleBoard();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -780,7 +837,16 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   };
 
   const room = (
-    <div className="bk-room safe-top" data-color={color} data-chrome={chrome || !!drawer ? 'on' : 'off'}>
+    <div
+      className="bk-room safe-top"
+      data-color={color}
+      data-chrome={chrome || !!drawer ? 'on' : 'off'}
+      data-board={boardOpen ? boardDock : undefined}
+      style={{
+        ['--bk-board' as string]: `${boardSide}px`,
+        ['--bk-board-h' as string]: boardOpen && boardDock === 'bottom' ? `${boardPx}px` : '0px',
+      }}
+    >
       <header className="bk-top">
         <button type="button" className="th-ib" onClick={onClose} aria-label="Back to the shelf">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -811,6 +877,12 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
           </button>
           <button type="button" className="th-ib" onClick={toggleBookmark} aria-pressed={bookmarks.has(current)} aria-label="Bookmark this page (B)" title="Bookmark (B)">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z" fill={bookmarks.has(current) ? '#E10600' : 'none'} stroke={bookmarks.has(current) ? '#E10600' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round" /></svg>
+          </button>
+          <button type="button" className="th-ib" onClick={toggleBoard} aria-pressed={boardOpen} aria-label="Whiteboard (W)" title="Whiteboard (W)">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3.5" y="4.5" width="17" height="12" rx="1.5" />
+              <path d="M7 13.5c1.5-2.5 2.6-3.5 3.6-1.5s2.2 1.2 3.9-2.2M9 20l3-3.5 3 3.5" />
+            </svg>
           </button>
           <button type="button" className="th-ib" onClick={() => setDrawer(d => (d && d !== 'search' ? null : 'contents'))} aria-pressed={drawer === 'contents' || drawer === 'marks'} aria-label="Contents and marks" title="Contents (C) · Marks (N)">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
@@ -924,7 +996,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
         <span className="bk-foot-group" role="radiogroup" aria-label="Page layout">
           <LayoutButton value="scroll" on={layout === 'scroll'} label="Scroll down" onPick={chooseLayout} />
           <LayoutButton value="flip" on={layout === 'flip'} label="Flip pages" onPick={chooseLayout} />
-          {viewW >= 700 && <LayoutButton value="spread" on={layout === 'spread'} label="Two pages" onPick={chooseLayout} />}
+          {availW >= 700 && <LayoutButton value="spread" on={layout === 'spread'} label="Two pages" onPick={chooseLayout} />}
         </span>
         <span className="bk-foot-group">
           <button type="button" className="th-ib" onClick={() => zoomStep(-1)} aria-label="Smaller">−</button>
@@ -968,7 +1040,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
           {menu.mark.note && <p className="bk-menu-note">{menu.mark.note}</p>}
           <button type="button" className="bk-menu-item" onClick={() => { setNoteFor(menu.mark.id); setMenu(null); }}>{menu.mark.note ? 'Edit note' : 'Add a note'}</button>
           {links && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('makeCard', m); }}>Make a flashcard</button>}
-          {links && menu.mark.kind === 'highlight' && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('toNotes', m); }}>Add to chapter notes</button>}
+          {links && (menu.mark.kind === 'highlight' || menu.mark.kind === 'snip') && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('toNotes', m); }}>Add to chapter notes</button>}
           {links && <button type="button" className="bk-menu-item" onClick={() => { const m = menu.mark; setMenu(null); void send('logMistake', m); }}>Log as a mistake</button>}
           {menu.mark.quote && <button type="button" className="bk-menu-item" onClick={() => { copy(menu.mark.quote!); setMenu(null); }}>Copy</button>}
           <button type="button" className="bk-menu-item bk-danger" onClick={() => remove(menu.mark)}>{menu.mark.kind === 'snip' ? 'Remove snip' : 'Remove highlight'}</button>
@@ -977,6 +1049,26 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
 
       {noteMark && !noteMark.deletedAt && (
         <NoteEditor mark={noteMark} onDone={text => { store.updateBookMark(noteMark.id, { note: text }); setNoteFor(null); }} />
+      )}
+
+      {boardOpen && (
+        <Suspense fallback={null}>
+          <Whiteboard
+            owner={owner}
+            bookId={book.id}
+            color={color}
+            dock={boardDock}
+            size={boardPx}
+            minSize={boardBounds.min}
+            maxSize={boardBounds.max}
+            defaultSize={boardBounds.def}
+            onResize={resizeBoard}
+            max={boardMax}
+            onMax={setBoardMax}
+            onClose={() => { setBoardOpen(false); setBoardMax(false); }}
+            onSend={links ? sendBoard : undefined}
+          />
+        </Suspense>
       )}
 
       {card && links && (

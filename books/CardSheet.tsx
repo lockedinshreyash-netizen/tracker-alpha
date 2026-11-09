@@ -58,7 +58,7 @@ export default function CardSheet({ src, userId, dark, onDone, onClose }: Props)
 
   const [cls, subject] = (src.chapterKey ?? '').split('|');
   const chapterName = src.chapterKey ? chapterOfKey(src.chapterKey) : null;
-  const source = `${src.book.title} · p. ${src.page}`;
+  const source = src.from === 'board' ? `Worked beside ${src.book.title}, p. ${src.page}` : `${src.book.title} · p. ${src.page}`;
   const newTitle = chapterName ?? src.book.title;
   const newSubject = (SUBJECTS.includes(subject as DeckSubject) ? subject : src.book.subject ?? null) as DeckSubject | null;
 
