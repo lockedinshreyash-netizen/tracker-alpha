@@ -20,7 +20,8 @@ import type * as Y from 'yjs';
 import { editorExtensions } from './extensions';
 import { blockDefs } from './blocks';
 import { SuggestBus, type MathEdit, type NotesEnv, type SuggestItem } from './env';
-import { looksLikeMarkdown, protectMath, restoreMath } from './markdown';
+import { looksLikeMarkdown, protectMath, restoreMath, splitMath, textToBlocks } from './markdown';
+import { mathifySlice } from './pasteMath';
 import { loadKatex, renderTex } from './katex';
 import { storeImage } from '../files';
 
@@ -87,6 +88,7 @@ export default function NoteEditor({ doc, env, dark, editable, onReady }: Props)
     extensions: editorExtensions(env, bus, doc),
     editorProps: {
       attributes: { class: 'nt-prose', spellcheck: 'true' },
+      transformPasted: (slice, view) => mathifySlice(slice, view.state.schema),
       handlePaste: (_view, event) => {
         const ed = editorRef.current;
         if (!ed) return false;
@@ -95,6 +97,10 @@ export default function NoteEditor({ doc, env, dark, editable, onReady }: Props)
         const html = event.clipboardData?.getData('text/html');
         const text = event.clipboardData?.getData('text/plain') ?? '';
         if (!html && text && !ed.isActive('codeBlock') && looksLikeMarkdown(text)) return insertMarkdown(ed, text);
+        // Plain text with maths in it: one paragraph per line, a line that is one $$…$$ or \[…\] a display equation.
+        if (!html && text && !ed.isActive('codeBlock') && !ed.isActive('code') && splitMath(text).some(r => r.t === 'math')) {
+          return ed.chain().focus().insertContent(textToBlocks(text)).run();
+        }
         return false;
       },
       handleDrop: (view, event, _slice, moved) => {

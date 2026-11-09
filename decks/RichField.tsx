@@ -29,6 +29,8 @@ export interface RichFieldApi {
   cloze: (same: boolean) => string | null;
   format: (cmd: 'bold' | 'italic' | 'underline' | 'list') => void;
   insertImage: (name: string) => void;
+  /** Wrap the selection in $…$, or put an empty $$ pair at the caret. */
+  math: () => void;
   /** Open the hint editor on the most recent cloze. */
   hint: () => string | null;
   focus: () => void;
@@ -231,6 +233,16 @@ const RichField = forwardRef<RichFieldApi, Props>(({ id, value, onChange, dark, 
       box.current?.focus();
       if (cmd === 'list') document.execCommand('insertUnorderedList');
       else document.execCommand(cmd);
+      emit();
+    },
+    math: () => {
+      const root = box.current;
+      if (!root) return;
+      if (!selectionIn()) { root.focus(); if (root.lastChild) caretAfter(root.lastChild); }
+      const range = selectionIn();
+      const text = range && !range.collapsed ? range.toString() : '';
+      document.execCommand('insertText', false, text ? `$${text}$` : '$$');
+      if (!text) (window.getSelection() as (Selection & { modify?: (a: string, d: string, g: string) => void }) | null)?.modify?.('move', 'backward', 'character');
       emit();
     },
     insertImage: (name: string) => {

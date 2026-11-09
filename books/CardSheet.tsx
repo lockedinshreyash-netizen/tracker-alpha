@@ -1,49 +1,83 @@
 /* ── A flashcard from a book, without leaving it ──
-   A highlighted line becomes a fill-in-the-blank card: tap the words to
-   hide, as many runs as you like (each run is its own blank, all hidden at
-   once, the Decks rule: one note is one card). A snip becomes a picture
-   card: the picture on the front, your answer on the back.
+   The full card editor from Decks (decks/CardEditor.tsx), opened over the
+   page: fill-the-blank or question, bold/italic/lists, pictures, maths
+   ($x^2$, $$…$$, \( \), \[ \]), tags, the live preview, and Save & add
+   another for a second card from the same page. Nothing about it is a
+   lesser editor because it was opened from a book.
+
+   It starts written for you. A highlighted line is the sentence (select
+   words and press Hide); a snip is the picture on the front. The back
+   starts with where it came from ("Physics Part 1 · p. 42"), as plain words
+   because card HTML strips links (decks/html.ts); delete it if you like.
 
    The card goes into a deck you own (Decks is server state: you must be
    signed in). The deck for this chapter is picked for you when one exists,
-   else the last deck you sent to, else a new deck named after the chapter
-   is offered. The back says where it came from ("Physics Part 1 · p. 42").
-   Links are stripped from card HTML on purpose (decks/html.ts), so the
-   source is words, not a link. */
+   else the last deck you sent to, else a new deck named after the chapter,
+   which is created only when the first card is saved. Pictures are held on
+   the device until then (`previewMedia`) and uploaded into whichever deck
+   the card lands in. */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { DuplicateNoteError, addNote, createDeck, fetchSummaries, humanError, uploadMedia } from '../decks/api';
-import type { DeckSubject, DeckSummary } from '../decks/types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import CardEditor from '../decks/CardEditor';
+import { createDeck, fetchSummaries, humanError, addNote } from '../decks/api';
+import { mediaNames } from '../decks/html';
+import { prepareEditorImage, previewMedia, uploadPrepared } from '../decks/media';
+import { deckAccent } from '../decks/theme';
+import { pill } from '../decks/ui';
+import type { DeckSubject, DeckSummary, DraftNote, NoteKind } from '../decks/types';
+import { Sheet } from '../ui/kit';
 import { chapterOfKey } from './model';
 import type { MarkSource } from './BookRoom';
-import { clozeFrom, escapeHtml as escape, tokensOf } from './cards';
+import { escapeHtml as escape } from './cards';
 
 const LAST_DECK = 'bk_card_deck_v1';
 const NEW = '__new__';
+const SUBJECTS: DeckSubject[] = ['Physics', 'Chemistry', 'Maths', 'Biology'];
 
 interface Props {
   src: MarkSource;
   userId: string | null;
+  /** The reading room's page colour is dark (Night, OLED). */
+  dark: boolean;
   onDone: (message: string) => void;
   onClose: () => void;
 }
 
-export default function CardSheet({ src, userId, onDone, onClose }: Props) {
+interface Start { kind: NoteKind; front: string; back: string }
+
+export default function CardSheet({ src, userId, dark, onDone, onClose }: Props) {
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [deckId, setDeckId] = useState<string>('');
-  const [hidden, setHidden] = useState<Set<number>>(new Set());
-  const [prompt, setPrompt] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const image = useMemo(() => (src.image ? URL.createObjectURL(src.image) : null), [src.image]);
-  useEffect(() => () => { if (image) URL.revokeObjectURL(image); }, [image]);
+  const [created, setCreated] = useState<{ id: string; title: string } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [start, setStart] = useState<Start | null>(null);
+  /* Pictures not yet in any deck, by name, and which deck has each one. */
+  const staged = useRef(new Map<string, Blob>());
+  const uploaded = useRef(new Set<string>());
+  const creating = useRef<Promise<string> | null>(null);
 
-  const [cls, subject, chapter] = (src.chapterKey ?? '').split('|');
+  const [cls, subject] = (src.chapterKey ?? '').split('|');
   const chapterName = src.chapterKey ? chapterOfKey(src.chapterKey) : null;
-  const tokens = useMemo(() => tokensOf(src.quote ?? ''), [src.quote]);
   const source = `${src.book.title} · p. ${src.page}`;
+  const newTitle = chapterName ?? src.book.title;
+  const newSubject = (SUBJECTS.includes(subject as DeckSubject) ? subject : src.book.subject ?? null) as DeckSubject | null;
+
+  /* The first draft: the quote as the sentence, or the snip as the front. */
+  useEffect(() => {
+    let live = true;
+    const back = `<i>${escape(source)}</i>`;
+    if (!src.image) {
+      setStart({ kind: 'cloze', front: escape((src.quote ?? '').trim()), back });
+      return;
+    }
+    prepareEditorImage(src.image).then(({ name, blob }) => {
+      if (!live) return;
+      staged.current.set(name, blob);
+      previewMedia(name, blob);
+      setStart({ kind: 'basic', front: `<img src="${name}">`, back });
+    }, () => { if (live) setStart({ kind: 'basic', front: '', back }); });
+    return () => { live = false; };
+  }, [src, source]);
 
   useEffect(() => {
     if (!userId) return;
@@ -56,113 +90,109 @@ export default function CardSheet({ src, userId, onDone, onClose }: Props) {
       try { last = localStorage.getItem(LAST_DECK) ?? ''; } catch { /* private */ }
       const forChapter = chapterName ? mine.find(d => d.chapter === chapterName && String(d.classId) === cls) : undefined;
       setDeckId(forChapter?.id ?? (mine.some(d => d.id === last) ? last : chapterName ? NEW : mine[0]?.id ?? NEW));
-    }, e => { if (live) { setDecks([]); setError(humanError(e)); } });
+    }, e => { if (live) { setDecks([]); setDeckId(NEW); setLoadError(humanError(e)); } });
     return () => { live = false; };
   }, [userId, chapterName, cls]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
+  const chosen = decks?.find(d => d.id === deckId) ?? null;
+  const deckTitle = chosen?.title ?? (created?.id === deckId ? created.title : newTitle);
+  const accent = deckAccent(chosen ? chosen.subject : newSubject, dark);
 
-  const toggle = (i: number) => setHidden(prev => {
-    const next = new Set(prev);
-    if (next.has(i)) next.delete(i); else next.add(i);
-    return next;
-  });
-
-  const isText = !src.image;
-  const ready = !!userId && !!deckId && (isText ? hidden.size > 0 : true) && !busy;
-
-  const save = async () => {
-    if (!userId || !ready) return;
-    setBusy(true);
-    setError(null);
-    try {
-      let id = deckId;
-      if (id === NEW) {
-        const sub = (['Physics', 'Chemistry', 'Maths', 'Biology'].includes(subject) ? subject : src.book.subject ?? null) as DeckSubject | null;
-        id = await createDeck(userId, 'personal', {
-          title: chapterName ?? src.book.title,
-          description: null,
-          subject: sub,
-          classId: cls === '11' || cls === '12' ? (Number(cls) as 11 | 12) : src.book.classId ?? null,
-          chapter: chapterName,
-        });
-      }
-      const from = `<div><i>${escape(source)}</i></div>`;
-      if (isText) {
-        await addNote(id, { kind: 'cloze', front: clozeFrom(tokens, hidden), back: from, tags: ['alpha-books'] });
-      } else {
-        const name = `bk-${Date.now().toString(36)}.${src.image!.type === 'image/webp' ? 'webp' : 'jpg'}`;
-        await uploadMedia(`${id}/${name}`, src.image!);
-        const front = `${prompt.trim() ? `<div>${escape(prompt.trim())}</div>` : ''}<img src="${name}">`;
-        await addNote(id, { kind: 'basic', front, back: `${answer.trim() ? `<div>${escape(answer.trim())}</div>` : ''}${from}`, tags: ['alpha-books'] });
-      }
-      try { localStorage.setItem(LAST_DECK, id); } catch { /* private */ }
-      const deckName = id === deckId ? decks?.find(d => d.id === id)?.title : chapterName ?? src.book.title;
-      onDone(`Card added to ${deckName ?? 'your deck'}.`);
-    } catch (e) {
-      setError(e instanceof DuplicateNoteError ? 'That card is already in this deck.' : humanError(e));
-      setBusy(false);
+  /* A deck to save into: the chosen one, or the new one, made once. */
+  const ensureDeck = async (): Promise<string> => {
+    if (deckId !== NEW) return deckId;
+    if (!creating.current) {
+      creating.current = createDeck(userId!, 'personal', {
+        title: newTitle,
+        description: null,
+        subject: newSubject,
+        classId: cls === '11' || cls === '12' ? (Number(cls) as 11 | 12) : src.book.classId ?? null,
+        chapter: chapterName,
+      });
+      creating.current.then(id => { setCreated({ id, title: newTitle }); setDeckId(id); }, () => { creating.current = null; });
     }
+    return creating.current;
   };
 
-  return createPortal(
-    <>
-      <div className="bk-scrim" onClick={onClose} />
-      <div className="bk-sheet bk-card" role="dialog" aria-label="Make a flashcard">
-        <div className="bk-sheet-head">
-          <h3>Make a flashcard</h3>
-          <button type="button" className="bk-btn" onClick={onClose}>Cancel</button>
-        </div>
+  const save = async (draft: DraftNote) => {
+    const id = await ensureDeck();
+    for (const name of new Set(mediaNames(`${draft.front}${draft.back}`))) {
+      const blob = staged.current.get(name);
+      if (!blob || uploaded.current.has(`${id}/${name}`)) continue;
+      await uploadPrepared(id, name, blob);
+      uploaded.current.add(`${id}/${name}`);
+    }
+    const note = await addNote(id, draft);
+    try { localStorage.setItem(LAST_DECK, id); } catch { /* private */ }
+    return note;
+  };
 
-        {!userId ? (
-          <p className="bk-dim">Sign in to make flashcards. Decks live on your account so every device can review them.</p>
-        ) : (
-          <>
-            {isText ? (
-              <>
-                <p className="bk-card-hint">Tap the words to hide.</p>
-                <p className="bk-cloze">
-                  {tokens.map((t, i) => (/^\s+$/.test(t)
-                    ? <span key={i}>{t}</span>
-                    : (
-                      <button key={i} type="button" className="bk-word" aria-pressed={hidden.has(i)} onClick={() => toggle(i)}>
-                        {t}
-                      </button>
-                    )))}
-                </p>
-              </>
-            ) : (
-              <>
-                {image && <img className="bk-card-img" src={image} alt="The snip" />}
-                <input className="bk-input" value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Question (optional): what should you recall?" maxLength={300} />
-                <textarea className="bk-input" value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Answer (optional)" maxLength={1500} rows={3} />
-              </>
-            )}
+  const stageImage = async (file: File): Promise<string> => {
+    const { name, blob } = await prepareEditorImage(file);
+    staged.current.set(name, blob);
+    previewMedia(name, blob);
+    return name;
+  };
 
-            <label className="bk-field">
-              <span>Deck</span>
-              <select className="bk-input" value={deckId} onChange={e => setDeckId(e.target.value)} disabled={decks === null}>
-                {decks === null && <option value="">Loading your decks…</option>}
-                {(decks ?? []).map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-                {decks !== null && <option value={NEW}>New deck: {chapterName ?? src.book.title}</option>}
-              </select>
-            </label>
-            <p className="bk-sheet-foot">The back says where it came from: {source}.</p>
-          </>
-        )}
+  /* The editor calls onSaved and then onClose in the same tick, so the count is a ref. */
+  const added = useRef<{ count: number; deck: string } | null>(null);
+  const close = () => {
+    const a = added.current;
+    if (a) onDone(a.count === 1 ? `Card added to ${a.deck}.` : `${a.count} cards added to ${a.deck}.`);
+    else onClose();
+  };
 
-        {error && <p className="bk-error" role="alert">{error}</p>}
-        {userId && (
-          <button type="button" className="bk-btn bk-primary" disabled={!ready} onClick={() => void save()}>
-            {busy ? 'Adding…' : 'Add the card'}
-          </button>
-        )}
-      </div>
-    </>,
-    document.body,
+  const picker = useMemo(() => (
+    <label className="inline-flex items-center gap-1.5 max-w-full">
+      <span>Deck</span>
+      <select
+        value={deckId}
+        onChange={e => setDeckId(e.target.value)}
+        disabled={decks === null}
+        aria-label="Deck"
+        className={`min-w-0 max-w-[260px] truncate bg-transparent font-semibold outline-none cursor-pointer rounded-md px-1 -mx-1 ${dark ? 'text-zinc-200 hover:bg-white/[0.06]' : 'text-zinc-800 hover:bg-zinc-100'}`}
+      >
+        {decks === null && <option value="">Loading your decks…</option>}
+        {(decks ?? []).map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+        {created && !(decks ?? []).some(d => d.id === created.id) && <option value={created.id}>{created.title}</option>}
+        {decks !== null && !created && <option value={NEW}>New deck: {newTitle}</option>}
+      </select>
+    </label>
+  ), [deckId, decks, created, newTitle, dark]);
+
+  if (!userId) {
+    return (
+      <Sheet
+        dark={dark}
+        onClose={onClose}
+        label="Make a flashcard"
+        header={<p className={`px-5 md:px-7 py-4 font-display text-[20px] ${dark ? 'text-white' : 'text-zinc-900'}`}>Make a flashcard</p>}
+        footer={<div className="flex justify-end"><button type="button" onClick={onClose} className={pill.quiet(dark)}>Close</button></div>}
+      >
+        <p className={`px-5 md:px-7 py-6 text-[14px] font-ui ${dark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+          Sign in to make flashcards. Decks live on your account so every device can review them.
+        </p>
+      </Sheet>
+    );
+  }
+
+  if (!start || !deckId) return null;
+
+  return (
+    <CardEditor
+      deckId={deckId === NEW ? '' : deckId}
+      deckTitle={deckTitle}
+      isGlobal={false}
+      dark={dark}
+      accent={accent}
+      initial={{ kind: start.kind, front: start.front, back: start.back, tags: [] }}
+      title="Make a flashcard"
+      deckSlot={picker}
+      stageImage={stageImage}
+      save={save}
+      footnote={loadError ? `Couldn't load your decks (${loadError}). The card will go into a new deck.` : `From ${source}. ${start.kind === 'cloze' ? 'Select the words to hide, then press Hide.' : 'Write the answer on the back.'}`}
+      onSaved={() => { added.current = { count: (added.current?.count ?? 0) + 1, deck: deckTitle }; }}
+      onClose={close}
+    />
   );
 }

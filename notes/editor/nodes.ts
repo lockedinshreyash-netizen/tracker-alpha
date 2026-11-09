@@ -127,6 +127,13 @@ export const MathInline = Node.create<EnvOptions>({
           state.tr.replaceWith(start, range.to, this.type.create({ latex: match[1] }));
         },
       }),
+      // \(F = ma\): the delimiters ChatGPT and most TeX sources use.
+      new InputRule({
+        find: /\\\(((?:(?!\\\)).)*\S(?:(?!\\\)).)*)\\\)$/,
+        handler: ({ state, range, match }) => {
+          state.tr.replaceWith(range.from, range.to, this.type.create({ latex: match[1].trim() }));
+        },
+      }),
     ];
   },
 });
@@ -157,6 +164,15 @@ export const MathBlock = Node.create<EnvOptions>({
           if ($from.parent.type.name !== 'paragraph' || $from.parent.textContent.trim() !== '$$') return null;
           this.options.env.mathPending = true;
           state.tr.replaceWith($from.before(), $from.after(), this.type.create({ latex: '' }));
+        },
+      }),
+      // A line that is one equation, typed whole: $$E = mc^2$$ or \[E = mc^2\].
+      new InputRule({
+        find: /^(?:\$\$([^$]*\S[^$]*)\$\$|\\\[(.*\S.*)\\\])$/,
+        handler: ({ state, range, match }) => {
+          const $from = state.doc.resolve(range.from);
+          if ($from.parent.type.name !== 'paragraph' || $from.parent.textContent.trim() !== match[0].trim()) return null;
+          state.tr.replaceWith($from.before(), $from.after(), this.type.create({ latex: (match[1] ?? match[2] ?? '').trim() }));
         },
       }),
     ];

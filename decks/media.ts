@@ -23,6 +23,16 @@ const TTL_MS = 5 * 60 * 60 * 1000;
 const cache = new Map<string, { url: string; at: number }>();
 const missing = new Map<string, number>();
 
+/* Pictures shown before they have a deck to live in: a card made from a
+   book can be written before its deck exists (the deck is created on save),
+   so its pictures are held on the device as object URLs, by name, and
+   uploaded when the card is saved. Names are content hashes, so a name can
+   never mean two pictures. */
+const local = new Map<string, string>();
+export const previewMedia = (name: string, blob: Blob): void => {
+  if (!local.has(name)) local.set(name, URL.createObjectURL(blob));
+};
+
 const fresh = (path: string): string | undefined => {
   const hit = cache.get(path);
   return hit && Date.now() - hit.at < TTL_MS ? hit.url : undefined;
@@ -43,12 +53,16 @@ const sign = async (paths: string[]): Promise<void> => {
 
 /** Name → URL for a deck's media. Names that cannot be signed (not uploaded yet) stay absent. */
 export const useMediaUrls = (deckId: string | null, names: string[]): Record<string, string> => {
-  const paths = deckId ? names.filter(isMediaName).map(n => `${deckId}/${n}`) : [];
-  const key = paths.join('\n');
-  const pick = () => Object.fromEntries(paths.flatMap(p => { const u = fresh(p); return u ? [[p.slice(p.indexOf('/') + 1), u]] : []; }));
+  const held = names.filter(n => local.has(n));
+  const paths = deckId ? names.filter(n => isMediaName(n) && !local.has(n)).map(n => `${deckId}/${n}`) : [];
+  const key = `${paths.join('\n')}\n${held.join('\n')}`;
+  const pick = () => ({
+    ...Object.fromEntries(paths.flatMap(p => { const u = fresh(p); return u ? [[p.slice(p.indexOf('/') + 1), u]] : []; })),
+    ...Object.fromEntries(held.map(n => [n, local.get(n)!])),
+  });
   const [urls, setUrls] = useState<Record<string, string>>(pick);
   useEffect(() => {
-    if (!paths.length) { setUrls({}); return; }
+    if (!paths.length) { setUrls(pick()); return; }
     let live = true;
     setUrls(pick());
     sign(paths).then(() => { if (live) setUrls(pick()); }).catch(() => { /* text stands alone */ });
@@ -96,20 +110,28 @@ const hex = async (blob: Blob): Promise<string> => {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-/** From the editor: shrink, WebP, hash-named. Returns the name to put in `<img src>`. GIFs keep their animation. */
-export const uploadEditorImage = async (deckId: string, file: File): Promise<string> => {
+/** Shrink, WebP, hash-named; GIFs keep their animation. Nothing is uploaded. */
+export const prepareEditorImage = async (file: Blob): Promise<{ name: string; blob: Blob }> => {
   if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) throw new Error('Use a PNG, JPG, WebP or GIF.');
   if (file.type === 'image/gif') {
     if (file.size > MAX_BYTES) throw new Error('GIFs must be under 1 MB.');
-    const name = `${(await hex(file)).slice(0, 32)}.gif`;
-    await uploadMedia(`${deckId}/${name}`, file);
-    cache.delete(`${deckId}/${name}`);
-    return name;
+    return { name: `${(await hex(file)).slice(0, 32)}.gif`, blob: file };
   }
   const blob = await fit(file, 'image/webp');
-  const name = `${(await hex(blob)).slice(0, 32)}.webp`;
+  return { name: `${(await hex(blob)).slice(0, 32)}.webp`, blob };
+};
+
+/** Put a prepared picture into a deck's folder. */
+export const uploadPrepared = async (deckId: string, name: string, blob: Blob): Promise<void> => {
   await uploadMedia(`${deckId}/${name}`, blob);
   missing.delete(`${deckId}/${name}`);
+  cache.delete(`${deckId}/${name}`);
+};
+
+/** From the editor: shrink, WebP, hash-named. Returns the name to put in `<img src>`. */
+export const uploadEditorImage = async (deckId: string, file: File): Promise<string> => {
+  const { name, blob } = await prepareEditorImage(file);
+  await uploadPrepared(deckId, name, blob);
   return name;
 };
 

@@ -37,8 +37,16 @@ interface Props {
   suggestions?: string[];
   onClose: () => void;
   onSaved: (note: Note) => void;
-  /** Design board only: save without a database. */
+  /** Design board, or a card made from a book: how the draft is saved. */
   save?: (draft: DraftNote) => Promise<Note>;
+  /** Drawn under the title in place of the deck's name (a deck picker). */
+  deckSlot?: React.ReactNode;
+  /** Hold a picture instead of uploading it now (the deck may not exist yet). Returns its name. */
+  stageImage?: (file: File) => Promise<string>;
+  /** The heading, when "New card" isn't the right word. */
+  title?: string;
+  /** A note under the fields, e.g. where the card came from. */
+  footnote?: React.ReactNode;
 }
 
 type Field = 'front' | 'back';
@@ -59,7 +67,7 @@ const Tool: React.FC<{ label: string; hint: string; onClick: () => void; dark: b
   </button>
 );
 
-const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent, note, initial, suggestions = [], onClose, onSaved, save: saveOverride }) => {
+const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent, note, initial, suggestions = [], onClose, onSaved, save: saveOverride, deckSlot, stageImage, title, footnote }) => {
   const r = room(dark);
   const [kind, setKind] = useState<NoteKind>(note?.kind ?? initial?.kind ?? 'cloze');
   const [front, setFront] = useState(note?.front ?? initial?.front ?? '');
@@ -106,7 +114,7 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
     setBusy('image');
     setError(null);
     try {
-      const name = await uploadEditorImage(deckId, file);
+      const name = stageImage ? await stageImage(file) : await uploadEditorImage(deckId, file);
       fieldApi()?.insertImage(name);
     } catch (e) {
       setError(e instanceof Error && !(e as { code?: string }).code ? e.message : humanError(e));
@@ -166,11 +174,11 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
       header={
         <div className="px-5 md:px-7 py-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className={`font-display text-[20px] leading-tight ${dark ? 'text-white' : 'text-zinc-900'}`}>{note ? 'Edit card' : 'New card'}</p>
-            <p className={`text-[12px] font-ui truncate mt-0.5 ${muted}`}>
-              {deckTitle}
+            <p className={`font-display text-[20px] leading-tight ${dark ? 'text-white' : 'text-zinc-900'}`}>{title ?? (note ? 'Edit card' : 'New card')}</p>
+            <div className={`text-[12px] font-ui truncate mt-0.5 ${muted}`}>
+              {deckSlot ?? deckTitle}
               {savedCount > 0 && <span className="text-[#1baf7a] font-semibold"> · {savedCount} added</span>}
-            </p>
+            </div>
           </div>
           <Segmented
             dark={dark}
@@ -224,6 +232,9 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
             <Tool dark={dark} label="Underline" hint="Underline (⌘U)" onClick={() => fieldApi()?.format('underline')}><u className="text-[14px]">U</u></Tool>
             <Tool dark={dark} label="List" hint="Make a list" onClick={() => fieldApi()?.format('list')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4" cy="6" r="1" fill="currentColor" /><circle cx="4" cy="12" r="1" fill="currentColor" /><circle cx="4" cy="18" r="1" fill="currentColor" /></svg>
+            </Tool>
+            <Tool dark={dark} label="Maths" hint="Maths: $x^2$ inline, $$…$$ on its own line. \( \) and \[ \] work too." onClick={() => fieldApi()?.math()} wide>
+              <span className="font-accent text-[16px] leading-none">∑</span>
             </Tool>
             <Tool dark={dark} label="Add a picture" hint="Add a picture" onClick={() => fileRef.current?.click()} disabled={busy === 'image'}>
               {busy === 'image'
@@ -308,6 +319,7 @@ const CardEditor: React.FC<Props> = ({ deckId, deckTitle, isGlobal, dark, accent
             )}
           </div>
 
+          {footnote && <div className={`text-[12px] font-ui ${muted}`}>{footnote}</div>}
         </div>
 
         {/* ── The card, as it will be studied ── */}

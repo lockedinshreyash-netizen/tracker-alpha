@@ -35,6 +35,7 @@ import { layerText, offsetAt, rangeAt, rectsOf } from './dom';
 import type { BookLinks } from './links';
 import { fitView, swipeTurns, viewIndexOf, viewsOf, type PageLayout } from './layout';
 import { contextOf, quoteOf, searchPage, snapToWords } from './anchors';
+import { textToBlocks } from '../notes/editor/markdown';
 import {
   MARK_COLORS, addChapterAt, chapterOfKey, marksOf, removeChapterAt, sectionAt, mergeRuns,
   type Book, type BookMark, type BookSubject, type MarkColor, type OutlineEntry, type PageRect, type PageRun,
@@ -611,13 +612,13 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
     }
     // To the chapter's notes page, staying here.
     const key = src.chapterKey;
-    if (!key || !src.quote) { setToast({ text: 'File this page under a chapter first (Edit on the shelf).' }); return; }
+    if (!key || !src.quote?.trim()) { setToast({ text: 'File this page under a chapter first (Edit on the shelf).' }); return; }
     const [, subject, chapter] = key.split('|');
     if (!links.notes.on) links.notes.enable();
     const href = `/?open=learn&book=${encodeURIComponent(book.id)}&page=${src.page}`;
     const blocks = [
-      { type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: src.quote }] }] },
-      ...(m.note ? [{ type: 'paragraph', content: [{ type: 'text', text: m.note }] }] : []),
+      { type: 'blockquote', content: textToBlocks(src.quote) },
+      ...(m.note ? textToBlocks(m.note) : []),
       { type: 'paragraph', content: [{ type: 'text', text: `${book.title}, p. ${src.page}`, marks: [{ type: 'italic' }, { type: 'link', attrs: { href } }] }] },
     ];
     try {
@@ -655,6 +656,8 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement)?.closest?.('input, textarea, [contenteditable="true"]');
+      // The flashcard editor is a sheet over the room: its keys are its own (it closes on Escape).
+      if (card) return;
       if (e.key === 'Escape') {
         if (noteFor) return;
         if (menu) { setMenu(null); return; }
@@ -978,7 +981,7 @@ export default function BookRoom({ store, book, startPage, dark: _dark, onClose,
 
       {card && links && (
         <Suspense fallback={null}>
-          <CardSheet src={card} userId={links.userId} onClose={() => setCard(null)} onDone={text => { setCard(null); setToast({ text }); }} />
+          <CardSheet src={card} userId={links.userId} dark={color === 'night' || color === 'oled'} onClose={() => setCard(null)} onDone={text => { setCard(null); setToast({ text }); }} />
         </Suspense>
       )}
 

@@ -5,7 +5,7 @@ import {
   buildTree, chapterIndex, createPage, descendants, movePage, purgePage, readPages, restorePage, trashPage, updatePage, orderBetween,
 } from '../workspace';
 import { fragmentText, fold, snippet } from '../text';
-import { protectMath, restoreMath, looksLikeMarkdown } from '../editor/markdown';
+import { protectMath, restoreMath, looksLikeMarkdown, splitMath, textToBlocks, displayOnly } from '../editor/markdown';
 import { fromB64, toB64 } from '../bytes';
 
 // newId() reads crypto.getRandomValues, which Node has globally.
@@ -172,4 +172,40 @@ test('fold and snippet', () => {
   assert.equal(fold('Don’t'), "don't");
   assert.equal(snippet('a   b\n\nc'), 'a b c');
   assert.ok(snippet('x'.repeat(200), 20).endsWith('…'));
+});
+
+test('every delimiter is maths: $, $$, \\( \\), \\[ \\]', () => {
+  assert.deepEqual(splitMath('a \\(x^2\\) b $y$ c'), [
+    { t: 'text', v: 'a ' }, { t: 'math', latex: 'x^2', display: false },
+    { t: 'text', v: ' b ' }, { t: 'math', latex: 'y', display: false }, { t: 'text', v: ' c' },
+  ]);
+  assert.equal(displayOnly('  \\[ E = mc^2 \\] '), 'E = mc^2');
+  assert.equal(displayOnly('$$\\int x$$'), '\\int x');
+  assert.equal(displayOnly('so $$x$$ here'), null);
+  assert.equal(protectMath('ChatGPT says \\(v = u + at\\)').stash[0].latex, 'v = u + at');
+});
+
+test('money, escaped dollars and spaced dollars stay prose', () => {
+  assert.deepEqual(splitMath('It costs $5 and $10.'), [{ t: 'text', v: 'It costs $5 and $10.' }]);
+  assert.equal(splitMath('a \\$5 b \\$6').length, 1);
+  assert.equal(splitMath('$ x $').length, 1);
+  assert.equal(splitMath('$x$5').length, 1);
+});
+
+test('plain text becomes paragraphs with equations', () => {
+  const blocks = textToBlocks('Speed is $v$.\n\\[ v = u + at \\]\n');
+  assert.deepEqual(blocks, [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Speed is ' }, { type: 'mathInline', attrs: { latex: 'v' } }, { type: 'text', text: '.' }] },
+    { type: 'mathBlock', attrs: { latex: 'v = u + at' } },
+  ]);
+});
+
+test('a display equation inside a paragraph becomes its own block', () => {
+  const { md, stash } = protectMath('Newton: \\(F = ma\\)\n\\[ s = ut \\]\nso $$x$$');
+  const out = restoreMath({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: md }] }] }, stash);
+  assert.deepEqual(out.content?.map(n => n.type), ['paragraph', 'mathBlock', 'paragraph', 'mathBlock']);
+  assert.deepEqual(out.content?.[0].content?.[1], { type: 'mathInline', attrs: { latex: 'F = ma' } });
+  assert.equal(out.content?.[2].content?.[0].text, 'so');
+  const heading = restoreMath({ type: 'doc', content: [{ type: 'heading', content: [{ type: 'text', text: md.split('\n')[1] }] }] }, stash);
+  assert.equal(heading.content?.[0].content?.[0].type, 'mathInline');
 });

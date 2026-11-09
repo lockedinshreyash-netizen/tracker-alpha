@@ -10,7 +10,9 @@ import { mediaNames, sanitize } from './html';
 import { useMediaUrls } from './media';
 import type { NoteKind } from './types';
 
-const hasMath = (s: string) => /\\\(|\\\[/.test(s);
+/* Any delimiter decks/math.ts knows ($ included). A $ that turns out to be
+   money loads KaTeX for nothing, once; the renderer decides what is maths. */
+const hasMath = (s: string) => /\\\(|\\\[|\$/.test(s);
 
 export const faceVars = (dark: boolean, accent?: string): React.CSSProperties => ({
   ['--dk-ink' as string]: dark ? '#FAFAFA' : '#09090B',
