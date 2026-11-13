@@ -56,6 +56,9 @@ if (import.meta.env.DEV && params.get('share') === 'debug') {
 } else if (import.meta.env.DEV && params.get('learn') === 'debug') {
   // Alpha Video on its own: the YouTube player, its controls and keys, every error, the link reader.
   import('./video/DebugVideo').then(({ default: DebugVideo }) => ReactDOM.createRoot(rootElement).render(<DebugVideo />));
+} else if (import.meta.env.DEV && params.get('glass') === 'debug') {
+  // The day-30 wallpapers full screen under a mock page, either theme (Glass first).
+  import('./rewards/DebugGlass').then(({ default: DebugGlass }) => ReactDOM.createRoot(rootElement).render(<DebugGlass />));
 } else if (import.meta.env.DEV && params.get('festive') === 'debug') {
   // Every festive theme in real device-width frames, with working fireworks.
   import('./festive/DebugFestive').then(({ default: DebugFestive }) => ReactDOM.createRoot(rootElement).render(<DebugFestive />));

@@ -27,9 +27,10 @@ export interface Wallpaper {
   /**
    * Named animated treatment layered over `background`, drawn by
    * `WallpaperLayer`. A CSS `background` cannot move on its own, so anything
-   * that drifts needs real elements — see `AURORA_CURTAINS`.
+   * that drifts needs real elements — see `AURORA_CURTAINS`. Glass is a
+   * still canvas (`GlassLayer`), because each rib refracts what is behind it.
    */
-  animation?: 'aurora';
+  animation?: 'aurora' | 'glass';
 }
 
 /**
@@ -270,6 +271,23 @@ export const WALLPAPERS: Wallpaper[] = [
         : `${GRAIN},
            radial-gradient(120% 50% at 50% 0%, rgba(16,185,129,0.10) 0%, transparent 72%),
            linear-gradient(180deg, #F4F6F3 0%, #EDF1EC 100%)`,
+  },
+  {
+    /* Liquid metal behind fluted glass. Still. The string is only what
+       shows before the canvas draws (the metal's colours, roughly, so that
+       first frame is not a jump): the picture and the reeds are GlassLayer. */
+    id: 'glass',
+    name: 'Glass',
+    note: 'Liquid metal, behind fluted glass.',
+    animation: 'glass',
+    background: (dark) =>
+      dark
+        ? `radial-gradient(60% 30% at 45% 55%, rgba(44,63,224,0.35) 0%, transparent 70%),
+           radial-gradient(40% 25% at 80% 30%, rgba(106,79,230,0.3) 0%, transparent 70%),
+           #000000`
+        : `radial-gradient(60% 30% at 45% 55%, rgba(113,134,251,0.3) 0%, transparent 70%),
+           radial-gradient(40% 25% at 80% 30%, rgba(162,140,250,0.25) 0%, transparent 70%),
+           #F5F5F7`,
   },
   {
     id: 'topo',

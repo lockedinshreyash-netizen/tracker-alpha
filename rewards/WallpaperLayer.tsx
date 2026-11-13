@@ -1,5 +1,6 @@
 import React from 'react';
 import { AURORA_CURTAINS, AURORA_GLOWS, Wallpaper } from './wallpapers';
+import GlassLayer from './GlassLayer';
 
 interface Props {
   wallpaper: Wallpaper;
@@ -90,6 +91,7 @@ const WallpaperLayer: React.FC<Props> = ({ wallpaper, dark, className = '', prev
     style={{ background: wallpaper.background(dark) }}
   >
     {wallpaper.animation === 'aurora' && <AuroraCurtains dark={dark} preview={preview} />}
+    {wallpaper.animation === 'glass' && <GlassLayer dark={dark} preview={preview} />}
   </div>
 );
 

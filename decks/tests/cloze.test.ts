@@ -74,14 +74,11 @@ test('browse view marks every answer', () => {
   assert.equal(renderAllAnswers(S), 'Aldehydes can be reduced to <span data-cloze="mark">primary alcohols</span> using <span data-cloze="mark">LiAlH4</span>.');
 });
 
-test('a note is one card: ord 0 hides every blank at once', () => {
+test('a card per cloze number; ord 0 (a leftover one-card note) hides every blank', () => {
   const src = 'Aldehydes reduce to {{c1::primary alcohols}} with {{c2::LiAlH₄::reagent}}.';
-  const q = renderCloze(src, 0, false);
-  assert.equal((q.match(/data-cloze="hidden"/g) ?? []).length, 2);
-  assert.ok(!q.includes('primary alcohols'));
-  const a = renderCloze(src, 0, true);
-  assert.equal((a.match(/data-cloze="shown"/g) ?? []).length, 2);
-  assert.deepEqual(answersFor(src, 0), ['primary alcohols', 'LiAlH₄']);
-  // A single number still renders on its own, for anything saved before.
   assert.equal((renderCloze(src, 2, false).match(/data-cloze="hidden"/g) ?? []).length, 1);
+  assert.ok(renderCloze(src, 2, false).includes('primary alcohols'));
+  assert.deepEqual(answersFor(src, 1), ['primary alcohols']);
+  assert.equal((renderCloze(src, 0, false).match(/data-cloze="hidden"/g) ?? []).length, 2);
+  assert.deepEqual(answersFor(src, 0), ['primary alcohols', 'LiAlH₄']);
 });

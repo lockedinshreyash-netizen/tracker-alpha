@@ -1,8 +1,8 @@
 /* ── A highlighted line as a fill-in-the-blank card ──
    Pure and tested. The student taps the words to hide; each run of
    consecutive hidden words (the spaces between them included) becomes one
-   blank, `{{c1::…}}`, `{{c2::…}}`, all hidden at once when studied: the
-   Decks rule, one note is one card (decks/cloze.ts). */
+   blank, `{{c1::…}}`, `{{c2::…}}`, and each blank is its own card when
+   studied, as everywhere in Decks (decks/cloze.ts). */
 
 export const escapeHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

@@ -1,10 +1,11 @@
 /* ── Cloze ──
    Anki's syntax, read the way Anki reads it: {{c1::answer}} and
-   {{c1::answer::hint}}. Unlike Anki, a note is ONE card however many blanks
-   it has: the card is `ord` 0 and every blank is hidden at once. The numbers
-   only tell blanks apart (and keep exports readable by Anki). Rendering one
-   number on its own (`ord` N) still works, for the editor and for anything
-   saved before the change.
+   {{c1::answer::hint}}. One note with c1 and c2 is two cards; on card N, cloze
+   N is hidden and every other cloze shows its answer as plain text.
+
+   `ord` 0 on a cloze card hides every blank at once. No card is made that way
+   any more; it is kept only so a card left at 0 by the short-lived
+   one-card-per-note model still asks something until decks.sql is re-run.
 
    One deliberate improvement: matching is brace-aware. Anki ends a cloze at
    the first "}}", so {{c1::\frac{a}{b}}} closes one brace early and leaves a
@@ -13,15 +14,12 @@
    where it looks like it should. When the braces inside do not balance, the
    reader falls back to Anki's rule, so anything Anki accepts reads the same.
 
-   The database refuses a fill-the-blank note with no blank using a plain
-   regex on `{{cN::` (supabase/decks.sql, deck_note_ordinals). Any note this
-   file calls valid passes there too. */
+   The database decides which cards a note makes from a plain regex on
+   `{{cN::` (supabase/decks.sql, deck_note_ordinals). Any note this file calls
+   valid makes the same set there. */
 
-/** The one card a note makes: every blank hidden together. */
+/** Every blank hidden at once (see the header). Cloze numbers start at 1. */
 export const ALL_BLANKS = 0;
-
-/** How many blanks a note has — what a student is asked on its one card. */
-export const blankCount = (src: string): number => parseCloze(src).segs.filter(s => s.t === 'cloze').length;
 
 export type ClozeSeg =
   | { t: 'text'; v: string }
