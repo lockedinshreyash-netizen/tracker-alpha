@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import WallpaperLayer from './WallpaperLayer';
 import { WALLPAPERS, wallpaperById } from './wallpapers';
 import { TUNE } from './glass';
@@ -18,6 +18,12 @@ const DebugGlass: React.FC = () => {
   const [dark, setDark] = useState(params.get('mode') !== 'light');
   const [id, setId] = useState(params.get('wp') ?? 'glass');
   const wp = wallpaperById(id) ?? WALLPAPERS[0];
+  // The Glass theme, exactly as App sets it.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('glass-dark', id === 'glass' && dark);
+    root.classList.toggle('glass-light', id === 'glass' && !dark);
+  }, [id, dark]);
   const card = dark ? 'bg-[#111114] border-white/[0.06] text-white' : 'bg-white border-zinc-100 shadow-sm text-zinc-900';
   const muted = dark ? 'text-zinc-400' : 'text-zinc-500';
   return (

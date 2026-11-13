@@ -163,7 +163,9 @@ const TaskBoard: React.FC<Props> = ({
     /* Card styling only — border and shadow open no stacking context, and no
        entrance animation here: a transform on this element would become the
        containing block of the `fixed` editor and drag overlay. */
-    <div className={`rounded-xl border p-4 md:p-6 space-y-4 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
+    /* `glass-flat`: the Glass theme never blurs this card (index.css). A
+       backdrop blur would be a containing block too. */
+    <div className={`glass-flat rounded-xl border p-4 md:p-6 space-y-4 ${dark ? 'bg-[#111114] border-white/[0.06]' : 'bg-white border-zinc-100 shadow-sm'}`}>
       <div className="flex justify-between items-baseline gap-3">
         <p className={`text-[10px] font-bold uppercase tracking-[0.06em] font-ui ${dark ? 'text-zinc-500' : 'text-zinc-400'}`}>Focus tasks</p>
         <span className={`text-[11px] font-ui tabular-nums ${dark ? 'text-zinc-600' : 'text-zinc-400'}`}>

@@ -776,6 +776,16 @@ const App: React.FC = () => {
     document.body.style.color = theme === 'dark' ? '#FFFFFF' : '#17150F';
   }, [theme]);
 
+  /* The Glass wallpaper is a whole theme: besides the wallpaper, cards turn
+     to ribbed glass and titles to polished metal (index.css, "GLASS THEME").
+     On <html>, so portals (sheets, menus) are dressed too. */
+  const glassTheme = state.rewards?.wallpaper === 'glass';
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('glass-dark', glassTheme && theme === 'dark');
+    root.classList.toggle('glass-light', glassTheme && theme !== 'dark');
+  }, [glassTheme, theme]);
+
   /* Something for the Decks tab to open once: a deck the console asked for,
      or a pack, sheet or kit just taken in the Store. DecksTab clears it. */
   const [decksIntent, setDecksIntent] = useState<DecksIntent | null>(null);

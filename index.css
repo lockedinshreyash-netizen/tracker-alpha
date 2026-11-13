@@ -1264,3 +1264,90 @@ html.scrolling .aurora-spill { animation-play-state: paused !important; }
 @keyframes lg-pop { from { transform: translateY(12px) scale(0.97); } to { transform: none; } }
 .lg-pop { animation: lg-pop 0.45s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @media (prefers-reduced-motion: reduce) { .lg-pop { animation: none; } }
+
+/* ══════════════════════════════════════════
+   GLASS THEME (the Glass wallpaper, rewards/glass.ts)
+   Picking the Glass wallpaper dresses the rest of the app to match, lightly:
+   cards become ribbed glass (the wallpaper's reeds, fainter, with a lit top
+   edge) and page titles take a polished-metal finish. App toggles
+   html.glass-dark / html.glass-light. Cards are matched by the shared card
+   classes in ui/kit.tsx, so every tab follows without each one opting in.
+   The blur is only for fine pointers: on a phone it would be re-run under
+   every card on every scrolled frame, so phones get a denser tint instead.
+   Without a blur the metal would show through sharp behind the text, so
+   an unblurred card is tinted denser (0.93 dark, 0.9 light).
+   ══════════════════════════════════════════ */
+
+html.glass-dark .bg-\[\#111114\] {
+  background-color: rgba(13, 13, 18, 0.93) !important;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 36%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 26px);
+  border-color: rgba(255, 255, 255, 0.085);
+}
+html.glass-dark .bg-\[\#111114\]:not([class*='shadow']) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+
+html.glass-light .bg-white.border-zinc-100,
+html.glass-light .bg-white.shadow-sm {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 40%),
+    repeating-linear-gradient(90deg, rgba(36, 40, 84, 0.028) 0 1px, transparent 1px 26px);
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html.glass-dark .bg-\[\#111114\] {
+    background-color: rgba(13, 13, 18, 0.72) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    backdrop-filter: blur(18px) saturate(1.35);
+  }
+  html.glass-light .bg-white.border-zinc-100,
+  html.glass-light .bg-white.shadow-sm {
+    background-color: rgba(255, 255, 255, 0.66) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+  }
+}
+
+/* Page titles (PageHeader): polished metal, lit from above, a peach glint at
+   the foot. Only the display titles; numbers and the accent keep their ink. */
+html.glass-dark h1.font-display,
+html.glass-light h1.font-display {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+html.glass-dark h1.font-display {
+  background-image: linear-gradient(180deg, #ffffff 0%, #e8ebff 36%, #9aa6f2 58%, #d8c8ff 76%, #ffd8cb 100%);
+}
+html.glass-light h1.font-display {
+  background-image: linear-gradient(180deg, #121219 0%, #262b52 52%, #574c98 78%, #8c6a86 100%);
+}
+
+/* A backdrop blur makes the card the containing block of anything `fixed`
+   inside it (the task board's drag overlay, marked `glass-flat` because it
+   only exists mid-drag) and a backdrop root for liquid
+   glass inside it, which would then refract only the card. Those cards keep
+   the tint and the ribs and skip the blur. */
+html.glass-dark .bg-\[\#111114\].glass-flat,
+html.glass-dark .bg-\[\#111114\]:has(.fixed, [style*='position: fixed'], .lg-lens) {
+  background-color: rgba(13, 13, 18, 0.93) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.glass-light .bg-white.glass-flat,
+html.glass-light .bg-white.border-zinc-100:has(.fixed, [style*='position: fixed'], .lg-lens),
+html.glass-light .bg-white.shadow-sm:has(.fixed, [style*='position: fixed'], .lg-lens) {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.glass-dark .bg-\[\#111114\] { background-color: #111114 !important; backdrop-filter: none; }
+  html.glass-light .bg-white.border-zinc-100,
+  html.glass-light .bg-white.shadow-sm { background-color: #fff !important; backdrop-filter: none; }
+}
