@@ -12,6 +12,7 @@
    size — a deck of image-heavy cards is still saved by the outbox, it just
    restarts its count. */
 
+import { ALL_BLANKS } from './cloze';
 import { SESSION_PREFIX } from './forget';
 import { remaining, type Session } from './session';
 
@@ -29,13 +30,25 @@ const MAX_BYTES = 1_500_000;
 
 const key = (uid: string, scope: string) => `${SESSION_PREFIX}${uid}:${scope}`;
 
+/**
+ * A session saved while the database still made one card per note (`ord` 0,
+ * every blank hidden at once). v3 was meant to rule those out, but a v3
+ * client running against a database where decks.sql §6 had not been re-run
+ * yet saved exactly that, and resuming it kept showing the old card long after
+ * the split, because a resumed session never asks the server. Drop it: the
+ * outbox still holds every answer, and the fresh session lays them over the
+ * split cards (the old card's id is now its first cloze number).
+ */
+const holdsAllBlanks = (s: Session): boolean =>
+  [...s.queue, ...s.learning.map(w => w?.card)].some(c => c?.kind === 'cloze' && c.ord === ALL_BLANKS);
+
 export const loadSnapshot = (uid: string, scope: string, day: string): Snapshot | null => {
   try {
     const raw = localStorage.getItem(key(uid, scope));
     if (!raw) return null;
     const s = JSON.parse(raw) as Snapshot;
     const fresh = s?.v === 3 && s.day === day && Date.now() - s.savedAt < MAX_AGE_MS;
-    if (!fresh || !s.session || !Array.isArray(s.session.queue) || !Array.isArray(s.session.learning) || remaining(s.session) === 0) {
+    if (!fresh || !s.session || !Array.isArray(s.session.queue) || !Array.isArray(s.session.learning) || remaining(s.session) === 0 || holdsAllBlanks(s.session)) {
       localStorage.removeItem(key(uid, scope));
       return null;
     }
